@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {  } from 'lucide-react';
 import type { AudioSnapshot } from '../../../../hooks/useAudioState';
 import type { EffectState, EffectTemplateBundle } from '../../../../types/lighting';
@@ -29,11 +29,13 @@ interface FullscreenShaderProps {
   /** Freezes the shader clock so fullscreen holds the same frame the paused
    *  lighting engine and the main canvas preview are holding. */
   paused?: boolean;
+  /** Drawn over the shader, under the controls. */
+  children?: ReactNode;
 }
 
 export function FullscreenShader({
   effect, state, bundle, canReset, audioRef,
-  onTemplateSelect, onChange, onCommit, onReset, onClose, onPrev, onNext, panelSlots, gpuAvailable, gpuState, paused,
+  onTemplateSelect, onChange, onCommit, onReset, onClose, onPrev, onNext, panelSlots, gpuAvailable, gpuState, paused, children,
 }: FullscreenShaderProps) {
   const { t } = useTranslation();
   const notice = gpuNotice(gpuState, gpuAvailable);
@@ -93,6 +95,7 @@ export function FullscreenShader({
       <canvas ref={canvasRef} className={styles.canvas} onClick={handleCanvasClick} />
       <CanvasNoticeBar visible={notice != null} message={notice ? t(notice.key) : ''}
         tone={notice?.tone} />
+      {children}
       {loading && <div className={styles.overlay}>{t('lighting.fullscreen.loadingShader')}</div>}
       {error && <div className={styles.overlay}>{error}</div>}
       <button type="button" aria-label={t('lighting.fullscreen.prevEffect')} className={`${styles.navZone} ${styles.navZoneLeft}`} onClick={onPrev}>

@@ -571,15 +571,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     () => currentState && mode === 'static' ? { ...currentState, speed: 0 } : currentState,
     [currentState, mode],
   );
-  const currentSelected: number = useMemo(
-    () => activeEffect ? (effectTemplates[activeEffect]?.selected ?? 0) : 0,
-    [activeEffect, effectTemplates],
-  );
-  const canReset: boolean = useMemo(
-    () => !!(activeEffect && currentState
-      && !slotMatchesDefault(activeEffect, currentSelected, currentState, animateDefaults)),
-    [activeEffect, currentState, currentSelected, animateDefaults],
-  );
 
   const throttleAnimate = useThrottle();
   const throttlePostProcess = useThrottle();
@@ -994,9 +985,22 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     setDevicePicks(prev => mergeLocksFromLooks(prev, res.looks));
   }, [setDevicePicks]);
 
+  // Ids with a lock request still in flight. A frame's read can predate that
+  // request, so those ids keep their optimistic value instead of flipping back.
+  const pendingLockRef = useRef(new Map<string, number>());
   const syncAnimateLocks = useCallback(async () => {
-    const locks = await fetchAnimateDeviceLocks();
-    if (locks) setAnimateLocks(locks);
+    const fetched = await fetchAnimateDeviceLocks();
+    if (!fetched) return;
+    setAnimateLocks(prev => {
+      const next: Record<string, string> = { ...fetched };
+      for (const id of pendingLockRef.current.keys()) {
+        if (id in prev) next[id] = prev[id]; else delete next[id];
+      }
+      const keys = Object.keys(next);
+      // Same locks: hand back the old object so a lighting frame during a
+      // slider drag does not re-render the page.
+      return keys.length === Object.keys(prev).length && keys.every(k => prev[k] === next[k]) ? prev : next;
+    });
   }, []);
 
   // Locks onto the running effect, or releases. Optimistic like the static
@@ -1008,7 +1012,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       const effect = locked ? activeEffect : null;
       if (locked && !effect) continue;
       setAnimateLocks(prev => withAnimateLock(prev, id, effect));
+      pendingLockRef.current.set(id, (pendingLockRef.current.get(id) ?? 0) + 1);
       setAnimateDeviceLock(id, effect).then(ok => {
+        const left = (pendingLockRef.current.get(id) ?? 1) - 1;
+        if (left > 0) pendingLockRef.current.set(id, left); else pendingLockRef.current.delete(id);
         if (!ok) setAnimateLocks(prev => withAnimateLock(prev, id, before));
       });
     }
@@ -2751,25 +2758,30 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         </div>
         )}
       </div>
-      {fullscreenOpen && activeEffect && currentState && committedTemplates[activeEffect] && (
+      {fullscreenOpen && dockEffect && dockState && dockBundle && (
+        // Shows and edits what the dock edits, so its handlers always write to
+        // the effect on screen (a locked animation, a scoped Static pick, or the running one).
         <FullscreenShader
-          effect={activeEffect}
-          state={currentState}
-          bundle={committedTemplates[activeEffect]}
-          canReset={canReset}
+          effect={dockEffect}
+          state={dockState}
+          bundle={dockBundle}
+          canReset={dockCanReset}
           audioRef={audioRef}
           onTemplateSelect={handleTemplateSelect}
           onChange={handleStatePatch}
           onCommit={handleStateCommit}
           onReset={handleStateReset}
-          panelSlots={panelUsage.slotsByEffect.get(activeEffect)}
+          panelSlots={panelUsage.slotsByEffect.get(dockEffect)}
           onClose={() => setFullscreenOpen(false)}
           onPrev={handlePrevEffect}
           onNext={handleNextEffect}
           gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
           gpuState={serviceState.lighting?.gpuState}
           paused={paused}
-        />
+        >
+          {/* The arrows cannot move a locked selection; say why, over the overlay. */}
+          {effectiveMode === 'animate' && <AnimateLockNotice seq={lockFlash.seq} />}
+        </FullscreenShader>
       )}
       {editorTarget && (
         <LedMapEditor

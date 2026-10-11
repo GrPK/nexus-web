@@ -600,7 +600,12 @@
 .cellBadgeGroup {
   display: flex;
   align-items: center;
-  gap: 3px;
+
+  // Chromium 83 (the Q60 panel floor) has no flex `gap`.
+  svg + svg,
+  svg + .cellLockCount {
+    margin-left: 3px;
+  }
 }
 
 .cellLockCount {

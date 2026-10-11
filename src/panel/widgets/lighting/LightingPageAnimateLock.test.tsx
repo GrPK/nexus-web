@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchAnimateDeviceLocks, setAnimateDeviceLock, startAnimate } from '../../../api/lighting';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
@@ -51,7 +51,14 @@ vi.mock('./page/AnimateGrid', () => ({
     </div>
   ),
 }));
-vi.mock('./page/FullscreenShader', () => ({ FullscreenShader: () => null }));
+vi.mock('./page/FullscreenShader', () => ({
+  FullscreenShader: ({ effect, onPrev, children }: { effect: string; onPrev: () => void; children?: React.ReactNode }) => (
+    <div data-testid="fullscreen" data-effect={effect}>
+      <button type="button" onClick={onPrev}>fs-prev</button>
+      {children}
+    </div>
+  ),
+}));
 vi.mock('./page/ModeControls', () => ({ ModeControls: () => null }));
 // The stub exposes exactly what the lock rides on: the pick the rail is handed
 // (locked or not) and the toggle callback.
@@ -200,5 +207,38 @@ describe('LightingPage animation lock', () => {
     await waitFor(() => expect(screen.getByText('lighting.animate.lockedNoticeTitle')).toBeTruthy());
     expect(startAnimate).not.toHaveBeenCalled();
     expect(screen.getByTestId('grid-effect').textContent).toBe('aurora');
+  });
+
+  it('keeps a lock request in flight against a lighting frame that predates it', async () => {
+    let resolve: (ok: boolean) => void = () => {};
+    vi.mocked(setAnimateDeviceLock).mockImplementation(() => new Promise<boolean>(r => { resolve = r; }));
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('rail').dataset.lockable).toBe('true'));
+    fireEvent.click(screen.getByText('toggle'));
+    expect(screen.getByTestId('rail').dataset.lock).toBe('fire');
+
+    vi.mocked(fetchAnimateDeviceLocks).mockClear();
+    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({}));
+    topicHandlers.lighting.forEach(cb => cb());
+    await waitFor(() => expect(fetchAnimateDeviceLocks).toHaveBeenCalled());
+    await new Promise(r => setTimeout(r, 0));
+    expect(screen.getByTestId('rail').dataset.lock).toBe('fire');
+
+    resolve(true);
+    await new Promise(r => setTimeout(r, 0));
+    expect(screen.getByTestId('rail').dataset.lock).toBe('fire');
+  });
+
+  it('shows and edits the dock effect in fullscreen, and explains the arrows under a lock', async () => {
+    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({ a: 'aurora' }));
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('aurora'));
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.fullscreen' }));
+    const fs = screen.getByTestId('fullscreen');
+    expect(fs.dataset.effect).toBe('aurora');
+
+    fireEvent.click(screen.getByText('fs-prev'));
+    await waitFor(() => expect(within(fs).getByText('lighting.animate.lockedNoticeTitle')).toBeTruthy());
+    expect(fs.dataset.effect).toBe('aurora');
   });
 });
