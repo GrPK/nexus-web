@@ -207,6 +207,25 @@ describe('PanelEntrypoint allocate-or-recover', () => {
     );
     expect(localStorage.getItem(PANEL_DEVICE_ID_KEY)).toBe(FRESH_ID);
   });
+
+  // jsdom's 1024x768 viewport reads as a phone, like a Y70 kiosk before KWin moves it.
+  it('registers with the host surface hint and withholds the off-panel viewport', async () => {
+    allocateMock.mockResolvedValueOnce({ ok: true, record: { id: FRESH_ID } });
+
+    render(
+      <PanelEntrypoint
+        initialDeviceId={null}
+        isPhonePair={false}
+        pairToken={null}
+        pairDeviceId={null}
+        pairSpki={null}
+        surfaceHint="y70"
+      />,
+    );
+
+    await waitFor(() => expect(allocateMock).toHaveBeenCalledTimes(1));
+    expect(allocateMock).toHaveBeenCalledWith({ surface: 'y70' });
+  });
 });
 
 describe('PanelEntrypoint failure gate', () => {
