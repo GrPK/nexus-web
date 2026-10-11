@@ -71,9 +71,11 @@ interface DevicePageProps {
   connectionState?: ConnectionState;
   onOpenFirmware?: () => void;
   onSectionNavigate?: DashboardSectionNavigate;
+  /** Reports the name of the device this page resolved for `deviceKey`, for the top bar. */
+  onTitleChange?: (deviceKey: string, title: string | undefined) => void;
 }
 
-export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFirmware, onSectionNavigate }: DevicePageProps) {
+export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFirmware, onSectionNavigate, onTitleChange }: DevicePageProps) {
   const { t } = useTranslation();
   const { push } = useToast();
   const { unified, controlDevice, turnedOffMonitorKeys } = useUnifiedDevices(serviceOnline);
@@ -81,6 +83,8 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
     () => unified.find(d => d.key === deviceKey),
     [unified, deviceKey],
   );
+  const title = device?.shortName;
+  useEffect(() => { onTitleChange?.(deviceKey, title); }, [onTitleChange, deviceKey, title]);
 
   // The device appearing in `unified` re-renders and dispatches immediately,
   // independent of this timer; the grace only defers the empty-state UI.

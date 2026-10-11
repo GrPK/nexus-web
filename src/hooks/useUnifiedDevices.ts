@@ -154,6 +154,7 @@ const CURATED_ICONS: Record<string, string> = {
   nollie: '/assets/devices/nollie.svg',
   tryx: '/assets/devices/tryx.svg',
   'nzxt-kraken': '/assets/devices/nzxt.svg',
+  'asus-ryujin-lcd': '/assets/devices/asus.svg',
 };
 
 const CURATED_SHORT_NAMES: Record<string, string> = {

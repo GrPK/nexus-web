@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchPanelDevices,
   fetchPanelPhoneSessions,
@@ -7,7 +7,7 @@ import {
   type PanelPhoneSession,
   type PanelStatus,
 } from '../api/panel';
-import { useTopicCallback } from './useMultiplexSocket';
+import { useMultiplex, useTopicCallback } from './useMultiplexSocket';
 import { getCorsairState, type CorsairState } from '../api/corsair';
 import { useTranslation } from '../lib/i18n';
 import {
@@ -180,8 +180,10 @@ export function usePanelDevices(
   const [records, setRecords] = useState<PanelDeviceRecord[]>([]);
   const [familyNames, setFamilyNames] = useState<Partial<Record<string, string>>>({});
   const [loading, setLoading] = useState(false);
+  const refreshSeqRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const seq = ++refreshSeqRef.current;
     setLoading(true);
     const [panelStatus, sessions, deviceRecords, corsair] = await Promise.all([
       fetchPanelStatus(),
@@ -189,6 +191,8 @@ export function usePanelDevices(
       fetchPanelDevices(),
       getCorsairState(),
     ]);
+    // Refreshes overlap (seed, reconnect, pushes); only the newest may land.
+    if (seq !== refreshSeqRef.current) return;
     const list = deviceRecords?.devices ?? [];
     setStatus(panelStatus ?? null);
     setPhoneSessions(sessions?.sessions ?? []);
@@ -210,6 +214,16 @@ export function usePanelDevices(
   useTopicCallback('panel/device', enabled, () => {
     void refresh();
   });
+
+  // A push sent while the socket was down (a service restart) is lost, so each
+  // reconnect re-seeds: a cooler LCD whose stream starts then would otherwise
+  // stay missing from this instance's list.
+  const connected = useMultiplex()?.connected ?? false;
+  const prevConnectedRef = useRef(connected);
+  useEffect(() => {
+    if (enabled && connected && !prevConnectedRef.current) void refresh();
+    prevConnectedRef.current = connected;
+  }, [enabled, connected, refresh]);
 
   const devices = useMemo(() => {
     return buildPanelDevices({
