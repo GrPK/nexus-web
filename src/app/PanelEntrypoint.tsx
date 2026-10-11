@@ -4,6 +4,7 @@ import { Spinner } from '../components/common/Spinner/Spinner';
 import { PanelSimulatorContent } from '../panel/embed/PanelSimulatorContent';
 import OverlayShell from '../overlay/OverlayShell';
 import { inferSurfaceFromViewport } from '../panel/device/inferSurface';
+import type { PanelSurface } from '../panel/types';
 import { isWiredPanel } from '../panel/device/wiredPanel';
 import { hasNativeFindComputerBridge, openFindComputer } from '../panel/device/panelNativeBridge';
 import {
@@ -70,7 +71,7 @@ export function OverlayWrapper() {
   );
 }
 
-export function PanelEntrypoint({ initialDeviceId, isPhonePair, pairToken, pairDeviceId, pairSpki }: {
+export function PanelEntrypoint({ initialDeviceId, isPhonePair, pairToken, pairDeviceId, pairSpki, surfaceHint = null }: {
   initialDeviceId: string | null;
   isPhonePair: boolean;
   pairToken: string | null;
@@ -85,6 +86,9 @@ export function PanelEntrypoint({ initialDeviceId, isPhonePair, pairToken, pairD
   // (see PanelPhoneClaimResponse's success branch), so a LAN claim with no
   // forwarded fp has no spki at all for the paired-PC record.
   pairSpki: string | null;
+  // From a host that knows which panel it opened (the Linux Y70 kiosk maps on
+  // the primary monitor before KWin moves it, so its first viewport reads as a phone).
+  surfaceHint?: PanelSurface | null;
 }) {
   const { t } = useTranslation();
   const needsPhoneClaim = isPhonePair && Boolean(pairToken);
@@ -99,12 +103,16 @@ export function PanelEntrypoint({ initialDeviceId, isPhonePair, pairToken, pairD
   const [failureKind, setFailureKind] = useState<PanelFailureKind>('network');
   const [failureDetail, setFailureDetail] = useState('');
   const [allocAttempt, setAllocAttempt] = useState(0);
-  const inferredSurface = useMemo(() => inferSurfaceFromViewport(isPhonePair), [isPhonePair]);
+  const viewportSurface = useMemo(() => inferSurfaceFromViewport(isPhonePair), [isPhonePair]);
+  const inferredSurface = surfaceHint ?? viewportSurface;
   // Snapshot the kiosk's own viewport so the service can pass it on to the
   // dashboard simulator iframe (which otherwise renders against a hardcoded
   // profile that doesn't reflect the user's actual Y70 model + Windows DPI).
   const viewportCapabilities = useMemo(() => {
     if (typeof window === 'undefined') return undefined;
+    // Not on its panel yet: keep the record's last real viewport; PanelApp
+    // reports this one once the window lands.
+    if (viewportSurface !== inferredSurface) return { surface: inferredSurface };
     const dpr = Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
       ? window.devicePixelRatio
       : 1;
@@ -114,7 +122,7 @@ export function PanelEntrypoint({ initialDeviceId, isPhonePair, pairToken, pairD
       cssHeight: Math.max(1, Math.round(window.innerHeight)),
       dpr,
     };
-  }, [inferredSurface]);
+  }, [inferredSurface, viewportSurface]);
 
   // Phone pair flow: claim the QR token, store the session cookie, then fall
   // through to allocate-or-cache a deviceId for this phone.
