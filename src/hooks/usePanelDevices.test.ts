@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { buildPanelDevices, icueLinkLcdNames, isTurnedOffPlainMonitor, titanIiLcdNames } from './usePanelDevices';
+import { buildPanelDevices, isTurnedOffPlainMonitor, titanIiLcdNames } from './usePanelDevices';
 import type { PanelDeviceRecord } from '../api/panel';
 
 const LABELS = {
@@ -87,37 +87,6 @@ describe('buildPanelDevices promoted-monitor branding', () => {
     const onTitan = buildPanelDevices({ curatedDevices: [], phoneSessions: [], records: [record], status: null, simulatedPanels: [], familyNames, labels: LABELS })[0];
     expect(onTitan.name).toBe('Corsair TITAN II LCD');
     expect(titanIiLcdNames({ isConnected: true, firmware: '4.1.656', devices: [{ ...pump, name: 'iCUE LINK QX RGB' }] })).toEqual({});
-  });
-});
-
-describe('iCUE LINK LCD named after its cooler', () => {
-  const aio = { channel: 14, name: 'iCUE LINK TITAN 240', deviceClass: 'Aio' as const, ledCount: 20, hasSpeed: true, hasTemperature: true, rpm: 2200, tempC: 28, serial: 'S' };
-  const hub = (devices: typeof aio[]) => ({ isConnected: true, firmware: '4.1.656', devices });
-
-  function lcdDevice(displayName: string, familyNames: Partial<Record<string, string>>) {
-    const record: PanelDeviceRecord = {
-      id: 'lcd-1',
-      displayName,
-      firstSeenAt: 0,
-      lastSeenAt: 1,
-      streamed: true,
-      capabilities: { surface: 'monitor', family: 'corsair-link-lcd', touch: false, cssWidth: 480, cssHeight: 480, dpi: 96 },
-    } as PanelDeviceRecord;
-    return buildPanelDevices({ curatedDevices: [], phoneSessions: [], records: [record], status: null, simulatedPanels: [], familyNames, labels: LABELS })[0];
-  }
-
-  it('shows "<AIO name> LCD" for the default record name', () => {
-    expect(lcdDevice('iCUE LINK LCD', icueLinkLcdNames(hub([aio]))).name).toBe('iCUE LINK TITAN 240 LCD');
-  });
-
-  it('lets a user rename win', () => {
-    expect(lcdDevice('Desk screen', icueLinkLcdNames(hub([aio]))).name).toBe('Desk screen');
-  });
-
-  it('keeps the default name without an AIO', () => {
-    expect(icueLinkLcdNames(hub([{ ...aio, deviceClass: 'Pump' as never }]))).toEqual({});
-    expect(icueLinkLcdNames(null)).toEqual({});
-    expect(lcdDevice('iCUE LINK LCD', {}).name).toBe('iCUE LINK LCD');
   });
 });
 

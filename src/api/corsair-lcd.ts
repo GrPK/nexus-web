@@ -34,35 +34,33 @@ export function getCorsairLcdMedia(): Promise<{ items: CorsairLcdMediaItem[] } |
   return fetchService<{ items: CorsairLcdMediaItem[] }>('/devices/corsair/lcd/media');
 }
 
-/** Resolves to the new library item, or the refusal message. */
-export async function uploadCorsairLcdMedia(file: File): Promise<{ item?: CorsairLcdMediaItem; msg: string | null }> {
+/** The new library item, or null when the upload was refused or the service was unreachable. */
+export async function uploadCorsairLcdMedia(file: File): Promise<CorsairLcdMediaItem | null> {
   const form = new FormData();
   form.append('file', file);
   const r = await postServiceFormResult<{ error: boolean; msg: string; item?: CorsairLcdMediaItem }>(
     '/devices/corsair/lcd/media/upload',
     form,
   );
-  if (!r) return { msg: '' };
-  if (r.error || !('item' in r) || !r.item) return { msg: r.msg || '' };
-  return { item: r.item, msg: null };
+  if (!r || r.error || !('item' in r) || !r.item) return null;
+  return r.item;
 }
 
 /**
  * Stores a library item on the cooler (null restores the coolant-temperature screen).
- * Resolves to null on success, else the service's message ('' when it gave none).
+ * Resolves to null on success, else the HTTP status (0 when the service was unreachable).
  */
-export async function setCorsairDeviceScreen(mediaId: string | null): Promise<string | null> {
+export async function setCorsairDeviceScreen(mediaId: string | null): Promise<number | null> {
   const { response, status } = await authFetchWithStatus('/devices/corsair/lcd/device-screen', {
     method: 'PUT',
     body: { mediaId },
   });
-  if (!response) return '';
-  let body: { error?: boolean; msg?: string } | null = null;
+  if (!response) return status;
+  let body: { error?: boolean } | null = null;
   try {
     body = await response.json();
   } catch {
     // Not JSON: the status decides.
   }
-  if (status >= 200 && status < 300 && !body?.error) return null;
-  return body?.msg ?? '';
+  return status >= 200 && status < 300 && !body?.error ? null : status;
 }

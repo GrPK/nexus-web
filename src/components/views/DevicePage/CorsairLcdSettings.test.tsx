@@ -65,15 +65,35 @@ describe('CorsairLcdSettings closed-screen setting', () => {
     expect(mockSetScreen).toHaveBeenCalledWith(null);
   });
 
-  it('shows the service message when saving fails', async () => {
-    mockSetScreen.mockResolvedValue('Too large for the cooler');
-    await renderSettings();
-    await pick('Fire');
-    expect(screen.getByRole('alert')).toHaveTextContent('Too large for the cooler');
+  it('shows a translated message per failure status', async () => {
+    const cases: Array<[number, string]> = [
+      [409, 'ErrNotConnected'], [404, 'ErrNotFound'], [413, 'ErrTooLarge'],
+      [422, 'ErrUnreadable'], [502, 'ErrRefused'], [500, 'Failed'],
+    ];
+    for (const [status, key] of cases) {
+      mockSetScreen.mockResolvedValue(status);
+      const { unmount } = render(<CorsairLcdSettings />);
+      await act(async () => { await Promise.resolve(); });
+      await pick('Fire');
+      expect(screen.getByRole('alert')).toHaveTextContent(`devices.corsair.deviceScreen${key}`);
+      unmount();
+    }
   });
 
-  it('applies an uploaded item and falls back to a generic message when none is given', async () => {
-    mockUpload.mockResolvedValueOnce({ item: { id: 'n2', name: 'New', type: 'static' }, msg: null });
+  it('shows a stored-image option when the cooler holds an unlisted item', async () => {
+    mockState.mockResolvedValue({ ...base, deviceMediaId: 'gone' });
+    await renderSettings();
+    expect(screen.getByRole('button', { name: 'devices.corsair.deviceScreenLabel' })).toHaveTextContent('devices.corsair.deviceScreenStored');
+  });
+
+  it('does not show the stored-image option for a listed item or the coolant screen', async () => {
+    mockState.mockResolvedValue({ ...base, deviceMediaId: 'a1' });
+    await renderSettings();
+    expect(screen.getByRole('button', { name: 'devices.corsair.deviceScreenLabel' })).toHaveTextContent('Fire');
+  });
+
+  it('applies an uploaded item and shows a translated message when the upload fails', async () => {
+    mockUpload.mockResolvedValueOnce({ id: 'n2', name: 'New', type: 'static' });
     await renderSettings();
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     await act(async () => {
@@ -81,10 +101,10 @@ describe('CorsairLcdSettings closed-screen setting', () => {
     });
     expect(mockSetScreen).toHaveBeenCalledWith('n2');
 
-    mockUpload.mockResolvedValueOnce({ msg: '' });
+    mockUpload.mockResolvedValueOnce(null);
     await act(async () => {
       fireEvent.change(input, { target: { files: [new File(['x'], 'bad.png', { type: 'image/png' })] } });
     });
-    expect(screen.getByRole('alert')).toHaveTextContent('devices.corsair.deviceScreenFailed');
+    expect(screen.getByRole('alert')).toHaveTextContent('devices.corsair.deviceScreenUploadFailed');
   });
 });

@@ -32,6 +32,16 @@ const LCD_ROTATIONS = [
   { value: 3, degrees: 270 },
 ];
 
+// Statuses the device-screen route answers with, each to its translated message. 409 is
+// both "screen not attached" and "Nexus Control switched off for it".
+const DEVICE_SCREEN_ERRORS: Partial<Record<number, string>> = {
+  404: 'devices.corsair.deviceScreenErrNotFound',
+  409: 'devices.corsair.deviceScreenErrNotConnected',
+  413: 'devices.corsair.deviceScreenErrTooLarge',
+  422: 'devices.corsair.deviceScreenErrUnreadable',
+  502: 'devices.corsair.deviceScreenErrRefused',
+};
+
 /**
  * Hardware options for the iCUE LINK cooler's LCD module. Hosted by the LCD panel page's
  * settings tab: the glass is the panel, the screen module around it is this tab.
@@ -81,7 +91,10 @@ export function CorsairLcdSettings() {
     await refresh();
   }, [refresh]);
 
-  const failureText = useCallback((msg: string | null) => msg || t('devices.corsair.deviceScreenFailed'), [t]);
+  const failureText = useCallback((status: number) => {
+    const key = DEVICE_SCREEN_ERRORS[status] ?? 'devices.corsair.deviceScreenFailed';
+    return t(key);
+  }, [t]);
 
   const applyDeviceScreen = useCallback(async (mediaId: string | null) => {
     setSavingScreen(true);
@@ -99,63 +112,71 @@ export function CorsairLcdSettings() {
     setScreenError(null);
     const uploaded = await uploadCorsairLcdMedia(file);
     if (!aliveRef.current) return;
-    if (!uploaded.item) {
-      setScreenError(failureText(uploaded.msg));
+    if (!uploaded) {
+      setScreenError(t('devices.corsair.deviceScreenUploadFailed'));
       setSavingScreen(false);
       return;
     }
     await refreshMedia();
-    await applyDeviceScreen(uploaded.item.id);
-  }, [applyDeviceScreen, failureText, refreshMedia]);
+    await applyDeviceScreen(uploaded.id);
+  }, [applyDeviceScreen, refreshMedia, t]);
 
   // The state route answers 200 with hasDevice:false when the screen module is not
   // attached; without this the controls look live and every write is silently dropped.
   const loaded = state !== null && state.hasDevice;
 
+  // The cooler may hold an image the library no longer lists (list still loading, fetch
+  // failed, item deleted); the select must still say something is stored there.
+  const deviceMediaId = state?.deviceMediaId || null;
+  const storedUnlisted = deviceMediaId !== null && !media.some(m => m.id === deviceMediaId);
+
   return (
     <>
-    <SettingsSection title={t('devices.corsair.screenSection')} boxClassName={styles.sectionBox}>
-      <SettingSlider
-        editable
-        trackFill
-        label={t('devices.corsair.screenBrightness')}
-        value={state?.brightness ?? 0}
-        min={0}
-        max={100}
-        step={1}
-        formatValue={v => localizeNumbers(`${v}%`, numberFormat)}
-        ariaLabel={t('devices.corsair.screenBrightnessAria')}
-        disabled={!loaded}
-        onChange={(v: number, commitNow?: boolean) => {
-          if (!state) return;
-          brightnessDirtyRef.current = true;
-          setState({ ...state, brightness: v });
-          if (commitNow) void commit({ brightness: v }).finally(() => { brightnessDirtyRef.current = false; });
-        }}
-        onCommit={(v: number) => {
-          void commit({ brightness: v }).finally(() => { brightnessDirtyRef.current = false; });
-        }}
-      />
+      <SettingsSection title={t('devices.corsair.screenSection')} boxClassName={styles.sectionBox}>
+        <SettingSlider
+          editable
+          trackFill
+          label={t('devices.corsair.screenBrightness')}
+          value={state?.brightness ?? 0}
+          min={0}
+          max={100}
+          step={1}
+          formatValue={v => localizeNumbers(`${v}%`, numberFormat)}
+          ariaLabel={t('devices.corsair.screenBrightnessAria')}
+          disabled={!loaded}
+          onChange={(v: number, commitNow?: boolean) => {
+            if (!state) return;
+            brightnessDirtyRef.current = true;
+            setState({ ...state, brightness: v });
+            if (commitNow) void commit({ brightness: v }).finally(() => { brightnessDirtyRef.current = false; });
+          }}
+          onCommit={(v: number) => {
+            void commit({ brightness: v }).finally(() => { brightnessDirtyRef.current = false; });
+          }}
+        />
 
-      <SettingSelect
-        label={t('devices.corsair.screenRotation')}
-        value={String(state?.rotation ?? 0)}
-        onChange={v => { void commit({ rotation: Number(v) }); }}
-        options={LCD_ROTATIONS.map(r => ({
-          value: String(r.value),
-          label: localizeNumbers(`${r.degrees}°`, numberFormat),
-        }))}
-        disabled={!loaded}
-      />
-    </SettingsSection>
+        <SettingSelect
+          label={t('devices.corsair.screenRotation')}
+          value={String(state?.rotation ?? 0)}
+          onChange={v => { void commit({ rotation: Number(v) }); }}
+          options={LCD_ROTATIONS.map(r => ({
+            value: String(r.value),
+            label: localizeNumbers(`${r.degrees}°`, numberFormat),
+          }))}
+          disabled={!loaded}
+        />
+      </SettingsSection>
 
       <SettingsSection title={t('devices.corsair.deviceScreenSection')} boxClassName={styles.sectionBox}>
         <SettingSelect
           label={t('devices.corsair.deviceScreenLabel')}
-          value={media.some(m => m.id === state?.deviceMediaId) ? (state?.deviceMediaId ?? '') : ''}
+          value={deviceMediaId ?? ''}
           onChange={v => { void applyDeviceScreen(v === '' ? null : v); }}
           options={[
             { value: '', label: t('devices.corsair.deviceScreenCoolant') },
+            ...(storedUnlisted && deviceMediaId
+              ? [{ value: deviceMediaId, label: t('devices.corsair.deviceScreenStored') }]
+              : []),
             ...media.map(m => ({ value: m.id, label: m.name })),
           ]}
           disabled={!loaded || savingScreen}
@@ -180,9 +201,6 @@ export function CorsairLcdSettings() {
         >
           {t('devices.corsair.deviceScreenUpload')}
         </Button>
-        {savingScreen && (
-          <p data-settings-aside="true" role="status">{t('devices.corsair.deviceScreenSaving')}</p>
-        )}
         {screenError !== null && <Notice tone="critical" role="alert">{screenError}</Notice>}
       </SettingsSection>
     </>

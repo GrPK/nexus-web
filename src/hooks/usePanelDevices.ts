@@ -147,15 +147,6 @@ export function titanIiLcdNames(corsair: CorsairState | null | undefined): Parti
     : {};
 }
 
-// The iCUE LINK LCD record is named at creation, before the cooler is known. Once the hub
-// lists an AIO, the default name becomes "<AIO name> LCD", as iCUE calls the product.
-const ICUE_LINK_LCD_DEFAULT_NAME = 'iCUE LINK LCD';
-
-export function icueLinkLcdNames(corsair: CorsairState | null | undefined): Partial<Record<string, string>> {
-  const aio = corsair?.devices.find(d => d.deviceClass === 'Aio');
-  return aio ? { 'corsair-link-lcd': `${aio.name} LCD` } : {};
-}
-
 // A plain monitor (no product family) promoted to a panel and then turned off:
 // it leaves the device list, since it is only a device while used as a panel.
 /** The panel device id of a streamed panel record. */
@@ -206,7 +197,7 @@ export function usePanelDevices(
     setStatus(panelStatus ?? null);
     setPhoneSessions(sessions?.sessions ?? []);
     setRecords(list);
-    setFamilyNames({ ...titanIiLcdNames(corsair), ...icueLinkLcdNames(corsair) });
+    setFamilyNames(titanIiLcdNames(corsair));
     setLoading(false);
   }, []);
 
@@ -373,14 +364,11 @@ export function buildPanelDevices({
     // A claimed panel IS the device's row, so it carries the device's name; the
     // record's own name describes only the glass ("NZXT Kraken LCD").
     const claimedName = claimed ? curatedDevices.find(d => d.id === claimed)?.name : undefined;
-    const coolerName = family === 'corsair-link-lcd' && record.displayName === ICUE_LINK_LCD_DEFAULT_NAME
-      ? familyNames[family]
-      : undefined;
     devices.push({
       id: streamedPanelId(record.id),
       panelRecordId: record.id,
       sourceId: claimed,
-      name: claimedName ?? coolerName ?? record.displayName,
+      name: claimedName ?? record.displayName,
       subtitle: cssWidth > 0 && cssHeight > 0
         ? `${labels.online} - ${cssWidth}x${cssHeight}`
         : labels.online,
