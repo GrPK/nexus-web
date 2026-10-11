@@ -1,9 +1,16 @@
+import { Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
+import { Button } from '../../common/Button/Button';
+import { Notice } from '../../common/Notice/Notice';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import {
+  getCorsairLcdMedia,
   getCorsairLcdState,
+  setCorsairDeviceScreen,
   setCorsairLcd,
+  uploadCorsairLcdMedia,
+  type CorsairLcdMediaItem,
   type CorsairLcdPatch,
   type CorsairLcdState,
 } from '../../../api/corsair-lcd';
@@ -33,7 +40,11 @@ export function CorsairLcdSettings() {
   const { t } = useTranslation();
   const { numberFormat } = useUnitPrefs();
   const [state, setState] = useState<CorsairLcdState | null>(null);
+  const [media, setMedia] = useState<CorsairLcdMediaItem[]>([]);
+  const [savingScreen, setSavingScreen] = useState(false);
+  const [screenError, setScreenError] = useState<string | null>(null);
   const aliveRef = useRef(true);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   // Set while the brightness thumb is being dragged, so the poll below keeps the local
   // value instead of snapping it back to whatever the service last reported.
   const brightnessDirtyRef = useRef(false);
@@ -46,9 +57,15 @@ export function CorsairLcdSettings() {
       : s));
   }, []);
 
+  const refreshMedia = useCallback(async () => {
+    const m = await getCorsairLcdMedia();
+    if (aliveRef.current && m) setMedia(m.items);
+  }, []);
+
   useEffect(() => {
     aliveRef.current = true;
     void refresh();
+    void refreshMedia();
     const onFocus = () => { void refresh(); };
     window.addEventListener('focus', onFocus);
     const id = window.setInterval(() => { void refresh(); }, STATE_POLL_MS);
@@ -57,18 +74,46 @@ export function CorsairLcdSettings() {
       window.removeEventListener('focus', onFocus);
       window.clearInterval(id);
     };
-  }, [refresh]);
+  }, [refresh, refreshMedia]);
 
   const commit = useCallback(async (patch: CorsairLcdPatch) => {
     await setCorsairLcd(patch);
     await refresh();
   }, [refresh]);
 
+  const failureText = useCallback((msg: string | null) => msg || t('devices.corsair.deviceScreenFailed'), [t]);
+
+  const applyDeviceScreen = useCallback(async (mediaId: string | null) => {
+    setSavingScreen(true);
+    setScreenError(null);
+    const failure = await setCorsairDeviceScreen(mediaId);
+    await refresh();
+    if (!aliveRef.current) return;
+    if (failure !== null) setScreenError(failureText(failure));
+    setSavingScreen(false);
+  }, [refresh, failureText]);
+
+  const onPickFile = useCallback(async (file: File | undefined) => {
+    if (!file) return;
+    setSavingScreen(true);
+    setScreenError(null);
+    const uploaded = await uploadCorsairLcdMedia(file);
+    if (!aliveRef.current) return;
+    if (!uploaded.item) {
+      setScreenError(failureText(uploaded.msg));
+      setSavingScreen(false);
+      return;
+    }
+    await refreshMedia();
+    await applyDeviceScreen(uploaded.item.id);
+  }, [applyDeviceScreen, failureText, refreshMedia]);
+
   // The state route answers 200 with hasDevice:false when the screen module is not
   // attached; without this the controls look live and every write is silently dropped.
   const loaded = state !== null && state.hasDevice;
 
   return (
+    <>
     <SettingsSection title={t('devices.corsair.screenSection')} boxClassName={styles.sectionBox}>
       <SettingSlider
         editable
@@ -103,5 +148,43 @@ export function CorsairLcdSettings() {
         disabled={!loaded}
       />
     </SettingsSection>
+
+      <SettingsSection title={t('devices.corsair.deviceScreenSection')} boxClassName={styles.sectionBox}>
+        <SettingSelect
+          label={t('devices.corsair.deviceScreenLabel')}
+          value={media.some(m => m.id === state?.deviceMediaId) ? (state?.deviceMediaId ?? '') : ''}
+          onChange={v => { void applyDeviceScreen(v === '' ? null : v); }}
+          options={[
+            { value: '', label: t('devices.corsair.deviceScreenCoolant') },
+            ...media.map(m => ({ value: m.id, label: m.name })),
+          ]}
+          disabled={!loaded || savingScreen}
+        />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={e => {
+            void onPickFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+        <Button
+          size="sm"
+          tone="neutral"
+          icon={<Upload size={14} />}
+          loading={savingScreen}
+          disabled={!loaded || savingScreen}
+          onClick={() => fileRef.current?.click()}
+        >
+          {t('devices.corsair.deviceScreenUpload')}
+        </Button>
+        {savingScreen && (
+          <p data-settings-aside="true" role="status">{t('devices.corsair.deviceScreenSaving')}</p>
+        )}
+        {screenError !== null && <Notice tone="critical" role="alert">{screenError}</Notice>}
+      </SettingsSection>
+    </>
   );
 }
