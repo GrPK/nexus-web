@@ -127,6 +127,14 @@ export function surfaceSupportsMountOrientation(surface: PanelSurface): boolean 
   return MOUNT_ORIENTABLE_SURFACES.has(surface);
 }
 
+// Square cooler glass can be landscape, where its tile is shorter than the
+// width-derived cell, so content scales to the shorter cell side.
+const SHORT_SIDE_CONTENT_SURFACES: ReadonlySet<PanelSurface> = new Set<PanelSurface>(['lcd-square']);
+
+export function surfaceScalesContentToShortSide(surface: PanelSurface): boolean {
+  return SHORT_SIDE_CONTENT_SURFACES.has(surface);
+}
+
 export function isSingleWidgetSurface(surface: PanelSurface): boolean {
   return singleWidgetSurfaceSize(surface) !== undefined;
 }

@@ -4,6 +4,7 @@ import {
   type PanelSurface,
   type PanelWidgetSize,
   singleWidgetSurfaceSize,
+  surfaceScalesContentToShortSide,
 } from '../types';
 
 // Grid is 4 columns wide on the short axis by default. Phone landscape keeps
@@ -223,7 +224,7 @@ export function panelGridCapacityForCanvas(
       : Math.max(1, (contentH - s.gap * (rows - 1)) / rows);
     return { columns: safeColumns, rows, cellSize, rowSize, gap: s.gap, padding: s.padding };
   };
-  return withContentGeometry(solve(spacing), solve(contentSpacing));
+  return withContentGeometry(solve(spacing), solve(contentSpacing), surfaceScalesContentToShortSide(surface));
 }
 
 function phoneLandscapeGridCapacityForCanvas(
@@ -243,14 +244,15 @@ function phoneLandscapeGridCapacityForCanvas(
 }
 
 // The live solve renders the grid; the stock solve sizes widget content and the immersive overlay.
-function withContentGeometry(live: PanelGridGeometry, stock: PanelGridGeometry): PanelGridCapacity {
+function withContentGeometry(live: PanelGridGeometry, stock: PanelGridGeometry, shortSide = false): PanelGridCapacity {
   return {
     ...live,
     // contentScale drives --panel-scale (the widget render scale ratio). Use
     // the cell width rather than min(cell, row) so fixed-row surfaces (y70,
     // q60) with short rows don't shrink widget content; the cellScaler CSS
-    // override handles the non-square card height per-surface.
-    contentScale: stock.cellSize,
+    // override handles the non-square card height per-surface. A short-side
+    // surface takes min(cell, row) so its one tile keeps its design height.
+    contentScale: shortSide ? Math.min(stock.cellSize, stock.rowSize) : stock.cellSize,
     contentGap: stock.gap,
     contentColumns: stock.columns,
     contentRows: stock.rows,

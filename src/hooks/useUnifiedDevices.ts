@@ -103,6 +103,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 // that prefix from a row whose icon is the brand's mark.
 const BRAND_LOGOS: Record<string, string> = {
   HYTE: HYTE_LOGO,
+  ASUS: '/assets/devices/asus.svg',
   'Lian Li': '/assets/devices/lianli.svg',
   Elgato: '/assets/devices/elgato.svg',
   Corsair: '/assets/devices/corsair.svg',

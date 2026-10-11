@@ -85,6 +85,14 @@ describe('wide cooler glass lays its tile out landscape', () => {
 
     expect(wide.cellSize / wide.rowSize).toBeLessThan(square.cellSize / square.rowSize);
   });
+
+  it('scales square-surface content to the shorter side of landscape glass', () => {
+    const landscape = panelGridCapacityForCanvas(320, 240, { surface: 'lcd-square', gap: 0, padding: 0 });
+    const square = panelGridCapacityForCanvas(480, 480, { surface: 'lcd-square', gap: 0, padding: 0 });
+
+    expect(landscape.contentScale).toBe(120);
+    expect(square.contentScale).toBe(square.cellSize);
+  });
 });
 
 describe('canvas editing', () => {
