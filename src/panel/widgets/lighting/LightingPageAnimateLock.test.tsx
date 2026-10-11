@@ -63,8 +63,7 @@ vi.mock('./page/ModeControls', () => ({ ModeControls: () => null }));
 // The stub exposes exactly what the lock rides on: the pick the rail is handed
 // (locked or not) and the toggle callback.
 vi.mock('./page/DevicePanel', () => ({
-  DevicePanel: ({ devicePicks, animateLocks, animateLockable, onSetAnimateLock, lockFlash, onSetSelection }: {
-    devicePicks?: Record<string, { key: string }>;
+  DevicePanel: ({ animateLocks, animateLockable, onSetAnimateLock, lockFlash, onSetSelection }: {
     animateLocks?: Record<string, string>;
     animateLockable?: boolean;
     onSetAnimateLock?: (ids: string[], locked: boolean) => void;
@@ -75,7 +74,6 @@ vi.mock('./page/DevicePanel', () => ({
       data-testid="rail"
       data-lockable={String(!!animateLockable)}
       data-lock={animateLocks?.a ?? ''}
-      data-pick={devicePicks?.a?.key ?? ''}
       data-flash={`${lockFlash?.seq ?? 0}:${[...(lockFlash?.ids ?? [])].join(',')}`}
     >
       <button type="button" onClick={() => onSetAnimateLock?.(['a'], !animateLocks?.a)}>toggle</button>
@@ -185,12 +183,6 @@ describe('LightingPage animation lock', () => {
     topicHandlers.lighting.forEach(cb => cb());
     await waitFor(() => expect(fetchAnimateDeviceLocks).toHaveBeenCalled());
     expect(screen.getByTestId('rail').dataset.lock).toBe('aurora');
-  });
-
-  it('gives a locked device the locked effect for its strip when it is not the running one', async () => {
-    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({ a: 'aurora' }));
-    renderPage();
-    await waitFor(() => expect(screen.getByTestId('rail').dataset.pick).toBe('aurora'));
   });
 
   it('lights the locked animation on the grid for a selected locked device, and ignores a different pick', async () => {

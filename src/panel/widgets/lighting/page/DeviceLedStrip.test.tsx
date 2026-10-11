@@ -62,4 +62,41 @@ describe('DeviceLedStrip', () => {
     expect(ctx.putImageData).not.toHaveBeenCalled();
     expect(ctx.fillStyle).toBe('#0000ff');
   });
+
+  describe('live device bytes (animation-locked)', () => {
+    const locked: LightingDevice = { ...device, frameIndex: 7 };
+    // 4 LEDs: red, green, blue, white.
+    const bytes = new Uint8Array([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]);
+    const lastImage = () => ctx.putImageData.mock.calls.at(-1)![0].data as Uint8ClampedArray;
+
+    it('paints the strip from the device bytes in LED order', () => {
+      publishLedFrame(new Uint8Array(3 * 4), 2, 2, new Map([[7, bytes]]));
+      render(<DeviceLedStrip device={locked} live />);
+      expect([...lastImage()]).toEqual([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
+    });
+
+    it('applies the device brightness', () => {
+      publishLedFrame(null, 0, 0, new Map([[7, bytes]]));
+      render(<DeviceLedStrip device={{ ...locked, brightness: 50 }} live />);
+      expect(lastImage()[0]).toBe(128);
+    });
+
+    it('falls back to sampling the canvas when the frame has no bytes for it', () => {
+      publishRed();
+      render(<DeviceLedStrip device={locked} live />);
+      expect([...lastImage().slice(0, 4)]).toEqual([255, 0, 0, 255]);
+    });
+
+    it('falls back when the device has no frame index', () => {
+      publishLedFrame(new Uint8Array(3 * 4).fill(9), 2, 2, new Map([[7, bytes]]));
+      render(<DeviceLedStrip device={device} live />);
+      expect([...lastImage().slice(0, 3)]).toEqual([9, 9, 9]);
+    });
+
+    it('leaves an unlocked device on the canvas even when bytes exist', () => {
+      publishLedFrame(new Uint8Array(3 * 4).fill(9), 2, 2, new Map([[7, bytes]]));
+      render(<DeviceLedStrip device={locked} />);
+      expect([...lastImage().slice(0, 3)]).toEqual([9, 9, 9]);
+    });
+  });
 });

@@ -2199,20 +2199,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // A colour picked with nothing selected has nowhere to land, so the browser
   // stops taking input until a device is chosen.
   const staticNeedsSelection = effectiveMode === 'static' && selectedDeviceIds.size === 0;
-  // The rail shows what the service paints. A device locked onto an animation
-  // is painted with that animation in every mode, so it outranks a Static pick;
-  // while that animation is the running one the strip samples the live canvas.
-  const railPicks = useMemo(() => {
-    const base = perDeviceMode ? livePicks : railLockedPicks;
-    const locked = Object.entries(animateLocks);
-    if (locked.length === 0) return base;
-    const out = { ...base };
-    for (const [id, effect] of locked) {
-      if (effectiveMode === 'animate' && effect === activeEffect) delete out[id];
-      else out[id] = { key: effect, slot: committedTemplates[effect]?.selected ?? 0, hex: '' };
-    }
-    return out;
-  }, [activeEffect, animateLocks, committedTemplates, effectiveMode, livePicks, perDeviceMode, railLockedPicks]);
   const lockedDevices = useMemo(() => {
     const names = new Map(devices.map(d => [d.id, d.name]));
     return lockedNamesByEffect(animateLocks, id => names.get(id));
@@ -2526,7 +2512,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             // returning to Static restores each device's own look. A locked
             // device is the exception: the service keeps painting it, so its
             // strip keeps showing the pick.
-            devicePicks={railPicks}
+            devicePicks={perDeviceMode ? livePicks : railLockedPicks}
             versionForSlot={versionForSlot}
             ledFullscreen={effectiveMode === 'static'}
             lockable={effectiveMode === 'static'}

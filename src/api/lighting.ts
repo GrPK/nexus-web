@@ -369,6 +369,9 @@ export interface LightingDevice {
   /** Current saturation, 0..1. Set only for color-capable smart lights. */
   saturation?: number;
   ledCount: number;
+  /** The byte the lighting output frame tags this device's LEDs with. Absent on
+   *  an older service, or when the device has no engine frame. */
+  frameIndex?: number;
   /** LEDs not disabled by the user map. Undefined on older services; the UI falls back to ledCount then. */
   enabledLedCount?: number;
   /** Card-local LEDs held on a colour by the LED map; absent when none is. */
