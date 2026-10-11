@@ -149,6 +149,7 @@ export default function App() {
     const second = segments[1];
     const isPhonePair = second === 'phone';
     const explicitDeviceId = second && !RESERVED_PANEL_PATH_SEGMENTS.has(second) ? second : null;
+    const surfaceHint = !isPhonePair && params.get('surface') === 'y70' ? 'y70' : null;
     return (
       <I18nProvider>
         <PanelEntrypoint
@@ -157,6 +158,7 @@ export default function App() {
           pairToken={params.get('pair')}
           pairDeviceId={params.get('deviceId')}
           pairSpki={params.get('fp')}
+          surfaceHint={surfaceHint}
         />
       </I18nProvider>
     );
