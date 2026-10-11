@@ -258,6 +258,11 @@
   }
 }
 
+// Shader Studio entry, left of the fullscreen button.
+.studioBtn {
+  right: calc(0.4rem + 26px + 0.3rem);
+}
+
 .musicReactive {
   position: absolute;
   top: 0.4rem;

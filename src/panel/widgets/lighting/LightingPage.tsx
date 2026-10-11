@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Music, Pause, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Music, Pause, Play, PanelRightOpen, PanelRightClose, WandSparkles } from 'lucide-react';
 import {
   startAnimate, startStatic, startScreenMirror, stopLighting, startGameSync,
   fetchStaticSettings,
@@ -167,6 +167,10 @@ function loadDeviceOrder(): string[] {
 
 // three.js loads only when someone turns the 3D view on.
 const LightingScene3D = lazy(() => import('./scene/LightingScene3D'));
+// Raw defines, not DEV_TOOLS: only the literal folds far enough to drop the import() from production.
+const ShaderStudio = (import.meta.env.DEV || __DEV_TOOLS__)
+  ? lazy(() => import('./studio/ShaderStudio').then(m => ({ default: m.ShaderStudio })))
+  : null;
 const VIEW_2D = '2d';
 const VIEW_3D = '3d';
 
@@ -376,6 +380,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // frame (effectTemplates churns during drag for the live RGB preview).
   const [committedTemplates, setCommittedTemplates] = useState<Record<string, EffectTemplateBundle>>({});
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
   const sceneApi = useLightingScene(SCENE_3D);
   const [sceneEditorOpen, setSceneEditorOpen] = useState(false);
   const scene3d = SCENE_3D && !!sceneApi.scene?.view.enabled;
@@ -2557,6 +2562,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                         )}
                       </div>
                     )}
+                    {ShaderStudio && (
+                      <HoverTooltip body={t('lighting.studio.title')} side="left">
+                        <button type="button" className={`${styles.fullscreenBtn} ${styles.studioBtn}`} onClick={() => setStudioOpen(true)} aria-label={t('lighting.studio.title')}>
+                          <WandSparkles size={14} strokeWidth={1.5} />
+                        </button>
+                      </HoverTooltip>
+                    )}
                     <HoverTooltip body={t('lighting.fullscreen')} side="left">
                       <button type="button" className={styles.fullscreenBtn} onClick={() => setFullscreenOpen(true)} aria-label={t('lighting.fullscreen')}>
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2690,6 +2702,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           gpuState={serviceState.lighting?.gpuState}
           paused={paused}
         />
+      )}
+      {ShaderStudio && studioOpen && (
+        <Suspense fallback={null}>
+          <ShaderStudio open onClose={() => setStudioOpen(false)} />
+        </Suspense>
       )}
       {editorTarget && (
         <LedMapEditor

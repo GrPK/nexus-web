@@ -48,6 +48,11 @@ export function primeShaderSource(name: string, frag: string): void {
   shaderCache.set(name, { frag, params: parseShaderParams(frag) });
 }
 
+/** Drops a primed entry; a later fetch for the name goes to the service. */
+export function forgetShaderSource(name: string): void {
+  shaderCache.delete(name);
+}
+
 /** Synchronous cache read so a consumer can seed state without a load tick. */
 export function peekShaderSource(name: string): ShaderSource | undefined {
   return shaderCache.get(name);

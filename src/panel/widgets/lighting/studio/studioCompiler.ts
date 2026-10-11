@@ -1,0 +1,317 @@
+import {
+  PATTERN_BLEND_PARAMS, STUDIO_STAGES, studioBlock,
+  type StudioBlockDef, type StudioHelper, type StudioParam, type StudioStage,
+} from './studioBlocks';
+
+export type StudioModSource = 'bass' | 'mid' | 'high' | 'level' | 'beat';
+
+export const STUDIO_MOD_SOURCES: readonly StudioModSource[] = ['bass', 'mid', 'high', 'level', 'beat'];
+
+const MOD_UNIFORM: Record<StudioModSource, string> = {
+  bass: 'u_audioBass', mid: 'u_audioMid', high: 'u_audioHigh', level: 'u_audioLevel', beat: 'u_audioBeat',
+};
+
+export interface StudioMod {
+  source: StudioModSource;
+  /** Signed fraction of the param's range. */
+  amount: number;
+}
+
+export interface StudioBlock {
+  /** Stable per-instance id for React keys and drag order; not part of the shader. */
+  uid: string;
+  type: string;
+  params: Record<string, number>;
+  /** Normalized RGB, keyed by StudioColor.key. */
+  colors?: Record<string, [number, number, number]>;
+  mods?: Record<string, StudioMod>;
+}
+
+export interface StudioRecipe {
+  v: 1;
+  blocks: StudioBlock[];
+  /** Wire units, same as EffectState.speed. */
+  speed: number;
+  hue: number;
+  saturation: number;
+  contrast: number;
+}
+
+export interface CompiledStudio {
+  /** Shader-cache key; changes only when the GLSL text changes, never on a param value. */
+  key: string;
+  frag: string;
+  /** Uniform values for EffectState.params. */
+  params: Record<string, number>;
+}
+
+let uidCounter = 0;
+export function newBlockUid(): string {
+  uidCounter += 1;
+  return `b${Date.now().toString(36)}${uidCounter.toString(36)}`;
+}
+
+/** Blocks in data-flow order: stages first, then each stage's own order. */
+export function orderedBlocks(recipe: StudioRecipe): StudioBlock[] {
+  return STUDIO_STAGES.flatMap(stage => recipe.blocks.filter(b => studioBlock(b.type)?.stage === stage));
+}
+
+export function blockParams(def: StudioBlockDef, firstPattern: boolean): readonly StudioParam[] {
+  return def.stage === 'pattern' && !firstPattern ? [...def.params, ...PATTERN_BLEND_PARAMS] : def.params;
+}
+
+export function makeBlock(type: string): StudioBlock {
+  const def = studioBlock(type);
+  const params: Record<string, number> = {};
+  for (const p of def?.params ?? []) params[p.key] = p.def;
+  for (const p of PATTERN_BLEND_PARAMS) if (def?.stage === 'pattern') params[p.key] = p.def;
+  const block: StudioBlock = { uid: newBlockUid(), type, params };
+  if (def?.colors) {
+    block.colors = Object.fromEntries(def.colors.map(c => [c.key, [...c.def] as [number, number, number]]));
+  }
+  return block;
+}
+
+const HELPERS: Record<StudioHelper, { deps: StudioHelper[]; src: string }> = {
+  rot: { deps: [], src: 'mat2 rot(float a) { float c = cos(a); float s = sin(a); return mat2(c, -s, s, c); }' },
+  hash21: {
+    deps: [],
+    src: 'float hash21(vec2 p) { p = fract(p * vec2(234.34, 435.345)); p += dot(p, p + 34.23); return fract(p.x * p.y); }',
+  },
+  vnoise: {
+    deps: ['hash21'],
+    src: [
+      'float vnoise(vec2 p) {',
+      '  vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);',
+      '  float a = hash21(i); float b = hash21(i + vec2(1.0, 0.0));',
+      '  float c = hash21(i + vec2(0.0, 1.0)); float d = hash21(i + vec2(1.0, 1.0));',
+      '  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);',
+      '}',
+    ].join('\n'),
+  },
+  fbm: {
+    deps: ['vnoise'],
+    src: [
+      'float fbm(vec2 p) {',
+      '  float s = 0.0; float a = 0.5;',
+      '  for (int i = 0; i < 5; i++) { s += a * vnoise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; }',
+      '  return s / 0.96875;',
+      '}',
+    ].join('\n'),
+  },
+  blendV: {
+    deps: [],
+    src: [
+      'float blendV(float a, float b, float mode, float amt) {',
+      '  float r = a + b;',
+      '  if (mode > 0.5) r = a * b;',
+      '  if (mode > 1.5) r = max(a, b);',
+      '  if (mode > 2.5) r = min(a, b);',
+      '  if (mode > 3.5) r = abs(a - b);',
+      '  if (mode > 4.5) r = 1.0 - (1.0 - a) * (1.0 - b);',
+      '  return clamp(mix(a, r, amt), 0.0, 1.0);',
+      '}',
+    ].join('\n'),
+  },
+  // Order matches PALETTE_OPTIONS.
+  presetPal: {
+    deps: [],
+    src: [
+      'vec3 presetPal(float k, float id) {',
+      '  vec3 a = vec3(0.5); vec3 b = vec3(0.5); vec3 c = vec3(1.0); vec3 d = vec3(0.0, 0.33, 0.67);',
+      '  if (id > 0.5) { d = vec3(0.0, 0.1, 0.2); }',
+      '  if (id > 1.5) { a = vec3(0.1, 0.4, 0.6); b = vec3(0.1, 0.3, 0.4); d = vec3(0.6, 0.5, 0.4); }',
+      '  if (id > 2.5) { a = vec3(0.5, 0.3, 0.7); b = vec3(0.5, 0.4, 0.3); d = vec3(0.0, 0.5, 0.25); }',
+      '  if (id > 3.5) { a = vec3(0.6, 0.25, 0.05); b = vec3(0.4, 0.25, 0.05); c = vec3(0.5); d = vec3(0.5); }',
+      '  if (id > 4.5) { a = vec3(0.3, 0.6, 0.2); b = vec3(0.3, 0.4, 0.2); c = vec3(1.0); d = vec3(0.2, 0.0, 0.5); }',
+      '  if (id > 5.5) { a = vec3(0.8, 0.5, 0.7); b = vec3(0.2, 0.3, 0.3); d = vec3(0.0, 0.33, 0.67); }',
+      '  if (id > 6.5) { a = vec3(0.6, 0.8, 0.95); b = vec3(0.4, 0.2, 0.05); c = vec3(0.5); d = vec3(0.5); }',
+      '  if (id > 7.5) { a = vec3(0.5); b = vec3(0.5); c = vec3(0.5); d = vec3(0.5); }',
+      '  return clamp(a + b * cos(6.2831853 * (c * k + d)), 0.0, 1.0);',
+      '}',
+    ].join('\n'),
+  },
+  grad3: {
+    deps: [],
+    src: [
+      'vec3 grad3(float k, vec3 a, vec3 b, vec3 c) {',
+      '  k = fract(k) * 3.0;',
+      '  vec3 r = mix(a, b, smoothstep(0.0, 1.0, clamp(k, 0.0, 1.0)));',
+      '  r = mix(r, c, smoothstep(0.0, 1.0, clamp(k - 1.0, 0.0, 1.0)));',
+      '  return mix(r, a, smoothstep(0.0, 1.0, clamp(k - 2.0, 0.0, 1.0)));',
+      '}',
+    ].join('\n'),
+  },
+};
+
+const HELPER_ORDER: StudioHelper[] = ['rot', 'hash21', 'vnoise', 'fbm', 'blendV', 'presetPal', 'grad3'];
+
+// Same contract as nexus-service's _prelude.frag: these names and hint_ranges
+// are what both renderers bind from EffectState.
+const HEADER = `#version 330 core
+out vec4 fragColor;
+uniform vec2  u_resolution;
+uniform float u_time;
+uniform float u_speed;      // hint_range(-2.0, 2.0, 0.02) = 1.0
+uniform float u_hue;        // hint_range(0.0, 1.0, 0.01) = 0.0
+uniform float u_colorize;   // hint_range(0.0, 1.0, 0.01) = 0.0
+uniform float u_saturation; // hint_range(0.0, 4.0, 0.01) = 1.0
+uniform float u_contrast;   // hint_range(0.0, 4.0, 0.01) = 1.0
+uniform float u_audioLevel;
+uniform float u_audioBass;
+uniform float u_audioMid;
+uniform float u_audioHigh;
+uniform float u_audioBeat;
+const float PI = 3.14159265;`;
+
+const FOOTER_HELPERS = `vec2 uvCentered() {
+  vec2 u = gl_FragCoord.xy / u_resolution;
+  u.y = 1.0 - u.y;
+  u = u * 2.0 - 1.0;
+  u.x *= u_resolution.x / u_resolution.y;
+  return u;
+}
+vec3 hsv2rgb(vec3 c) {
+  vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+vec3 finalize(vec3 col) {
+  float luma = dot(max(col, 0.0), vec3(0.2126, 0.7152, 0.0722));
+  vec3 blended = mix(col, luma * hsv2rgb(vec3(u_hue, 1.0, 1.0)) * 1.4, clamp(u_colorize, 0.0, 1.0));
+  float bl = dot(max(blended, 0.0), vec3(0.2126, 0.7152, 0.0722));
+  blended = mix(vec3(bl), blended, clamp(u_saturation, 0.0, 4.0));
+  blended = (blended - 0.5) * clamp(u_contrast, 0.0, 4.0) + 0.5;
+  return max(blended, 0.0);
+}`;
+
+function fmt(n: number): string {
+  return Number.isInteger(n) ? n.toFixed(1) : String(n);
+}
+
+function uniformName(index: number, key: string): string {
+  return `u_b${index}_${key}`;
+}
+
+function collectHelpers(defs: StudioBlockDef[], needsBlend: boolean): string[] {
+  const wanted = new Set<StudioHelper>();
+  const add = (h: StudioHelper) => {
+    if (wanted.has(h)) return;
+    wanted.add(h);
+    HELPERS[h].deps.forEach(add);
+  };
+  defs.forEach(d => d.helpers?.forEach(add));
+  if (needsBlend) add('blendV');
+  return HELPER_ORDER.filter(h => wanted.has(h)).map(h => HELPERS[h].src);
+}
+
+function fnv1a(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+function clampParam(p: StudioParam, value: number | undefined): number {
+  const v = value ?? p.def;
+  return Number.isFinite(v) ? Math.min(p.max, Math.max(p.min, v)) : p.def;
+}
+
+/**
+ * Compiles a recipe into one self-contained GLSL 330 fragment shader. Every
+ * block param is a hint_range uniform, so slider moves only change `params`;
+ * the GLSL (and `key`) changes on block add/remove/reorder/type and mod routing.
+ */
+export function compileStudio(recipe: StudioRecipe): CompiledStudio {
+  const blocks = orderedBlocks(recipe);
+  const defs = blocks.map(b => studioBlock(b.type)!);
+  const uniforms: string[] = [];
+  const params: Record<string, number> = {};
+  const body: string[] = [];
+  let patternIndex = 0;
+
+  blocks.forEach((block, i) => {
+    const def = defs[i];
+    const first = def.stage === 'pattern' && patternIndex === 0;
+    const list = blockParams(def, first);
+    const exprs: Record<string, string> = {};
+    for (const p of list) {
+      const name = uniformName(i, p.key);
+      uniforms.push(`uniform float ${name}; // hint_range(${fmt(p.min)}, ${fmt(p.max)}, ${fmt(p.step)}) = ${fmt(p.def)}`);
+      params[name] = clampParam(p, block.params[p.key]);
+      const mod = p.options ? undefined : block.mods?.[p.key];
+      if (mod) {
+        const modName = `${name}_m`;
+        uniforms.push(`uniform float ${modName}; // hint_range(-1.0, 1.0, 0.01) = 0.5`);
+        params[modName] = Math.min(1, Math.max(-1, mod.amount));
+        const swept = `clamp(${name} + ${modName} * ${fmt(p.max - p.min)} * ${MOD_UNIFORM[mod.source]}, ${fmt(p.min)}, ${fmt(p.max)})`;
+        // A count between integers seams at the atan wrap (kaleidoscope, spiral).
+        exprs[p.key] = p.whole ? `floor(${swept} + 0.5)` : swept;
+      } else {
+        exprs[p.key] = name;
+      }
+    }
+    for (const c of def.colors ?? []) {
+      const rgb = block.colors?.[c.key] ?? c.def;
+      const names = ['r', 'g', 'b'].map(ch => uniformName(i, `${c.key}${ch}`));
+      names.forEach((n, k) => {
+        uniforms.push(`uniform float ${n}; // hint_range(0.0, 1.0, 0.001) = ${fmt(c.def[k])}`);
+        params[n] = Math.min(1, Math.max(0, rgb[k]));
+      });
+      exprs[c.key] = `vec3(${names.join(', ')})`;
+    }
+    const keys = Object.keys(exprs).sort((a, b) => b.length - a.length);
+    let code = def.code;
+    for (const k of keys) code = code.split(`$${k}`).join(`(${exprs[k]})`);
+
+    if (def.stage === 'pattern') {
+      const combine = first ? 'v = f;' : `v = blendV(v, f, ${exprs.blend}, ${exprs.mix});`;
+      body.push(`  { float f = 0.0;\n${indent(code)}\n    ${combine} }`);
+      patternIndex += 1;
+    } else {
+      body.push(`  {\n${indent(code)}\n  }`);
+    }
+  });
+
+  const needsBlend = patternIndex > 1;
+  const hasColor = defs.some(d => d.stage === 'color');
+  const frag = [
+    HEADER,
+    ...uniforms,
+    ...collectHelpers(defs, needsBlend),
+    FOOTER_HELPERS,
+    'void main() {',
+    '  vec2 p0 = uvCentered();',
+    '  vec2 p = p0;',
+    '  float t = mod(u_time, 3600.0) * u_speed;',
+    '  float v = 0.0;',
+    '  vec3 col = vec3(0.0);',
+    ...insertColorDefault(body, defs, hasColor),
+    '  fragColor = vec4(finalize(col), 1.0);',
+    '}',
+  ].join('\n');
+
+  return { key: `studio-${fnv1a(frag)}`, frag, params };
+}
+
+function insertColorDefault(body: string[], defs: StudioBlockDef[], hasColor: boolean): string[] {
+  if (hasColor) return body;
+  const firstFinish = defs.findIndex(d => d.stage === 'finish');
+  const gray = '  col = vec3(v);';
+  if (firstFinish < 0) return [...body, gray];
+  return [...body.slice(0, firstFinish), gray, ...body.slice(firstFinish)];
+}
+
+function indent(code: string): string {
+  return code.split('\n').map(l => `    ${l}`).join('\n');
+}
+
+export function recipeCost(recipe: StudioRecipe): number {
+  return recipe.blocks.reduce((sum, b) => sum + (studioBlock(b.type)?.cost ?? 0), 0);
+}
+
+export function stageCount(recipe: StudioRecipe, stage: StudioStage): number {
+  return recipe.blocks.filter(b => studioBlock(b.type)?.stage === stage).length;
+}
