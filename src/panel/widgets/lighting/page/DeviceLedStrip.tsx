@@ -5,7 +5,8 @@ import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import { isStaticFill } from '../../../../types/lighting';
 import { isPaletteKey } from '../../../../types/lightingPalette';
 import { cardEnabledLedCount } from './zoneUtils';
-import { sliceStackSlot, type StackSlot } from '../../../../lib/stackSlots';
+import { type StackSlot } from '../../../../lib/stackSlots';
+import { ledSample, sampleBox, sampleSpot } from '../../../../lib/ledSampling';
 import { getScenePoints } from '../../../../lib/scene/scenePointsStore';
 import type { LightingDevice } from '../../../../api/lighting';
 import styles from '../LightingPage.module.scss';
@@ -62,20 +63,21 @@ function paint(
   fullscreen: boolean,
   pickOnly: boolean,
   locks: readonly LockedCell[],
-  live: boolean,
 ): void {
-  if (!(live && paintDeviceBytes(canvas, device, frame))) {
+  // The device's own bytes are what the hardware gets, so they are the strip
+  // whenever the frame carries them; identify still outranks them.
+  if (!(identifyPhase(device.id) === null && paintDeviceBytes(canvas, device, frame))) {
     paintLook(canvas, device, slot, frame, pick, pattern, fullscreen, pickOnly);
   }
   if (locks.length > 0 && identifyPhase(device.id) === null) paintLockedCells(canvas, device, locks);
 }
 
 /**
- * The device's own LED bytes from the output frame, for a device the shared
- * canvas does not describe (one locked onto its own animation). One cell per
- * strip cell, sampled along the LED order. False when the frame carries no
- * bytes for it (no frame index, relay connection, lighting off), so the
- * caller falls back to the canvas path.
+ * The device's own LED bytes from the output frame, before brightness. One
+ * cell per strip cell, sampled along the LED order (a matrix device reads in
+ * wiring order, which is the order the service and the hardware use). False
+ * when the frame carries no bytes for it (no frame index, relay connection,
+ * lighting off), so the caller falls back to sampling the canvas.
  */
 function paintDeviceBytes(canvas: HTMLCanvasElement, device: LightingDevice, frame: LedFrame): boolean {
   if (device.frameIndex === undefined) return false;
@@ -195,40 +197,30 @@ function paintLook(
       const o = i * 4;
       d[o + 3] = 255;
       if (Number.isNaN(cx)) continue;
-      // Floor, as the engine truncates its sample position.
-      const ux = Math.min(w - 1, Math.max(0, Math.floor((cx / CW) * w)));
-      const vy = Math.min(h - 1, Math.max(0, Math.floor((cy / CH) * h)));
-      const s = (vy * w + ux) * 3;
-      d[o] = pixels[s] * scale;
-      d[o + 1] = pixels[s + 1] * scale;
-      d[o + 2] = pixels[s + 2] * scale;
+      // The same spot mean the engine reads at an LED.
+      const [r, g, b] = sampleSpot({ pixels, w, h }, { sx: (cx / CW) * w, sy: (cy / CH) * h, halfW: Infinity, halfH: Infinity });
+      d[o] = r * scale;
+      d[o + 1] = g * scale;
+      d[o + 2] = b * scale;
     }
     ctx.putImageData(img, 0, 0);
     return;
   }
   // Static evaluates every device as if its frame filled the canvas, so a
-  // pattern reads end to end on each device instead of the slice its rect
-  // happens to cover. Other modes sample the centreline of the device's part
-  // of its frame (its stack slot, else the whole frame), first LED at its own
-  // left, turned about the frame centre by the frame's rotation - the line
-  // the engine's strip sampler walks.
-  const rad = fullscreen ? 0 : (((device.canvasRotation ?? 0) % 360) + 360) % 360 * Math.PI / 180;
-  const cos = Math.cos(rad), sin = Math.sin(rad);
-  const fcx = fullscreen ? CW / 2 : device.canvasX + device.canvasW / 2;
-  const fcy = fullscreen ? CH / 2 : device.canvasY + device.canvasH / 2;
-  const whole = fullscreen ? { x: 0, y: 0, w: CW, h: CH } : { x: device.canvasX, y: device.canvasY, w: device.canvasW, h: device.canvasH };
-  const part = slot && !fullscreen ? sliceStackSlot(whole, slot) : whole;
-  const midY = part.y + part.h / 2 - fcy;
+  // pattern reads end to end on each device (a box mean over its slice of it).
+  // Other modes read the spot at each LED along the centreline of the device's
+  // part of its frame (its stack slot, else the whole frame), turned about the
+  // frame centre - the positions and the read the engine uses.
+  const leds = Math.max(1, device.ledCount);
+  const frameView = { pixels, w, h };
   for (let i = 0; i < cells; i++) {
-    const t = cells === 1 ? 0 : i / (cells - 1) - 0.5;
-    const lx = part.x + part.w / 2 + t * part.w - fcx;
-    const ux = Math.min(w - 1, Math.max(0, Math.round(((fcx + lx * cos - midY * sin) / CW) * w)));
-    const vy = Math.min(h - 1, Math.max(0, Math.round(((fcy + lx * sin + midY * cos) / CH) * h)));
-    const s = (vy * w + ux) * 3;
+    const led = cells === 1 ? 0 : Math.round((i * (leds - 1)) / (cells - 1));
+    const at = ledSample(device, led, leds, w, h, { fullFrame: fullscreen, slot });
+    const [r, g, b] = fullscreen ? sampleBox(frameView, at) : sampleSpot(frameView, at);
     const o = i * 4;
-    d[o] = pixels[s] * scale;
-    d[o + 1] = pixels[s + 1] * scale;
-    d[o + 2] = pixels[s + 2] * scale;
+    d[o] = r * scale;
+    d[o + 1] = g * scale;
+    d[o + 2] = b * scale;
     d[o + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
@@ -241,9 +233,7 @@ function paintLook(
  * the device list. The card decides whether a readout exists at all; a dark or
  * un-driven device does not mount this.
  */
-export const DeviceLedStrip = memo(function DeviceLedStrip({ device, slot, pick, fullscreen, pickOnly, live }: { device: LightingDevice; slot?: StackSlot | null; pick?: LedPick; fullscreen?: boolean; pickOnly?: boolean;
-  /** Paint the device's own LED bytes from the frame (a device locked onto its own animation). */
-  live?: boolean }) {
+export const DeviceLedStrip = memo(function DeviceLedStrip({ device, slot, pick, fullscreen, pickOnly }: { device: LightingDevice; slot?: StackSlot | null; pick?: LedPick; fullscreen?: boolean; pickOnly?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   // Read through refs so a device refetch (new object identity, same values)
   // does not tear down and rebuild the subscription.
@@ -257,8 +247,6 @@ export const DeviceLedStrip = memo(function DeviceLedStrip({ device, slot, pick,
   fullscreenRef.current = fullscreen;
   const pickOnlyRef = useRef(pickOnly);
   pickOnlyRef.current = pickOnly;
-  const liveRef = useRef(!!live);
-  liveRef.current = !!live;
   // Last frame delivered, so a pattern that decodes between frames can repaint
   // without waiting for the next one (there is none while lighting is held).
   const frameRef = useRef<LedFrame>(EMPTY_FRAME);
@@ -291,13 +279,13 @@ export const DeviceLedStrip = memo(function DeviceLedStrip({ device, slot, pick,
 
   useEffect(() => subscribeIdentify(() => {
     const el = ref.current;
-    if (el) paint(el, deviceRef.current, slotRef.current, frameRef.current, pickRef.current, patternRef.current, !!fullscreenRef.current, !!pickOnlyRef.current, locksRef.current, liveRef.current);
+    if (el) paint(el, deviceRef.current, slotRef.current, frameRef.current, pickRef.current, patternRef.current, !!fullscreenRef.current, !!pickOnlyRef.current, locksRef.current);
   }), []);
 
   useEffect(() => subscribeLedFrame(frame => {
     frameRef.current = frame;
     const el = ref.current;
-    if (el) paint(el, deviceRef.current, slotRef.current, frame, pickRef.current, patternRef.current, !!fullscreenRef.current, !!pickOnlyRef.current, locksRef.current, liveRef.current);
+    if (el) paint(el, deviceRef.current, slotRef.current, frame, pickRef.current, patternRef.current, !!fullscreenRef.current, !!pickOnlyRef.current, locksRef.current);
   }), []);
 
   // A pick or a decoded pattern lands between frames, so repaint immediately
@@ -306,8 +294,8 @@ export const DeviceLedStrip = memo(function DeviceLedStrip({ device, slot, pick,
   // arriving (a per-device surface) nothing else would ever repaint it.
   useEffect(() => {
     const el = ref.current;
-    if (el) paint(el, deviceRef.current, slot, frameRef.current, pick, pattern, !!fullscreen, !!pickOnly, locks, !!live);
-  }, [pick, pattern, fullscreen, pickOnly, device.brightness, slot, locks, live]);
+    if (el) paint(el, deviceRef.current, slot, frameRef.current, pick, pattern, !!fullscreen, !!pickOnly, locks);
+  }, [pick, pattern, fullscreen, pickOnly, device.brightness, slot, locks]);
 
   return <canvas ref={ref} className={styles.ledStrip} aria-hidden />;
 });

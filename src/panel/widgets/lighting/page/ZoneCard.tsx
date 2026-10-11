@@ -719,7 +719,7 @@ export function ZoneCard({
         {/* A dark device has nothing to read out, and firmware lighting does not
             come from our canvas, so the bar is absent rather than blank. */}
         {!unavailable && !firmwareControlled && controlled && device.ledsOn && (
-          <DeviceLedStrip device={device} slot={stackSlot} pick={lock?.animateLocked ? undefined : ledPick} fullscreen={ledFullscreen} pickOnly={ledPickOnly} live={lock?.animateLocked} />
+          <DeviceLedStrip device={device} slot={stackSlot} pick={ledPick} fullscreen={ledFullscreen} pickOnly={ledPickOnly} />
         )}
         {/* Only a locked card carries the badge: it sits between the strip
             and the menu, so the strip gives up its width to it, and a press
