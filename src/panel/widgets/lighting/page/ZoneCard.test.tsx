@@ -901,6 +901,83 @@ describe('ZoneCard color lock', () => {
   });
 });
 
+describe('ZoneCard animation lock', () => {
+  const badge = () => screen.queryByRole('button', { name: 'lighting.devices.unlockAnimation' }) as HTMLButtonElement | null;
+  const menuRow = (re: RegExp) => screen.queryAllByRole('button').find(b => re.test(b.textContent ?? '')) ?? null;
+  const openMenu = () => fireEvent.click(screen.getByRole('button', { name: 'lighting.devices.moreActions' }));
+  const renderLock = (lock: Partial<NonNullable<Parameters<typeof ZoneCard>[0]['lock']>>) => render(
+    <ZoneCard
+      device={baseDevice} selected={false} indent={false} onSelect={() => {}}
+      onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
+      lock={{ locked: false, lockable: false, hasPick: false, setLocked: () => {}, ...lock }}
+    />,
+  );
+
+  it('badges an animation-locked card with the animation tooltip, and the badge unlocks', () => {
+    const setAnimateLocked = vi.fn();
+    const setLocked = vi.fn();
+    renderLock({ animateLocked: true, setAnimateLocked, setLocked });
+    expect(screen.queryByRole('button', { name: 'lighting.devices.unlockLook' })).toBeNull();
+    fireEvent.click(badge()!);
+    expect(setAnimateLocked).toHaveBeenCalledWith(false);
+    expect(setLocked).not.toHaveBeenCalled();
+  });
+
+  it('shows no badge on an unlocked card', () => {
+    renderLock({ animateLockable: true });
+    expect(badge()).toBeNull();
+  });
+
+  it('offers Lock animation when animation locks are available and the card has no lock', () => {
+    const setAnimateLocked = vi.fn();
+    renderLock({ animateLockable: true, setAnimateLocked });
+    openMenu();
+    fireEvent.click(menuRow(/^lighting\.devices\.lockAnimation$/)!);
+    expect(setAnimateLocked).toHaveBeenCalledWith(true);
+  });
+
+  it('offers no Lock animation outside Animate, or on a card holding a static lock', () => {
+    renderLock({ animateLockable: false });
+    openMenu();
+    expect(menuRow(/lockAnimation/)).toBeNull();
+    cleanup();
+    renderLock({ animateLockable: true, locked: true });
+    openMenu();
+    expect(menuRow(/^lighting\.devices\.lockAnimation$/)).toBeNull();
+  });
+
+  it('offers Unlock animation on a locked card, and no Lock static color beside it', () => {
+    const setAnimateLocked = vi.fn();
+    renderLock({ animateLocked: true, lockable: true, hasPick: true, setAnimateLocked });
+    openMenu();
+    expect(menuRow(/^lighting\.devices\.lockLook$/)).toBeNull();
+    expect(menuRow(/^lighting\.devices\.lockAnimation$/)).toBeNull();
+    fireEvent.click(menuRow(/^lighting\.devices\.unlockAnimation$/)!);
+    expect(setAnimateLocked).toHaveBeenCalledWith(false);
+  });
+
+  it('counts the members each animation row reaches in a selection', () => {
+    const setAnimateLocked = vi.fn();
+    render(
+      <ZoneCard
+        device={baseDevice} selected indent={false} onSelect={() => {}}
+        onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
+        lock={{ locked: false, lockable: false, hasPick: false, setLocked: () => {} }}
+        bulk={{
+          count: 3, identifyCount: 3, tunableCount: 3, controlled: true, ledsOn: true,
+          setControlled: () => {}, setPower: () => {}, identify: () => {},
+          animateLockCount: 2, animateUnlockCount: 1, setAnimateLocked,
+        }}
+      />,
+    );
+    openMenu();
+    fireEvent.click(menuRow(/lockAnimationCount\.other:\{"count":2\}/)!);
+    expect(setAnimateLocked).toHaveBeenCalledWith(true);
+    fireEvent.click(menuRow(/unlockAnimationCount\.one:\{"count":1\}/)!);
+    expect(setAnimateLocked).toHaveBeenCalledWith(false);
+  });
+});
+
 describe('ZoneCard LED colours badge', () => {
   const badge = () => screen.queryByRole('button', { name: 'lighting.devices.ledColorsBadge' }) as HTMLButtonElement | null;
   const renderWith = (device: LightingDevice, extra: Partial<Parameters<typeof ZoneCard>[0]> = {}) => render(

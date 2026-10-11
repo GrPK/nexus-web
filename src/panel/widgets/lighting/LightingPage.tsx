@@ -9,7 +9,7 @@ import {
   renameLightingDevice, saveLightingGroups, saveLightingStacks, saveDeviceLayout,
   fetchScreenEffect, setScreenEffect, fetchMediaEffect, setMediaEffect, fetchLedMap,
   fetchCurrentSync, fetchAvailableMappings, fetchGameSyncState, fetchGameSyncGames,
-  fetchStaticDeviceLooks, setStaticDeviceLock,
+  fetchStaticDeviceLooks, setStaticDeviceLock, fetchAnimateDeviceLocks, setAnimateDeviceLock,
   steamArtworkUrl, resolveActiveGame, setLightingPaused,
   resetDeviceLayouts, applyDeviceLayouts, setActiveLayoutPreset, updateLayoutPreset, identifyLightingDevice,
   type LightingDevice, type LedMapEntry, type PostProcessSettings, type GameSyncDevice,
@@ -30,6 +30,10 @@ import type { ServiceState } from '../../../hooks/useServiceState';
 import type { ConnectionState } from '../../../hooks/useServiceStatus';
 import type { DashboardSectionNavigate } from '../../engine/panelLayoutHelpers';
 import { buildDeviceBlocks, sortZonesWithinDevice, type ZoneBlock } from './page/deviceBlocks';
+import { AnimateLockNotice } from './page/AnimateLockNotice';
+import {
+  animateLockedAmong, lockedNamesByEffect, sharedAnimateLock, withAnimateLock, type AnimateLocks,
+} from './page/animateLocks';
 import { canStack, isStackedSet, setStackLayout, stackDevices, stackOf, unstackDevices, withStacked, type DeviceStack } from './page/deviceStacks';
 import { controlGroupOf } from './page/controlGroupOf';
 import { stackLayoutOf, type StackLayout } from '../../../lib/stackSlots';
@@ -137,6 +141,7 @@ interface LayoutHistorySnapshot {
 type ScopedTarget =
   | { kind: 'none' }
   | { kind: 'locked' }
+  | { kind: 'animateLock'; key: string; slot: number }
   | { kind: 'pick'; key: string; slot: number; explicit: boolean; hex: string };
 
 // Module scope so the layout undo/redo history survives LightingPage's unmount
@@ -341,6 +346,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     () => (previewPicks ? { ...devicePicks, ...previewPicks } : devicePicks),
     [devicePicks, previewPicks],
   );
+  // Device id to the Animate effect it is locked onto. The service owns these;
+  // this is its copy, re-read on every lighting frame.
+  const [animateLocks, setAnimateLocks] = useState<AnimateLocks>({});
+  const animateLocksRef = useRef(animateLocks);
+  animateLocksRef.current = animateLocks;
   // What the rail shows outside Static: the picks the service still paints.
   const railLockedPicks = useMemo(() => lockedPicks(devicePicks), [devicePicks]);
   // Collapsing the effect dock hands its space to the canvas and the browser.
@@ -789,6 +799,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // flags are taken: replacing the picks wholesale here would put a
     // still-queued colour write's record back to the older look.
     void syncDeviceLocks();
+    void syncAnimateLocks();
     // Static edits the same template slots, so both modes follow a remote edit.
     if (mode === 'animate' || mode === 'static') {
       if (Date.now() < localAnimateEditUntilRef.current) return;
@@ -934,7 +945,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const lockFlashAtRef = useRef(new Map<string, number>());
   const flashLockedAmong = useCallback((ids: readonly string[]) => {
     const now = Date.now();
-    const due = ids.filter(id => devicePicksRef.current[id]?.locked
+    const due = ids.filter(id => (devicePicksRef.current[id]?.locked || id in animateLocksRef.current)
       && now - (lockFlashAtRef.current.get(id) ?? 0) >= LOCK_FLASH_GAP_MS);
     if (due.length === 0) return;
     for (const id of due) lockFlashAtRef.current.set(id, now);
@@ -983,6 +994,26 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     setDevicePicks(prev => mergeLocksFromLooks(prev, res.looks));
   }, [setDevicePicks]);
 
+  const syncAnimateLocks = useCallback(async () => {
+    const locks = await fetchAnimateDeviceLocks();
+    if (locks) setAnimateLocks(locks);
+  }, []);
+
+  // Locks onto the running effect, or releases. Optimistic like the static
+  // lock: the cards flip at once and the entry is put back if the service
+  // refused (a Static lock, lighting off, or a service without the route).
+  const handleSetAnimateLock = useCallback((ids: string[], locked: boolean) => {
+    for (const id of ids) {
+      const before = animateLocksRef.current[id] ?? null;
+      const effect = locked ? activeEffect : null;
+      if (locked && !effect) continue;
+      setAnimateLocks(prev => withAnimateLock(prev, id, effect));
+      setAnimateDeviceLock(id, effect).then(ok => {
+        if (!ok) setAnimateLocks(prev => withAnimateLock(prev, id, before));
+      });
+    }
+  }, [activeEffect]);
+
   // Optimistic: the cards flip at once, and a record is put back only if the
   // service refused it (no look to hold, or a service without the route).
   const handleSetLock = useCallback((ids: string[], locked: boolean) => {
@@ -1015,6 +1046,17 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   }, []);
 
   const handleEffectSelect = useCallback((key: string) => {
+    // Animate paints every device without a lock of its own. Locked devices in
+    // the selection flash their badge; when the whole selection is locked there
+    // is nobody left for the pick to reach, so it changes nothing.
+    if (effectiveMode === 'animate' && selectedDeviceIds.size > 0) {
+      const ids = [...selectedDeviceIds];
+      const lockedIds = animateLockedAmong(animateLocksRef.current, ids);
+      if (lockedIds.length > 0) {
+        flashLockedAmong(lockedIds);
+        if (lockedIds.length === ids.length) return;
+      }
+    }
     // Scoped pick: the running effect is untouched, only the selected devices
     // take the colour.
     if (perDeviceMode && selectedDeviceIds.size > 0 && isStaticEffect(key)) {
@@ -1046,7 +1088,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       rawSync: selectMode === 'static' ? 'static' : key,
       effect: key,
     });
-  }, [activeEffect, applyAnimate, applyDeviceColor, effectiveMode, perDeviceMode, selectedDeviceIds, stateFor]);
+  }, [activeEffect, applyAnimate, applyDeviceColor, effectiveMode, flashLockedAmong, perDeviceMode, selectedDeviceIds, stateFor]);
 
   const queueCustomWrite = useColorWriteQueue();
 
@@ -1097,6 +1139,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // disagreement. 'locked' also covers a selection with no pick yet: there is
   // nothing scoped to edit, and the dock must not silently edit the global one.
   const scoped: ScopedTarget = useMemo(() => {
+    // Animate has no per-device picks, but a selection held on one animation
+    // shows that animation: the grid lights it and the dock edits its settings.
+    if (effectiveMode === 'animate') {
+      const key = sharedAnimateLock(animateLocks, [...selectedDeviceIds]);
+      return key ? { kind: 'animateLock', key, slot: slotOf(key) } : { kind: 'none' };
+    }
     if (!perDeviceMode || selectedDeviceIds.size === 0) return { kind: 'none' };
     let first: DevicePick | undefined;
     let explicit = false;
@@ -1116,12 +1164,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
     if (!first || !first.key) return { kind: 'locked' };
     return { kind: 'pick', key: first.key, slot: first.slot, explicit, hex: first.hex };
-  }, [activeEffect, livePicks, perDeviceMode, selectedDeviceIds, slotOf]);
+  }, [activeEffect, animateLocks, effectiveMode, livePicks, perDeviceMode, selectedDeviceIds, slotOf]);
 
   // The dock always edits a single (effect, slot). Scoped, that is the
   // selection's own preset; otherwise the running effect's selected one.
-  const dockEffect = scoped.kind === 'pick' ? scoped.key : activeEffect;
-  const dockSlot = scoped.kind === 'pick' ? scoped.slot : slotOf(activeEffect);
+  const dockEffect = scoped.kind === 'pick' || scoped.kind === 'animateLock' ? scoped.key : activeEffect;
+  const dockSlot = scoped.kind === 'pick' || scoped.kind === 'animateLock' ? scoped.slot : slotOf(activeEffect);
+  // Editing a locked animation that is not the running one changes its settings
+  // only: the running effect and the other surfaces stay as they were.
+  const lockedElsewhere = scoped.kind === 'animateLock' && scoped.key !== activeEffect;
   const dockState: EffectState | null = dockEffect ? stateOf(dockEffect, dockSlot) : null;
   // The slot strip highlights what the dock edits, so a scoped bundle carries
   // the selection's slot rather than the effect's shared pointer.
@@ -1145,18 +1196,21 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       writeDevicePicks(scoped.key, clampedIdx, [...selectedDeviceIds], true);
       return;
     }
-    if (!activeEffect) return;
-    const bundle = effectTemplates[activeEffect];
+    // A selection held on a locked animation edits that animation's preset.
+    const target = scoped.kind === 'animateLock' ? scoped.key : activeEffect;
+    if (!target) return;
+    const bundle = effectTemplates[target];
     if (!bundle) return;
     if (idx === bundle.selected) return;
     localAnimateEditUntilRef.current = Date.now() + 1500;
     const clamped = Math.min(Math.max(idx, 0), bundle.slots.length - 1);
     const nextBundle: EffectTemplateBundle = { ...bundle, selected: clamped };
-    const nextTemplates = { ...effectTemplates, [activeEffect]: nextBundle };
-    writeTemplates(nextTemplates, activeEffect, true);
+    const nextTemplates = { ...effectTemplates, [target]: nextBundle };
+    writeTemplates(nextTemplates, target === activeEffect ? target : null, true);
     // Selection is instant and the slot's params are unchanged, so the committed
     // snapshot can advance immediately (no save race).
     setCommittedTemplates(nextTemplates);
+    if (target !== activeEffect) return;
     publishControlSync({
       domain: 'lighting',
       // Static edits must not announce themselves as animate: subscribers
@@ -1187,9 +1241,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const scopedEdit = scoped.kind === 'pick' && scoped.explicit;
     writeTemplates(
       { ...effectTemplates, [dockEffect]: nextBundle },
-      scopedEdit ? null : dockEffect,
+      scopedEdit || lockedElsewhere ? null : dockEffect,
       commit,
     );
+    if (lockedElsewhere) return;
     if (scopedEdit) {
       writeDevicePicks(dockEffect, idx, [...selectedDeviceIds], commit);
       return;
@@ -1205,7 +1260,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       templateIndex: idx,
       effectState: nextSlot,
     });
-  }, [dockEffect, dockSlot, dockState, effectTemplates, scoped, selectedDeviceIds, writeDevicePicks, writeTemplates]);
+  }, [dockEffect, dockSlot, dockState, effectTemplates, lockedElsewhere, scoped, selectedDeviceIds, writeDevicePicks, writeTemplates]);
 
   const handleStateCommit = useCallback(() => {
     if (!dockEffect) return;
@@ -1227,8 +1282,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       writeDevicePicks(dockEffect, idx, [...selectedDeviceIds], true);
       return;
     }
+    if (lockedElsewhere) return;
     applyAnimate(dockEffect, latest, true);
-  }, [applyAnimate, dockEffect, dockSlot, scoped, selectedDeviceIds, writeDevicePicks]);
+  }, [applyAnimate, dockEffect, dockSlot, lockedElsewhere, scoped, selectedDeviceIds, writeDevicePicks]);
 
   const handleStateReset = useCallback(() => {
     if (!dockEffect) return;
@@ -1241,12 +1297,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const nextBundle: EffectTemplateBundle = { ...bundle, slots: nextSlots };
     const nextTemplates = { ...effectTemplates, [dockEffect]: nextBundle };
     const scopedEdit = scoped.kind === 'pick' && scoped.explicit;
-    writeTemplates(nextTemplates, scopedEdit ? null : dockEffect, true)
+    writeTemplates(nextTemplates, scopedEdit || lockedElsewhere ? null : dockEffect, true)
       .then(() => {
         setCommittedTemplates(nextTemplates);
         if (scopedEdit) writeDevicePicks(dockEffect, idx, [...selectedDeviceIds], true);
       });
-  }, [animateDefaults, dockEffect, dockSlot, effectTemplates, scoped, selectedDeviceIds, writeDevicePicks, writeTemplates]);
+  }, [animateDefaults, dockEffect, dockSlot, effectTemplates, lockedElsewhere, scoped, selectedDeviceIds, writeDevicePicks, writeTemplates]);
 
   // Cross-panel usage drives the "used by a panel" badge. No exclusion: the
   // desktop page isn't a panel, so every panel background counts.
@@ -1606,7 +1662,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (!serviceOnline) return;
     void refreshDevices();
     void syncDevicePicks();
-  }, [serviceOnline, activeProfileId, refreshDevices, syncDevicePicks]);
+    void syncAnimateLocks();
+  }, [serviceOnline, activeProfileId, refreshDevices, syncDevicePicks, syncAnimateLocks]);
 
   useEffect(() => {
     if (!serviceOnline) return;
@@ -2130,7 +2187,25 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // A colour picked with nothing selected has nowhere to land, so the browser
   // stops taking input until a device is chosen.
   const staticNeedsSelection = effectiveMode === 'static' && selectedDeviceIds.size === 0;
-  const gridEffect = scoped.kind === 'pick' ? scoped.key : (scoped.kind === 'locked' ? '' : activeEffect);
+  // The rail shows what the service paints. A device locked onto an animation
+  // is painted with that animation in every mode, so it outranks a Static pick;
+  // while that animation is the running one the strip samples the live canvas.
+  const railPicks = useMemo(() => {
+    const base = perDeviceMode ? livePicks : railLockedPicks;
+    const locked = Object.entries(animateLocks);
+    if (locked.length === 0) return base;
+    const out = { ...base };
+    for (const [id, effect] of locked) {
+      if (effectiveMode === 'animate' && effect === activeEffect) delete out[id];
+      else out[id] = { key: effect, slot: committedTemplates[effect]?.selected ?? 0, hex: '' };
+    }
+    return out;
+  }, [activeEffect, animateLocks, committedTemplates, effectiveMode, livePicks, perDeviceMode, railLockedPicks]);
+  const lockedDevices = useMemo(() => {
+    const names = new Map(devices.map(d => [d.id, d.name]));
+    return lockedNamesByEffect(animateLocks, id => names.get(id));
+  }, [animateLocks, devices]);
+  const gridEffect = scoped.kind === 'pick' || scoped.kind === 'animateLock' ? scoped.key : (scoped.kind === 'locked' ? '' : activeEffect);
   // The colour the selection wears, which is where its dots sit on the field.
   const scopedHex = scoped.kind === 'pick' ? scoped.hex : '';
   // Selected devices wearing different looks have no single value for the
@@ -2439,11 +2514,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             // returning to Static restores each device's own look. A locked
             // device is the exception: the service keeps painting it, so its
             // strip keeps showing the pick.
-            devicePicks={perDeviceMode ? livePicks : railLockedPicks}
+            devicePicks={railPicks}
             versionForSlot={versionForSlot}
             ledFullscreen={effectiveMode === 'static'}
             lockable={effectiveMode === 'static'}
             onSetLock={handleSetLock}
+            animateLocks={animateLocks}
+            animateLockable={effectiveMode === 'animate' && !simpleAnimation && !!activeEffect}
+            onSetAnimateLock={handleSetAnimateLock}
             lockFlash={lockFlash}
             selectedIds={selectedDeviceIds}
             onSetSelection={handleSetSelection}
@@ -2531,6 +2609,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   <DeviceCanvas devices={canvasDevices} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? activeEffect : null} shaderState={shaderMode ? previewState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
                 )}
                 {effectiveMode === 'gif' && <MediaCanvasNotice />}
+                {effectiveMode === 'animate' && <AnimateLockNotice seq={lockFlash.seq} />}
                 {shaderMode && activeEffect && currentState && (
                   <>
                     {EFFECTS.find(e => e.key === activeEffect)?.audio && (
@@ -2588,6 +2667,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   slotFor={gridSlotFor}
                   versionFor={gridVersionFor}
                   panelEffects={panelUsage.effects}
+                  lockedDevices={lockedDevices}
                   gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
                   leading={effectiveMode === 'static' ? (
                     <CollapsibleSection

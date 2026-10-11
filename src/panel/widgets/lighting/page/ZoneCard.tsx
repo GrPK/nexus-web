@@ -73,6 +73,12 @@ export interface BulkSelection {
   /** Members currently locked, which an Unlock row releases. */
   unlockCount?: number;
   setLocked?: (locked: boolean) => void;
+  /** Members a Lock animation row can hold: no lock of either kind yet.
+   *  Zero outside Animate mode on a shader effect. */
+  animateLockCount?: number;
+  /** Members currently locked onto an animation, which an Unlock animation row releases. */
+  animateUnlockCount?: number;
+  setAnimateLocked?: (locked: boolean) => void;
 }
 
 /**
@@ -86,6 +92,13 @@ export interface DeviceLock {
   lockable: boolean;
   hasPick: boolean;
   setLocked: (locked: boolean) => void;
+  /** Locked onto an Animate effect instead. A card holds one kind of lock, so
+   *  this and `locked` are never both true. The same badge shows, and a press
+   *  releases it. */
+  animateLocked?: boolean;
+  /** An animation lock can be set here: Animate mode on a shader effect. */
+  animateLockable?: boolean;
+  setAnimateLocked?: (locked: boolean) => void;
   /** Bumped when a pick was aimed at this locked card; the badge flashes so
    *  the user sees why nothing changed. 0 (or unchanged) flashes nothing. */
   flashSeq?: number;
@@ -505,8 +518,11 @@ export function ZoneCard({
     // only where a lock can be set (the Static tab) and there is a pick to
     // hold. In a selection each row counts the members it will reach.
     if (lock && !unavailable) {
-      const lockCount = bulk ? (bulk.lockCount ?? 0) : (lock.lockable && lock.hasPick && !lock.locked ? 1 : 0);
+      const lockCount = bulk ? (bulk.lockCount ?? 0) : (lock.lockable && lock.hasPick && !lock.locked && !lock.animateLocked ? 1 : 0);
       const unlockCount = bulk ? (bulk.unlockCount ?? 0) : (lock.locked ? 1 : 0);
+      const animateLockCount = bulk ? (bulk.animateLockCount ?? 0) : (lock.animateLockable && !lock.locked && !lock.animateLocked ? 1 : 0);
+      const animateUnlockCount = bulk ? (bulk.animateUnlockCount ?? 0) : (lock.animateLocked ? 1 : 0);
+      const setAnimateLocked = (locked: boolean) => bulk ? bulk.setAnimateLocked?.(locked) : lock.setAnimateLocked?.(locked);
       const setLocked = (locked: boolean) => bulk ? bulk.setLocked?.(locked) : lock.setLocked(locked);
       if (lockCount > 0) {
         toggles.push({
@@ -518,6 +534,18 @@ export function ZoneCard({
         toggles.push({
           key: 'unlock', icon: <Unlock size={14} />, onSelect: () => setLocked(false),
           label: bulkMenuLabel(t, language, bulk && { count: unlockCount }, 'lighting.devices.unlockLook', 'lighting.devices.unlockLookCount'),
+        });
+      }
+      if (animateLockCount > 0) {
+        toggles.push({
+          key: 'lockAnimation', icon: <Lock size={14} />, onSelect: () => setAnimateLocked(true),
+          label: bulkMenuLabel(t, language, bulk && { count: animateLockCount }, 'lighting.devices.lockAnimation', 'lighting.devices.lockAnimationCount'),
+        });
+      }
+      if (animateUnlockCount > 0) {
+        toggles.push({
+          key: 'unlockAnimation', icon: <Unlock size={14} />, onSelect: () => setAnimateLocked(false),
+          label: bulkMenuLabel(t, language, bulk && { count: animateUnlockCount }, 'lighting.devices.unlockAnimation', 'lighting.devices.unlockAnimationCount'),
         });
       }
     }
@@ -696,15 +724,15 @@ export function ZoneCard({
         {/* Only a locked card carries the badge: it sits between the strip
             and the menu, so the strip gives up its width to it, and a press
             unlocks in any mode. Locking lives in the menu. */}
-        {lock?.locked && !toggleMode && !unavailable && !firmwareControlled && (
-          <HoverTooltip body={t('lighting.devices.unlockLook')} side="top">
+        {(lock?.locked || lock?.animateLocked) && !toggleMode && !unavailable && !firmwareControlled && (
+          <HoverTooltip body={t(lock.animateLocked ? 'lighting.devices.unlockAnimation' : 'lighting.devices.unlockLook')} side="top">
             <button
               key={flashSeq}
               type="button"
               className={`${styles.deviceSettingsBtn} ${styles.deviceLockBtn} ${flashing ? styles.deviceLockBtnFlash : ''}`}
-              aria-label={t('lighting.devices.unlockLook')}
+              aria-label={t(lock.animateLocked ? 'lighting.devices.unlockAnimation' : 'lighting.devices.unlockLook')}
               data-no-dnd
-              onClick={e => { e.stopPropagation(); lock.setLocked(false); }}
+              onClick={e => { e.stopPropagation(); if (lock.animateLocked) lock.setAnimateLocked?.(false); else lock.setLocked(false); }}
             >
               <Lock />
             </button>

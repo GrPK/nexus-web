@@ -105,3 +105,47 @@ describe('AnimateGrid category sections', () => {
     expect(has(container, 'fire')).toBe(true);
   });
 });
+
+describe('AnimateGrid animation lock badge', () => {
+  const grid = (lockedDevices?: Map<string, string[]>) => render(
+    <AnimateGrid
+      effect="plasma"
+      onSelect={() => {}}
+      slotFor={() => 0}
+      versionFor={() => '0'}
+      lockedDevices={lockedDevices}
+    />,
+  );
+
+  it('badges exactly the effects with a locked device, showing the count', () => {
+    const { container } = grid(new Map([['plasma', ['Fan 1', 'Strip']]]));
+    const badges = screen.getAllByTestId('effect-lock-badge');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].textContent).toBe('2');
+    expect(badges[0].closest('[data-effect-key]')?.getAttribute('data-effect-key')).toBe('plasma');
+    expect(container.querySelectorAll('svg.lucide-lock').length).toBe(1);
+  });
+
+  it('shows no lock when nothing is locked', () => {
+    const { container } = grid(new Map());
+    expect(container.querySelectorAll('svg.lucide-lock').length).toBe(0);
+  });
+
+  it('lists the device names in the tooltip on hover', async () => {
+    grid(new Map([['plasma', ['Fan 1', 'Strip']]]));
+    fireEvent.pointerEnter(screen.getByTestId('effect-lock-badge'));
+    expect(await screen.findByText('Fan 1')).toBeTruthy();
+    expect(screen.getByText('Strip')).toBeTruthy();
+  });
+
+  it('keeps the usage icons beside the lock', () => {
+    const { container } = render(
+      <AnimateGrid
+        effect="plasma" onSelect={() => {}} slotFor={() => 0} versionFor={() => '0'}
+        rgbActiveEffect="plasma" lockedDevices={new Map([['plasma', ['Fan 1']]])}
+      />,
+    );
+    expect(container.querySelectorAll('svg.lucide-lightbulb').length).toBe(1);
+    expect(container.querySelectorAll('svg.lucide-lock').length).toBe(1);
+  });
+});

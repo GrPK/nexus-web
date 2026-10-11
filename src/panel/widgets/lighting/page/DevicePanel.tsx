@@ -33,7 +33,7 @@ import styles from '../LightingPage.module.scss';
  * using the same component/styling as a motherboard group: a chevron, the brand
  * name, a group power switch, and its lights as indented child cards.
  */
-export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, devicePicks, versionForSlot, ledFullscreen, lockable = false, onSetLock, lockFlash, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
+export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, devicePicks, versionForSlot, ledFullscreen, lockable = false, onSetLock, animateLocks, animateLockable = false, onSetAnimateLock, lockFlash, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
   devices: LightingDevice[];
   /** Optional control rendered at the top of the scrolling list (master brightness). */
   /** Every device before the Nexus-Control-off filter, so a group header can
@@ -59,6 +59,13 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   lockable?: boolean;
   /** Sets the colour lock on these cards. Absent leaves every card lock-less. */
   onSetLock?: (ids: string[], locked: boolean) => void;
+  /** Device id to the Animate effect it is locked onto. */
+  animateLocks?: Readonly<Record<string, string>>;
+  /** Animate mode on a shader: a card with no lock can be locked onto the running effect. */
+  animateLockable?: boolean;
+  /** Locks these cards onto the running effect, or releases them. Absent leaves
+   *  every card without animation locks. */
+  onSetAnimateLock?: (ids: string[], locked: boolean) => void;
   /** A pick just aimed at these locked cards: each flashes its badge. `seq`
    *  changes per burst so the same card can flash again. */
   lockFlash?: { ids: ReadonlySet<string>; seq: number };
@@ -369,14 +376,23 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
 
   // The members each lock row reaches: Lock the unlocked cards with a pick
   // (only where a lock can be set), Unlock the locked ones.
-  const lockBulkFor = (members: readonly LightingDevice[]): Pick<BulkSelection, 'lockCount' | 'unlockCount' | 'setLocked'> => {
+  const lockBulkFor = (members: readonly LightingDevice[]): Pick<BulkSelection, 'lockCount' | 'unlockCount' | 'setLocked' | 'animateLockCount' | 'animateUnlockCount' | 'setAnimateLocked'> => {
     if (!onSetLock) return {};
-    const lockableIds = lockable ? members.filter(x => devicePicks?.[x.id] && !devicePicks[x.id].locked).map(x => x.id) : [];
+    // One lock kind per card: an animation-locked card is offered no static lock.
+    const animLocked = (id: string) => !!animateLocks?.[id];
+    const lockableIds = lockable ? members.filter(x => devicePicks?.[x.id] && !devicePicks[x.id].locked && !animLocked(x.id)).map(x => x.id) : [];
     const lockedIds = members.filter(x => devicePicks?.[x.id]?.locked).map(x => x.id);
+    const animLockableIds = animateLockable && onSetAnimateLock
+      ? members.filter(x => !devicePicks?.[x.id]?.locked && !animLocked(x.id)).map(x => x.id)
+      : [];
+    const animLockedIds = onSetAnimateLock ? members.filter(x => animLocked(x.id)).map(x => x.id) : [];
     return {
       lockCount: lockableIds.length,
       unlockCount: lockedIds.length,
       setLocked: (locked: boolean) => onSetLock(locked ? lockableIds : lockedIds, locked),
+      animateLockCount: animLockableIds.length,
+      animateUnlockCount: animLockedIds.length,
+      setAnimateLocked: (locked: boolean) => onSetAnimateLock?.(locked ? animLockableIds : animLockedIds, locked),
     };
   };
 
@@ -386,6 +402,9 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
     return {
       locked: !!pick?.locked, lockable, hasPick: !!pick,
       setLocked: locked => onSetLock([id], locked),
+      animateLocked: !!animateLocks?.[id],
+      animateLockable: animateLockable && !!onSetAnimateLock,
+      setAnimateLocked: locked => onSetAnimateLock?.([id], locked),
       flashSeq: lockFlash?.ids.has(id) ? lockFlash.seq : 0,
     };
   };

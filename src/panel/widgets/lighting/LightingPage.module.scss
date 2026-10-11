@@ -596,6 +596,24 @@
   }
 }
 
+// One tooltip target inside the cell badges: the usage icons, or the lock with its count.
+.cellBadgeGroup {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.cellLockCount {
+  color: #fff;
+  font-size: var(--type-mini);
+  line-height: 1;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.85);
+}
+
+.cellLockName {
+  display: block;
+}
+
 .effectCard {
   display: flex;
   flex-direction: column;

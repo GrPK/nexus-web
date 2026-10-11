@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Lightbulb, Monitor } from 'lucide-react';
+import { Lightbulb, Lock, Monitor } from 'lucide-react';
 import { useTranslation } from '../../../../lib/i18n';
 import { HoverTooltip } from '../../../../components/common/HoverTooltip/HoverTooltip';
 import { CollapsibleSection } from '../../../../components/common/CollapsibleSection/CollapsibleSection';
@@ -11,13 +11,15 @@ import { EffectCard } from '../../../../components/common/EffectCard/EffectCard'
 import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import styles from '../LightingPage.module.scss';
 
-function AnimateGridCell({ fx, slot, version, active, live, panel, label, hideLabel, gpuAvailable, frozen, onSelect }: {
+function AnimateGridCell({ fx, slot, version, active, live, panel, lockedNames, label, hideLabel, gpuAvailable, frozen, onSelect }: {
   fx: EffectDef;
   slot: number;
   version: string;
   active: boolean;
   live: boolean;
   panel: boolean;
+  /** Names of the devices locked onto this effect. */
+  lockedNames?: readonly string[];
   label: string;
   /** Simple colour swatches drop the on-thumbnail caption. */
   hideLabel?: boolean;
@@ -41,13 +43,29 @@ function AnimateGridCell({ fx, slot, version, active, live, panel, label, hideLa
       active={active}
       onClick={onSelect}
       audio={fx.audio}
-      cornerBadge={hints.length ? (
-        <HoverTooltip title={hints.length > 1 ? hints[0] : undefined} body={hints.length > 1 ? hints[1] : hints[0]} side="top">
-          <span className={styles.cellBadges}>
-            {live && <Lightbulb aria-hidden={true} />}
-            {panel && <Monitor aria-hidden={true} />}
-          </span>
-        </HoverTooltip>
+      cornerBadge={hints.length || lockedNames?.length ? (
+        <span className={styles.cellBadges}>
+          {hints.length > 0 && (
+            <HoverTooltip title={hints.length > 1 ? hints[0] : undefined} body={hints.length > 1 ? hints[1] : hints[0]} side="top">
+              <span className={styles.cellBadgeGroup}>
+                {live && <Lightbulb aria-hidden={true} />}
+                {panel && <Monitor aria-hidden={true} />}
+              </span>
+            </HoverTooltip>
+          )}
+          {!!lockedNames?.length && (
+            <HoverTooltip
+              title={t('lighting.badge.animationLocked')}
+              body={lockedNames.map((n, i) => <span key={i} className={styles.cellLockName}>{n}</span>)}
+              side="top"
+            >
+              <span className={styles.cellBadgeGroup} data-testid="effect-lock-badge">
+                <Lock aria-hidden={true} />
+                <span className={styles.cellLockCount}>{lockedNames.length}</span>
+              </span>
+            </HoverTooltip>
+          )}
+        </span>
       ) : undefined}
     />
   );
@@ -60,7 +78,7 @@ function AnimateGridCell({ fx, slot, version, active, live, panel, label, hideLa
  * hardware gets a bulb. Effects are listed in pre-expanded category groups
  * (EFFECT_CATEGORIES order), each under a header in the cooling-panel style.
  */
-export function AnimateGrid({ effect, onSelect, effects = EFFECTS, slotFor, versionFor, rgbActiveEffect, panelEffects, gpuAvailable, frozen, leading }: {
+export function AnimateGrid({ effect, onSelect, effects = EFFECTS, slotFor, versionFor, rgbActiveEffect, panelEffects, lockedDevices, gpuAvailable, frozen, leading }: {
   effect: string;
   onSelect: (key: string) => void;
   /** Rendered above the category groups, inside the same scroll container. */
@@ -76,6 +94,8 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, slotFor, vers
   rgbActiveEffect?: string | null;
   /** Effects used as a background by ≥1 panel - those cells show a panel icon. */
   panelEffects?: Set<string> | null;
+  /** Names of the devices locked onto each effect: a cell with any shows a lock and the count. */
+  lockedDevices?: ReadonlyMap<string, readonly string[]>;
   /** When false, thumbnail fetches are skipped and a static placeholder is shown. */
   gpuAvailable?: boolean;
   /** Static mode: tiles render frozen so the grid matches the LED output. */
@@ -133,6 +153,7 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, slotFor, vers
               active={fx.key === effect}
               live={!!rgbActiveEffect && fx.key === rgbActiveEffect}
               panel={!!panelEffects && panelEffects.has(fx.key)}
+              lockedNames={lockedDevices?.get(fx.key)}
               label={t(fx.labelKey)}
               hideLabel={g.cat === 'simple'}
               gpuAvailable={gpuAvailable}

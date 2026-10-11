@@ -603,6 +603,29 @@ export const setStaticDeviceLock = async (id: string, locked: boolean): Promise<
 export const fetchStaticDeviceLooks = () =>
   fetchService<{ looks: Record<string, StaticDeviceLookDto> }>('/devices/lighting-devices/static-looks');
 
+/**
+ * Lock a device onto an Animate effect, or release it with a null effect. The
+ * service keeps painting that shader on the device in every mode and refuses a
+ * new animation for it until it is unlocked. Resolves false when the service
+ * refused (409: the device holds a Static lock, or lighting is off; 400: not a
+ * shader) or is a build without the route, so the caller can roll back.
+ */
+export const setAnimateDeviceLock = async (id: string, effect: string | null): Promise<boolean> => {
+  const { status } = await authFetchWithStatus('/devices/lighting-devices/animate-lock', {
+    method: 'POST', body: { id, effect },
+  });
+  return status === 200;
+};
+
+/** Every device locked onto an Animate effect, keyed by device id. Null when the
+ *  answer is unreadable (a service predating the route replies with the SPA
+ *  index, so the JSON parse throws), so the caller leaves what it has alone. */
+export const fetchAnimateDeviceLocks = async (): Promise<Record<string, string> | null> => {
+  const res = await fetchService<{ locks?: Record<string, string> }>('/devices/lighting-devices/animate-locks')
+    .catch(() => null);
+  return res?.locks ?? null;
+};
+
 // --- Per-device colour tuning ---
 // Channel gains / temperature / saturation trims applied by the service on the
 // frame's way to the hardware. Calibration, not an effect: the canvas preview
