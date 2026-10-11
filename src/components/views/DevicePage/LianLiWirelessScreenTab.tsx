@@ -242,18 +242,19 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
   }, [applyToTargets]);
 
   const handleSleepWhenLockedChange = useCallback((sleepWhenLocked: boolean) => {
+    const previous = new Map(targetScreens.map(s => [s.serial, s.sleepWhenLocked]));
     applyToTargets(
       s => ({ ...s, sleepWhenLocked }),
       serial => {
         void setLianLiWirelessScreenSettings(serial, { sleepWhenLocked }).then(ok => {
           if (ok) return;
           setScreens(prev => prev
-            ? prev.map(s => (s.serial === serial ? { ...s, sleepWhenLocked: !sleepWhenLocked } : s))
+            ? prev.map(s => (s.serial === serial ? { ...s, sleepWhenLocked: previous.get(serial) } : s))
             : prev);
         });
       },
     );
-  }, [applyToTargets]);
+  }, [applyToTargets, targetScreens]);
 
   const handleContentTypeChange = useCallback((contentType: LianLiWirelessScreenContentType) => {
     applyToTargets(

@@ -109,12 +109,12 @@ export function LianLiAioScreenSection({ mac, usbConnected = false, onOpenPanel 
           />
         </SettingRow>
       )}
+      {showNative && (<>
       <SettingToggle
         label={t('devices.lcd.sleepWhenLocked')}
         checked={screen.sleepWhenLocked ?? true}
         onChange={() => { void commit({ sleepWhenLocked: !(screen.sleepWhenLocked ?? true) }); }}
       />
-      {showNative && (<>
       <SettingSlider
         editable
         trackFill
