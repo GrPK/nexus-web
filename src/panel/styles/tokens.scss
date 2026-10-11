@@ -291,6 +291,24 @@
   font-family: var(--panel-font);
 }
 
+// The Q-series WebView is Chromium 83, which has no color-mix(), so the fill
+// above computes to transparent there. These are --panel-card-fill-opaque
+// flattened per theme. Only live panels set --panel-card-bg-alpha (the 0-1
+// widget opacity); embedded hosts keep the transparent card.
+@supports not (color: color-mix(in srgb, red, blue)) {
+  .panel-root {
+    --panel-card-fill-rgb: 17, 17, 17;
+  }
+
+  .panel-root[data-theme='light'] {
+    --panel-card-fill-rgb: 248, 248, 248;
+  }
+
+  .panel-card {
+    background-color: rgba(var(--panel-card-fill-rgb), var(--panel-card-bg-alpha));
+  }
+}
+
 // The scaler fills the card's outer box, so a border-box border leaves a strip of the card's own background around full-bleed SDK content.
 .panel-card[data-widget-type^='app:'],
 .panel-card[data-widget-type^='marketplace:'] {

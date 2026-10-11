@@ -71,9 +71,11 @@ interface DevicePageProps {
   connectionState?: ConnectionState;
   onOpenFirmware?: () => void;
   onSectionNavigate?: DashboardSectionNavigate;
+  /** Reports the name of the device this page resolved for `deviceKey`, for the top bar. */
+  onTitleChange?: (deviceKey: string, title: string | undefined) => void;
 }
 
-export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFirmware, onSectionNavigate }: DevicePageProps) {
+export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFirmware, onSectionNavigate, onTitleChange }: DevicePageProps) {
   const { t } = useTranslation();
   const { push } = useToast();
   const { unified, controlDevice, turnedOffMonitorKeys } = useUnifiedDevices(serviceOnline);
@@ -81,6 +83,8 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
     () => unified.find(d => d.key === deviceKey),
     [unified, deviceKey],
   );
+  const title = device?.shortName;
+  useEffect(() => { onTitleChange?.(deviceKey, title); }, [onTitleChange, deviceKey, title]);
 
   // The device appearing in `unified` re-renders and dispatches immediately,
   // independent of this timer; the grace only defers the empty-state UI.
@@ -154,7 +158,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
     return (
       <NexusControlOff
         key={device.key}
-        deviceName={device.name}
+        deviceName={device.shortName}
         conflictAppId={device.conflictAppId}
         experimental={device.experimental}
         requiresBeta={device.requiresBeta}
@@ -179,7 +183,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
     return (
       <NexusControlOff
         key={device.key}
-        deviceName={device.name}
+        deviceName={device.shortName}
         onEnable={() => {
           void promoteDisplayToPanel(offMonitorDisplayId).then(record => {
             if (!record) push({ title: t('displays.error.promote') });
@@ -194,7 +198,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
   return (
     <>
       {holdBody && (
-        <NexusControlOff key={device.key} deviceName={device.name} experimental={device.experimental} detecting onEnable={() => {}} />
+        <NexusControlOff key={device.key} deviceName={device.shortName} experimental={device.experimental} detecting onEnable={() => {}} />
       )}
       <div className={holdBody ? styles.bodyHeld : styles.bodyShown}>
         <DeviceDetectingContext.Provider value={reportWaiting}>
@@ -297,7 +301,7 @@ function DeviceBody({ device, controlDevice, onOpenFirmware, onSectionNavigate }
   // sidebar deep link still lands on something readable.
   return (
     <section>
-      <ViewHeader title={device.name} />
+      <ViewHeader title={device.shortName} />
       <Placeholder title={t('devices.page.noPageYet', { category: device.category })} />
     </section>
   );

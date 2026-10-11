@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState, type RefObject } from 'react';
-import { PANEL_WIDGET_PADDING_DEFAULT_PERCENT, panelGridCapacityForCanvas, panelWidgetPaddingRatio, type PanelGridCapacity } from './grid';
+import { columnsForPhysicalSize, PANEL_WIDGET_PADDING_DEFAULT_PERCENT, panelGridCapacityForCanvas, panelWidgetPaddingRatio, type PanelGridCapacity } from './grid';
 import type { PanelSurface } from '../types';
 import { getPanelGridSizingSettings, PANEL_SIMULATION_CHANGED_EVENT } from '../../lib/panelSimulation';
 import { streamFrameCap } from '../../lib/framePacer';
@@ -126,6 +126,18 @@ export function useDesktopFitColumns(ref: RefObject<HTMLElement | null>, enabled
   return enabled ? columns : null;
 }
 
+// True while the window is wider than tall; a streamed panel's window is its canvas.
+export function useViewportLandscape(): boolean {
+  const [landscape, setLandscape] = useState(() => typeof window !== 'undefined' && window.innerWidth > window.innerHeight);
+  useEffect(() => {
+    const update = () => setLandscape(window.innerWidth > window.innerHeight);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return landscape;
+}
+
 export function useRuntimePanelGrid(
   surface: PanelSurface,
   rootRef?: RefObject<HTMLElement | null>,
@@ -134,14 +146,15 @@ export function useRuntimePanelGrid(
   // Widget-padding ratio (panelWidgetPaddingRatio of the theme setting).
   // Defaults to 0 for callers that don't have a theme in scope.
   widgetPaddingRatio = 0,
+  shortSideSlots?: number,
 ): PanelGridCapacity {
   // Initialise from the surface without touching `rootRef` (no ref reads
   // during render). The effect below re-reads with the mounted root on first
   // paint.
-  const [metrics, setMetrics] = useState(() => readRuntimePanelGrid(surface, null, simulator, deviceDpi, widgetPaddingRatio));
+  const [metrics, setMetrics] = useState(() => readRuntimePanelGrid(surface, null, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots));
 
   useEffect(() => {
-    const update = () => setMetrics(readRuntimePanelGrid(surface, rootRef?.current ?? null, simulator, deviceDpi, widgetPaddingRatio));
+    const update = () => setMetrics(readRuntimePanelGrid(surface, rootRef?.current ?? null, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots));
     update();
     const observed = rootRef?.current ?? null;
     const observer = observed && typeof ResizeObserver !== 'undefined'
@@ -159,7 +172,7 @@ export function useRuntimePanelGrid(
       window.removeEventListener(PANEL_SIMULATION_CHANGED_EVENT, update);
       observer?.disconnect();
     };
-  }, [surface, rootRef, simulator, deviceDpi, widgetPaddingRatio]);
+  }, [surface, rootRef, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots]);
 
   return metrics;
 }
@@ -175,12 +188,14 @@ export function readRuntimePanelGrid(
   simulator = false,
   deviceDpi?: number,
   widgetPaddingRatio = 0,
+  shortSideSlots?: number,
 ): PanelGridCapacity {
   if (typeof window === 'undefined') {
     return panelGridCapacityForCanvas(682, 2560, {
       surface,
       dpi: deviceDpi ?? DEFAULT_SURFACE_DPI[surface],
       sizing: getPanelGridSizingSettings(),
+      shortSideSlots,
       paddingRatio: widgetPaddingRatio,
     });
   }
@@ -207,14 +222,10 @@ export function readRuntimePanelGrid(
 
   // The simulator iframe is sized at the device's native pixels (e.g.
   // 682x2560 for Y70). The host DPR would inflate the physical-size calc and
-  // trip the 4-to-8 column jump on Retina hosts, so treat cssWidth/cssHeight
+  // trip the column jump on Retina hosts, so treat cssWidth/cssHeight
   // as device pixels directly. A streamed panel's CSS px are its native px too;
   // its devicePixelRatio is the render scale.
-  const dpr = simulator || streamFrameCap(window.location.search) !== null
-    ? 1
-    : Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
-      ? window.devicePixelRatio
-      : 1;
+  const dpr = runtimeDpr(simulator);
   const rect = root?.getBoundingClientRect();
   const cssWidth = Math.max(1, Math.round(rect?.width ?? window.innerWidth));
   const cssHeight = Math.max(1, Math.round(rect?.height ?? window.innerHeight));
@@ -224,6 +235,7 @@ export function readRuntimePanelGrid(
     surface,
     dpi: deviceDpi ?? estimateRuntimePanelDpi(surface),
     sizing: getPanelGridSizingSettings(),
+    shortSideSlots,
     paddingRatio: widgetPaddingRatio,
   });
   // Column/row counts are decided in physical px (density), but every length
@@ -241,6 +253,27 @@ export function readRuntimePanelGrid(
     padding: capacity.padding / dpr,
     contentGap: capacity.contentGap / dpr,
   };
+}
+
+function runtimeDpr(simulator: boolean): number {
+  if (simulator || streamFrameCap(window.location.search) !== null) return 1;
+  return Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
+}
+
+// The density grid's short-axis slot count for a glass of these CSS px, as the
+// runtime grid derives it.
+export function densityShortSideSlots(cssWidth: number, cssHeight: number, dpr: number, dpi: number): number {
+  return columnsForPhysicalSize(
+    Math.max(1, Math.round(cssWidth * dpr)),
+    Math.max(1, Math.round(cssHeight * dpr)),
+    dpi,
+    getPanelGridSizingSettings(),
+  );
+}
+
+// The same count for this kiosk window.
+export function runtimeDensityShortSideSlots(surface: PanelSurface, deviceDpi?: number): number {
+  return densityShortSideSlots(window.innerWidth, window.innerHeight, runtimeDpr(false), deviceDpi ?? estimateRuntimePanelDpi(surface));
 }
 
 export function estimateRuntimePanelDpi(surface: PanelSurface): number {

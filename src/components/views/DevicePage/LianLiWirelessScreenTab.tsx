@@ -5,7 +5,7 @@ import {
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { ChipGroup, type ChipOption } from '../../common/ChipGroup/ChipGroup';
 import { Select, type SelectOption } from '../../common/Select/Select';
-import { SettingRow, SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
+import { SettingRow, SettingSelect, SettingSlider, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { HsvPicker } from '../../common/HsvPicker/HsvPicker';
 import { Button } from '../../common/Button/Button';
 import { EffectCard } from '../../common/EffectCard/EffectCard';
@@ -241,6 +241,21 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
     );
   }, [applyToTargets]);
 
+  const handleSleepWhenLockedChange = useCallback((sleepWhenLocked: boolean) => {
+    const previous = new Map(targetScreens.map(s => [s.serial, s.sleepWhenLocked]));
+    applyToTargets(
+      s => ({ ...s, sleepWhenLocked }),
+      serial => {
+        void setLianLiWirelessScreenSettings(serial, { sleepWhenLocked }).then(ok => {
+          if (ok) return;
+          setScreens(prev => prev
+            ? prev.map(s => (s.serial === serial ? { ...s, sleepWhenLocked: previous.get(serial) } : s))
+            : prev);
+        });
+      },
+    );
+  }, [applyToTargets, targetScreens]);
+
   const handleContentTypeChange = useCallback((contentType: LianLiWirelessScreenContentType) => {
     applyToTargets(
       s => ({ ...s, contentType }),
@@ -440,6 +455,12 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
             }))}
           />
         </SettingRow>
+        <SettingToggle
+          label={t('devices.lcd.sleepWhenLocked')}
+          checked={representative?.sleepWhenLocked ?? true}
+          onChange={() => handleSleepWhenLockedChange(!(representative?.sleepWhenLocked ?? true))}
+          disabled={!representative}
+        />
       </SettingsSection>}
 
       {fanScreens && <SettingsSection

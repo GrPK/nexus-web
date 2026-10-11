@@ -59,10 +59,14 @@ export interface PanelDevice {
   // Display-bound panel (promoted monitor): whether Nexus Control is on.
   // Absent for every other panel kind - there is no such toggle there.
   linkEnabled?: boolean;
+  // Display-bound panel whose family's support is experimental (badge only).
+  experimental?: boolean;
 }
 
 export const PANEL_DEVICE_ICON = '/assets/devices/y70.svg';
 export const PANEL_MONITOR_ICON = '/assets/devices/monitor.svg';
+// Lucide's monitor glyph, for an OS monitor promoted to a panel.
+export const PROMOTED_MONITOR_ICON = '/assets/devices/monitor-panel.svg';
 export const HYTE_LOGO = '/assets/devices/hyte.svg';
 
 // Per-panel-family icon for PanelDevice.iconSrc: the brand's mark. Falls back

@@ -53,7 +53,7 @@ import { onOpenBuild, useBuildFrameHistory } from '../components/views/BuildPage
 import { requestBenchmarkStart, takeBenchmarkStartRequest } from '../panel/widgets/benchmark/benchmarkNav';
 import { requestOpenDeckEditor } from '../panel/widgets/deck/deckOpenEditorNav';
 import { getPendingDeckEdit, type PendingDeckEdit } from '../api/streamdeck';
-import { useUnifiedDevices } from '../hooks/useUnifiedDevices';
+import { useUnifiedDevices, deviceTitle } from '../hooks/useUnifiedDevices';
 import { fetchPanelRemoteControlState } from '../api/panel';
 import { isLocalhostUnreachable, isRemoteOrigin } from '../api/service';
 import { MultiplexContext, useMultiplexConnection, useTopicCallback } from '../hooks/useMultiplexSocket';
@@ -511,6 +511,9 @@ export function Dashboard() {
   // Resolves the active device's top-bar title on /system/device/<key>, and
   // lists the panels a fresh Marketplace widget can be placed on.
   const unifiedDevices = useUnifiedDevices(online);
+  // DevicePage's own list can hold a device this one missed (a lost panel/device push).
+  const [devicePageTitle, setDevicePageTitle] = useState<{ key: string; title: string | undefined }>();
+  const onDeviceTitle = useCallback((key: string, title: string | undefined) => setDevicePageTitle({ key, title }), []);
   const { t, setLanguage } = useTranslation();
 
   // Always-on monitoring: subscribe to composite frame + screentime at app
@@ -676,11 +679,8 @@ export function Dashboard() {
     // A specific device page shows the device's own name; the all-devices
     // landing keeps the generic "Devices" label.
     if (activeView === 'device') {
-      const dev = unifiedDevices.unified.find(d => d.key === subtab);
-      // Stream Deck's top-bar title is the product name, not the per-deck
-      // custom name.
-      if (dev?.curatedId === 'streamdeck') return dev.shortName;
-      return dev?.name ?? t('sidebar.section.devices');
+      const shown = devicePageTitle?.key === subtab ? devicePageTitle.title : undefined;
+      return shown ?? deviceTitle(unifiedDevices.unified, subtab) ?? t('sidebar.section.devices');
     }
     if (activeView === 'devices') return t('sidebar.section.devices');
     // A marketplace (SDK) widget's page: the top bar shows the widget's name.
@@ -954,6 +954,7 @@ export function Dashboard() {
           deviceKey={subtab ?? ''}
           serviceOnline={online}
           connectionState={status.state}
+          onTitleChange={onDeviceTitle}
           onOpenFirmware={() => navigate('system', 'devices', 'firmware')}
           onSectionNavigate={(target, payload) => {
             if (target === 'device' && payload?.deviceKey) { navigate('system', 'device', payload.deviceKey); return; }

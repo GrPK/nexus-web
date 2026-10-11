@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchPanelDevices,
   fetchPanelPhoneSessions,
@@ -7,7 +7,8 @@ import {
   type PanelPhoneSession,
   type PanelStatus,
 } from '../api/panel';
-import { useTopicCallback } from './useMultiplexSocket';
+import { useMultiplex, useTopicCallback } from './useMultiplexSocket';
+import { getCorsairState, type CorsairState } from '../api/corsair';
 import { useTranslation } from '../lib/i18n';
 import {
   formatPanelInches,
@@ -19,6 +20,7 @@ import { useDevices, type DeviceListItem } from './useDevices';
 import {
   panelIconForSource,
   PANEL_MONITOR_ICON,
+  PROMOTED_MONITOR_ICON,
   type PanelDevice,
   type PanelDeviceCapabilities,
 } from '../panel/device/panelDevices';
@@ -94,6 +96,7 @@ const SIMULATED_SURFACE_CAPABILITIES: Partial<Record<PanelSurface, PanelDeviceCa
 // handler id; surfaces are shared ('lcd-round' cannot tell a Lian Li from an ID-Cooling).
 const STREAMED_FAMILY_ICONS: Partial<Record<string, string>> = {
   'nzxt-kraken': '/assets/devices/nzxt.svg',
+  'asus-ryujin-lcd': '/assets/devices/asus.svg',
   'lianli-galahad2-lcd': '/assets/devices/lianli.svg',
   'lianli-hydroshift-lcd': '/assets/devices/lianli.svg',
   'lianli-hydroshift2': '/assets/devices/lianli.svg',
@@ -128,9 +131,21 @@ const WIDGET_PANEL_IDS = new Set(Object.keys(WIDGET_PANEL_PROFILES));
 // when the EDID product name never surfaces; matched exactly). A user rename
 // to anything else wins. Grid math reads the dpi capability directly; this map
 // is presentation only.
-const PROMOTED_FAMILY_BRANDING: Partial<Record<string, { name: string; icon: string; defaultNames: readonly string[] }>> = {
-  'xeneon-edge': { name: 'Xeneon Edge', icon: '/assets/devices/corsair.svg', defaultNames: ['crx ed00'] },
+const PROMOTED_FAMILY_BRANDING: Partial<Record<string, { name: string; icon: string; defaultNames: readonly string[]; experimental?: boolean }>> = {
+  'xeneon-edge': { name: 'Corsair Xeneon Edge', icon: '/assets/devices/corsair.svg', defaultNames: ['crx ed00', 'xeneon edge'] },
+  'icue-link-lcd5': { name: 'Corsair iCUE LINK 5" LCD', icon: '/assets/devices/corsair.svg', defaultNames: ['xmd 00ea', "icue link 5''"], experimental: true },
 };
+
+// The 5" LCD is a TITAN II's screen when that pump is on the LINK hub; sold on its own
+// it can sit on another cooler. The hub reports no radiator size, so neither does this.
+const ICUE_LINK_LCD5_ON_TITAN_II = 'Corsair TITAN II LCD';
+const TITAN_II_PUMP_NAME = 'iCUE LINK TITAN II';
+
+export function titanIiLcdNames(corsair: CorsairState | null | undefined): Partial<Record<string, string>> {
+  return corsair?.devices.some(d => d.name === TITAN_II_PUMP_NAME)
+    ? { 'icue-link-lcd5': ICUE_LINK_LCD5_ON_TITAN_II }
+    : {};
+}
 
 // A plain monitor (no product family) promoted to a panel and then turned off:
 // it leaves the device list, since it is only a device while used as a panel.
@@ -163,18 +178,26 @@ export function usePanelDevices(
   const [status, setStatus] = useState<PanelStatus | null>(null);
   const [phoneSessions, setPhoneSessions] = useState<PanelPhoneSession[]>([]);
   const [records, setRecords] = useState<PanelDeviceRecord[]>([]);
+  const [familyNames, setFamilyNames] = useState<Partial<Record<string, string>>>({});
   const [loading, setLoading] = useState(false);
+  const refreshSeqRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const seq = ++refreshSeqRef.current;
     setLoading(true);
-    const [panelStatus, sessions, deviceRecords] = await Promise.all([
+    const [panelStatus, sessions, deviceRecords, corsair] = await Promise.all([
       fetchPanelStatus(),
       fetchPanelPhoneSessions(),
       fetchPanelDevices(),
+      getCorsairState(),
     ]);
+    // Refreshes overlap (seed, reconnect, pushes); only the newest may land.
+    if (seq !== refreshSeqRef.current) return;
+    const list = deviceRecords?.devices ?? [];
     setStatus(panelStatus ?? null);
     setPhoneSessions(sessions?.sessions ?? []);
-    setRecords(deviceRecords?.devices ?? []);
+    setRecords(list);
+    setFamilyNames(titanIiLcdNames(corsair));
     setLoading(false);
   }, []);
 
@@ -192,6 +215,16 @@ export function usePanelDevices(
     void refresh();
   });
 
+  // A push sent while the socket was down (a service restart) is lost, so each
+  // reconnect re-seeds: a cooler LCD whose stream starts then would otherwise
+  // stay missing from this instance's list.
+  const connected = useMultiplex()?.connected ?? false;
+  const prevConnectedRef = useRef(connected);
+  useEffect(() => {
+    if (enabled && connected && !prevConnectedRef.current) void refresh();
+    prevConnectedRef.current = connected;
+  }, [enabled, connected, refresh]);
+
   const devices = useMemo(() => {
     return buildPanelDevices({
       curatedDevices,
@@ -199,6 +232,7 @@ export function usePanelDevices(
       records,
       status,
       simulatedPanels,
+      familyNames,
       labels: {
         simulated: t('devices.panels.simulated'),
         phone: t('devices.panels.phone'),
@@ -210,7 +244,7 @@ export function usePanelDevices(
         linkOff: t('devices.nexusControlOff.sidebarTooltip'),
       },
     });
-  }, [curatedDevices, phoneSessions, records, status, simulatedPanels, t]);
+  }, [curatedDevices, familyNames, phoneSessions, records, status, simulatedPanels, t]);
 
   // Device ids of monitors that left the list because they were turned off,
   // so a page open on one can tell that apart from a list still loading.
@@ -228,6 +262,7 @@ export function buildPanelDevices({
   records,
   status,
   simulatedPanels,
+  familyNames = {},
   labels,
 }: {
   curatedDevices: DeviceListItem[];
@@ -235,6 +270,8 @@ export function buildPanelDevices({
   records: PanelDeviceRecord[];
   status: PanelStatus | null;
   simulatedPanels: SimulatedPanelDefinition[];
+  // Per-family name overriding the branding's default name.
+  familyNames?: Partial<Record<string, string>>;
   labels: {
     simulated: string;
     phone: string;
@@ -358,7 +395,8 @@ export function buildPanelDevices({
     // CSS pixels, same convention as the Y70/phone subtitles. Reconstructing
     // native px (css x dpr) double-rounds and drifts by a pixel at 150%.
     const resolution = cssWidth > 0 && cssHeight > 0 ? `${cssWidth}x${cssHeight}` : '';
-    const branding = record.capabilities?.family ? PROMOTED_FAMILY_BRANDING[record.capabilities.family] : undefined;
+    const family = record.capabilities?.family;
+    const branding = family ? PROMOTED_FAMILY_BRANDING[family] : undefined;
     const normalizedName = record.displayName.trim().toLowerCase();
     const isDefaultName = !!branding
       && (normalizedName.includes(branding.name.toLowerCase())
@@ -367,7 +405,7 @@ export function buildPanelDevices({
       id: promotedMonitorDeviceId(record),
       panelRecordId: record.id,
       displayId: record.displayId,
-      name: isDefaultName ? branding.name : record.displayName,
+      name: isDefaultName ? (family && familyNames[family]) || branding.name : record.displayName,
       subtitle: !linkEnabled
         ? labels.linkOff
         : (resolution ? `${labels.online} - ${resolution}` : labels.online),
@@ -380,10 +418,11 @@ export function buildPanelDevices({
       previewSize: cssWidth > 0 && cssHeight > 0 ? { width: cssWidth, height: cssHeight } : undefined,
       previewDpi: record.capabilities?.dpi,
       previewDpr: record.capabilities?.dpr,
-      iconSrc: branding?.icon ?? PANEL_MONITOR_ICON,
+      iconSrc: branding?.icon ?? PROMOTED_MONITOR_ICON,
       capabilities: { ...HOSTED_MONITOR_CAPABILITIES, touch: record.capabilities?.touch ?? false },
       modalKind: 'panel-editor',
       linkEnabled,
+      experimental: branding?.experimental,
       warning: record.warning ?? undefined,
     });
   }

@@ -55,9 +55,9 @@ export interface UnifiedDevice {
   // panel/app-device kind and plugin devices.
   supportsNexusControl: boolean;
   // True for a Nexus Control device driving non-HYTE/iBUYPOWER hardware
-  // (experimental support); drives the "Experimental" badge. Always false for
-  // panel devices (no promoted-monitor handler is experimental) and whenever
-  // supportsNexusControl is false.
+  // (experimental support); drives the "Experimental" badge. A promoted-monitor
+  // panel takes it from its display family; false whenever supportsNexusControl
+  // is false.
   experimental: boolean;
   // True for an experimental device on a stable build: Nexus Control stays off and its switch is locked.
   requiresBeta: boolean;
@@ -103,6 +103,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 // that prefix from a row whose icon is the brand's mark.
 const BRAND_LOGOS: Record<string, string> = {
   HYTE: HYTE_LOGO,
+  ASUS: '/assets/devices/asus.svg',
   'Lian Li': '/assets/devices/lianli.svg',
   Elgato: '/assets/devices/elgato.svg',
   Corsair: '/assets/devices/corsair.svg',
@@ -121,6 +122,11 @@ export function sidebarDeviceName(device: UnifiedDevice): string {
   return brand && device.shortName.startsWith(`${brand} `)
     ? device.shortName.slice(brand.length + 1)
     : device.shortName;
+}
+
+/** Title for a device's page (top bar, header): the same full name the Devices row shows. */
+export function deviceTitle(unified: readonly UnifiedDevice[], key: string | null | undefined): string | undefined {
+  return unified.find(d => d.key === key)?.shortName;
 }
 
 /** Sidebar sort key: the brand its logo shows, then the label, so rows group by brand. */
@@ -148,6 +154,7 @@ const CURATED_ICONS: Record<string, string> = {
   nollie: '/assets/devices/nollie.svg',
   tryx: '/assets/devices/tryx.svg',
   'nzxt-kraken': '/assets/devices/nzxt.svg',
+  'asus-ryujin-lcd': '/assets/devices/asus.svg',
 };
 
 const CURATED_SHORT_NAMES: Record<string, string> = {
@@ -217,8 +224,8 @@ export function useUnifiedDevices(enabled: boolean) {
     // are handler-level (one on/off gate for every deck), so every entry
     // mirrors the same handler row; warning/conflictAppId come straight off
     // each deck since the service already computes them per deck. shortName
-    // is the product name; name is the deck's own persisted name so the
-    // Devices-page card still tells two same-model decks apart.
+    // is the deck's own persisted name (falling back to the product name) so
+    // every surface still tells two same-model decks apart.
     const streamdeckHandler = devices.find(d => d.id === 'streamdeck');
     const deckSupportsControl = streamdeckHandler?.supportsNexusControl ?? false;
     const deckControlEnabled = streamdeckHandler?.nexusControlEnabled ?? true;
@@ -245,7 +252,7 @@ export function useUnifiedDevices(enabled: boolean) {
       if (!deck.connected && !deckPresentWhileReleased) continue;
       list.push({
         key: `streamdeck:${deck.serial}`,
-        shortName: deck.displayName,
+        shortName: deck.name || deck.displayName,
         name: deck.name,
         subtitle: streamdeckHandler?.category ?? 'controller',
         category: streamdeckHandler?.category ?? 'controller',
@@ -350,7 +357,7 @@ function buildUnifiedList(
       supportsNexusControl: isSimulated
         ? false
         : isPromotedMonitor ? true : (backing?.supportsNexusControl ?? false),
-      experimental: backing?.experimental ?? false,
+      experimental: backing?.experimental ?? p.experimental ?? false,
       requiresBeta: backing?.requiresBeta ?? false,
       warning: p.warning ?? undefined,
       conflictAppId: backing?.conflictAppId,

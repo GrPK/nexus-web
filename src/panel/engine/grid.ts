@@ -4,6 +4,7 @@ import {
   type PanelSurface,
   type PanelWidgetSize,
   singleWidgetSurfaceSize,
+  surfaceScalesContentToShortSide,
 } from '../types';
 
 // Grid is 4 columns wide on the short axis by default. Phone landscape keeps
@@ -22,6 +23,8 @@ export const PANEL_Y70_LONG_AXIS_CELLS = 16;
 export const PANEL_GRID_GAP = 8;
 export const PANEL_GRID_PREVIEW_PADDING = 8;
 export const DEFAULT_PANEL_GRID_SHORT_SIDE_JUMP_INCHES = 4;
+// Past the jump, the short axis keeps about one slot per this many inches.
+export const PANEL_GRID_CELL_INCHES = 1;
 
 // The Theme "Widget padding" control is a 0-100% slider. Gap and page padding
 // are both solved as a fraction of the resolved cell size (resolvePanelSpacing),
@@ -125,6 +128,7 @@ export function panelGridCapacityForCanvas(
     surface = 'y70',
     dpi,
     sizing,
+    shortSideSlots,
     columns,
     rows,
     gap = PANEL_GRID_GAP,
@@ -134,6 +138,8 @@ export function panelGridCapacityForCanvas(
     surface?: PanelSurface;
     dpi?: number;
     sizing?: PanelGridSizing;
+    // Overrides the density-derived short-axis slot count (portrait columns, landscape rows).
+    shortSideSlots?: number;
     columns?: number;
     rows?: number;
     gap?: number;
@@ -152,7 +158,7 @@ export function panelGridCapacityForCanvas(
   // isPhoneLandscape below.
   const y70Landscape = surface === 'y70' && width > height
     && columns === undefined && rows === undefined;
-  const shortAxisSlots = columnsForPhysicalSize(width, height, dpi, sizing);
+  const shortAxisSlots = shortSideSlots ?? columnsForPhysicalSize(width, height, dpi, sizing);
   // A single-widget surface's grid IS its one tile: deriving it from the tile's
   // span makes the widget fill the glass on any such surface. This reproduces the
   // Q-series 2x4 exactly and gives the round Kraken glass its 2x2.
@@ -218,7 +224,7 @@ export function panelGridCapacityForCanvas(
       : Math.max(1, (contentH - s.gap * (rows - 1)) / rows);
     return { columns: safeColumns, rows, cellSize, rowSize, gap: s.gap, padding: s.padding };
   };
-  return withContentGeometry(solve(spacing), solve(contentSpacing));
+  return withContentGeometry(solve(spacing), solve(contentSpacing), surfaceScalesContentToShortSide(surface));
 }
 
 function phoneLandscapeGridCapacityForCanvas(
@@ -238,14 +244,15 @@ function phoneLandscapeGridCapacityForCanvas(
 }
 
 // The live solve renders the grid; the stock solve sizes widget content and the immersive overlay.
-function withContentGeometry(live: PanelGridGeometry, stock: PanelGridGeometry): PanelGridCapacity {
+function withContentGeometry(live: PanelGridGeometry, stock: PanelGridGeometry, shortSide = false): PanelGridCapacity {
   return {
     ...live,
     // contentScale drives --panel-scale (the widget render scale ratio). Use
     // the cell width rather than min(cell, row) so fixed-row surfaces (y70,
     // q60) with short rows don't shrink widget content; the cellScaler CSS
-    // override handles the non-square card height per-surface.
-    contentScale: stock.cellSize,
+    // override handles the non-square card height per-surface. A short-side
+    // surface takes min(cell, row) so its one tile keeps its design height.
+    contentScale: shortSide ? Math.min(stock.cellSize, stock.rowSize) : stock.cellSize,
     contentGap: stock.gap,
     contentColumns: stock.columns,
     contentRows: stock.rows,
@@ -281,7 +288,10 @@ export function columnsForPhysicalSize(
     ? Math.max(1, configuredJumpAtInches)
     : DEFAULT_PANEL_GRID_SHORT_SIDE_JUMP_INCHES;
   const physical = panelPhysicalSize(width, height, dpi);
-  return physical.shortSideInches >= jumpAtInches ? PANEL_LARGE_GRID_COLS : PANEL_GRID_COLS;
+  if (physical.shortSideInches < jumpAtInches) return PANEL_GRID_COLS;
+  // Steps of four keep a Widget size half of the count even.
+  const step = PANEL_GRID_COLS * PANEL_GRID_CELL_INCHES;
+  return Math.max(PANEL_LARGE_GRID_COLS, PANEL_GRID_COLS * Math.round(physical.shortSideInches / step));
 }
 
 function toEvenRound(value: number): number {

@@ -127,8 +127,136 @@ export function surfaceSupportsMountOrientation(surface: PanelSurface): boolean 
   return MOUNT_ORIENTABLE_SURFACES.has(surface);
 }
 
+// Square cooler glass can be landscape, where its tile is shorter than the
+// width-derived cell, so content scales to the shorter cell side.
+const SHORT_SIDE_CONTENT_SURFACES: ReadonlySet<PanelSurface> = new Set<PanelSurface>(['lcd-square']);
+
+export function surfaceScalesContentToShortSide(surface: PanelSurface): boolean {
+  return SHORT_SIDE_CONTENT_SURFACES.has(surface);
+}
+
 export function isSingleWidgetSurface(surface: PanelSurface): boolean {
   return singleWidgetSurfaceSize(surface) !== undefined;
+}
+
+// Pages are reached by swiping, so a panel without touch keeps one page.
+export function surfaceAllowsPages(surface: PanelSurface, deviceTouch?: boolean): boolean {
+  return surfaceSupportsTouch(surface, deviceTouch);
+}
+
+// Widget size: 'large' shows fewer, bigger widgets; 'small' a denser grid. A panel
+// that offers the switch lays out each size as another surface does, while its own
+// surface keeps driving the hardware (touch, render cost, offline behaviour).
+export const PANEL_WIDGET_SIZE_MODES = ['large', 'small'] as const;
+export type PanelWidgetSizeMode = typeof PANEL_WIDGET_SIZE_MODES[number];
+
+export const ICUE_LINK_LCD5_FAMILY = 'icue-link-lcd5';
+export const HYDROSHIFT2_CURVE_FAMILY = 'lianli-hydroshift2-curve';
+export const LIANLI_SCREEN88_FAMILY = 'lianli-screen88';
+
+export interface PanelWidgetSizeOptions {
+  default: PanelWidgetSizeMode;
+  layoutSurface: Readonly<Record<PanelWidgetSizeMode, PanelSurface>>;
+  // Physical px/inch of the glass, for a size laid out as a density-sized grid.
+  dpi?: number;
+  // Short-axis slot count a size forces, replacing the density-derived one.
+  shortSideSlots?: Readonly<Partial<Record<PanelWidgetSizeMode, number>>>;
+  // Share of the density-derived short-axis slot count a size keeps.
+  densitySlotShare?: Readonly<Partial<Record<PanelWidgetSizeMode, number>>>;
+}
+
+// The Q-series and the iCUE LINK 5" LCD share one portrait glass size: Large is the
+// Q-series' one full-screen tile, Small a monitor grid sized by the glass's density.
+const ONE_TILE_OR_GRID: Readonly<Record<PanelWidgetSizeMode, PanelSurface>> = { large: 'q60', small: 'monitor' };
+
+export function panelWidgetSizeOptions(surface: PanelSurface, family?: string | null): PanelWidgetSizeOptions | undefined {
+  if (surface === 'q60') return { default: 'large', layoutSurface: ONE_TILE_OR_GRID };
+  if (surface === 'monitor' && family === ICUE_LINK_LCD5_FAMILY) return { default: 'small', layoutSurface: ONE_TILE_OR_GRID };
+  // HydroShift II OLED Curved: Large is its one wide tile, Small a landscape grid
+  // sized by the glass's physical density at its rendered resolution.
+  if (surface === 'lcd-wide' && family === HYDROSHIFT2_CURVE_FAMILY) {
+    return { default: 'large', layoutSurface: { large: 'lcd-wide', small: 'monitor' }, dpi: 379 };
+  }
+  // Lian Li Universal Screen 8.8: Large forces a coarse short axis, so cells are fewer and bigger.
+  if (surface === 'monitor' && family === LIANLI_SCREEN88_FAMILY) {
+    return { default: 'small', layoutSurface: { large: 'monitor', small: 'monitor' }, shortSideSlots: { large: 2 } };
+  }
+  // A plain OS monitor: Large halves its density grid's short axis, so cells double.
+  if (surface === 'monitor' && !family) {
+    return { default: 'small', layoutSurface: { large: 'monitor', small: 'monitor' }, densitySlotShare: { large: 0.5 } };
+  }
+  return undefined;
+}
+
+// A grid whose short axis a Widget size forces; landscape means the short axis is its rows.
+export interface ForcedGrid {
+  slots: number;
+  landscape: boolean;
+}
+
+export function forcedGridOf(slots: number | undefined, landscape: boolean): ForcedGrid | undefined {
+  return slots === undefined ? undefined : { slots, landscape };
+}
+
+// The short-axis slot count a Widget size forces, if any. `densitySlots` is the
+// glass's density-derived count (columnsForPhysicalSize), which a share scales.
+export function widgetSizeShortSideSlots(
+  options: PanelWidgetSizeOptions | undefined,
+  mode: PanelWidgetSizeMode | undefined,
+  densitySlots: number | undefined,
+): number | undefined {
+  if (!options || !mode) return undefined;
+  const share = options.densitySlotShare?.[mode];
+  if (share === undefined) return options.shortSideSlots?.[mode];
+  return densitySlots === undefined ? undefined : Math.max(2, Math.round(densitySlots * share));
+}
+
+export function panelShortSideSlots(
+  surface: PanelSurface,
+  family: string | null | undefined,
+  widgetSize: string | null | undefined,
+  densitySlots?: number,
+): number | undefined {
+  return widgetSizeShortSideSlots(
+    panelWidgetSizeOptions(surface, family),
+    resolvePanelWidgetSize(surface, family, widgetSize),
+    densitySlots,
+  );
+}
+
+// Density for a panel's grid: the record's own, else the glass's when Widget size
+// lays it out as another surface (whose estimate would be wrong for this glass).
+export function panelLayoutDpi(
+  surface: PanelSurface,
+  family: string | null | undefined,
+  widgetSize: string | null | undefined,
+  recordDpi: number | null | undefined,
+  surfaceDpi: Readonly<Record<PanelSurface, number>>,
+): number | undefined {
+  if (recordDpi) return recordDpi;
+  if (panelLayoutSurface(surface, family, widgetSize) === surface) return undefined;
+  return panelWidgetSizeOptions(surface, family)?.dpi ?? surfaceDpi[surface];
+}
+
+export function resolvePanelWidgetSize(
+  surface: PanelSurface,
+  family: string | null | undefined,
+  widgetSize: string | null | undefined,
+): PanelWidgetSizeMode | undefined {
+  const options = panelWidgetSizeOptions(surface, family);
+  if (!options) return undefined;
+  return widgetSize === 'large' || widgetSize === 'small' ? widgetSize : options.default;
+}
+
+// The surface whose layout rules (grid, single tile, sizes, playlist) the panel follows.
+export function panelLayoutSurface(
+  surface: PanelSurface,
+  family: string | null | undefined,
+  widgetSize: string | null | undefined,
+): PanelSurface {
+  const options = panelWidgetSizeOptions(surface, family);
+  const mode = resolvePanelWidgetSize(surface, family, widgetSize);
+  return options && mode ? options.layoutSurface[mode] : surface;
 }
 
 // A panel with no stored background starts solid, except a Q-series cooler, whose

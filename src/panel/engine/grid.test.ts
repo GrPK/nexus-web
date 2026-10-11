@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
 import {
+  columnsForPhysicalSize,
   panelGridCapacityForCanvas,
   panelPhysicalSize,
   panelWidgetPaddingRatio,
@@ -139,6 +140,18 @@ describe('sizeToSpan', () => {
     });
   });
 
+  // Widget size Small: the HydroShift II Curved, and the glass the Q-series and the
+  // iCUE LINK 5" LCD share, at default widget padding.
+  it('gives the Small widget size its grids', () => {
+    const paddingRatio = panelWidgetPaddingRatio(PANEL_WIDGET_PADDING_DEFAULT_PERCENT);
+    expect(panelGridCapacityForCanvas(2288, 1080, { surface: 'monitor', dpi: 379, paddingRatio }))
+      .toMatchObject({ columns: 8, rows: 4 });
+    expect(panelGridCapacityForCanvas(720, 1280, { surface: 'monitor', dpi: 294, paddingRatio }))
+      .toMatchObject({ columns: 4, rows: 6 });
+    expect(panelGridCapacityForCanvas(720, 1280, { surface: 'monitor', dpi: 220, paddingRatio }))
+      .toMatchObject({ columns: 4, rows: 6 });
+  });
+
   it('gives the Xeneon Edge 4 columns of large cells in portrait', () => {
     expect(panelGridCapacityForCanvas(720, 2560, { surface: 'monitor', dpi: 183 })).toMatchObject({
       columns: 4,
@@ -155,6 +168,15 @@ describe('sizeToSpan', () => {
       columns: 28,
       rows: 8,
     });
+  });
+
+  it('keeps adding short-axis slots in fours on a desktop monitor, about one per inch', () => {
+    const dell24 = columnsForPhysicalSize(1920, 1200, 94.1, undefined);
+    const uhd32 = columnsForPhysicalSize(3840, 2160, 137.7, undefined);
+    const laptop156 = columnsForPhysicalSize(1920, 1080, 141.2, undefined);
+    expect([dell24, uhd32, laptop156]).toEqual([12, 16, 8]);
+    expect(columnsForPhysicalSize(682, 2560, 337, undefined)).toBe(PANEL_GRID_COLS);
+    expect(panelGridCapacityForCanvas(1920, 1200, { surface: 'monitor', dpi: 94.1 })).toMatchObject({ rows: 12 });
   });
 });
 
