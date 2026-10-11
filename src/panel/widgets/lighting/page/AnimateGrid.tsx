@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Lightbulb, Monitor } from 'lucide-react';
 import { useTranslation } from '../../../../lib/i18n';
+import { matchesAllWords } from '../../../../search/match';
 import { HoverTooltip } from '../../../../components/common/HoverTooltip/HoverTooltip';
 import { CollapsibleSection } from '../../../../components/common/CollapsibleSection/CollapsibleSection';
 import {
@@ -60,7 +61,7 @@ function AnimateGridCell({ fx, slot, version, active, live, panel, label, hideLa
  * hardware gets a bulb. Effects are listed in pre-expanded category groups
  * (EFFECT_CATEGORIES order), each under a header in the cooling-panel style.
  */
-export function AnimateGrid({ effect, onSelect, effects = EFFECTS, slotFor, versionFor, rgbActiveEffect, panelEffects, gpuAvailable, frozen, leading }: {
+export function AnimateGrid({ effect, onSelect, effects = EFFECTS, query = '', slotFor, versionFor, rgbActiveEffect, panelEffects, gpuAvailable, frozen, leading }: {
   effect: string;
   onSelect: (key: string) => void;
   /** Rendered above the category groups, inside the same scroll container. */
@@ -68,6 +69,8 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, slotFor, vers
   /** Effect pool to show. Defaults to the full RGB set; panel backgrounds pass
    *  their own narrower pool, so categories it drops render no section. */
   effects?: EffectDef[];
+  /** Search text; matches an effect's name or category. */
+  query?: string;
   /** Preset slot to show per effect (this device's selection). Defaults to 0. */
   slotFor?: (key: string) => number;
   /** Content hash of that slot, for cache-busting. Defaults to '0'. */
@@ -108,10 +111,16 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, slotFor, vers
   // (e.g. audio on panel backgrounds) drop out.
   const groups = useMemo(
     () => EFFECT_CATEGORIES
-      .map(cat => ({ cat, items: effects.filter(fx => categoryOf(fx.key) === cat) }))
+      .map(cat => ({
+        cat,
+        items: effects.filter(fx => categoryOf(fx.key) === cat
+          && matchesAllWords(query, [t(fx.labelKey), t(`lighting.category.${cat}`)])),
+      }))
       .filter(g => g.items.length > 0),
-    [effects],
+    [effects, query, t],
   );
+
+  const searching = query.trim() !== '';
 
   const toggle = (c: EffectCategory) => setCollapsed(prev => {
     const next = new Set(prev);
@@ -145,7 +154,7 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, slotFor, vers
               key={g.cat}
               compact
               title={t(`lighting.category.${g.cat}`)}
-              open={!collapsed.has(g.cat)}
+              open={searching || !collapsed.has(g.cat)}
               onToggle={() => toggle(g.cat)}
             >
               <div className={`${styles.animateGridSection} ${g.cat === 'simple' ? styles.animateGridSectionSimple : ''}`}>
@@ -154,6 +163,7 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, slotFor, vers
             </CollapsibleSection>
           );
         })}
+        {searching && groups.length === 0 && <p className={styles.browserHint}>{t('lighting.effects.noMatches')}</p>}
       </div>
     </div>
   );

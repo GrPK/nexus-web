@@ -105,3 +105,28 @@ describe('AnimateGrid category sections', () => {
     expect(has(container, 'fire')).toBe(true);
   });
 });
+
+describe('AnimateGrid search', () => {
+  const keys = (container: HTMLElement) =>
+    [...container.querySelectorAll('[data-effect-key]')].map(el => el.getAttribute('data-effect-key'));
+
+  it('shows only effects whose name matches every word', () => {
+    const { container } = render(<AnimateGrid effect="plasma" onSelect={() => {}} query="plasma" />);
+    const shown = keys(container);
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.every(k => k?.includes('plasma'))).toBe(true);
+  });
+
+  it('treats a whitespace-only query as no search', () => {
+    const all = keys(render(<AnimateGrid effect="plasma" onSelect={() => {}} />).container);
+    const spaced = keys(render(<AnimateGrid effect="plasma" onSelect={() => {}} query="   " />).container);
+    expect(spaced).toEqual(all);
+    expect(screen.queryByText('lighting.effects.noMatches')).not.toBeInTheDocument();
+  });
+
+  it('says so when nothing matches', () => {
+    const { container } = render(<AnimateGrid effect="plasma" onSelect={() => {}} query="zzzz-no-such-effect" />);
+    expect(keys(container)).toEqual([]);
+    expect(screen.getByText('lighting.effects.noMatches')).toBeInTheDocument();
+  });
+});

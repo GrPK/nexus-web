@@ -258,11 +258,6 @@
   }
 }
 
-// Shader Studio entry, left of the fullscreen button.
-.studioBtn {
-  right: calc(0.4rem + 26px + 0.3rem);
-}
-
 .musicReactive {
   position: absolute;
   top: 0.4rem;
@@ -526,8 +521,23 @@
   color: var(--text-dim);
 }
 
+// Search + effect source switch, docked between the canvas and the effect grid.
+.effectToolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: 0.5rem;
+  padding: 0 0.3rem;
+}
+
+.effectSearch {
+  flex: 1;
+  min-width: 0;
+}
+
 // Effect browser shell. Static with nothing selected has nowhere to put a
-// colour, so it dims and stops taking input rather than silently doing nothing.
+// color, so it dims and stops taking input rather than silently doing nothing.
 .browserWrap {
   flex: 1;
   min-height: 0;

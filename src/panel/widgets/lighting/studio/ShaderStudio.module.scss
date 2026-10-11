@@ -266,3 +266,9 @@
   align-items: center;
   gap: var(--space-sm);
 }
+
+// Create tile: the lighting rail's dashed add affordance (.addSmartLights),
+// shaped like an effect card's thumbnail.
+.createTile {
+  aspect-ratio: 16 / 9;
+}

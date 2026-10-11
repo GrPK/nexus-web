@@ -7,6 +7,7 @@ import { Select } from '../../../../components/common/Select/Select';
 import { Slider } from '../../../../components/common/Slider/Slider';
 import { Badge } from '../../../../components/common/Badge/Badge';
 import { PromptModal } from '../../../../components/common/PromptModal/PromptModal';
+import { ConfirmModal } from '../../../../components/common/ConfirmModal/ConfirmModal';
 import { SortableList, type SortableRowArgs } from '../../../../components/common/SortableList/SortableList';
 import { forgetShaderSource, primeShaderSource } from '../../../../api/lighting';
 import { useAudioState } from '../../../../hooks/useAudioState';
@@ -17,68 +18,20 @@ import {
   type StudioStage,
 } from './studioBlocks';
 import {
-  STUDIO_MOD_SOURCES, compileStudio, makeBlock, recipeCost, stageCount,
+  compileStudio, makeBlock, recipeCost, stageCount,
   type CompiledStudio, type StudioBlock, type StudioRecipe,
 } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, shuffleRecipe } from './studioRecipes';
+import { deleteSavedEffect, getSavedEffects, putSavedEffect, useSavedEffects } from './studioLibrary';
+import { renderStudioThumbnail } from './studioThumbnail';
 import { StudioBlockCard } from './StudioBlockCard';
 import { StudioPreview } from './StudioPreview';
 import styles from './ShaderStudio.module.scss';
 
 const STACKED = 'stacked' as const;
 
-// Prototype storage: browser-local until the service owns custom effects.
-const SAVED_KEY = 'nexus.studio.saved';
-const DRAFT_KEY = 'nexus.studio.draft';
 const HISTORY_LIMIT = 50;
 const VARIATION_COUNT = 6;
-
-interface SavedEffect {
-  id: string;
-  name: string;
-  recipe: StudioRecipe;
-}
-
-function readJson(key: string): unknown {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeJson(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
-
-const isObj = (o: unknown): o is Record<string, unknown> => !!o && typeof o === 'object' && !Array.isArray(o);
-
-function isBlock(b: StudioBlock | null | undefined): boolean {
-  if (!b || typeof b.uid !== 'string' || !studioBlock(b.type) || !isObj(b.params)) return false;
-  if (!Object.values(b.params).every(isNum)) return false;
-  if (b.mods !== undefined && !(isObj(b.mods) && Object.values(b.mods).every(m => isObj(m) && STUDIO_MOD_SOURCES.includes(m.source) && isNum(m.amount)))) return false;
-  return b.colors === undefined || (isObj(b.colors) && Object.values(b.colors).every(c => Array.isArray(c) && c.length === 3 && c.every(isNum)));
-}
-
-function isRecipe(x: unknown): x is StudioRecipe {
-  if (!x || typeof x !== 'object') return false;
-  const r = x as StudioRecipe;
-  if (r.v !== 1 || !Array.isArray(r.blocks) || !r.blocks.every(isBlock)) return false;
-  if (![r.speed, r.hue, r.saturation, r.contrast].every(isNum)) return false;
-  return stageCount(r, 'pattern') >= 1 && stageCount(r, 'color') === 1;
-}
-
-function readSaved(): SavedEffect[] {
-  const raw = readJson(SAVED_KEY);
-  return Array.isArray(raw) ? raw.filter((s): s is SavedEffect => !!s && typeof s.name === 'string' && isRecipe(s.recipe)) : [];
-}
 
 // Keys this editor primed; evicted on close so the module-level shader cache stays bounded.
 const primedKeys = new Set<string>();
@@ -113,17 +66,27 @@ function VariationTile({ recipe, label, onPick }: { recipe: StudioRecipe; label:
   );
 }
 
-export function ShaderStudio({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** `effectId` opens that saved effect; null starts a new one. */
+export function ShaderStudio({ open, effectId, onClose }: { open: boolean; effectId: string | null; onClose: () => void }) {
   const { t } = useTranslation();
+  const saved = useSavedEffects();
+  const [currentId, setCurrentId] = useState<string | null>(
+    () => (effectId && getSavedEffects().some(s => s.id === effectId) ? effectId : null),
+  );
   const [recipe, setRecipe] = useState<StudioRecipe>(() => {
-    const draft = readJson(DRAFT_KEY);
-    return isRecipe(draft) ? draft : STUDIO_STARTERS[0].build();
+    const existing = getSavedEffects().find(s => s.id === effectId);
+    return existing ? structuredClone(existing.recipe) : STUDIO_STARTERS[0].build();
   });
   const [past, setPast] = useState<StudioRecipe[]>([]);
   const [future, setFuture] = useState<StudioRecipe[]>([]);
   const [variations, setVariations] = useState<StudioRecipe[] | null>(null);
-  const [saved, setSaved] = useState<SavedEffect[]>(readSaved);
   const [saving, setSaving] = useState(false);
+  // The recipe as last saved or loaded; null when nothing saved backs it. Any
+  // difference counts as unsaved, so closing or loading another effect asks first.
+  const [baseline, setBaseline] = useState<string | null>(() => JSON.stringify(recipe));
+  // What runs once the user agrees to drop unsaved edits (close, or load another effect).
+  const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(null);
+  const currentName = saved.find(s => s.id === currentId)?.name;
   const committedRef = useRef(recipe);
   const recipeRef = useRef(recipe);
 
@@ -139,11 +102,17 @@ export function ShaderStudio({ open, onClose }: { open: boolean; onClose: () => 
 
   // Evicts on the explicit close, not an unmount cleanup: StrictMode re-runs cleanups
   // while the previews still need their keys.
-  const close = () => {
+  const finishClose = () => {
     primedKeys.forEach(forgetShaderSource);
     primedKeys.clear();
     onClose();
   };
+  const unlessDirty = (action: () => void) => {
+    const dirty = baseline === null || JSON.stringify(recipeRef.current) !== baseline;
+    if (dirty) setPendingDiscard(() => action);
+    else action();
+  };
+  const close = () => unlessDirty(finishClose);
 
   const apply = (next: StudioRecipe, commit: boolean) => {
     setRecipe(next);
@@ -153,7 +122,6 @@ export function ShaderStudio({ open, onClose }: { open: boolean; onClose: () => 
     setPast(p => [...p.slice(1 - HISTORY_LIMIT), prev]);
     setFuture([]);
     committedRef.current = next;
-    writeJson(DRAFT_KEY, next);
   };
   const commitCurrent = () => apply(recipeRef.current, true);
 
@@ -164,7 +132,6 @@ export function ShaderStudio({ open, onClose }: { open: boolean; onClose: () => 
     setFuture([committedRef.current, ...future]);
     committedRef.current = prev;
     setRecipe(prev);
-    writeJson(DRAFT_KEY, prev);
   };
   const redo = () => {
     const next = future[0];
@@ -173,7 +140,6 @@ export function ShaderStudio({ open, onClose }: { open: boolean; onClose: () => 
     setPast([...past, committedRef.current]);
     committedRef.current = next;
     setRecipe(next);
-    writeJson(DRAFT_KEY, next);
   };
 
   const cost = recipeCost(recipe);
@@ -209,17 +175,29 @@ export function ShaderStudio({ open, onClose }: { open: boolean; onClose: () => 
     openVariations(v);
   };
 
+  // Keeping the name overwrites the open effect; a new name saves a copy.
   const saveEffect = (name: string) => {
-    const next = [...saved, { id: `fx${Date.now().toString(36)}`, name: name.trim(), recipe: structuredClone(recipe) }];
-    setSaved(next);
-    writeJson(SAVED_KEY, next);
+    const trimmed = name.trim();
+    const id = currentId && currentName === trimmed ? currentId : `fx${Date.now().toString(36)}`;
+    putSavedEffect({ id, name: trimmed, recipe: structuredClone(recipe), thumb: renderStudioThumbnail(recipe) ?? undefined });
+    setCurrentId(id);
     setSaving(false);
+    setBaseline(JSON.stringify(recipe));
   };
 
+  const loadSaved = (id: string) => unlessDirty(() => {
+    const s = getSavedEffects().find(e => e.id === id);
+    if (!s) return;
+    apply(structuredClone(s.recipe), true);
+    setCurrentId(id);
+    setBaseline(JSON.stringify(s.recipe));
+  });
+
   const deleteSaved = (id: string) => {
-    const next = saved.filter(s => s.id !== id);
-    setSaved(next);
-    writeJson(SAVED_KEY, next);
+    deleteSavedEffect(id);
+    if (currentId !== id) return;
+    setCurrentId(null);
+    setBaseline(null);
   };
 
   const costLevel = cost <= 4 ? 'light' : cost <= 8 ? 'medium' : 'heavy';
@@ -312,6 +290,7 @@ export function ShaderStudio({ open, onClose }: { open: boolean; onClose: () => 
       onClose={close}
       fullscreen
       title={t('lighting.studio.title')}
+      subtitle={currentName}
       icon={<WandSparkles size={18} />}
       headerRight={toolbar}
     >
@@ -345,7 +324,7 @@ export function ShaderStudio({ open, onClose }: { open: boolean; onClose: () => 
                     <ul className={styles.savedList}>
                       {saved.map(s => (
                         <li key={s.id} className={styles.savedRow}>
-                          <Button size="sm" tone="ghost" className={styles.savedName} onClick={() => apply(structuredClone(s.recipe), true)}>
+                          <Button size="sm" tone="ghost" className={styles.savedName} onClick={() => loadSaved(s.id)}>
                             {s.name}
                           </Button>
                           <Button size="sm" tone="ghost" icon={<Trash2 size={13} />} aria-label={t('lighting.studio.delete')} onClick={() => deleteSaved(s.id)} />
@@ -378,10 +357,20 @@ export function ShaderStudio({ open, onClose }: { open: boolean; onClose: () => 
           {STUDIO_STAGES.map(renderStage)}
         </div>
       </div>
+      <ConfirmModal
+        open={!!pendingDiscard}
+        title={t('lighting.studio.discardTitle')}
+        message={t('lighting.studio.discardMessage')}
+        confirmLabel={t('lighting.studio.discard')}
+        destructive
+        onConfirm={() => { const action = pendingDiscard; setPendingDiscard(null); action?.(); }}
+        onCancel={() => setPendingDiscard(null)}
+      />
       <PromptModal
         open={saving}
         title={t('lighting.studio.saveTitle')}
         placeholder={t('lighting.studio.namePlaceholder')}
+        initialValue={currentName ?? ''}
         maxLength={40}
         confirmLabel={t('lighting.studio.save')}
         validate={v => (v.trim() ? null : t('lighting.studio.nameRequired'))}

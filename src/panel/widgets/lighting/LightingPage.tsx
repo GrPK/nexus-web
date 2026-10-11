@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Music, Pause, Play, PanelRightOpen, PanelRightClose, WandSparkles } from 'lucide-react';
+import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Music, Pause, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
   startAnimate, startStatic, startScreenMirror, stopLighting, startGameSync,
   fetchStaticSettings,
@@ -55,6 +55,7 @@ import { DeviceCanvas } from '../../../components/common/DeviceCanvas/DeviceCanv
 import { SCENE_3D } from '../../../lib/scene/sceneFeature';
 import { useLightingScene } from './scene/useLightingScene';
 import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
+import { SearchInput } from '../../../components/common/SearchInput/SearchInput';
 import { usePersistentState, usePersistentIdSet } from '../../../hooks/usePersistentState';
 import {
   pickLookForDevices, pickPaletteForDevices, pickCustomForDevices, pushPalettePick, devicePicksFromLooks,
@@ -171,6 +172,12 @@ const LightingScene3D = lazy(() => import('./scene/LightingScene3D'));
 const ShaderStudio = (import.meta.env.DEV || __DEV_TOOLS__)
   ? lazy(() => import('./studio/ShaderStudio').then(m => ({ default: m.ShaderStudio })))
   : null;
+const CustomEffectsGrid = (import.meta.env.DEV || __DEV_TOOLS__)
+  ? lazy(() => import('./studio/CustomEffectsGrid').then(m => ({ default: m.CustomEffectsGrid })))
+  : null;
+const SOURCE_BUILTIN = 'builtin';
+const SOURCE_CUSTOM = 'custom';
+type EffectSource = typeof SOURCE_BUILTIN | typeof SOURCE_CUSTOM;
 const VIEW_2D = '2d';
 const VIEW_3D = '3d';
 
@@ -380,7 +387,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // frame (effectTemplates churns during drag for the live RGB preview).
   const [committedTemplates, setCommittedTemplates] = useState<Record<string, EffectTemplateBundle>>({});
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
-  const [studioOpen, setStudioOpen] = useState(false);
+  // Saved effect to open in the studio; id null starts a new one.
+  const [studioTarget, setStudioTarget] = useState<{ id: string | null } | null>(null);
+  const [effectQuery, setEffectQuery] = useState('');
+  const [effectSource, setEffectSource] = useState<EffectSource>(SOURCE_BUILTIN);
   const sceneApi = useLightingScene(SCENE_3D);
   const [sceneEditorOpen, setSceneEditorOpen] = useState(false);
   const scene3d = SCENE_3D && !!sceneApi.scene?.view.enabled;
@@ -2562,13 +2572,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                         )}
                       </div>
                     )}
-                    {ShaderStudio && (
-                      <HoverTooltip body={t('lighting.studio.title')} side="left">
-                        <button type="button" className={`${styles.fullscreenBtn} ${styles.studioBtn}`} onClick={() => setStudioOpen(true)} aria-label={t('lighting.studio.title')}>
-                          <WandSparkles size={14} strokeWidth={1.5} />
-                        </button>
-                      </HoverTooltip>
-                    )}
                     <HoverTooltip body={t('lighting.fullscreen')} side="left">
                       <button type="button" className={styles.fullscreenBtn} onClick={() => setFullscreenOpen(true)} aria-label={t('lighting.fullscreen')}>
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2585,6 +2588,26 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   effect pool; Screen and Media get their source controls. */}
               {effectiveMode === 'animate' || effectiveMode === 'static' ? (
                 <>
+                <div className={styles.effectToolbar}>
+                  <SearchInput
+                    className={styles.effectSearch}
+                    value={effectQuery}
+                    onChange={setEffectQuery}
+                    placeholder={t('lighting.effects.search')}
+                    ariaLabel={t('lighting.effects.search')}
+                  />
+                  {CustomEffectsGrid && effectiveMode === 'animate' && (
+                    <ChipGroup
+                      ariaLabel={t('lighting.effects.source')}
+                      options={[
+                        { key: SOURCE_BUILTIN, label: t('lighting.effects.builtIn') },
+                        { key: SOURCE_CUSTOM, label: t('lighting.effects.custom') },
+                      ]}
+                      activeKey={effectSource}
+                      onChange={key => setEffectSource(key as EffectSource)}
+                    />
+                  )}
+                </div>
                 {staticNeedsSelection && (
                   <p className={styles.browserHint}>{t('lighting.pane.pickDevices')}</p>
                 )}
@@ -2592,10 +2615,20 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   className={`${styles.browserWrap} ${staticNeedsSelection ? styles.browserLocked : ''}`}
                   inert={staticNeedsSelection || undefined}
                 >
+                {CustomEffectsGrid && effectiveMode === 'animate' && effectSource === SOURCE_CUSTOM ? (
+                  <Suspense fallback={null}>
+                    <CustomEffectsGrid
+                      query={effectQuery}
+                      onCreate={() => setStudioTarget({ id: null })}
+                      onOpen={id => setStudioTarget({ id })}
+                    />
+                  </Suspense>
+                ) : (
                 <AnimateGrid
                   effect={gridEffect}
                   onSelect={handleEffectSelect}
                   effects={effectiveMode === 'static' ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
+                  query={effectQuery}
                   frozen={effectiveMode === 'static'}
                   slotFor={gridSlotFor}
                   versionFor={gridVersionFor}
@@ -2627,6 +2660,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     </CollapsibleSection>
                   ) : undefined}
                 />
+                )}
                 </div>
                 </>
               ) : effectiveMode === 'none' ? (
@@ -2703,9 +2737,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           paused={paused}
         />
       )}
-      {ShaderStudio && studioOpen && (
+      {ShaderStudio && studioTarget && (
         <Suspense fallback={null}>
-          <ShaderStudio open onClose={() => setStudioOpen(false)} />
+          <ShaderStudio open effectId={studioTarget.id} onClose={() => setStudioTarget(null)} />
         </Suspense>
       )}
       {editorTarget && (
