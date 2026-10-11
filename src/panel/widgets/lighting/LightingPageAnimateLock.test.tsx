@@ -80,6 +80,7 @@ vi.mock('./page/DevicePanel', () => ({
     >
       <button type="button" onClick={() => onSetAnimateLock?.(['a'], !animateLocks?.a)}>toggle</button>
       <button type="button" onClick={() => onSetSelection(new Set(['a']), 'a')}>select-a</button>
+      <button type="button" onClick={() => onSetSelection(new Set(), null)}>clear-selection</button>
     </div>
   ),
 }));
@@ -88,7 +89,11 @@ vi.mock('./page/RightPaneTabs', () => ({ RightPaneTabs: () => null }));
 vi.mock('./page/EffectTab', () => ({ EffectTab: () => null }));
 vi.mock('../../../components/common/ViewHeader/ViewHeader', () => ({ ViewHeader: () => null }));
 vi.mock('../../../components/views/ServiceRequired', () => ({ ServiceRequired: () => null }));
-vi.mock('../../../components/common/DeviceCanvas/DeviceCanvas', () => ({ DeviceCanvas: () => null }));
+vi.mock('../../../components/common/DeviceCanvas/DeviceCanvas', () => ({
+  DeviceCanvas: ({ shaderEffect }: { shaderEffect?: string | null }) => (
+    <div data-testid="preview" data-effect={shaderEffect ?? ''} />
+  ),
+}));
 
 vi.mock('../../../api/lighting', async importOriginal => {
   const actual = await importOriginal<typeof import('../../../api/lighting')>();
@@ -240,5 +245,16 @@ describe('LightingPage animation lock', () => {
     fireEvent.click(screen.getByText('fs-prev'));
     await waitFor(() => expect(within(fs).getByText('lighting.animate.lockedNoticeTitle')).toBeTruthy());
     expect(fs.dataset.effect).toBe('aurora');
+  });
+
+  it('previews the locked animation while scoped to it, and the running effect otherwise', async () => {
+    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({ a: 'aurora' }));
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('preview').dataset.effect).toBe('aurora'));
+    expect(screen.getByTestId('grid-effect').textContent).toBe('aurora');
+
+    // Clearing the selection leaves the scope.
+    fireEvent.click(screen.getByText('clear-selection'));
+    await waitFor(() => expect(screen.getByTestId('preview').dataset.effect).toBe('fire'));
   });
 });
