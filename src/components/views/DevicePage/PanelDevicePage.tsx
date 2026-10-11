@@ -313,6 +313,7 @@ export function PanelDevicePage({ device, onOpenFirmware, onSectionNavigate }: P
   const [qSeriesScreenOff, setQSeriesScreenOff] = useState(false);
   const [qSeriesSleepWithHost, setQSeriesSleepWithHost] = useState(true);
   const [qSeriesSleepWhenLocked, setQSeriesSleepWhenLocked] = useState(true);
+  const [recordSleepWhenLocked, setRecordSleepWhenLocked] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [layout, setLayout] = useState<PanelLayout>(() => defaultLayoutForSurface('y70'));
   const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
@@ -661,6 +662,7 @@ export function PanelDevicePage({ device, onOpenFirmware, onSectionNavigate }: P
       setRecordPortrait(match?.portrait ?? false);
       setRecordSupportsPortrait(match?.capabilities?.supportsPortrait ?? false);
       setRecordLcdBrightness(match?.lcdBrightness ?? DEFAULT_LCD_BRIGHTNESS);
+      setRecordSleepWhenLocked(match?.sleepWhenLocked ?? true);
       setRecordSupportsBrightness(match?.capabilities?.supportsBrightness ?? false);
       setRecordSupportsSecondaryMonitor(match?.capabilities?.supportsSecondaryMonitor ?? false);
       setRecordSecondaryMonitor(match?.secondaryMonitor ?? false);
@@ -1813,8 +1815,16 @@ export function PanelDevicePage({ device, onOpenFirmware, onSectionNavigate }: P
                       onScreenOffToggle={() => {}}
                       sleepWithHost={null}
                       onSleepWithHostToggle={() => {}}
-                      sleepWhenLocked={null}
-                      onSleepWhenLockedToggle={() => {}}
+                      sleepWhenLocked={recordSleepWhenLocked}
+                      onSleepWhenLockedToggle={() => {
+                        const next = !recordSleepWhenLocked;
+                        setRecordSleepWhenLocked(next);
+                        const id = device?.panelRecordId;
+                        if (!id) return;
+                        void patchPanelDevice(id, { sleepWhenLocked: next })
+                          .then(r => { if (!r) setRecordSleepWhenLocked(!next); })
+                          .catch(() => setRecordSleepWhenLocked(!next));
+                      }}
                       autoOrient={null}
                       onAutoOrientToggle={() => {}}
                       reserveMonitor={null}
@@ -2575,7 +2585,7 @@ function MonitorSettingsPanel({
       )}
       {sleepWhenLocked !== null && (
         <SettingToggle
-          label={t('devices.qseries.sleepWhenLocked')}
+          label={t('devices.lcd.sleepWhenLocked')}
           checked={sleepWhenLocked}
           onChange={onSleepWhenLockedToggle}
         />

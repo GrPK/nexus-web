@@ -1,6 +1,6 @@
 import { Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
+import { SettingSelect, SettingSlider, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { Button } from '../../common/Button/Button';
 import { Notice } from '../../common/Notice/Notice';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
@@ -164,6 +164,18 @@ export function CorsairLcdSettings() {
             value: String(r.value),
             label: localizeNumbers(`${r.degrees}°`, numberFormat),
           }))}
+          disabled={!loaded}
+        />
+
+        <SettingToggle
+          label={t('devices.lcd.sleepWhenLocked')}
+          checked={state?.sleepWhenLocked ?? true}
+          onChange={() => {
+            if (!state) return;
+            const next = !(state.sleepWhenLocked ?? true);
+            setState({ ...state, sleepWhenLocked: next });
+            void commit({ sleepWhenLocked: next });
+          }}
           disabled={!loaded}
         />
       </SettingsSection>

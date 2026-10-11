@@ -687,6 +687,7 @@
   "devices.lcd.secondaryMonitorPreview": "Bu ekran ikincil monitör olarak kullanılıyor.",
   "devices.lcd.secondaryMonitorSection": "İkincil monitör",
   "devices.lcd.secondaryMonitorStarting": "Monitör başlatılıyor",
+  "devices.lcd.sleepWhenLocked": "PC kilitliyken ekranı kapat",
   "devices.lianli-aio.fan": "Fan",
   "devices.lianli-aio.innerColor": "İç halka",
   "devices.lianli-aio.notConnected": "Lian Li Galahad II bağlı değil",

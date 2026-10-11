@@ -687,6 +687,7 @@
   "devices.lcd.secondaryMonitorPreview": "Dit scherm wordt gebruikt als tweede monitor.",
   "devices.lcd.secondaryMonitorSection": "Tweede monitor",
   "devices.lcd.secondaryMonitorStarting": "Monitor wordt gestart",
+  "devices.lcd.sleepWhenLocked": "Scherm uitschakelen wanneer de pc vergrendeld is",
   "devices.lianli-aio.fan": "Ventilator",
   "devices.lianli-aio.innerColor": "Binnenring",
   "devices.lianli-aio.notConnected": "Lian Li Galahad II niet verbonden",

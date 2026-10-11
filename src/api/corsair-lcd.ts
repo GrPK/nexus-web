@@ -6,6 +6,8 @@ export interface CorsairLcdState {
   selectedMediaId: string | null;
   brightness: number;
   rotation: number;
+  /** Absent/null = on. */
+  sleepWhenLocked?: boolean | null;
   /** Library item stored in the cooler's flash, shown while Nexus is closed; null/absent is the built-in coolant screen. */
   deviceMediaId?: string | null;
 }
@@ -13,6 +15,7 @@ export interface CorsairLcdState {
 export interface CorsairLcdPatch {
   brightness?: number;
   rotation?: number;
+  sleepWhenLocked?: boolean;
   mediaId?: string;
 }
 

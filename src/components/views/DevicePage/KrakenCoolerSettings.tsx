@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image as ImageIcon, Lightbulb, Unplug } from 'lucide-react';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
-import { SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
+import { SettingSelect, SettingSlider, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { Button } from '../../common/Button/Button';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import {
@@ -202,6 +202,18 @@ export function KrakenCoolerSettings({ onSectionNavigate, screenStreamed = false
                 value: String(deg),
                 label: localizeNumbers(`${deg}°`, numberFormat),
               }))}
+              disabled={!loaded}
+            />
+
+            <SettingToggle
+              label={t('devices.lcd.sleepWhenLocked')}
+              checked={state?.lcdSleepWhenLocked ?? true}
+              onChange={() => {
+                if (!state) return;
+                const next = !(state.lcdSleepWhenLocked ?? true);
+                setState({ ...state, lcdSleepWhenLocked: next });
+                void commitLcd({ sleepWhenLocked: next });
+              }}
               disabled={!loaded}
             />
 

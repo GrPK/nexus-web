@@ -694,6 +694,7 @@
   "devices.lcd.secondaryMonitorPreview": "Этот экран используется как второй монитор.",
   "devices.lcd.secondaryMonitorSection": "Второй монитор",
   "devices.lcd.secondaryMonitorStarting": "Запуск монитора",
+  "devices.lcd.sleepWhenLocked": "Выключать экран, когда ПК заблокирован",
   "devices.lianli-aio.fan": "Вентилятор",
   "devices.lianli-aio.innerColor": "Внутреннее кольцо",
   "devices.lianli-aio.notConnected": "Lian Li Galahad II не подключён",

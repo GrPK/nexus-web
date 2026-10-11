@@ -687,6 +687,7 @@
   "devices.lcd.secondaryMonitorPreview": "Este ecrã está a ser utilizado como monitor secundário.",
   "devices.lcd.secondaryMonitorSection": "Monitor secundário",
   "devices.lcd.secondaryMonitorStarting": "A iniciar o monitor",
+  "devices.lcd.sleepWhenLocked": "Desligar o ecrã quando o PC está bloqueado",
   "devices.lianli-aio.fan": "Ventoinha",
   "devices.lianli-aio.innerColor": "Anel interior",
   "devices.lianli-aio.notConnected": "Lian Li Galahad II não ligado",

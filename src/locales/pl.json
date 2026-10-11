@@ -694,6 +694,7 @@
   "devices.lcd.secondaryMonitorPreview": "Ten ekran jest używany jako dodatkowy monitor.",
   "devices.lcd.secondaryMonitorSection": "Dodatkowy monitor",
   "devices.lcd.secondaryMonitorStarting": "Uruchamianie monitora",
+  "devices.lcd.sleepWhenLocked": "Wyłącz wyświetlacz, gdy komputer jest zablokowany",
   "devices.lianli-aio.fan": "Wentylator",
   "devices.lianli-aio.innerColor": "Wewnętrzny pierścień",
   "devices.lianli-aio.notConnected": "Lian Li Galahad II nie podłączony",

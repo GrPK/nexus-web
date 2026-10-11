@@ -687,6 +687,7 @@
   "devices.lcd.secondaryMonitorPreview": "This screen is in use as a secondary monitor.",
   "devices.lcd.secondaryMonitorSection": "Secondary monitor",
   "devices.lcd.secondaryMonitorStarting": "Starting the monitor",
+  "devices.lcd.sleepWhenLocked": "Turn off display when PC is locked",
   "devices.lianli-aio.fan": "Fan",
   "devices.lianli-aio.innerColor": "Inner ring",
   "devices.lianli-aio.notConnected": "Lian Li Galahad II not connected",

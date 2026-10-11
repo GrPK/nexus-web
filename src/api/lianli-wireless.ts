@@ -160,6 +160,8 @@ export interface LianLiAioScreen {
   loopInterval: number;
   /** Nexus widgets own the glass (USB stream); off shows the AIO's own theme and readings. Absent from a service older than the switch, which always streams. */
   nexusWidgets?: boolean;
+  /** Absent/null = on. */
+  sleepWhenLocked?: boolean | null;
 }
 
 export type LianLiAioScreenPatch = Partial<Omit<LianLiAioScreen, 'themeCount'>>;
@@ -208,6 +210,8 @@ export interface LianLiWirelessScreen {
   colorB?: string;
   /** Display unit for a temperature sensor source. */
   tempUnit?: LianLiWirelessTempUnit;
+  /** Absent/null = on. */
+  sleepWhenLocked?: boolean | null;
 }
 
 export interface LianLiWirelessScreenContentExtra {
@@ -227,7 +231,7 @@ export async function getLianLiWirelessScreens(): Promise<LianLiWirelessScreen[]
 
 export async function setLianLiWirelessScreenSettings(
   serial: string,
-  settings: { brightness?: number; rotation?: number },
+  settings: { brightness?: number; rotation?: number; sleepWhenLocked?: boolean },
 ): Promise<boolean> {
   return isOk(await postService<OkResponse>('/devices/lianli-wireless/screen/settings', { serial, ...settings }));
 }

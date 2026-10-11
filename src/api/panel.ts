@@ -136,6 +136,9 @@ export interface PanelDeviceRecord {
   // Cooler LCDs whose panel takes a brightness command: backlight percent
   // 0-100. Absent/null = the panel's default; the hardware reset writes null.
   lcdBrightness?: number | null;
+  // Dimmable cooler LCDs: false = screen turns off while the PC is locked.
+  // Absent/null = on.
+  sleepWhenLocked?: boolean | null;
   // Display-bound panels: false = turned off (record + config kept; no
   // kiosk). Absent/null = on.
   enabled?: boolean | null;
@@ -207,6 +210,7 @@ export interface PanelDevicePatch {
   mirror?: boolean;
   // Dimmable cooler LCDs only; ignored for other panels.
   lcdBrightness?: number;
+  sleepWhenLocked?: boolean;
   // Streamed panels whose driver supports it only; ignored for other panels.
   secondaryMonitor?: boolean;
   // Panels whose capabilities carry supportsPortrait only; ignored for other panels.

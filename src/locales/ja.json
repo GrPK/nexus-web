@@ -687,6 +687,7 @@
   "devices.lcd.secondaryMonitorPreview": "この画面はセカンドモニターとして使用中です。",
   "devices.lcd.secondaryMonitorSection": "セカンドモニター",
   "devices.lcd.secondaryMonitorStarting": "モニターを起動しています",
+  "devices.lcd.sleepWhenLocked": "PC のロック中はディスプレイをオフにする",
   "devices.lianli-aio.fan": "ファン",
   "devices.lianli-aio.innerColor": "インナーリング",
   "devices.lianli-aio.notConnected": "Lian Li Galahad II が接続されていません",

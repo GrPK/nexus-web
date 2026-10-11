@@ -687,6 +687,7 @@
   "devices.lcd.secondaryMonitorPreview": "這個螢幕正用作第二台顯示器。",
   "devices.lcd.secondaryMonitorSection": "第二台顯示器",
   "devices.lcd.secondaryMonitorStarting": "正在啟動顯示器",
+  "devices.lcd.sleepWhenLocked": "鎖定電腦時關閉顯示器",
   "devices.lianli-aio.fan": "風扇",
   "devices.lianli-aio.innerColor": "內環",
   "devices.lianli-aio.notConnected": "Lian Li Galahad II 未連線",
