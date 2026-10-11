@@ -32,8 +32,8 @@ const LCD_ROTATIONS = [
   { value: 3, degrees: 270 },
 ];
 
-// Statuses the device-screen route answers with, each to its translated message. 409 is
-// both "screen not attached" and "Nexus Control switched off for it".
+// Statuses the device-screen route answers with, each to its translated message. The
+// not-connected status also covers Nexus Control being off for the screen.
 const DEVICE_SCREEN_ERRORS: Partial<Record<number, string>> = {
   404: 'devices.corsair.deviceScreenErrNotFound',
   409: 'devices.corsair.deviceScreenErrNotConnected',
@@ -102,9 +102,10 @@ export function CorsairLcdSettings() {
     const failure = await setCorsairDeviceScreen(mediaId);
     await refresh();
     if (!aliveRef.current) return;
-    if (failure !== null) setScreenError(failureText(failure));
+    // Restoring the coolant screen involves no image, so its refusal reads as the generic failure.
+    if (failure !== null) setScreenError(mediaId === null && failure === 502 ? t('devices.corsair.deviceScreenFailed') : failureText(failure));
     setSavingScreen(false);
-  }, [refresh, failureText]);
+  }, [refresh, failureText, t]);
 
   const onPickFile = useCallback(async (file: File | undefined) => {
     if (!file) return;
@@ -171,7 +172,11 @@ export function CorsairLcdSettings() {
         <SettingSelect
           label={t('devices.corsair.deviceScreenLabel')}
           value={deviceMediaId ?? ''}
-          onChange={v => { void applyDeviceScreen(v === '' ? null : v); }}
+          onChange={v => {
+            // Re-picking the current choice would rewrite the cooler's flash for nothing.
+            if (v === (deviceMediaId ?? '')) return;
+            void applyDeviceScreen(v === '' ? null : v);
+          }}
           options={[
             { value: '', label: t('devices.corsair.deviceScreenCoolant') },
             ...(storedUnlisted && deviceMediaId

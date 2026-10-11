@@ -48,7 +48,7 @@ export async function uploadCorsairLcdMedia(file: File): Promise<CorsairLcdMedia
 
 /**
  * Stores a library item on the cooler (null restores the coolant-temperature screen).
- * Resolves to null on success, else the HTTP status (0 when the service was unreachable).
+ * Resolves to null on success, else the HTTP status (zero when the service was unreachable).
  */
 export async function setCorsairDeviceScreen(mediaId: string | null): Promise<number | null> {
   const { response, status } = await authFetchWithStatus('/devices/corsair/lcd/device-screen', {

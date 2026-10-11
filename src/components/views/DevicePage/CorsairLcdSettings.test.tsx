@@ -58,6 +58,21 @@ describe('CorsairLcdSettings closed-screen setting', () => {
     expect(mockSetScreen).toHaveBeenCalledWith('a1');
   });
 
+  it('does not rewrite the cooler when the current choice is picked again', async () => {
+    mockState.mockResolvedValue({ ...base, deviceMediaId: 'a1' });
+    await renderSettings();
+    await pick('Fire');
+    expect(mockSetScreen).not.toHaveBeenCalled();
+  });
+
+  it('shows the generic failure when restoring the coolant screen is refused', async () => {
+    mockState.mockResolvedValue({ ...base, deviceMediaId: 'a1' });
+    mockSetScreen.mockResolvedValue(502);
+    await renderSettings();
+    await pick('devices.corsair.deviceScreenCoolant');
+    expect(screen.getByText('devices.corsair.deviceScreenFailed')).toBeInTheDocument();
+  });
+
   it('restores the coolant screen with null', async () => {
     mockState.mockResolvedValue({ ...base, deviceMediaId: 'a1' });
     await renderSettings();
