@@ -52,25 +52,6 @@ export function MediaSettings({ widget, onUpdate }: WidgetSettingsProps) {
         />
         <SettingsHint>{t(preferredApp ? 'panel.media.app.hint.preferred' : 'panel.media.app.hint.auto')}</SettingsHint>
       </SettingsSection>
-      <SettingsSection title={t('panel.media.visualizer.label')}>
-        <SettingsToggle
-          label={t('panel.media.liveBackground.toggle')}
-          checked={widget.config?.liveBackground === true}
-          onChange={value => onUpdate({ liveBackground: value })}
-        />
-        <SettingsToggle
-          label={t('panel.media.visualizer.startOn')}
-          checked={visualizer}
-          onChange={value => onUpdate({ visualizer: value })}
-        />
-        <SettingsSelect
-          label={t('panel.media.visualizer.effect')}
-          value={effect}
-          options={MEDIA_VISUALIZER_EFFECTS.map(key => ({ value: key, label: t(visualizerLabelKey(key)) }))}
-          onChange={value => onUpdate({ visualizerEffect: value })}
-        />
-        <SettingsHint>{t('panel.media.visualizer.hint')}</SettingsHint>
-      </SettingsSection>
       <SettingsSection title={t('panel.media.volumeTarget.label')}>
         <SettingsToggle
           label={t('panel.media.volumeTarget.show')}
@@ -104,6 +85,25 @@ export function MediaSettings({ widget, onUpdate }: WidgetSettingsProps) {
             <SettingsHint>{t(`panel.media.volumeTarget.hint.${volumeMode}`)}</SettingsHint>
           </>
         )}
+      </SettingsSection>
+      <SettingsSection title={t('panel.media.visualizer.label')}>
+        <SettingsToggle
+          label={t('panel.media.liveBackground.toggle')}
+          checked={widget.config?.liveBackground === true}
+          onChange={value => onUpdate({ liveBackground: value })}
+        />
+        <SettingsToggle
+          label={t('panel.media.visualizer.startOn')}
+          checked={visualizer}
+          onChange={value => onUpdate({ visualizer: value })}
+        />
+        <SettingsSelect
+          label={t('panel.media.visualizer.effect')}
+          value={effect}
+          options={MEDIA_VISUALIZER_EFFECTS.map(key => ({ value: key, label: t(visualizerLabelKey(key)) }))}
+          onChange={value => onUpdate({ visualizerEffect: value })}
+        />
+        <SettingsHint>{t('panel.media.visualizer.hint')}</SettingsHint>
       </SettingsSection>
     </div>
   );
