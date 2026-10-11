@@ -188,7 +188,7 @@
   z-index: 1;
 }
 
-// Wearing a colour, held by the LED map or live from the output: shadowed to read on any frame.
+// Held on a colour by the LED map: the dot wears it, shadowed to read on any frame.
 .ledDotLocked {
   box-shadow: var(--shadow-sm);
 }
