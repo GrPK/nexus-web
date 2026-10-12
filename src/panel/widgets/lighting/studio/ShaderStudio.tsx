@@ -485,6 +485,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
       return (
         <StudioBlockCard
           key={b.uid}
+          audioRef={audioRef}
           block={b}
           def={def}
           firstPattern={stage === 'pattern' && blocks[0] === b}

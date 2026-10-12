@@ -57,6 +57,8 @@ export interface SliderProps {
       secondary level such as the master-brightness cap. Omit to draw no
       pointer. */
   marker?: number;
+  /** A [from, to] span of the scale drawn on the track, e.g. how far audio modulation can move the value. */
+  band?: readonly [number, number];
   /** Optional node stacked directly above the marker caret (e.g. an info
       affordance). Interactive; only rendered when `marker` is set. */
   markerLabel?: ReactNode;
@@ -79,7 +81,7 @@ export function Slider({
   label = '', info, value, min, max, step = 1,
   orientation = 'inline', editable = false, zeroMarker = false, showRange = false,
   formatValue, onChange, onCommit, onPointerDown, onPointerCancel,
-  disabled, trackFill, marker, markerLabel, fillCap, ariaLabel, className, labelAction, mixed = false, mixedLabel,
+  disabled, trackFill, marker, markerLabel, band, fillCap, ariaLabel, className, labelAction, mixed = false, mixedLabel,
 }: SliderProps) {
   const rangeId = useId();
   const latestInputValueRef = useRef(value);
@@ -113,6 +115,10 @@ export function Slider({
     ...(capPct != null ? { '--slider-fill-cap': `${capPct}%` } : {}),
   } as CSSProperties;
   const markerPct = marker != null ? clamp(((marker - min) / (max - min)) * 100) : null;
+  const bandPct = band ? band.map(v => clamp(((v - min) / (max - min)) * 100)).sort((a, b) => a - b) : null;
+  const bandNode = bandPct ? (
+    <span className={styles.band} style={{ left: `${bandPct[0]}%`, width: `${bandPct[1] - bandPct[0]}%` }} aria-hidden />
+  ) : null;
   const markerNode = markerPct != null ? (
     <span className={styles.marker} style={{ left: `${markerPct}%` }}>
       {markerLabel != null && <span className={styles.markerLabel}>{markerLabel}</span>}
@@ -260,6 +266,7 @@ export function Slider({
         <div className={styles.track}>
           {range}
           {showZero && <span className={styles.zeroTick} style={{ left: `${zeroPct}%` }} />}
+          {bandNode}
           {markerNode}
         </div>
       </div>
@@ -278,6 +285,7 @@ export function Slider({
         <div className={styles.track}>
           {range}
           {showZero && <span className={styles.zeroTick} style={{ left: `${zeroPct}%` }} />}
+          {bandNode}
           {markerNode}
         </div>
         {showRange && (
@@ -300,6 +308,7 @@ export function Slider({
       <div className={styles.track}>
         {range}
         {showZero && <span className={styles.zeroTick} style={{ left: `${zeroPct}%` }} />}
+        {bandNode}
         {markerNode}
       </div>
       {inlineValueNode}

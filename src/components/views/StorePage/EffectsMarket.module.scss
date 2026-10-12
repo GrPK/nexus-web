@@ -109,6 +109,30 @@
   gap: 1rem;
 }
 
+.audioInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.reactions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--type-small);
+  color: var(--text);
+
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 22rem;
+  }
+}
+
 .author,
 .count {
   display: inline-flex;

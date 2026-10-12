@@ -116,6 +116,18 @@ describe('EffectsMarket', () => {
     await waitFor(() => expect(remove).toHaveBeenCalledWith('fx1'));
   });
 
+  it('says an effect is audio reactive and which knobs follow which part of the music', async () => {
+    const audioRecipe = {
+      ...recipe,
+      blocks: [{ uid: 'a1', type: 'rings', params: {}, mods: { speed: { source: 'bass', amount: 0.5 } } }, { uid: 'b2', type: 'palette', params: {} }],
+    };
+    getEffect.mockResolvedValue({ ok: true, value: { ...listing, audio: true, recipe: audioRecipe } });
+    detail();
+    expect(await screen.findByText('lighting.category.audio')).toBeInTheDocument();
+    expect(screen.getByText('lighting.studio.block.rings · lighting.studio.param.speed')).toBeInTheDocument();
+    expect(screen.getByText('lighting.studio.mod.bass')).toBeInTheDocument();
+  });
+
   it('opens an installed copy on the Lighting page', async () => {
     installed = [{ id: 'fx1', name: 'Fan spin', recipe: JSON.stringify(recipe), updatedAt: 1, audio: false, marketId: ID }];
     const onOpenInLighting = vi.fn();

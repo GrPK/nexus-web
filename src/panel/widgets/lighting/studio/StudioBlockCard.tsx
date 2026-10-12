@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { AudioLines, GripVertical, Pin, X } from 'lucide-react';
+import type { AudioSnapshot } from '../../../../hooks/useAudioState';
 import { Card } from '../../../../components/common/Card/Card';
 import { Select } from '../../../../components/common/Select/Select';
 import { Slider } from '../../../../components/common/Slider/Slider';
@@ -13,6 +15,28 @@ import styles from './ShaderStudio.module.scss';
 
 const STACKED = 'stacked' as const;
 const INLINE = 'inline' as const;
+
+// How often a modulated slider's live marker follows the music.
+const LIVE_AUDIO_MS = 66;
+
+type Levels = Partial<Record<StudioModSource, number>>;
+
+/** The current level of each of `sources`, sampled while there are any; null when silent. Re-renders only when a level moves. */
+function useLiveLevels(audioRef: React.RefObject<AudioSnapshot | null> | undefined, sources: readonly StudioModSource[]): Levels | null {
+  const [levels, setLevels] = useState<Levels | null>(null);
+  const key = sources.join(',');
+  useEffect(() => {
+    if (!key || !audioRef) return;
+    const wanted = key.split(',') as StudioModSource[];
+    const id = window.setInterval(() => {
+      const snap = audioRef.current;
+      const next: Levels | null = snap ? Object.fromEntries(wanted.map(s => [s, Math.round((snap[s] ?? 0) * 100) / 100])) : null;
+      setLevels(prev => (prev && next && wanted.every(s => prev[s] === next[s]) ? prev : next));
+    }, LIVE_AUDIO_MS);
+    return () => window.clearInterval(id);
+  }, [key, audioRef]);
+  return key ? levels : null;
+}
 
 const COLOR_PRESETS = ['#ff2a8c', '#ff7a1a', '#ffd21f', '#3dff8a', '#00e5ff', '#3a5bff', '#a64dff', '#ffffff'] as const;
 
@@ -43,12 +67,15 @@ interface StudioBlockCardProps {
   /** Params shown as knobs in the Lighting page's effect controls. */
   isPinned: (key: string) => boolean;
   onTogglePin: (key: string) => void;
+  /** Live audio, so a modulated knob shows where the music has it now. */
+  audioRef?: React.RefObject<AudioSnapshot | null>;
 }
 
 export function StudioBlockCard({
-  block, def, firstPattern, removable, canSwitchTo, drag, onChange, onCommit, onTypeChange, onRemove, isPinned, onTogglePin,
+  block, def, firstPattern, removable, canSwitchTo, drag, onChange, onCommit, onTypeChange, onRemove, isPinned, onTogglePin, audioRef,
 }: StudioBlockCardProps) {
   const { t } = useTranslation();
+  const audio = useLiveLevels(audioRef, [...new Set(Object.values(block.mods ?? {}).map(m => m.source))]);
   const typeOptions = blocksForStage(def.stage).map(d => ({
     value: d.type,
     label: t(`lighting.studio.block.${d.type}`),
@@ -89,6 +116,12 @@ export function StudioBlockCard({
     }
     const scale = scaleOf(p);
     const mod = block.mods?.[p.key];
+    // As the shader does: value + amount x the param's span x the audio source's level (0 to 1), clamped.
+    // The slider's band is how far full volume moves the knob; its marker, where the music has it now.
+    const clampP = (v: number) => Math.min(p.max, Math.max(p.min, v));
+    const swing = mod ? Math.min(1, Math.max(-1, mod.amount)) * (p.max - p.min) : 0;
+    const reach = mod ? clampP(value + swing) : null;
+    const live = mod && audio ? clampP(value + swing * (audio[mod.source] ?? 0)) : null;
     const modLabel = t('lighting.studio.mod.toggle');
     const pinLabel = t('lighting.studio.pin');
     const pinned = isPinned(p.key);
@@ -126,6 +159,8 @@ export function StudioBlockCard({
           value={Math.round(value * scale)}
           min={Math.round(p.min * scale)}
           max={Math.round(p.max * scale)}
+          band={reach === null ? undefined : [Math.round(value * scale), Math.round(reach * scale)]}
+          marker={live === null ? undefined : Math.round(live * scale)}
           onChange={(v, commit) => setParam(p.key, v / scale, !!commit)}
           onCommit={onCommit}
         />

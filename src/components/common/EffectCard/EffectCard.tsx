@@ -85,13 +85,14 @@ export function EffectCard({
         {thumbUrl
           ? <img className={styles.thumbImg} src={thumbUrl} alt={label} style={thumbImgStyle} />
           : <div className={thumbStatic ? styles.thumbStaticPlaceholder : styles.thumbSkeleton} aria-hidden="true" style={thumbSkeletonStyle} />}
+        {/* Before the badge: an overlay canvas fills the thumbnail and would hide it. */}
+        {thumbOverlay}
         {audio && (
           <svg className={styles.audioBadge} width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 10.5a1.5 1.5 0 1 0 3 0v-7l6 -1.5v7" />
             <circle cx="10.5" cy="9.5" r="1.5" />
           </svg>
         )}
-        {thumbOverlay}
         {cornerBadge}
         {onDelete && (
           <CardDeleteButton

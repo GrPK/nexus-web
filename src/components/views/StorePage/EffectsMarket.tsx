@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, Download, User } from 'lucide-react';
+import { AudioLines, ChevronLeft, Download, User } from 'lucide-react';
+import { Badge } from '../../common/Badge/Badge';
 import { Button } from '../../common/Button/Button';
 import { Card } from '../../common/Card/Card';
 import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
@@ -26,7 +27,8 @@ import { HoverTooltip } from '../../common/HoverTooltip/HoverTooltip';
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import { formatNumber } from '../../../lib/units';
 import { deleteEffect, isDownloaded, newEffectId, parseMarketRecipe, saveEffect, unlinkEffect, useSavedEffects } from '../../../panel/widgets/lighting/studio/studioLibrary';
-import { compileStudio, type StudioRecipe } from '../../../panel/widgets/lighting/studio/studioCompiler';
+import { blockParams, compileStudio, type StudioRecipe } from '../../../panel/widgets/lighting/studio/studioCompiler';
+import { studioBlock } from '../../../panel/widgets/lighting/studio/studioBlocks';
 import storeStyles from './StorePage.module.scss';
 import styles from './EffectsMarket.module.scss';
 
@@ -348,6 +350,18 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn, onOpenIn
   if (loadError) return <><BackBar onBack={onBack} /><div className={storeStyles.notice}>{t(ERROR_KEYS[loadError] ?? 'store.unavailable')}</div></>;
   if (!listing) return <div className={storeStyles.notice}>{t('store.loading')}</div>;
 
+  // Only the mods the compiled shader applies: a recipe can carry mods on params the block lacks.
+  const firstPattern = recipe?.blocks.find(b => studioBlock(b.type)?.stage === 'pattern');
+  const reactions = (recipe?.blocks ?? []).flatMap(b => {
+    const def = studioBlock(b.type);
+    if (!def) return [];
+    const modulated = new Set(blockParams(def, b === firstPattern).filter(p => !p.options).map(p => p.key));
+    return Object.entries(b.mods ?? {}).filter(([key]) => modulated.has(key)).map(([key, mod]) => ({
+      id: `${b.uid}:${key}`,
+      knob: `${t(`lighting.studio.block.${b.type}`)} · ${t(`lighting.studio.param.${key}`)}`,
+      source: t(`lighting.studio.mod.${mod.source}`),
+    }));
+  });
   const header = (
     <header className={storeStyles.heroMain}>
       <h1 className={`${storeStyles.heroTitle} selectable`}>{listing.name}</h1>
@@ -361,6 +375,24 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn, onOpenIn
           {downloads(listing.downloads)}
         </span>
       </div>
+      {listing.audio && (
+        <div className={styles.audioInfo}>
+          <span className={styles.count}>
+            <AudioLines size={14} aria-hidden={true} />
+            {t('lighting.category.audio')}
+          </span>
+          {reactions.length > 0 && (
+            <ul className={styles.reactions}>
+              {reactions.map(r => (
+                <li key={r.id}>
+                  <span>{r.knob}</span>
+                  <Badge label={r.source} compact />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <div className={storeStyles.heroActions}>
         {mine ? (
           <Button tone="danger" onClick={() => setConfirmUnpublish(true)}>{t('store.effects.unpublish')}</Button>
