@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useRef } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PanelActionsTray } from './PanelActionsTray';
 import { resetGestureAxis } from '../engine/gestureAxisLock';
 import type { PanelSurface } from '../types';
@@ -55,6 +55,46 @@ describe('PanelActionsTray Sentry row', () => {
     fireEvent.click(row);
     expect(onSentry).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe('PanelActionsTray pairing tile', () => {
+  afterEach(() => {
+    delete (window as { nexusNative?: unknown }).nexusNative;
+  });
+
+  function renderTray(onPair: () => void, onPairSheet: () => void) {
+    render(
+      <PanelActionsTray
+        open
+        onOpen={vi.fn()}
+        onClose={vi.fn()}
+        onAddWidget={vi.fn()}
+        onPair={onPair}
+        pairAvailable
+        onPairSheet={onPairSheet}
+        pairSheetAvailable
+        surfaceRef={{ current: null }}
+        surface="phone"
+      />,
+    );
+  }
+
+  it('is Settings inside the native app and opens the native sheet', () => {
+    (window as { nexusNative?: unknown }).nexusNative = { openSettings: vi.fn() };
+    const onPair = vi.fn();
+    renderTray(onPair, vi.fn());
+    expect(screen.queryByRole('button', { name: 'panel.actions.pairing' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'panel.actions.settings' }));
+    expect(onPair).toHaveBeenCalled();
+  });
+
+  it('is Pairing outside the native app and opens the pairing sheet', () => {
+    const onPairSheet = vi.fn();
+    renderTray(vi.fn(), onPairSheet);
+    expect(screen.queryByRole('button', { name: 'panel.actions.settings' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'panel.actions.pairing' }));
+    expect(onPairSheet).toHaveBeenCalled();
   });
 });
 
