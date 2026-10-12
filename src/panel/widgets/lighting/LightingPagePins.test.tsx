@@ -253,6 +253,16 @@ describe('LightingPage pins', () => {
       expect(lastPinsCall()[1]).toMatchObject({ kind: 'static', effect: 'checker' });
     });
 
+    it('pins to the global flat color in Static when one is set, not the pattern', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      vi.mocked(fetchStaticSettings).mockResolvedValue({ effect: 'checker', states: {}, color: '#336699' });
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail').dataset.source).toBe('lighting.palette.azure 4'));
+      fireEvent.click(screen.getByText('toggle'));
+      expect(lastPinsCall()).toEqual([['a'], colorPin('#336699')]);
+    });
+
     it('pins to the one universal Mirror in Mirror', async () => {
       syncState.mode = 'screen';
       syncState.rawSync = 'screen';
@@ -551,7 +561,7 @@ describe('LightingPage pins', () => {
       expect(setPins).not.toHaveBeenCalled();
     });
 
-    it('with nothing selected a picked colour is the exact global colour', async () => {
+    it('with nothing selected a picked color is the exact global color', async () => {
       syncState.mode = 'static';
       syncState.rawSync = 'static';
       renderPage();
@@ -564,7 +574,7 @@ describe('LightingPage pins', () => {
       await waitFor(() => expect(screen.getByTestId('picker-hex').textContent).toBe('#00ff00'));
     });
 
-    it('shows the service\'s global flat colour as the selected look, with no effect tile lit', async () => {
+    it('shows the service\'s global flat color as the selected look, with no effect tile lit', async () => {
       syncState.mode = 'static';
       syncState.rawSync = 'static';
       vi.mocked(fetchStaticSettings).mockResolvedValue({ effect: 'checker', states: {}, color: '#336699' });
@@ -573,7 +583,7 @@ describe('LightingPage pins', () => {
       expect(screen.getByTestId('grid-effect').textContent).toBe('');
     });
 
-    it('picking an effect after a global colour leaves the colour out of the start', async () => {
+    it('picking an effect after a global color leaves the color out of the start', async () => {
       syncState.mode = 'static';
       syncState.rawSync = 'static';
       vi.mocked(fetchStaticSettings).mockResolvedValue({ effect: 'checker', states: {}, color: '#336699' });
@@ -617,7 +627,7 @@ describe('LightingPage pins', () => {
       expect(lastPinsCall()[1]?.params).toBeDefined();
     });
 
-    it('with devices selected a picked colour pins them to it', async () => {
+    it('with devices selected a picked color pins them to it', async () => {
       syncState.mode = 'static';
       syncState.rawSync = 'static';
       renderPage();
@@ -629,7 +639,7 @@ describe('LightingPage pins', () => {
       expect(lastPinsCall()[1]).toMatchObject({ kind: 'static', effect: 'flat', color: '#00ff00' });
     });
 
-    it('re-pins a selected pinned device instead of blocking, with no refusal notice', async () => {
+    it('re-pins a selected pinned device instead of blocking', async () => {
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
       renderPage();
       await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
@@ -637,7 +647,6 @@ describe('LightingPage pins', () => {
       fireEvent.click(screen.getByTestId('grid-effect'));
       expect(lastPinsCall()).toEqual([['a'], { kind: 'animate', effect: 'stripes' }]);
       await waitFor(() => expect(pinOf()?.effect).toBe('stripes'));
-      expect(screen.queryByText(/lockedNotice/)).toBeNull();
     });
 
     it('never touches unselected pinned devices', async () => {

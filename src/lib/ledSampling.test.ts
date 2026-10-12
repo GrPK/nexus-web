@@ -17,23 +17,23 @@ const dev = (over: Partial<SampleDevice> = {}): SampleDevice => ({
 });
 
 describe('ledSample positions (mirror of the service linear path)', () => {
-  it('walks the rect width along its centreline, first LED at the left', () => {
+  it('walks the rect width along its centerline, first LED at the left', () => {
     const p0 = ledSample(dev(), 0, 3, W, H);
     const p1 = ledSample(dev(), 1, 3, W, H);
     const p2 = ledSample(dev(), 2, 3, W, H);
-    // 0.16 pixels per canvas unit: x 100, 200, 300 units; y centre 150 units.
+    // 0.16 pixels per canvas unit: x 100, 200, 300 units; y center 150 units.
     expect([p0.sx, p1.sx, p2.sx]).toEqual([16, 32, 48]);
     expect(p0.sy).toBeCloseTo(24);
   });
 
-  it('puts a lone LED at the box centre', () => {
+  it('puts a lone LED at the box center', () => {
     const p = ledSample(dev(), 0, 1, W, H);
     expect(p.sx).toBeCloseTo(32);
     expect(p.sy).toBeCloseTo(24);
   });
 
-  it('turns the line about the frame centre for a rotated device', () => {
-    // Frame centre (200,150); a 90 degree clockwise turn sends the left end to the top.
+  it('turns the line about the frame center for a rotated device', () => {
+    // Frame center (200,150); a 90 degree clockwise turn sends the left end to the top.
     const p0 = ledSample(dev({ canvasRotation: 90 }), 0, 3, W, H);
     const p2 = ledSample(dev({ canvasRotation: 90 }), 2, 3, W, H);
     expect(p0.sx).toBeCloseTo(32);
@@ -49,7 +49,7 @@ describe('ledSample positions (mirror of the service linear path)', () => {
     expect(turned.halfH).toBeCloseTo(flat.halfW);
   });
 
-  it('cuts a stack slot from the unturned rect, keeping the frame centre', () => {
+  it('cuts a stack slot from the unturned rect, keeping the frame center', () => {
     const slot = { layout: 'series' as const, index: 1, count: 2 };
     // Right half of the rect: LEDs run x 200..300 units.
     const p0 = ledSample(dev(), 0, 2, W, H, { slot });
@@ -75,7 +75,7 @@ describe('sampleSpot', () => {
     expect(sampleSpot(f, { sx: 10.4, sy: 10.4, halfW: 50, halfH: 50 })).toEqual([30, 30, 30]);
   });
 
-  it('turns a 1-LED device black when its centre is black and the rest of the box is lit', () => {
+  it('turns a 1-LED device black when its center is black and the rest of the box is lit', () => {
     const f = canvas([255, 255, 255]);
     const at = ledSample(dev(), 0, 1, W, H);
     for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) setPx(f, Math.floor(at.sx) + x, Math.floor(at.sy) + y, [0, 0, 0]);
@@ -127,13 +127,13 @@ describe('parity with the service sampler', () => {
     expect(read(f, one, 0, 1)[0]).toBe(100);
   });
 
-  it('a single LED goes black when a black band covers its centre', () => {
+  it('a single LED goes black when a black band covers its center', () => {
     const f = frame([200, 100, 50]);
     for (let y = 0; y < PH; y++) for (let x = 102; x <= 106; x++) put(f, x, y, [0, 0, 0]);
     expect(read(f, one, 0, 1)).toEqual([0, 0, 0]);
   });
 
-  it('a lit centre gives the lit colour even with the rest of the box dark', () => {
+  it('a lit center gives the lit color even with the rest of the box dark', () => {
     const f = frame([0, 0, 0]);
     for (let y = 36; y <= 38; y++) for (let x = 103; x <= 105; x++) put(f, x, y, [255, 128, 0]);
     expect(read(f, one, 0, 1)).toEqual([255, 128, 0]);

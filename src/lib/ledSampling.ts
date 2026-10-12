@@ -1,7 +1,7 @@
 import { sliceStackSlot, type StackSlot } from './stackSlots';
 
 /**
- * Turns the effect canvas into one LED's colour the way the service does.
+ * Turns the effect canvas into one LED's color the way the service does.
  * Mirrors LightingEngine.SampleDevicesCore (linear strip path) and
  * SampleLedSpot / SampleLedBox in nexus-service
  * (src/Lighting/Engine/LightingEngine.cs). Change them together.
@@ -41,8 +41,8 @@ export interface LedSample {
 
 /**
  * Where LED `index` of `ledCount` reads. The LEDs walk the unturned rect's
- * width along its centreline, first at the left (a lone LED sits at the centre);
- * the frame turns about its own centre, a stack slot is cut from the unturned
+ * width along its centerline, first at the left (a lone LED sits at the center);
+ * the frame turns about its own center, a stack slot is cut from the unturned
  * rect before that and turns with the frame. `fullFrame` ignores the layout:
  * the rect is the whole canvas, unturned, and the cell is a thin slice of it.
  */
@@ -96,7 +96,7 @@ function meanRect(f: SampleFrame, ix0: number, iy0: number, ix1: number, iy1: nu
 }
 
 /**
- * The colour of one LED: the plain mean of a small spot of pixels centred on
+ * The color of one LED: the plain mean of a small spot of pixels centered on
  * the pixel holding its position, shrunk to the LED's own cell when that is
  * smaller, clamped at the canvas edges.
  */

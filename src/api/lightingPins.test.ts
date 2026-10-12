@@ -72,14 +72,14 @@ describe('fetchPins', () => {
 });
 
 describe('startStatic', () => {
-  it('carries the exact global colour when one is given', async () => {
+  it('carries the exact global color when one is given', async () => {
     const fetchMock = vi.fn(async () => jsonResponse(200, { error: false, msg: 'Ok' }));
     vi.stubGlobal('fetch', fetchMock);
     await startStatic('gradientlinear', 1, 0, 0, 1, 1, {}, true, '#12ab34');
     expect(bodyOf(fetchMock).color).toBe('#12ab34');
   });
 
-  it('sends no colour for an effect pick, which clears a global colour', async () => {
+  it('sends no color for an effect pick, which clears a global color', async () => {
     const fetchMock = vi.fn(async () => jsonResponse(200, { error: false, msg: 'Ok' }));
     vi.stubGlobal('fetch', fetchMock);
     await startStatic('stripes');

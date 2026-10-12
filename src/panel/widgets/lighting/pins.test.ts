@@ -35,7 +35,7 @@ describe('pin builders', () => {
     });
   });
 
-  it('a colour pin is a flat fill with the colour', () => {
+  it('a color pin is a flat fill with the color', () => {
     expect(colorPin('#ff0000')).toMatchObject({ kind: 'static', effect: 'flat', color: '#ff0000', hue: 0, saturation: 1 });
   });
 
@@ -77,7 +77,7 @@ describe('selectionPin', () => {
     expect(selectionPin({ a, b }, ['a', 'b'])).toEqual({ kind: 'pin', pin: a });
   });
 
-  it('keeps two flat colours apart and one colour together', () => {
+  it('keeps two flat colors apart and one color together', () => {
     const pins = { a: colorPin('#ff0000'), b: colorPin('#FF0000'), c: colorPin('#00ff00') };
     expect(selectionPin(pins, ['a', 'b']).kind).toBe('pin');
     expect(selectionPin(pins, ['a', 'c']).kind).toBe('mixed');
@@ -92,7 +92,7 @@ describe('selectionPin', () => {
 });
 
 describe('grid key and strip pick', () => {
-  it('a flat colour resolves to its palette swatch, a pattern to its effect', () => {
+  it('a flat color resolves to its palette swatch, a pattern to its effect', () => {
     const c = paletteColor('red-3')!;
     expect(pinGridKey(paletteColorPin(c))).toBe(paletteKey('red-3'));
     expect(pinGridKey(animatePin('plasma'))).toBe('plasma');
@@ -103,7 +103,7 @@ describe('grid key and strip pick', () => {
     expect(pinStripPick(animatePin('plasma'))).toMatchObject({ key: 'plasma', slot: 0 });
   });
 
-  it('reads a static pin\'s colour from the colour or the hue', () => {
+  it('reads a static pin\'s color from the color or the hue', () => {
     expect(pinHex(colorPin('#123456'))).toBe('#123456');
     expect(pinHex({ kind: 'static', effect: 'stripes', hue: 0, saturation: 1 }).toLowerCase()).toBe('#ff0000');
   });
@@ -150,7 +150,7 @@ describe('pinnedNamesByEffect', () => {
     expect(m.has('stripes')).toBe(false);
   });
 
-  it('lists static pattern pins, leaving flat colours to the palette', () => {
+  it('lists static pattern pins, leaving flat colors to the palette', () => {
     const m = pinnedNamesByEffect(pins, 'static', id => names[id]);
     expect([...m.keys()]).toEqual(['stripes']);
   });
@@ -195,7 +195,7 @@ describe('pressReach', () => {
 describe('pinTargetLabel', () => {
   const t = (key: string) => key;
 
-  it('names a palette swatch by family and shade, and an off-palette colour by hex', () => {
+  it('names a palette swatch by family and shade, and an off-palette color by hex', () => {
     const c = paletteColor('red-3')!;
     expect(pinTargetLabel(paletteColorPin(c), t)).toBe('lighting.palette.red 3');
     expect(pinTargetLabel(colorPin('#010203'), t)).toMatch(/^#010203$|^lighting\.palette\./);

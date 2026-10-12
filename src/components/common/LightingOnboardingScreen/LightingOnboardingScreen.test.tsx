@@ -297,7 +297,7 @@ describe('LightingOnboardingScreen colour test strip', () => {
     expect(startStatic).not.toHaveBeenCalled();
   });
 
-  it('keeps a picked colour the way the simple palette does: Static with the exact global colour', async () => {
+  it('keeps a picked color the way the simple palette does: Static with the exact global color', async () => {
     seed([strip, hub]);
     renderScreen();
     await screen.findByRole('switch', { name: 'Test Strip' });
@@ -307,13 +307,13 @@ describe('LightingOnboardingScreen colour test strip', () => {
 
     const color = paletteColor('red-3')!;
     await waitFor(() => expect(startStatic).toHaveBeenCalledTimes(1));
-    // Saved, not previewed, and the exact colour is global: nothing is pinned.
+    // Saved, not previewed, and the exact color is global: nothing is pinned.
     expect(vi.mocked(startStatic).mock.calls[0]).toEqual(['gradientlinear', 1, 0, 0, 1, 1, {}, true, color.hex]);
     expect(setPins).not.toHaveBeenCalled();
     expect(red).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('runs the picked colour globally in advanced too', async () => {
+  it('runs the picked color globally in advanced too', async () => {
     seed([strip, hub]);
     renderScreen();
     chooseAdvanced();
@@ -355,7 +355,7 @@ describe('LightingOnboardingScreen colour test strip', () => {
     expect(setPins).not.toHaveBeenCalled();
   });
 
-  it('does not re-apply the colour on Finish: a device found after the pick follows the global colour', async () => {
+  it('does not re-apply the color on Finish: a device found after the pick follows the global color', async () => {
     seed([strip]);
     vi.mocked(completeLightingOnboarding).mockResolvedValue({ completed: true, lightingCompleted: true });
     const onComplete = renderScreen();

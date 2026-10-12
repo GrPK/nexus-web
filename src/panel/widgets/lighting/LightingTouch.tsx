@@ -11,6 +11,7 @@ import type { LedPick } from './page/DeviceLedStrip';
 import { StaticPickerCanvas } from './page/StaticPickerCanvas';
 import { PICKER_FIELD_SVG, PICKER_SEGMENTED_SVG, pickerHexAt, pickerPointFor, snapToSegment } from './page/staticPickerField';
 import { useColorWriteQueue } from './page/useColorWriteQueue';
+import { useGlobalColor } from './page/useGlobalColor';
 import { usePins } from './page/usePins';
 import { visibleCards } from './page/zoneUtils';
 import { EffectCard } from '../../../components/common/EffectCard/EffectCard';
@@ -53,7 +54,7 @@ import { usePersistentState } from '../../../hooks/usePersistentState';
 import { useTranslation } from '../../../lib/i18n';
 import { isPaletteKey } from '../../../types/lightingPalette';
 import {
-  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pickerMarks, pinnedNamesByEffect, pinModeTargetLabel, clearLegacyLightingKeys,
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pickerMarks, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, clearLegacyLightingKeys,
 } from './pins';
 import type { WidgetProps } from '../types';
 import styles from './LightingPage.module.scss';
@@ -181,7 +182,7 @@ function renderImmersiveEditor(
     return (
       <EffectEditor
         devices={<StaticDeviceSelect {...animate.deviceSelect} />}
-        // A mixed selection or a palette colour has no single set of controls.
+        // A mixed selection or a palette color has no single set of controls.
         effectDisabled={scope === 'mixed' || scope === 'palette'}
         // A selection pinned to the shared Mirror or Media edits that source here,
         // without switching the global mode to it.
@@ -189,7 +190,7 @@ function renderImmersiveEditor(
           : scope === 'media' ? <MediaList keepMode /> : (
           <AnimateGrid
             // The highlight belongs to what the SELECTION wears, not to what was
-            // last browsed: a pattern tile left lit after a colour pick reads as
+            // last browsed: a pattern tile left lit after a color pick reads as
             // a second selection beside the picker tile.
             effect={isStatic ? (animate.staticPattern?.key ?? '') : animate.effect}
             onSelect={animate.onSelectEffect}
@@ -312,7 +313,7 @@ function useImmersiveDevices(enabled: boolean) {
   return { devices, selectedIds, onSetSelection };
 }
 
-/** What the selection wears, for the editor: nothing, mixed pins, a palette colour, Mirror, or a shader or static look. */
+/** What the selection wears, for the editor: nothing, mixed pins, a palette color, Mirror, or a shader or static look. */
 type EditorScope = 'none' | 'mixed' | 'palette' | 'mirror' | 'media' | 'pin';
 
 function useImmersiveAnimateState(): {
@@ -338,8 +339,8 @@ function useImmersiveAnimateState(): {
   const [segmented, setSegmented] = usePersistentState('nexus.lighting.pickerSegmented', true);
   const queueColorWrite = useColorWriteQueue(useCallback((ids: string[], pin: Pin) => applyPins(ids, pin, false), [applyPins]));
   const [customStaticColor, setCustomStaticColor] = usePersistentState('nexus.lighting.customColor', '');
-  // The exact flat colour the global Static look is, from the service; '' when it is an effect.
-  const [globalColor, setGlobalColor] = useState('');
+  // The exact flat color the global Static look is, from the service; '' when it is an effect.
+  const [globalColor, setGlobalColor, readGlobalColor] = useGlobalColor();
 
   const selectionIds = useMemo(() => [...selectedIds], [selectedIds]);
   const selection = useMemo(() => selectionPin(pins, selectionIds), [pins, selectionIds]);
@@ -371,6 +372,7 @@ function useImmersiveAnimateState(): {
   }, [globalColor, pins, selectedIds]);
 
   const hydrate = useCallback(async () => {
+    const land = readGlobalColor();
     const [sync, settings, staticSettings, defaults] = await Promise.all([
       fetchCurrentSync(),
       fetchAnimateSettings(),
@@ -382,7 +384,7 @@ function useImmersiveAnimateState(): {
       next[e.key] = mergeTemplates(e.key, settings?.templates?.[e.key], defaults);
     }
     setTemplates(next);
-    setGlobalColor(staticSettings?.color ?? '');
+    land(staticSettings?.color ?? '');
     const rawSync = sync?.sync || 'none';
     const nextMode = resolveImmersiveMode(rawSync);
     setMode(nextMode);
@@ -397,7 +399,7 @@ function useImmersiveAnimateState(): {
     } else if (settings?.effect) {
       setActive(settings.effect);
     }
-  }, []);
+  }, [readGlobalColor]);
 
   useEffect(() => { hydrate(); }, [hydrate]);
   useTopicCallback('lighting', true, hydrate);
@@ -429,12 +431,11 @@ function useImmersiveAnimateState(): {
     }
     if (pinnedKey && pinnedKey !== active) return;
     if (mode === 'static') {
-      setGlobalColor('');
-      void startStatic(key, s.intensity, s.hue, s.colorize, s.saturation, s.contrast, s.params, true);
+      setGlobalColor('', startStatic(key, s.intensity, s.hue, s.colorize, s.saturation, s.contrast, s.params, true));
       return;
     }
     void startAnimate(key, s.speed, s.intensity, s.hue, s.colorize, s.saturation, s.contrast, s.params, true);
-  }, [active, applyPins, mode, pinnedKey, selection, selectionIds]);
+  }, [active, applyPins, mode, pinnedKey, selection, selectionIds, setGlobalColor]);
 
   const versionForSlot = useCallback((key: string, slot: number) => {
     const b = templates[key];
@@ -449,7 +450,7 @@ function useImmersiveAnimateState(): {
   }, [pins, versionForSlot]);
 
   // The selection wears a pattern when every device agrees on one static pin
-  // and that pin is an effect rather than a flat colour.
+  // and that pin is an effect rather than a flat color.
   const staticPattern = useMemo(
     () => selection.kind === 'pin' && selection.pin.kind === 'static' && pinnedKey
       ? { key: pinnedKey, slot: selection.pin.slot ?? 0 }
@@ -481,10 +482,9 @@ function useImmersiveAnimateState(): {
 
   const onSelectCustom = useCallback((hex: string) => {
     setCustomStaticColor(hex);
-    // Nothing selected: the colour is the exact global flat colour.
+    // Nothing selected: the color is the exact global flat color.
     if (selectionIds.length === 0) {
-      setGlobalColor(hex);
-      void startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, hex);
+      setGlobalColor(hex, startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, hex));
       return;
     }
     // Record without pushing and queue the write, so a commit cannot race a
@@ -492,7 +492,7 @@ function useImmersiveAnimateState(): {
     const pin = colorPin(hex);
     recordPins(selectionIds, pin);
     queueColorWrite(pin, selectionIds);
-  }, [queueColorWrite, recordPins, selectionIds, setCustomStaticColor]);
+  }, [queueColorWrite, recordPins, selectionIds, setCustomStaticColor, setGlobalColor]);
 
   const onPreviewCustom = useCallback((hex: string) => {
     if (selectionIds.length === 0) return;
@@ -560,6 +560,11 @@ function useImmersiveAnimateState(): {
   }, [t]);
   const globalPin: { pin: Pin; name: string } | null = useMemo(() => {
     if (mode === 'static') {
+      // A no-selection pick sets the global color and leaves the pattern alone.
+      if (globalColor) {
+        const pin = colorPin(globalColor);
+        return { pin, name: pinTargetLabel(pin, t) };
+      }
       const b = templates[active];
       const slot = b?.selected ?? 0;
       return { pin: staticLookPin(active, slot, b?.slots[slot] ?? defaultStateFor(active)), name: sourceLabel(active) };
@@ -568,7 +573,7 @@ function useImmersiveAnimateState(): {
     if (mode === 'screen') return { pin: MIRROR_PIN, name: t('lighting.mode.screen') };
     if (mode === 'gif') return { pin: MEDIA_PIN, name: t('lighting.mode.gif') };
     return null;
-  }, [active, mode, sourceLabel, t, templates]);
+  }, [active, globalColor, mode, sourceLabel, t, templates]);
   const deviceSelect: React.ComponentProps<typeof StaticDeviceSelect> = {
     devices,
     selectedIds,

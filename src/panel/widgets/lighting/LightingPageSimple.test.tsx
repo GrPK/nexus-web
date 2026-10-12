@@ -160,7 +160,7 @@ describe('LightingPage simple mode', () => {
     expect(vi.mocked(lightingApi.setLightingDeviceControlled).mock.calls.some(c => c[0] === 'dev-1')).toBe(false);
   });
 
-  it('runs a picked colour as the exact global colour, entering static first', async () => {
+  it('runs a picked color as the exact global color, entering static first', async () => {
     const { container } = renderPage();
     // Wait for the device fetch: a colour has nowhere to land until it lands.
     await waitFor(() => {
@@ -175,7 +175,7 @@ describe('LightingPage simple mode', () => {
     expect(vi.mocked(lightingApi.setPins)).not.toHaveBeenCalled();
   });
 
-  it('marks the swatch the exact global colour matches', async () => {
+  it('marks the swatch the exact global color matches', async () => {
     syncState.mode = 'static';
     vi.mocked(lightingApi.fetchStaticSettings).mockResolvedValue({ effect: 'gradientlinear', states: {}, color: PALETTE.find(p => p.id === 'blue-3')!.hex });
     const { container } = renderPage();

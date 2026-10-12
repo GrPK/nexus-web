@@ -44,7 +44,7 @@ export function withPins(prev: Pins, ids: readonly string[], pin: Pin | null): P
 }
 
 /** The static pin for a pattern picked from the grid. The whole look travels, so
- *  the service renders THIS effect for the device, not the swatch colour. */
+ *  the service renders THIS effect for the device, not the swatch color. */
 export function staticLookPin(key: string, slot: number, state: EffectState): Pin {
   return {
     kind: 'static',
@@ -59,7 +59,7 @@ export function staticLookPin(key: string, slot: number, state: EffectState): Pi
   };
 }
 
-/** The static pin for a plain colour (palette swatch or picker): a flat fill. */
+/** The static pin for a plain color (palette swatch or picker): a flat fill. */
 export function colorPin(hex: string): Pin {
   const { h, s } = hexToHsv(hex);
   return {
@@ -85,7 +85,7 @@ export const MEDIA_PIN: Pin = { kind: 'media' };
 /** Stable identity of a pin's target, for "do these devices share one pin". */
 export function pinSignature(pin: Pin): string {
   // A static pin on a template slot is (effect, slot), the identity the drawer
-  // edits; a flat colour is its colour; a shader pin is the shader alone.
+  // edits; a flat color is its color; a shader pin is the shader alone.
   if (pin.kind === 'static') {
     return pin.effect === 'flat' ? JSON.stringify(['static', 'flat', (pin.color ?? '').toLowerCase()])
       : JSON.stringify(['static', pin.effect ?? '', pin.slot ?? 0]);
@@ -114,13 +114,13 @@ export function selectionPin(pins: Pins, ids: readonly string[]): SelectionPin {
   return first ? { kind: 'pin', pin: first } : { kind: 'none' };
 }
 
-/** The effect-grid key a static or animate pin lights: a flat colour resolves to its palette swatch. */
+/** The effect-grid key a static or animate pin lights: a flat color resolves to its palette swatch. */
 export function pinGridKey(pin: Pin): string {
   if (pin.kind === 'static' && pin.effect === 'flat' && pin.color) return paletteKey(nearestPaletteId(pin.color));
   return pin.effect ?? '';
 }
 
-/** The colour a static pin shows on a card strip or marker. */
+/** The color a static pin shows on a card strip or marker. */
 export function pinHex(pin: Pin): string {
   if (pin.color) return pin.color;
   return hsvToHex((pin.hue ?? 0) * 360, (pin.saturation ?? 1) * 100, 100);

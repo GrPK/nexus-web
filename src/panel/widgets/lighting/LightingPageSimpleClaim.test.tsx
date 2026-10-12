@@ -82,14 +82,14 @@ describe('LightingPage simple mode device claiming', () => {
     expect(lightingApi.setLightingDevicePower).toHaveBeenCalledWith('openrgb-0', true);
   });
 
-  it('claims the device and sets the global colour, on the first press', async () => {
+  it('claims the device and sets the global color, on the first press', async () => {
     const { container } = renderSimple();
     await waitFor(() => expect(lightingApi.fetchLightingDevices).toHaveBeenCalled());
 
     const swatch = container.querySelector('[data-palette-id="red-3"]') as HTMLButtonElement;
     fireEvent.click(swatch);
 
-    // The colour is global, so it reaches the claimed device without a write for it.
+    // The color is global, so it reaches the claimed device without a write for it.
     await waitFor(() => expect(lightingApi.startStatic).toHaveBeenCalled());
     expect(vi.mocked(lightingApi.startStatic).mock.calls.at(-1)?.[8]).toMatch(/^#[0-9a-f]{6}$/i);
     expect(lightingApi.setLightingDeviceControlled).toHaveBeenCalledWith('openrgb-0', true);

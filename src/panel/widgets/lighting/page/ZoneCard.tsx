@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { Power, PowerOff, Ban, Blend, Eye, Keyboard, Lightbulb, Users, Cpu, Check, Link2Off, Link2, Layers, MousePointerClick, Paintbrush, Pencil, Pin, PinOff, RotateCcw } from 'lucide-react';
 import {
   identifyLightingDevice,
@@ -71,7 +71,7 @@ export interface BulkSelection {
   /** Takes the selection apart; present when it is exactly one stack. */
   unstack?: () => void;
   /** Members a Pin row can pin: following the global mode. Zero where
-   *  nothing can be pinned (Media, Game Sync, Off). */
+   *  nothing can be pinned (Game Sync, Off). */
   pinCount?: number;
   /** Members currently pinned, which an Unpin row releases. */
   unpinCount?: number;
@@ -90,7 +90,7 @@ export interface DevicePin {
   targetName?: string;
   /** What the card is pinned to; the button wears that mode's tab icon. */
   kind?: PinKind;
-  /** Why this card cannot be pinned right now (Media, Game Sync, Off). */
+  /** Why this card cannot be pinned right now (Game Sync, Off). */
   disabledReason?: string;
   setPinned: (pinned: boolean) => void;
 }
@@ -389,6 +389,7 @@ export function ZoneCard({
   pulseSeq?: number;
 }) {
   const { t, language } = useTranslation();
+  const unpinHintId = useId();
   const isZone = device.parentDeviceId != null && device.zoneIndex != null;
   const resizable = device.zoneResizable === true && isZone;
   const unavailable = zoneCardUnavailable(device);
@@ -658,14 +659,14 @@ export function ZoneCard({
         {notice != null && !unavailable && <DeviceNotice notice={notice} />}
         {colorTuned && (
           <HoverTooltip body={t('lighting.colorTuning.title')} side="top">
-            <span className={styles.deviceTuneBadge} aria-label={t('lighting.colorTuning.title')}>
+            <span className={styles.deviceTuneBadge} role="img" aria-label={t('lighting.colorTuning.title')}>
               <Blend size={12} aria-hidden />
             </span>
           </HoverTooltip>
         )}
         {inStack && (
           <HoverTooltip body={t(pluralKey('lighting.devices.stackedCount', language, inStack.count), { count: inStack.count })} side="top">
-            <span className={styles.deviceStackBadge} aria-label={t(pluralKey('lighting.devices.stackedCount', language, inStack.count), { count: inStack.count })}>
+            <span className={styles.deviceStackBadge} role="img" aria-label={t(pluralKey('lighting.devices.stackedCount', language, inStack.count), { count: inStack.count })}>
               <Layers size={12} aria-hidden />
             </span>
           </HoverTooltip>
@@ -718,6 +719,7 @@ export function ZoneCard({
               type="button"
               className={`${styles.deviceSettingsBtn} ${styles.deviceBadgeBtn} ${styles.devicePinBtn}`}
               aria-label={t('lighting.pin.pinnedTo', { name: pin.targetName ?? '' })}
+              aria-describedby={unpinHintId}
               data-no-dnd
               onClick={e => {
                 e.stopPropagation();
@@ -726,6 +728,7 @@ export function ZoneCard({
             >
               <PinIcon className={styles.devicePinMode} />
               <PinOff className={styles.devicePinOff} />
+              <span id={unpinHintId} hidden>{t('lighting.pin.clickToUnpin')}</span>
             </button>
           </HoverTooltip>
         )}

@@ -127,7 +127,7 @@ export const fetchAnimateSettings = () =>
 /** Static-mode selection plus its per-key looks; slots stay in AnimateSettings. */
 export interface StaticSettings {
   effect: string;
-  /** "#rrggbb" when the global look is an exact flat colour; absent otherwise. */
+  /** "#rrggbb" when the global look is an exact flat color; absent otherwise. */
   color?: string;
   states: Record<string, AnimateEffectState>;
 }
@@ -206,7 +206,7 @@ export const startStatic = (
   contrast = 1,
   params?: Record<string, number>,
   persist = true,
-  /** Exact global flat colour for every unpinned device. Left out, picking an effect clears it. */
+  /** Exact global flat color for every unpinned device. Left out, picking an effect clears it. */
   color?: string,
 ) =>
   postService('/lighting/static/headless-start', {
@@ -562,7 +562,7 @@ export const setLightingDeviceBrightness = (id: string, brightness: number) =>
 // Per-device color for color-capable smart lights. Hue + saturation are floats
 // in 0..1; both are sent on every call so the service has the full HS pair.
 /**
- * Per-device colour for color-capable smart lights: hue and saturation, both
+ * Per-device color for color-capable smart lights: hue and saturation, both
  * 0..1. Not a pin; a pin carries the whole look and goes through
  * {@link setPins}.
  */

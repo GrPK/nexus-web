@@ -184,12 +184,12 @@ export function LightingOnboardingScreen({ open, onComplete, onBack, onSkipOnboa
   }, [applyPick]);
 
   // The simple page's palette path: Static owns the output first, then every
-  // device is pinned to the colour.
+  // device is pinned to the color.
   const runColor = useCallback((id: string) => {
     const color = paletteColor(id);
     if (!color) return;
     applyPick(id, async () => {
-      // The exact global flat colour: every device that follows the global mode wears it.
+      // The exact global flat color: every device that follows the global mode wears it.
       await startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, color.hex);
     });
   }, [applyPick]);
@@ -247,7 +247,7 @@ export function LightingOnboardingScreen({ open, onComplete, onBack, onSkipOnboa
           await Promise.allSettled(off.map(d => setLightingDeviceControlled(d.id, true)));
         }
       }
-      // A device detected after the colour was picked follows the global colour.
+      // A device detected after the color was picked follows the global color.
       await pickChainRef.current;
       updateUiSettings({ lightingDashboardMode: mode });
       const result = await completeLightingOnboarding();

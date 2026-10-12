@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LightingTouch } from './LightingTouch';
-import { fetchAnimateSettings, fetchCurrentSync, fetchPins, saveAnimateTemplates, setPins, startStatic, type Pin } from '../../../api/lighting';
+import { fetchAnimateSettings, fetchCurrentSync, fetchPins, fetchStaticSettings, saveAnimateTemplates, setPins, startStatic, type Pin } from '../../../api/lighting';
 import { defaultStateFor } from '../../../types/lighting';
 import { paletteColor } from '../../../types/lightingPalette';
 import type { PanelWidget } from '../types';
@@ -172,10 +172,9 @@ describe('LightingTouch pins', () => {
     await waitFor(() => expect(startStatic).toHaveBeenCalled());
     expect(vi.mocked(startStatic).mock.calls.at(-1)?.[0]).toBe('stripes');
     expect(setPins).not.toHaveBeenCalled();
-    expect(screen.queryByText('lighting.pane.pickDevices')).toBeNull();
   });
 
-  it('with nothing selected a picked colour is the exact global colour', async () => {
+  it('with nothing selected a picked color is the exact global color', async () => {
     render(<LightingTouch widget={widget} />);
     fireEvent.click(await screen.findByText('pick-custom'));
     await waitFor(() => expect(startStatic).toHaveBeenCalled());
@@ -194,7 +193,7 @@ describe('LightingTouch pins', () => {
   });
 
   // A finger drag has to reach the hardware on every move.
-  it('pins a dragged colour on the selected devices', async () => {
+  it('pins a dragged color on the selected devices', async () => {
     render(<LightingTouch widget={widget} />);
     await select(['dev-a']);
 
@@ -205,7 +204,7 @@ describe('LightingTouch pins', () => {
     expect(lastPins()[1]).toMatchObject({ kind: 'static', effect: 'flat', color: '#abcdef' });
   });
 
-  it('pins a custom colour on the selected devices', async () => {
+  it('pins a custom color on the selected devices', async () => {
     render(<LightingTouch widget={widget} />);
     await select(['dev-a']);
     fireEvent.click(await screen.findByText('pick-custom'));
@@ -246,6 +245,15 @@ describe('LightingTouch pins', () => {
     expect(lastPins()[1]).toMatchObject({ kind: 'static' });
     props.onSetPin(['dev-a'], false);
     expect(lastPins()).toEqual([['dev-a'], null]);
+  });
+
+  it('pins a card to the global flat color when one is set, not the pattern', async () => {
+    vi.mocked(fetchStaticSettings).mockResolvedValueOnce({ effect: 'gradientlinear', states: {}, color: '#336699' });
+    render(<LightingTouch widget={widget} />);
+    await waitFor(() => expect(selectProps.current?.pinSource).toBe('lighting.palette.azure 4'));
+    const props = selectProps.current as { onSetPin: (ids: string[], pinned: boolean) => void };
+    props.onSetPin(['dev-a'], true);
+    expect(lastPins()[1]).toMatchObject({ kind: 'static', effect: 'flat', color: '#336699' });
   });
 
 
@@ -326,7 +334,7 @@ describe('LightingTouch editor scope', () => {
     expect(saved.plasma.slots[saved.plasma.selected].intensity).not.toBe(0.2);
   });
 
-  it('locks the effect editor for a mixed selection and for a palette colour', async () => {
+  it('locks the effect editor for a mixed selection and for a palette color', async () => {
     render(<LightingTouch widget={widget} />);
     await waitFor(() => expect(selectProps.current).not.toBeNull());
     expect(editorDisabled()).toBe('false');

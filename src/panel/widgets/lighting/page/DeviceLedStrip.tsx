@@ -208,9 +208,9 @@ function paintLook(
   }
   // Static evaluates every device as if its frame filled the canvas, so a
   // pattern reads end to end on each device (a box mean over its slice of it).
-  // Other modes read the spot at each LED along the centreline of the device's
+  // Other modes read the spot at each LED along the centerline of the device's
   // part of its frame (its stack slot, else the whole frame), turned about the
-  // frame centre - the positions and the read the engine uses.
+  // frame center - the positions and the read the engine uses.
   const leds = Math.max(1, device.ledCount);
   const frameView = { pixels, w, h };
   for (let i = 0; i < cells; i++) {

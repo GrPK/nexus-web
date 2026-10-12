@@ -56,10 +56,10 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   /** Static mode: strips sample the whole canvas rather than each device's rect. */
   ledFullscreen?: boolean;
   /** Display name of the global source a press on a following card pins it to
-   *  (the running shader, the global static look, Mirror). Null when nothing can
-   *  be pinned in this mode. */
+   *  (the running shader, the global color or static look, Mirror, Media). Null
+   *  when nothing can be pinned in this mode. */
   pinSource?: string | null;
-  /** Why nothing can be pinned right now (Media, Game Sync, Off). */
+  /** Why nothing can be pinned right now (Game Sync, Off). */
   pinDisabledReason?: string;
   /** Display name of what a pin targets, for the pinned tooltip. */
   pinTargetName?: (pin: Pin) => string;
