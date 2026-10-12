@@ -1295,9 +1295,9 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     return s;
   }, [effectiveCurveId, fanStates]);
 
-  // A press sweeps a sheen across the fans it changed; a new seq replays it.
-  const [sheen, setSheen] = useState<{ ids: ReadonlySet<string>; seq: number }>({ ids: new Set(), seq: 0 });
-  const sheenFans = (ids: ReadonlySet<string>) => setSheen(s => ({ ids, seq: s.seq + 1 }));
+  // A press pulses the fans it changed; a new seq replays it.
+  const [pulse, setPulse] = useState<{ ids: ReadonlySet<string>; seq: number }>({ ids: new Set(), seq: 0 });
+  const pulseFans = (ids: ReadonlySet<string>) => setPulse(s => ({ ids, seq: s.seq + 1 }));
   // Off is not a tab any more: it shares the first tab with the simple /
   // advanced swap, which the tab opens as a menu instead of switching mode.
   const modeMenu = usePageModeMenu({
@@ -1309,7 +1309,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     simpleDescription: t('cooling.modeMenu.simpleDesc'),
     advancedDescription: t('cooling.modeMenu.advancedDesc'),
     onOff: () => {
-      if (activeMode !== 'off') sheenFans(presetReach(channels, true));
+      if (activeMode !== 'off') pulseFans(presetReach(channels, true));
       void handleModeChange('off');
     },
     onModeChange: setDashboardMode,
@@ -1351,7 +1351,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
       return;
     }
     closeModeMenu();
-    if (isCoolingModeKey(key) && key !== activeMode) sheenFans(presetReach(channels));
+    if (isCoolingModeKey(key) && key !== activeMode) pulseFans(presetReach(channels));
     void handleModeChange(key);
   };
   // The mode tab leads the strip in both dashboard modes; simple mode carries
@@ -1743,7 +1743,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                 <FanCard key={ch.id} channel={ch} state={fanStates[ch.id]} curves={curves} hazard={hazardByFan[ch.id]}
                   compact
                   presetTarget={presetTargets.has(ch.id)}
-                  sheenSeq={sheen.ids.has(ch.id) ? sheen.seq : undefined}
+                  pulseSeq={pulse.ids.has(ch.id) ? pulse.seq : undefined}
                   selected={selectedFanIds.has(ch.id)}
                   onSelect={additive => selectFan(ch.id, additive)}
                   calibrating={calibrating}

@@ -43,7 +43,7 @@ export const ModeControls = memo(function ModeControls({ mode, screenPP, onScree
   onScreenPPChange: (pp: PostProcessSettings) => void;
   /** Change the shared capture or media item without switching the global mode to it. */
   keepMode?: boolean;
-  /** Set while cards are selected: called after a pick so it applies to them. */
+  /** Called after every capture or media pick. */
   onSelectionPick?: () => void;
 }) {
   switch (mode) {

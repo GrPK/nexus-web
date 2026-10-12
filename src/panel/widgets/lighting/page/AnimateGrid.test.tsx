@@ -123,12 +123,12 @@ describe('AnimateGrid pin badge', () => {
     expect(badges).toHaveLength(1);
     expect(badges[0].textContent).toBe('2');
     expect(badges[0].closest('[data-effect-key]')?.getAttribute('data-effect-key')).toBe('plasma');
-    expect(container.querySelectorAll('svg.lucide-pin').length).toBe(1);
+    expect(container.querySelectorAll('svg.lucide-pin').length).toBe(0);
   });
 
-  it('shows no pin when nothing is pinned', () => {
-    const { container } = grid(new Map());
-    expect(container.querySelectorAll('svg.lucide-pin').length).toBe(0);
+  it('shows no count when nothing is pinned', () => {
+    grid(new Map());
+    expect(screen.queryByTestId('effect-pin-badge')).toBeNull();
   });
 
   it('lists the device names in the tooltip on hover', async () => {
@@ -138,7 +138,7 @@ describe('AnimateGrid pin badge', () => {
     expect(screen.getByText('Strip')).toBeTruthy();
   });
 
-  it('keeps the usage icons beside the pin', () => {
+  it('keeps the usage icons beside the count', () => {
     const { container } = render(
       <AnimateGrid
         effect="plasma" onSelect={() => {}} slotFor={() => 0} versionFor={() => '0'}
@@ -146,6 +146,6 @@ describe('AnimateGrid pin badge', () => {
       />,
     );
     expect(container.querySelectorAll('svg.lucide-lightbulb').length).toBe(1);
-    expect(container.querySelectorAll('svg.lucide-pin').length).toBe(1);
+    expect(screen.getByTestId('effect-pin-badge').textContent).toBe('1');
   });
 });

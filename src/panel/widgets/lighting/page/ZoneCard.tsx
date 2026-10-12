@@ -298,7 +298,7 @@ export function ZoneCard({
   stackSlot,
   pin,
   target = false,
-  sheenSeq,
+  pulseSeq,
 }: {
   device: LightingDevice;
   /** Deep-link anchor the card answers to; see CollapsibleSection's searchAnchor. */
@@ -381,16 +381,16 @@ export function ZoneCard({
   pin?: DevicePin;
   /** The next pick lands on this card. */
   target?: boolean;
-  /** Set when a press changed this card; each new value plays the sheen once. */
-  sheenSeq?: number;
+  /** Set when a press or pick changed this card; each new value plays the pulse once. */
+  pulseSeq?: number;
 }) {
   const { t, language } = useTranslation();
   const isZone = device.parentDeviceId != null && device.zoneIndex != null;
   const resizable = device.zoneResizable === true && isZone;
   const unavailable = zoneCardUnavailable(device);
   const PinIcon = pin?.kind ? LIGHTING_MODE_ICONS[pinMode(pin.kind)] : Pin;
-  // A card mounting (group expand, filter) under a past press plays no sheen.
-  const [mountSheenSeq] = useState(sheenSeq);
+  // A card mounting (group expand, filter) under a past pulse plays none.
+  const [mountPulseSeq] = useState(pulseSeq);
   // seq remounts the menu on every open: it latches its own closing state, so
   // a reused instance would fade the reopened menu straight back out.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; seq: number } | null>(null);
@@ -780,7 +780,10 @@ export function ZoneCard({
           onClose={() => setMenuAt(null)}
         />
       )}
-      {sheenSeq !== undefined && sheenSeq !== mountSheenSeq && <span key={sheenSeq} className={styles.deviceCardSheen} aria-hidden />}
+      {/* The light highlight level; its global CSS ships with the command palette. */}
+      {pulseSeq !== undefined && pulseSeq !== mountPulseSeq && (
+        <span key={pulseSeq} className={styles.deviceCardPulse} aria-hidden><span className="nexus-highlight-light" /></span>
+      )}
     </div>
   );
   // Only failed/zero-LED zones get an explanatory tooltip; configurable zones

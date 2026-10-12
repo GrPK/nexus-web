@@ -811,18 +811,18 @@ describe('ZoneCard pin', () => {
     expect(menuRow(/lighting\.devices\.(un)?pin$/)).toBeNull();
   });
 
-  it('plays a sheen for a press after it mounted, never for one before', () => {
-    const { rerender } = renderPin({}, { sheenSeq: 3 });
-    expect(document.querySelector(`.${styles.deviceCardSheen}`)).toBeNull();
+  it('plays a pulse for a press after it mounted, never for one before', () => {
+    const { rerender } = renderPin({}, { pulseSeq: 3 });
+    expect(document.querySelector(`.${styles.deviceCardPulse}`)).toBeNull();
     rerender(
       <ZoneCard
         device={baseDevice} selected={false} indent={false} onSelect={() => {}}
         onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
         pin={{ pinned: false, setPinned: () => {} }}
-        sheenSeq={4}
+        pulseSeq={4}
       />,
     );
-    expect(document.querySelector(`.${styles.deviceCardSheen}`)).toBeTruthy();
+    expect(document.querySelector(`.${styles.deviceCardPulse}`)).toBeTruthy();
   });
 
   it('shows no pin on a following card', () => {

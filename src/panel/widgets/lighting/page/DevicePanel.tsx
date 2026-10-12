@@ -35,7 +35,7 @@ import styles from '../LightingPage.module.scss';
  * using the same component/styling as a motherboard group: a chevron, the brand
  * name, a group power switch, and its lights as indented child cards.
  */
-export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pickTargetIds, sheen, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
+export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
   devices: LightingDevice[];
   /** Optional control rendered at the top of the scrolling list (master brightness). */
   /** Every device before the Nexus-Control-off filter, so a group header can
@@ -68,8 +68,8 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   onSetPin?: (ids: string[], pinned: boolean) => void;
   /** While a press or pick is hovered, the cards it reaches, outlined. */
   pickTargetIds?: ReadonlySet<string>;
-  /** The cards a press just changed; a new seq replays their sheen. */
-  sheen?: { ids: ReadonlySet<string>; seq: number };
+  /** The cards a press or pick just changed; a new seq replays their pulse. */
+  pulse?: { ids: ReadonlySet<string>; seq: number };
   /** Device ids currently selected (single-tap → 1-element set, canvas marquee → N-element set). */
   selectedIds: Set<string>;
   /** Bulk set: Cmd/Ctrl+click on a row toggles membership without clobbering the rest. */
@@ -434,7 +434,7 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
       stackSlot={stackSlotOf(stacks, d.id)}
       pin={pinFor(d.id)}
       target={pickTargetIds?.has(d.id)}
-      sheenSeq={sheen?.ids.has(d.id) ? sheen.seq : undefined}
+      pulseSeq={pulse?.ids.has(d.id) ? pulse.seq : undefined}
       onUnstack={stackOf(stacks, d.id) ? () => onStacksChange?.(unstackDevices(stacks, [d.id])) : undefined}
     />
   );

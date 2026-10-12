@@ -59,7 +59,7 @@ export interface FanBulkSelection {
 
 export const FanCard = memo(function FanCard({
   channel, state, curves, calibrating, compact, canCreateCurve = true, highlighted,
-  selected = false, onSelect, presetTarget = false, sheenSeq,
+  selected = false, onSelect, presetTarget = false, pulseSeq,
   hubMode, hubSupportsFirmware,
   hubSupportsBios = true,
   nubRef, cardRef: cardRefProp, onWirePointerDown, onWireHover,
@@ -76,8 +76,8 @@ export const FanCard = memo(function FanCard({
   selected?: boolean;
   /** A hovered preset tab will retarget this fan. */
   presetTarget?: boolean;
-  /** Set when a press changed this fan; each new value plays the sheen once. */
-  sheenSeq?: number;
+  /** Set when a press changed this fan; each new value plays the pulse once. */
+  pulseSeq?: number;
   /** Body click. Receives whether the multi-select modifier was held, so the
    *  caller owns additive vs replace without FanCard holding a Set. */
   onSelect?: (additive: boolean) => void;
@@ -210,8 +210,8 @@ export const FanCard = memo(function FanCard({
   // a reused instance would fade the reopened menu straight back out. Same
   // shape as ZoneCard.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; seq: number } | null>(null);
-  // A fan mounting under a past press plays no sheen.
-  const [mountSheenSeq] = useState(sheenSeq);
+  // A fan mounting under a past pulse plays none.
+  const [mountPulseSeq] = useState(pulseSeq);
   const menuSeq = useRef(0);
   const nameRef = useRef<EditableTextHandle>(null);
   const openMenu = (x: number, y: number) => setMenuAt({ x, y, seq: ++menuSeq.current });
@@ -635,7 +635,10 @@ export const FanCard = memo(function FanCard({
           onClose={() => setMenuAt(null)}
         />
       )}
-      {sheenSeq !== undefined && sheenSeq !== mountSheenSeq && <span key={sheenSeq} className={styles.fanCardSheen} aria-hidden />}
+      {/* The light highlight level; its global CSS ships with the command palette. */}
+      {pulseSeq !== undefined && pulseSeq !== mountPulseSeq && (
+        <span key={pulseSeq} className={styles.fanCardPulse} aria-hidden><span className="nexus-highlight-light" /></span>
+      )}
     </div>
   );
 });

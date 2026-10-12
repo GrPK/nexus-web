@@ -588,14 +588,13 @@
   }
 }
 
-// One tooltip target inside the cell badges: the usage icons, or the pin with its count.
+// One tooltip target inside the cell badges: the usage icons, or the pinned count.
 .cellBadgeGroup {
   display: flex;
   align-items: center;
 
   // Chromium 83 (the Q60 panel floor) has no flex `gap`.
-  svg + svg,
-  svg + .cellPinCount {
+  svg + svg {
     margin-left: 3px;
   }
 }
@@ -1171,31 +1170,21 @@
     border-color: var(--accent);
   }
 
-  // One sweep of light across a card a press just changed.
-  .deviceCardSheen {
+  // Covers a card a press or pick just changed, border included; the light highlight inside plays.
+  .deviceCardPulse {
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    top: calc(-1 * var(--border-width));
+    right: calc(-1 * var(--border-width));
+    bottom: calc(-1 * var(--border-width));
+    left: calc(-1 * var(--border-width));
     border-radius: inherit;
     overflow: hidden;
     pointer-events: none;
 
-    &::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      width: 50%;
-      background: linear-gradient(100deg, transparent, var(--accent-glow-shadow), transparent);
-      transform: translateX(-100%);
-      animation: cardSheen calc(var(--ease-slow) * 3) ease-out forwards;
-
-      @media (prefers-reduced-motion: reduce) {
-        animation: none;
-      }
+    > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
     }
   }
 
@@ -2134,8 +2123,4 @@
 .staticFieldFill {
   height: 100%;
   width: 100%;
-}
-
-@keyframes cardSheen {
-  to { transform: translateX(200%); }
 }

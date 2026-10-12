@@ -1935,9 +1935,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const simpleCustomActive = synced && effectiveMode !== 'none' && !simpleAnimation
     && selectableIds.length > 0 && simplePaletteId === null;
 
-  // A press sweeps a sheen across the cards it changed; a new seq replays it.
-  const [sheen, setSheen] = useState<{ ids: ReadonlySet<string>; seq: number }>({ ids: new Set(), seq: 0 });
-  const sheenCards = (ids: ReadonlySet<string>) => setSheen(s => ({ ids, seq: s.seq + 1 }));
+  // A press or pick pulses the cards it changed; a new seq replays it.
+  const [pulse, setPulse] = useState<{ ids: ReadonlySet<string>; seq: number }>({ ids: new Set(), seq: 0 });
+  const pulseCards = useCallback((ids: ReadonlySet<string>) => setPulse(s => ({ ids, seq: s.seq + 1 })), []);
+  const pulsePick = () => pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds));
   // Pause/freeze applies to the three modes that drive a continuous output
   // (animate shader, media playback, screen mirror) - Off has nothing to
   // freeze and Game Sync is driven by the foreground game, not us.
@@ -1956,7 +1957,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     onOff: () => {
       // Already off: asking again would re-run the claim and re-issue the stop.
       if (synced && effectiveMode === 'none') return;
-      sheenCards(pressReach(visibleDevices, pins, selectedDeviceIds, true));
+      pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds, true));
       if (simpleDashboard) claimAllDevices();
       void handleModeChange('none');
     },
@@ -2054,7 +2055,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
     closeModeMenu();
     if (!tabPressChangesNothing(key, activeTabKey, selectedDeviceIds.size, scoped.kind === 'pin')) {
-      sheenCards(pressReach(visibleDevices, pins, selectedDeviceIds, key === 'gamesync'));
+      pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds, key === 'gamesync'));
     }
     const pin = selectedDeviceIds.size > 0 ? tabPinFor(key as LightingMode) : null;
     if (pin) {
@@ -2113,6 +2114,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // A global flat colour is what Static is showing, so no effect tile reads as selected beside it.
   const gridEffect = scoped.kind === 'pin' ? scoped.key
     : (scoped.kind === 'mixed' || (scoped.kind === 'none' && viewMode === 'static' && globalColor) ? '' : activeEffect);
+  // With nothing selected, re-picking the running tile changes no card, so it
+  // pulses none. A selection's re-pick can move a static pin to the current slot.
+  const handleEffectPick = (key: string) => {
+    if (!(key === gridEffect && selectedDeviceIds.size === 0)) pulsePick();
+    handleEffectSelect(key);
+  };
   // The colour the selection wears, which is where its dots sit on the field.
   const scopedHex = scoped.kind === 'pin' ? scoped.hex : (scoped.kind === 'none' ? globalColor : '');
   // Selected devices wearing different pins have no single value for the
@@ -2199,6 +2206,19 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const ids = [...selectedDeviceIds];
     return () => { void applyPins(ids, pin); };
   }, [applyPins, selectedDeviceIds, viewMode]);
+  // A Mirror or Media pick also changes the shared source every card already
+  // wearing it shows: those pinned to it, and the unpinned ones while it is global.
+  const handleSharedPick = useCallback(() => {
+    const kind = viewMode === 'screen' ? 'mirror' : 'media';
+    const reach = pressReach(visibleDevices, pins, selectedDeviceIds);
+    for (const d of visibleDevices) {
+      if (d.ledsOn === false || d.controlled === false) continue;
+      const pin = pins[d.id];
+      if (pin ? pin.kind === kind : effectiveMode === viewMode) reach.add(d.id);
+    }
+    pulseCards(reach);
+    handleSelectionPick?.();
+  }, [viewMode, visibleDevices, pins, selectedDeviceIds, effectiveMode, pulseCards, handleSelectionPick]);
 
   const simpleOff = synced && effectiveMode === 'none';
   // The mode tab leads the strip in both dashboard modes; simple mode carries
@@ -2463,7 +2483,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             pinTargetName={pinTargetName}
             onSetPin={handleSetPin}
             pickTargetIds={pickTargetIds}
-            sheen={sheen}
+            pulse={pulse}
             selectedIds={selectedDeviceIds}
             onSetSelection={handleSetSelection}
             onTogglePower={handleTogglePower}
@@ -2526,7 +2546,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   patternVersion={staticPattern ? versionForSlot(staticPattern.key, staticPattern.slot) : '0'}
                   gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
                   onPreview={handleCustomPreview}
-                  onCommit={handleCustomSelect}
+                  onCommit={hex => { pulsePick(); handleCustomSelect(hex); }}
                 />
               </div>
               )}
@@ -2598,7 +2618,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 <div className={styles.browserWrap}>
                 <AnimateGrid
                   effect={gridEffect}
-                  onSelect={handleEffectSelect}
+                  onSelect={handleEffectPick}
                   effects={viewMode === 'static' ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
                   frozen={viewMode === 'static'}
                   slotFor={gridSlotFor}
@@ -2619,14 +2639,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                           label={t('lighting.static.pickerSegmented')}
                           thumbUrl={PICKER_SEGMENTED_SVG}
                           active={colorScoped && pickerSegmented}
-                          onClick={() => handlePickerSelect(true)}
+                          onClick={() => { pulsePick(); handlePickerSelect(true); }}
                         />
                         <EffectCard
                           overlay
                           label={t('lighting.static.picker')}
                           thumbUrl={PICKER_FIELD_SVG}
                           active={colorScoped && !pickerSegmented}
-                          onClick={() => handlePickerSelect(false)}
+                          onClick={() => { pulsePick(); handlePickerSelect(false); }}
                         />
                       </div>
                     </CollapsibleSection>
@@ -2643,7 +2663,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     screenPP={screenPP}
                     onScreenPPChange={setScreenPP}
                     keepMode={selectedDeviceIds.size > 0 && viewMode !== effectiveMode}
-                    onSelectionPick={handleSelectionPick}
+                    onSelectionPick={handleSharedPick}
                   />
                 </div>
               )}

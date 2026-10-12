@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Lightbulb, Monitor, Pin } from 'lucide-react';
+import { Lightbulb, Monitor } from 'lucide-react';
 import { useTranslation } from '../../../../lib/i18n';
 import { HoverTooltip } from '../../../../components/common/HoverTooltip/HoverTooltip';
 import { CollapsibleSection } from '../../../../components/common/CollapsibleSection/CollapsibleSection';
@@ -60,7 +60,6 @@ function AnimateGridCell({ fx, slot, version, active, live, panel, pinnedNames, 
               side="top"
             >
               <span className={styles.cellBadgeGroup} data-testid="effect-pin-badge">
-                <Pin aria-hidden={true} />
                 <span className={styles.cellPinCount}>{pinnedNames.length}</span>
               </span>
             </HoverTooltip>

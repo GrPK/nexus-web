@@ -88,7 +88,7 @@ vi.mock('./page/StaticPickerCanvas', () => ({
 // The stub exposes what the pins ride on: the pins the rail is handed, the
 // source a press pins to, the disabled reason, and the callbacks.
 vi.mock('./page/DevicePanel', () => ({
-  DevicePanel: ({ pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onSetSelection, pickTargetIds, sheen }: {
+  DevicePanel: ({ pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onSetSelection, pickTargetIds, pulse }: {
     pins?: Record<string, Pin>;
     pinSource?: string | null;
     pinDisabledReason?: string;
@@ -96,12 +96,12 @@ vi.mock('./page/DevicePanel', () => ({
     onSetPin?: (ids: string[], pinned: boolean) => void;
     onSetSelection: (ids: Set<string>, primary: string | null) => void;
     pickTargetIds?: ReadonlySet<string>;
-    sheen?: { ids: ReadonlySet<string>; seq: number };
+    pulse?: { ids: ReadonlySet<string>; seq: number };
   }) => (
     <div
       data-testid="rail"
       data-targets={pickTargetIds ? [...pickTargetIds].join(',') : 'none'}
-      data-sheen={sheen ? `${[...sheen.ids].join(',')}#${sheen.seq}` : ''}
+      data-pulse={pulse ? `${[...pulse.ids].join(',')}#${pulse.seq}` : ''}
       data-pin={pins?.a ? JSON.stringify(pins.a) : ''}
       data-pin-name={pins?.a && pinTargetName ? pinTargetName(pins.a) : ''}
       data-source={pinSource ?? ''}
@@ -425,20 +425,57 @@ describe('LightingPage pins', () => {
       expect(targets()).toBe('none');
     });
 
-    it('sweeps a sheen across the cards a press changes, and none for a press that changes nothing', async () => {
+    it('sweeps a pulse across the cards a press changes, and none for a press that changes nothing', async () => {
       withDevices('a', 'b', 'c');
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
       await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
       await screen.findByText('lighting.pane.allExceptPinned.one');
-      const sheen = () => screen.getByTestId('rail').dataset.sheen;
+      const pulse = () => screen.getByTestId('rail').dataset.pulse;
       fireEvent.click(tab('animate'));
-      expect(sheen()).toBe('#0');
+      expect(pulse()).toBe('#0');
       fireEvent.click(tab('static'));
-      expect(sheen()).toBe('b,c#1');
+      expect(pulse()).toBe('b,c#1');
       fireEvent.click(screen.getByText('select-a'));
       fireEvent.click(tab('gif'));
-      expect(sheen()).toBe('a#2');
+      expect(pulse()).toBe('a#2');
+    });
+
+    it('pulses the cards a pick changes, selected ones included', async () => {
+      withDevices('a', 'b', 'c');
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      await screen.findByText('lighting.pane.allExceptPinned.one');
+      const pulse = () => screen.getByTestId('rail').dataset.pulse;
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      expect(pulse()).toBe('b,c#1');
+      fireEvent.click(screen.getByText('select-ab'));
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      expect(pulse()).toBe('a,b#2');
+    });
+
+    it('pulses no card for a re-pick of the tile already worn', async () => {
+      withDevices('a', 'b');
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      vi.mocked(fetchStaticSettings).mockResolvedValue({ effect: 'stripes', states: {} });
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('stripes'));
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      expect(screen.getByTestId('rail').dataset.pulse).toBe('#0');
+    });
+
+    it('pulses every card a Mirror pick reaches through the shared capture', async () => {
+      withDevices('a', 'b', 'c');
+      syncState.mode = 'animate';
+      syncState.rawSync = 'fire';
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' }, b: { kind: 'mirror' } }));
+      renderPage();
+      await screen.findByText('lighting.pane.allExceptPinned.other');
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('screen'));
+      fireEvent.click(await screen.findByText('selection-pick'));
+      expect(screen.getByTestId('rail').dataset.pulse).toBe('a,b#1');
     });
 
     it('outlines nothing on the mode menu', async () => {
@@ -762,7 +799,9 @@ describe('LightingPage pins', () => {
     it('a screen pick with cards selected gives only them Mirror; with none it is global', async () => {
       renderPage();
       await waitFor(() => expect(screen.getByTestId('mode-controls')).toBeTruthy());
-      expect(screen.queryByText('selection-pick')).toBeNull();
+      const pinWrites = vi.mocked(setPins).mock.calls.length;
+      fireEvent.click(screen.getByText('selection-pick'));
+      expect(vi.mocked(setPins).mock.calls.length).toBe(pinWrites);
       fireEvent.click(screen.getByText('select-a'));
       fireEvent.click(await screen.findByText('selection-pick'));
       expect(lastPinsCall()).toEqual([['a'], { kind: 'mirror' }]);
