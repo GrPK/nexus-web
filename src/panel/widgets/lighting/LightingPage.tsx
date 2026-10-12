@@ -60,7 +60,7 @@ import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
 import { SearchInput } from '../../../components/common/SearchInput/SearchInput';
 import { usePersistentState } from '../../../hooks/usePersistentState';
 import {
-  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex,
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, pinGridKey, pinHex, pinSignature, type Pins,
   pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, pressReach, tabPressChangesNothing, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
@@ -138,6 +138,14 @@ interface LayoutHistorySnapshot {
   /** Device ids whose power this action changed; empty for layout-only edits.
    *  Scopes power reconciliation on undo/redo to exactly the touched devices. */
   powerIds: string[];
+}
+
+// The modes a tab press can pin selected cards to; Off and Game Sync always change the global mode.
+const PINNABLE_MODES: ReadonlySet<string> = new Set(['static', 'animate', 'screen', 'gif']);
+
+/** The selected cards a press on `mode` pins: cards already pinned to that mode keep their own looks. */
+function tabPressPins(pins: Pins, selected: ReadonlySet<string>, mode: string): string[] {
+  return [...selected].filter(id => !(pins[id] && pinMode(pins[id].kind) === mode));
 }
 
 /** What the effect grid and dock are pointed at - see the `scoped` memo. */
@@ -963,18 +971,32 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     return Promise.resolve();
   }, [applyAnimate]);
 
-  // What the effect grid, the dock and the preview are pointed at. Devices
-  // selected and all wearing one pin: that pin's target (identity includes the
-  // preset slot, so the same effect on two presets is a disagreement). Devices
-  // wearing different pins, or a mix of pinned and following, have no single
-  // value for the controls to edit, so the dock locks. Nothing selected, or
-  // every selected device following the global mode: the global source.
+  // What the effect grid, the dock and the preview are pointed at. The open
+  // tab never follows a selection: a card wears its pin's mode or else the
+  // global one, and a selection reaching outside the tab shows no effect, so
+  // the dock locks. Inside the tab, the first-selected card is in focus: its
+  // pin's target, or the global source when it follows the global mode.
   const selectionIds = useMemo(() => [...selectedDeviceIds], [selectedDeviceIds]);
+  // The tab a press opened for the selection; with nothing selected the open tab is the global mode.
+  const [selectionTab, setSelectionTab] = useState<LightingMode | null>(null);
+  const [tabBaseMode, setTabBaseMode] = useState(effectiveMode);
+  if (tabBaseMode !== effectiveMode) {
+    // A global mode change from anywhere (a press, Off, simple mode, another client) reopens the global tab.
+    setTabBaseMode(effectiveMode);
+    setSelectionTab(null);
+  } else if (selectedDeviceIds.size === 0 && selectionTab !== null) {
+    setSelectionTab(null);
+  }
+  const viewMode: LightingMode = selectionTab ?? effectiveMode;
+  const cardMode = useCallback((id: string): LightingMode => {
+    const p = pins[id];
+    return p ? pinMode(p.kind) : effectiveMode;
+  }, [pins, effectiveMode]);
   const scoped: ScopedTarget = useMemo(() => {
-    const sel = selectionPin(pins, selectionIds);
-    if (sel.kind === 'none') return { kind: 'none' };
-    if (sel.kind === 'mixed') return { kind: 'mixed' };
-    const pin = sel.pin;
+    if (selectionIds.length === 0) return { kind: 'none' };
+    if (selectionIds.some(id => cardMode(id) !== viewMode)) return { kind: 'mixed' };
+    const pin = pins[selectionIds[0]];
+    if (!pin) return { kind: 'none' };
     return {
       kind: 'pin',
       pin,
@@ -983,12 +1005,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       slot: pin.kind === 'static' ? (pin.slot ?? 0) : slotOf(pin.effect ?? ''),
       hex: pin.kind === 'static' ? pinHex(pin) : '',
     };
-  }, [pins, selectionIds, slotOf]);
-  // The tabs and the views under them show what the selection wears, so a
-  // card pinned to Mirror opens on Mirror whatever the global mode is. Nothing
-  // selected, a selection following the global mode, or one wearing different
-  // pins shows the global mode.
-  const viewMode: LightingMode = scoped.kind === 'pin' ? pinMode(scoped.pin.kind) : effectiveMode;
+  }, [pins, selectionIds, slotOf, cardMode, viewMode]);
+  // The cards the focused look belongs to: the first-selected card and every selected card wearing
+  // the same pin (or following the global mode with it). Dock edits reach only these.
+  const focusIds = useMemo(() => {
+    const sigOf = (id: string) => (pins[id] ? pinSignature(pins[id]) : '');
+    const first = selectionIds[0];
+    return first === undefined ? [] : selectionIds.filter(id => sigOf(id) === sigOf(first));
+  }, [pins, selectionIds]);
 
   // Pins the selection to a static look: the whole look travels, so the service
   // renders THIS effect for the device rather than approximating it with a
@@ -1148,7 +1172,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       if (idx === pinTarget.slot) return;
       const bundle = effectTemplates[pinTarget.key];
       const clampedIdx = bundle ? Math.min(Math.max(idx, 0), bundle.slots.length - 1) : idx;
-      pinStaticLook(pinTarget.key, clampedIdx, selectionIds, stateOf(pinTarget.key, clampedIdx));
+      pinStaticLook(pinTarget.key, clampedIdx, focusIds, stateOf(pinTarget.key, clampedIdx));
       return;
     }
     // A selection pinned to a shader edits that shader's preset.
@@ -1177,7 +1201,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       templateIndex: clamped,
       effectState: nextBundle.slots[clamped],
     });
-  }, [activeEffect, effectTemplates, pinStaticLook, pinTarget, selectionIds, stateOf, writeTemplates]);
+  }, [activeEffect, effectTemplates, pinStaticLook, pinTarget, focusIds, stateOf, writeTemplates]);
 
   const handleStatePatch = useCallback((patch: Partial<EffectState>, commit = false) => {
     if (!dockEffect || !dockState) return;
@@ -1201,8 +1225,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (pinnedElsewhere) return;
     if (staticPinEdit) {
       const pin = staticLookPin(dockEffect, idx, nextSlot);
-      recordPins(selectionIds, pin);
-      if (commit) void applyPins(selectionIds, pin, false);
+      recordPins(focusIds, pin);
+      if (commit) void applyPins(focusIds, pin, false);
       return;
     }
     publishControlSync({
@@ -1216,7 +1240,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       templateIndex: idx,
       effectState: nextSlot,
     });
-  }, [applyPins, dockEffect, dockSlot, dockState, effectTemplates, pinnedElsewhere, recordPins, selectionIds, staticPinEdit, writeTemplates]);
+  }, [applyPins, dockEffect, dockSlot, dockState, effectTemplates, pinnedElsewhere, recordPins, focusIds, staticPinEdit, writeTemplates]);
 
   const handleStateCommit = useCallback(() => {
     if (!dockEffect) return;
@@ -1235,12 +1259,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // running on the canvas - restarting the global effect here would swap it
     // out from under every unselected device.
     if (staticPinEdit) {
-      pinStaticLook(dockEffect, idx, selectionIds, latest);
+      pinStaticLook(dockEffect, idx, focusIds, latest);
       return;
     }
     if (pinnedElsewhere) return;
     applyAnimate(dockEffect, latest, true);
-  }, [applyAnimate, dockEffect, dockSlot, pinStaticLook, pinnedElsewhere, selectionIds, staticPinEdit]);
+  }, [applyAnimate, dockEffect, dockSlot, pinStaticLook, pinnedElsewhere, focusIds, staticPinEdit]);
 
   const handleStateReset = useCallback(() => {
     if (!dockEffect) return;
@@ -1255,9 +1279,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     writeTemplates(nextTemplates, staticPinEdit || pinnedElsewhere ? null : dockEffect, true)
       .then(() => {
         setCommittedTemplates(nextTemplates);
-        if (staticPinEdit) pinStaticLook(dockEffect, idx, selectionIds, nextBundle.slots[idx]);
+        if (staticPinEdit) pinStaticLook(dockEffect, idx, focusIds, nextBundle.slots[idx]);
       });
-  }, [animateDefaults, dockEffect, dockSlot, effectTemplates, pinStaticLook, pinnedElsewhere, selectionIds, staticPinEdit, writeTemplates]);
+  }, [animateDefaults, dockEffect, dockSlot, effectTemplates, pinStaticLook, pinnedElsewhere, focusIds, staticPinEdit, writeTemplates]);
 
   // After a studio save, slot values for params the save changed or unpinned are
   // dropped so the LEDs show the saved look; untouched knob tweaks stay.
@@ -2184,6 +2208,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     setScopeHovered(false);
     setPickHovered(false);
   }
+  // The cards a press on `key` changes, outlined on hover and pulsed on press: with a selection
+  // and a pinnable mode, the cards it pins; otherwise the global reach.
+  const tabPressReach = useCallback((key: string): Set<string> | undefined => {
+    if (selectedDeviceIds.size > 0 && PINNABLE_MODES.has(key)) {
+      const ids = tabPressPins(pins, selectedDeviceIds, key);
+      return ids.length ? pressReach(visibleDevices, pins, new Set(ids)) : undefined;
+    }
+    if (tabPressChangesNothing(key, activeTabKey, selectedDeviceIds.size, false)) return undefined;
+    return pressReach(visibleDevices, pins, selectedDeviceIds, key === 'gamesync');
+  }, [activeTabKey, pins, selectedDeviceIds, visibleDevices]);
   // A tab press either opens the mode menu or applies a mode: to the selected
   // cards when there are any, else to every unpinned one. A mode switch also
   // drops the menu, which the tab row keeps "inside" its anchor.
@@ -2194,15 +2228,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       return;
     }
     closeModeMenu();
-    if (!tabPressChangesNothing(key, activeTabKey, selectedDeviceIds.size, scoped.kind === 'pin')) {
-      pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds, key === 'gamesync'));
-    }
+    const reach = tabPressReach(key);
+    if (reach) pulseCards(reach);
     const pin = selectedDeviceIds.size > 0 ? tabPinFor(key as LightingMode) : null;
     if (pin) {
-      // Cards already pinned to this mode keep their own look.
-      if (!(scoped.kind === 'pin' && key === viewMode)) void applyPins([...selectedDeviceIds], pin);
+      setSelectionTab(key as LightingMode);
+      const ids = tabPressPins(pins, selectedDeviceIds, key);
+      if (ids.length > 0) void applyPins(ids, pin);
       return;
     }
+    setSelectionTab(null);
     void handleModeChange(key as LightingMode);
   };
 
@@ -2213,9 +2248,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       return viewMode === 'none' || viewMode === 'gamesync' ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
     }
     if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
-    if (tabPressChangesNothing(hoveredTab, activeTabKey, selectedDeviceIds.size, scoped.kind === 'pin')) return undefined;
-    return pressReach(visibleDevices, pins, selectedDeviceIds, hoveredTab === 'gamesync');
-  }, [scopeHovered, pickHovered, viewMode, hoveredTab, activeTabKey, scoped.kind, pins, selectedDeviceIds, visibleDevices]);
+    return tabPressReach(hoveredTab);
+  }, [scopeHovered, pickHovered, viewMode, hoveredTab, tabPressReach, pins, selectedDeviceIds, visibleDevices]);
   const pinnedNames = useMemo(() => visibleDevices.filter(d => d.id in pins).map(canvasLabelName), [visibleDevices, pins]);
   // How many cards the next pick changes; with none, the way to reach any is a selection.
   const reachCount = pressReach(visibleDevices, pins, selectedDeviceIds).size;
