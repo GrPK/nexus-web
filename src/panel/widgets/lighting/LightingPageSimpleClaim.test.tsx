@@ -60,6 +60,8 @@ function renderSimple() {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  vi.mocked(lightingApi.fetchLightingDevices).mockImplementation(() => Promise.resolve({ isInit: true, devices: [DEVICE] } as never));
+  vi.mocked(lightingApi.fetchPins).mockImplementation(() => Promise.resolve({}));
 });
 
 describe('LightingPage simple mode device claiming', () => {
@@ -109,5 +111,51 @@ describe('LightingPage simple mode device claiming', () => {
     openMenu();
     fireEvent.click(screen.getByRole('menuitemradio', { name: /lighting\.mode\.off/ }));
     expect(lightingApi.setLightingDeviceControlled).not.toHaveBeenCalled();
+  });
+});
+
+describe('LightingPage simple mode and pins', () => {
+  const pinned = () => vi.mocked(lightingApi.fetchPins).mockImplementation(
+    () => Promise.resolve({ 'openrgb-0': { kind: 'animate', effect: 'aurora' } }),
+  );
+  const driven = () => vi.mocked(lightingApi.fetchLightingDevices).mockImplementation(
+    () => Promise.resolve({ isInit: true, devices: [{ ...DEVICE, controlled: true, ledsOn: true }] } as never),
+  );
+
+  it('leaves pins alone on arrival and on Off', async () => {
+    pinned();
+    renderSimple();
+    await waitFor(() => expect(lightingApi.fetchPins).toHaveBeenCalled());
+    fireEvent.click(await screen.findByRole('tab'));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /lighting\.mode\.off/ }));
+    await waitFor(() => expect(lightingApi.setLightingDeviceControlled).toHaveBeenCalled());
+    expect(lightingApi.setPins).not.toHaveBeenCalled();
+  });
+
+  it('unpins every device on a palette pick', async () => {
+    pinned();
+    const { container } = renderSimple();
+    await waitFor(() => expect(lightingApi.fetchPins).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('button', { name: /lighting\.simple\.controlAll/ })).toBeTruthy());
+    fireEvent.click(container.querySelector('[data-palette-id="red-3"]') as HTMLButtonElement);
+    await waitFor(() => expect(lightingApi.setPins).toHaveBeenCalledWith(['openrgb-0'], null));
+  });
+
+  it('counts a pinned device as not controlled, and Control all unpins it', async () => {
+    pinned();
+    driven();
+    renderSimple();
+    const button = await screen.findByRole('button', { name: /lighting\.simple\.controlAll/ });
+    fireEvent.click(button);
+    await waitFor(() => expect(lightingApi.setPins).toHaveBeenCalledWith(['openrgb-0'], null));
+    expect(lightingApi.setLightingDeviceControlled).not.toHaveBeenCalled();
+  });
+
+  it('offers no Control all once every driven device follows', async () => {
+    driven();
+    renderSimple();
+    // The singular count renders only once the one device has loaded.
+    await screen.findByText('lighting.simple.controlledOf.one');
+    expect(screen.queryByRole('button', { name: /lighting\.simple\.controlAll/ })).toBeNull();
   });
 });

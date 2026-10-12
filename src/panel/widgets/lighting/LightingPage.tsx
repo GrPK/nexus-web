@@ -782,10 +782,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // A pin set from another client arrives on this frame; ids with a write
     // still in flight here keep their local value.
     void refreshPins();
-    // A remote change of the global flat color.
+    // A remote change of the global flat color or pattern. A local pick clears
+    // the color, so the same guard keeps a stale reply off the pattern too.
     if (mode === 'static') {
       const land = readGlobalColor();
-      fetchStaticSettings().then(data => { if (data) land(data.color ?? ''); }).catch(() => {});
+      fetchStaticSettings().then(data => {
+        if (!data || !land(data.color ?? '') || !isStaticEffect(data.effect)) return;
+        staticEffectRef.current = data.effect;
+        setActiveEffect(data.effect);
+      }).catch(() => {});
     }
     // Custom effects are added, renamed or deleted from any client; follow once the list is in use.
     if (customEffectsLoaded() || isCustomEffectKey(activeEffect)) void refreshCustomEffects();
@@ -882,19 +887,40 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     screenPP.colorize,
   ]);
 
+  // Settles the static start still waiting on the throttle; any newer call drops
+  // that callback, so every call settles the older one's registration.
+  const pendingStaticWriteRef = useRef<(() => void) | null>(null);
   const applyAnimate = useCallback((effect: string, state: EffectState, persist: boolean) => {
     if (!effect) return;
     const expectedProfileKey = activeProfileKeyRef.current;
+    // A start without a color clears the global flat color service side. It
+    // counts as in flight from now, not from when the throttle fires, so a
+    // refetch in between cannot land the look this call replaces.
+    const write = { settle: () => {} };
+    const registered = modeRef.current === 'static';
+    pendingStaticWriteRef.current?.();
+    pendingStaticWriteRef.current = null;
+    if (registered) {
+      setGlobalColor('', new Promise<void>(resolve => { write.settle = resolve; }));
+      pendingStaticWriteRef.current = write.settle;
+    }
+    const done = () => {
+      if (pendingStaticWriteRef.current === write.settle) pendingStaticWriteRef.current = null;
+      write.settle();
+    };
     throttleAnimate(() => {
-      if (activeProfileKeyRef.current !== expectedProfileKey) return;
+      if (activeProfileKeyRef.current !== expectedProfileKey) { done(); return; }
       if (modeRef.current === 'static') {
-        // A start without a color clears the global flat color service side.
-        setGlobalColor('', startStatic(
+        const started = startStatic(
           effect, state.intensity, state.hue, state.colorize,
           state.saturation, state.contrast, state.params, persist,
-        ));
+        );
+        // Static only since the call: register the write now.
+        if (!registered) setGlobalColor('', started);
+        started.catch(() => {}).finally(done);
         return;
       }
+      done();
       startAnimate(
         effect, state.speed, state.intensity, state.hue, state.colorize,
         state.saturation, state.contrast, state.params, persist,
@@ -1934,6 +1960,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
     return orderedDevices.filter(d => !zoneCardUnavailable(d)).map(d => d.id);
   }, [devices, orderedDevices, handleSetControlled, handleSetPower]);
+  // Simple mode has no rail to show pins on, so a pick or Control all releases
+  // every pin, the same way it claims; arriving and Off leave pins alone.
+  const unpinAll = useCallback(() => {
+    const ids = Object.keys(pins);
+    if (ids.length > 0) void applyPins(ids, null);
+  }, [applyPins, pins]);
 
   // Counted over the devices the claim can actually reach. A zone with no LEDs
   // cannot be lit, so including it would leave the ratio permanently short of
@@ -1943,10 +1975,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     [orderedDevices],
   );
   // Matches zoneCardSelectable: a device Nexus drives AND that is lit. Counting
-  // only `controlled` would claim a dark device is being driven.
+  // only `controlled` would claim a dark device is being driven. A pinned device
+  // does not follow Simple mode's picks, so it is not counted either.
   const controlledCount = useMemo(
-    () => claimableDevices.filter(d => d.controlled !== false && d.ledsOn).length,
-    [claimableDevices],
+    () => claimableDevices.filter(d => d.controlled !== false && d.ledsOn && !pins[d.id]).length,
+    [claimableDevices, pins],
   );
 
   // The switch holds a browser-local preference, but the direction the hardware
@@ -1961,6 +1994,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // canvas while the hardware runs this one.
   const handleSimpleAnimationSelect = useCallback(async (key: string) => {
     claimAllDevices();
+    unpinAll();
     setActiveEffect('');
     // This IS the direction now, so the conform read below must not run for
     // this key: rawSync goes optimistic, and the stored sign is still the old
@@ -1977,7 +2011,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       await startAnimate(key, state.speed, state.intensity, state.hue, state.colorize, state.saturation, state.contrast, state.params);
       publishControlSync({ domain: 'lighting', mode: 'animate', rawSync: key, effect: key });
     } catch { /* the sync poll reconciles */ }
-  }, [claimAllDevices, paused, setMode, setPausedState, setRawSync, simpleReversed]);
+  }, [claimAllDevices, paused, setMode, setPausedState, setRawSync, simpleReversed, unpinAll]);
 
   // The running sweep, which is also what marks a tile.
   const simpleAnimation = synced && effectiveMode === 'animate' && isSimpleAnimation(rawSync)
@@ -2223,11 +2257,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     [visibleDevices, selectedDeviceIds],
   );
 
-  // Static's canvas is the color picker. A pattern pin replaces the field
-  // with the effect's own render; a color pin (or none yet) keeps the field.
-  const staticPattern = viewMode === 'static' && pinTarget?.pin.kind === 'static' && !isPaletteKey(pinTarget.key)
-    ? { key: pinTarget.key, slot: pinTarget.slot }
-    : null;
+  // Static's canvas is the color picker. A pattern replaces the field with the
+  // effect's own render: a selection's pattern pin, or with nothing selected
+  // (or a following selection) the global pattern while no global color is set.
+  const staticPattern = viewMode !== 'static' ? null
+    : pinTarget ? (pinTarget.pin.kind === 'static' && !isPaletteKey(pinTarget.key) ? { key: pinTarget.key, slot: pinTarget.slot } : null)
+      : scoped.kind === 'none' && !globalColor && isStaticEffect(activeEffect) && !isPaletteKey(activeEffect)
+        ? { key: activeEffect, slot: slotOf(activeEffect) }
+        : null;
   // The picker tiles stand for "this selection's colour was chosen by hand", so
   // only a color pin, or the global flat color, lights one.
   const colorScoped = viewMode === 'static' && (pinTarget?.pin.kind === 'static'
@@ -2358,9 +2395,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               /* Off states what it did; every other mode carries both counts,
                  so a device the advanced page left un-driven is visible here
                  without a device list. Same line either way. The action runs
-                 the same claim the palette does - controlledCount also
-                 requires the lights to be on, so setting `controlled` alone
-                 would leave the count short and the button stuck on screen. */
+                 the same claim and unpin the palette does - controlledCount
+                 also requires the lights to be on and no pin, so setting
+                 `controlled` alone would leave the button stuck on screen. */
               tabsAdjacent={(
                 <DeviceCountSummary
                   detected={simpleOff
@@ -2370,7 +2407,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                       total: claimableDevices.length,
                     })}
                   action={!simpleOff && controlledCount < claimableDevices.length ? (
-                    <Button size="sm" pill onClick={() => { claimAllDevices(); }}>
+                    <Button size="sm" pill onClick={() => { claimAllDevices(); unpinAll(); }}>
                       {t('lighting.simple.controlAll')}
                     </Button>
                   ) : undefined}
@@ -2383,7 +2420,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             <SectionHeader className={styles.simpleSectionHeader}>{t('lighting.mode.static')}</SectionHeader>
             <StaticPalette
               selectedId={simplePaletteId}
-              onSelect={color => { claimAllDevices(); void handleSimplePaletteSelect(color); }}
+              onSelect={color => { claimAllDevices(); unpinAll(); void handleSimplePaletteSelect(color); }}
             />
           </div>
           <div className={styles.simpleSection}>
