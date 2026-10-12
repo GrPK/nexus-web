@@ -2320,6 +2320,7 @@
   "lighting.controls.importFolderEmpty": "そのフォルダに対応する画像や動画がありません",
   "lighting.controls.importFolderPartial": "{total}件中{failed}件のファイルをインポートできませんでした",
   "lighting.controls.importNetworkError": "サービスに接続できません。起動していますか？",
+  "lighting.controls.importTooLarge": "上限の {limit} MB を超えるファイルはスキップされました",
   "lighting.controls.importing": "変換中...",
   "lighting.controls.importingCount": "変換中 {n}/{total}...",
   "lighting.controls.inkbloom": "墨滴",

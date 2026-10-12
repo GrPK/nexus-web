@@ -2320,6 +2320,7 @@
   "lighting.controls.importFolderEmpty": "Geen ondersteunde afbeeldingen of video's in die map",
   "lighting.controls.importFolderPartial": "{failed} van {total} bestanden konden niet worden geïmporteerd",
   "lighting.controls.importNetworkError": "Kon de service niet bereiken. Is deze actief?",
+  "lighting.controls.importTooLarge": "Bestanden boven de limiet van {limit} MB zijn overgeslagen",
   "lighting.controls.importing": "Converteren...",
   "lighting.controls.importingCount": "Converteren {n} van {total}...",
   "lighting.controls.inkbloom": "Inktbloei",

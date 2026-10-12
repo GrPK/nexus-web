@@ -2320,6 +2320,7 @@
   "lighting.controls.importFolderEmpty": "Nissune imagjin o video supuartât in chê cartele",
   "lighting.controls.importFolderPartial": "No si à podût impuartâ {failed} file su {total}",
   "lighting.controls.importNetworkError": "No si è rivâts al servizi. Isal in esecuzion?",
+  "lighting.controls.importTooLarge": "I file che a passin il limit di {limit} MB a son stâts saltâts",
   "lighting.controls.importing": "Daûr a convertî...",
   "lighting.controls.importingCount": "Daûr a convertî {n} di {total}...",
   "lighting.controls.inkbloom": "Florî dal ingjustri",

@@ -2335,6 +2335,7 @@
   "lighting.controls.importFolderEmpty": "В этой папке нет поддерживаемых изображений или видео",
   "lighting.controls.importFolderPartial": "Не удалось импортировать {failed} из {total} файлов",
   "lighting.controls.importNetworkError": "Сервис недоступен. Он запущен?",
+  "lighting.controls.importTooLarge": "Файлы больше {limit} MB пропущены",
   "lighting.controls.importing": "Конвертация...",
   "lighting.controls.importingCount": "Конвертация {n} из {total}...",
   "lighting.controls.inkbloom": "Чернила",

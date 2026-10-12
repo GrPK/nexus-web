@@ -2320,6 +2320,7 @@
   "lighting.controls.importFolderEmpty": "Bu klasörde desteklenen görsel veya video yok",
   "lighting.controls.importFolderPartial": "{total} dosyadan {failed} tanesi aktarılamadı",
   "lighting.controls.importNetworkError": "Hizmete ulasilamadi. Calisiyor mu?",
+  "lighting.controls.importTooLarge": "{limit} MB sınırını aşan dosyalar atlandı",
   "lighting.controls.importing": "Donusturuluyor...",
   "lighting.controls.importingCount": "Dönüştürülüyor {n}/{total}...",
   "lighting.controls.inkbloom": "Mürekkep",

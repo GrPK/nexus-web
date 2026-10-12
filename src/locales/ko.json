@@ -2320,6 +2320,7 @@
   "lighting.controls.importFolderEmpty": "해당 폴더에 지원되는 이미지나 동영상이 없습니다",
   "lighting.controls.importFolderPartial": "{total}개 중 {failed}개 파일을 가져오지 못했습니다",
   "lighting.controls.importNetworkError": "서비스에 연결할 수 없습니다. 실행 중입니까?",
+  "lighting.controls.importTooLarge": "{limit} MB 제한을 초과한 파일은 건너뛰었습니다",
   "lighting.controls.importing": "변환 중...",
   "lighting.controls.importingCount": "변환 중 {n}/{total}...",
   "lighting.controls.inkbloom": "잉크",

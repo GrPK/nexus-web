@@ -2320,6 +2320,7 @@
   "lighting.controls.importFolderEmpty": "No hay imágenes ni vídeos compatibles en esa carpeta",
   "lighting.controls.importFolderPartial": "No se pudieron importar {failed} de {total} archivos",
   "lighting.controls.importNetworkError": "No se pudo conectar con el servicio. ¿Está en ejecución?",
+  "lighting.controls.importTooLarge": "Se omitieron los archivos que superan el límite de {limit} MB",
   "lighting.controls.importing": "Convirtiendo...",
   "lighting.controls.importingCount": "Convirtiendo {n} de {total}...",
   "lighting.controls.inkbloom": "Tinta",

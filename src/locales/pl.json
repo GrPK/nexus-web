@@ -2335,6 +2335,7 @@
   "lighting.controls.importFolderEmpty": "Brak obsługiwanych obrazów lub filmów w tym folderze",
   "lighting.controls.importFolderPartial": "Nie udało się zaimportować {failed} z {total} plików",
   "lighting.controls.importNetworkError": "Nie mozna polaczyc sie z usluga. Czy jest uruchomiona?",
+  "lighting.controls.importTooLarge": "Pliki przekraczające limit {limit} MB zostały pominięte",
   "lighting.controls.importing": "Konwertowanie...",
   "lighting.controls.importingCount": "Konwertowanie {n} z {total}...",
   "lighting.controls.inkbloom": "Atrament",

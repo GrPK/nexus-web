@@ -2320,6 +2320,7 @@
   "lighting.controls.importFolderEmpty": "No supported images or videos in that folder",
   "lighting.controls.importFolderPartial": "{failed} of {total} files could not be imported",
   "lighting.controls.importNetworkError": "Could not reach the service. Is it running?",
+  "lighting.controls.importTooLarge": "Files over the {limit} MB limit were skipped",
   "lighting.controls.importing": "Converting...",
   "lighting.controls.importingCount": "Converting {n} of {total}...",
   "lighting.controls.inkbloom": "Ink Bloom",

@@ -2320,6 +2320,7 @@
   "lighting.controls.importFolderEmpty": "Nenhuma imagem ou vídeo suportado nessa pasta",
   "lighting.controls.importFolderPartial": "Não foi possível importar {failed} de {total} ficheiros",
   "lighting.controls.importNetworkError": "Servico inacessivel. Esta em execucao?",
+  "lighting.controls.importTooLarge": "Os ficheiros acima do limite de {limit} MB foram ignorados",
   "lighting.controls.importing": "A converter...",
   "lighting.controls.importingCount": "A converter {n} de {total}...",
   "lighting.controls.inkbloom": "Tinta",

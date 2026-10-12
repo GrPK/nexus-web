@@ -2320,6 +2320,7 @@
   "lighting.controls.importFolderEmpty": "該資料夾中沒有支援的圖片或影片",
   "lighting.controls.importFolderPartial": "{total} 個檔案中有 {failed} 個無法匯入",
   "lighting.controls.importNetworkError": "無法連接到服務。是否正在執行？",
+  "lighting.controls.importTooLarge": "超過 {limit} MB 限制的檔案已略過",
   "lighting.controls.importing": "轉換中...",
   "lighting.controls.importingCount": "轉換中 {n}/{total}...",
   "lighting.controls.inkbloom": "墨染",
