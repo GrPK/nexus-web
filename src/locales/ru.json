@@ -2929,6 +2929,7 @@
   "lighting.pin.disabledGameSync": "Game Sync нельзя закрепить",
   "lighting.pin.disabledOff": "Подсветка выключена, закреплять нечего",
   "lighting.pin.disabledUnavailable": "Сейчас не к чему закреплять",
+  "lighting.pin.modeTarget": "{mode}: {name}",
   "lighting.pin.pinnedTo": "Закреплено: {name}",
   "lighting.renderGpu.auto": "Автоматически",
   "lighting.renderGpu.confirmButton": "Перезапустить",

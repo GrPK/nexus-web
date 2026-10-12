@@ -53,7 +53,7 @@ import { usePersistentState } from '../../../hooks/usePersistentState';
 import { useTranslation } from '../../../lib/i18n';
 import { isPaletteKey } from '../../../types/lightingPalette';
 import {
-  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pickerMarks, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pickerMarks, pinnedNamesByEffect, pinModeTargetLabel, clearLegacyLightingKeys,
 } from './pins';
 import type { WidgetProps } from '../types';
 import styles from './LightingPage.module.scss';
@@ -577,7 +577,7 @@ function useImmersiveAnimateState(): {
     pins,
     pinSource: globalPin?.name ?? null,
     pinDisabledReason: globalPin ? undefined : t('lighting.pin.disabledUnavailable'),
-    pinTargetName: (pin: Pin) => pinTargetLabel(pin, t),
+    pinTargetName: (pin: Pin) => pinModeTargetLabel(pin, t),
     onSetPin: (ids, pinned) => { if (!pinned) void applyPins(ids, null); else if (globalPin) void applyPins(ids, globalPin.pin); },
   };
 

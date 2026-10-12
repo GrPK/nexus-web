@@ -77,7 +77,7 @@ vi.mock('./page/StaticPickerCanvas', () => ({
     devices: { id: string; hex: string; pinned?: boolean }[];
     implied?: boolean;
   }) => (
-    <div>
+    <div data-pick data-testid="picker-field">
       <span data-testid="picker-hex">{hex}</span>
       <span data-testid="picker-marks" data-implied={implied ? '1' : ''}>{devices.map(d => `${d.id}@${d.hex}${d.pinned ? '(pinned)' : ''}`).join(';')}</span>
       <button type="button" onClick={() => onCommit('#00ff00')}>pick-green</button>
@@ -88,7 +88,7 @@ vi.mock('./page/StaticPickerCanvas', () => ({
 // The stub exposes what the pins ride on: the pins the rail is handed, the
 // source a press pins to, the disabled reason, and the callbacks.
 vi.mock('./page/DevicePanel', () => ({
-  DevicePanel: ({ pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onSetSelection, pickTargetIds }: {
+  DevicePanel: ({ pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onSetSelection, pickTargetIds, sheen }: {
     pins?: Record<string, Pin>;
     pinSource?: string | null;
     pinDisabledReason?: string;
@@ -96,10 +96,12 @@ vi.mock('./page/DevicePanel', () => ({
     onSetPin?: (ids: string[], pinned: boolean) => void;
     onSetSelection: (ids: Set<string>, primary: string | null) => void;
     pickTargetIds?: ReadonlySet<string>;
+    sheen?: { ids: ReadonlySet<string>; seq: number };
   }) => (
     <div
       data-testid="rail"
       data-targets={pickTargetIds ? [...pickTargetIds].join(',') : 'none'}
+      data-sheen={sheen ? `${[...sheen.ids].join(',')}#${sheen.seq}` : ''}
       data-pin={pins?.a ? JSON.stringify(pins.a) : ''}
       data-pin-name={pins?.a && pinTargetName ? pinTargetName(pins.a) : ''}
       data-source={pinSource ?? ''}
@@ -321,6 +323,21 @@ describe('LightingPage pins', () => {
       expect(targets()).toBe('none');
     });
 
+    it('previews its reach on a hover of a pick control, like a tab', async () => {
+      withDevices('a', 'b', 'c');
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      const field = await screen.findByTestId('picker-field');
+      await screen.findByText('lighting.pane.allExceptPinned.one');
+      const targets = () => screen.getByTestId('rail').dataset.targets;
+      fireEvent.pointerOver(screen.getByTestId('picker-hex'), { pointerType: 'mouse' });
+      expect(targets()).toBe('b,c');
+      fireEvent.pointerOver(field.parentElement!, { pointerType: 'mouse' });
+      expect(targets()).toBe('none');
+    });
+
     it('says all pinned when every device wears a pin', async () => {
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
@@ -406,6 +423,22 @@ describe('LightingPage pins', () => {
       expect(targets()).toBe('a,b');
       fireEvent.click(tab('static'));
       expect(targets()).toBe('none');
+    });
+
+    it('sweeps a sheen across the cards a press changes, and none for a press that changes nothing', async () => {
+      withDevices('a', 'b', 'c');
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
+      await screen.findByText('lighting.pane.allExceptPinned.one');
+      const sheen = () => screen.getByTestId('rail').dataset.sheen;
+      fireEvent.click(tab('animate'));
+      expect(sheen()).toBe('#0');
+      fireEvent.click(tab('static'));
+      expect(sheen()).toBe('b,c#1');
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(tab('gif'));
+      expect(sheen()).toBe('a#2');
     });
 
     it('outlines nothing on the mode menu', async () => {

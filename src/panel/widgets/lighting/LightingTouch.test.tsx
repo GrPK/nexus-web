@@ -249,12 +249,11 @@ describe('LightingTouch pins', () => {
   });
 
 
-  it('names pins as the page does: palette family and shade, simple sweeps by their label', async () => {
+  it('names pins as the page does: mode and target, Mirror by its mode alone', async () => {
     render(<LightingTouch widget={widget} />);
     await waitFor(() => expect(selectProps.current).not.toBeNull());
     const name = selectProps.current!.pinTargetName as (pin: Pin) => string;
-    expect(name({ kind: 'static', effect: 'flat', color: paletteColor('red-3')!.hex })).toBe('lighting.palette.red 3');
-    expect(name({ kind: 'animate', effect: 'sweeprainbow' })).toBe('lighting.simple.anim.rainbow');
+    expect(name({ kind: 'static', effect: 'flat', color: paletteColor('red-3')!.hex })).toBe('lighting.pin.modeTarget');
     expect(name({ kind: 'mirror' })).toBe('lighting.mode.screen');
   });
 

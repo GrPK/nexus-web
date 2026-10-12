@@ -1159,7 +1159,7 @@
   border: var(--border-width) solid transparent;
   background: var(--surface);
   cursor: pointer;
-  transition: border-color var(--ease-fast), background var(--ease-fast), opacity var(--ease-fast);
+  transition: border-color var(--ease-fast), background var(--ease-fast);
 
   &:hover {
     border-color: var(--border-strong);
@@ -1171,8 +1171,32 @@
     border-color: var(--accent);
   }
 
-  &.deviceCardDimmed {
-    opacity: var(--alpha-medium);
+  // One sweep of light across a card a press just changed.
+  .deviceCardSheen {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 50%;
+      background: linear-gradient(100deg, transparent, var(--accent-glow-shadow), transparent);
+      transform: translateX(-100%);
+      animation: cardSheen calc(var(--ease-slow) * 3) ease-out forwards;
+
+      @media (prefers-reduced-motion: reduce) {
+        animation: none;
+      }
+    }
   }
 
   &.deviceCardSelected {
@@ -1221,15 +1245,10 @@
   font-weight: var(--weight-strong);
   color: var(--text);
   line-height: var(--leading-tight);
-  transition: opacity var(--ease-fast);
 }
 
 .deviceCardStackHeaderSelectable {
   cursor: pointer;
-}
-
-.deviceCardStackHeaderDimmed {
-  opacity: var(--alpha-medium);
 }
 
 // Any zone under the header selected: the fill only, so the selected zone's
@@ -2115,4 +2134,8 @@
 .staticFieldFill {
   height: 100%;
   width: 100%;
+}
+
+@keyframes cardSheen {
+  to { transform: translateX(200%); }
 }

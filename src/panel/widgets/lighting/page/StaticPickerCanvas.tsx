@@ -232,6 +232,7 @@ export function StaticPickerCanvas({
     <div className={`${styles.staticPicker} ${fill ? styles.staticPickerFill : ''}`} style={{ '--picker-notice-hold': `${NOTICE_MS}ms` } as React.CSSProperties}>
       <div
         ref={fieldRef}
+        data-pick
         className={`${styles.staticField} ${fill ? styles.staticFieldFill : ''} ${patternEffect ? styles.staticFieldPattern : ''} ${!patternEffect && segmented ? styles.staticFieldSegmented : ''}`}
         style={patternEffect && blastUrl ? { backgroundImage: `url(${blastUrl})` } : undefined}
         // The field owns its drag; without this a vertical pick on a panel

@@ -169,7 +169,7 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, slotFor, vers
               open={!collapsed.has(g.cat)}
               onToggle={() => toggle(g.cat)}
             >
-              <div className={`${styles.animateGridSection} ${g.cat === 'simple' ? styles.animateGridSectionSimple : ''}`}>
+              <div data-pick className={`${styles.animateGridSection} ${g.cat === 'simple' ? styles.animateGridSectionSimple : ''}`}>
                 {cells}
               </div>
             </CollapsibleSection>

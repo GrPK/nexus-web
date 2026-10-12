@@ -59,7 +59,7 @@ export interface FanBulkSelection {
 
 export const FanCard = memo(function FanCard({
   channel, state, curves, calibrating, compact, canCreateCurve = true, highlighted,
-  selected = false, onSelect, presetTarget = false, presetDimmed = false,
+  selected = false, onSelect, presetTarget = false, sheenSeq,
   hubMode, hubSupportsFirmware,
   hubSupportsBios = true,
   nubRef, cardRef: cardRefProp, onWirePointerDown, onWireHover,
@@ -76,8 +76,8 @@ export const FanCard = memo(function FanCard({
   selected?: boolean;
   /** A hovered preset tab will retarget this fan. */
   presetTarget?: boolean;
-  /** A hovered preset tab will leave this fan alone. */
-  presetDimmed?: boolean;
+  /** Set when a press changed this fan; each new value plays the sheen once. */
+  sheenSeq?: number;
   /** Body click. Receives whether the multi-select modifier was held, so the
    *  caller owns additive vs replace without FanCard holding a Set. */
   onSelect?: (additive: boolean) => void;
@@ -210,6 +210,8 @@ export const FanCard = memo(function FanCard({
   // a reused instance would fade the reopened menu straight back out. Same
   // shape as ZoneCard.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; seq: number } | null>(null);
+  // A fan mounting under a past press plays no sheen.
+  const [mountSheenSeq] = useState(sheenSeq);
   const menuSeq = useRef(0);
   const nameRef = useRef<EditableTextHandle>(null);
   const openMenu = (x: number, y: number) => setMenuAt({ x, y, seq: ++menuSeq.current });
@@ -423,7 +425,7 @@ export const FanCard = memo(function FanCard({
       {...(drag?.attributes ?? {})}
       {...(drag?.listeners ?? {})}
       data-menu-arrow-host={menuEnabled || undefined}
-      className={`${styles.fanCard} ${presetTarget ? styles.fanCardTarget : ''} ${presetDimmed ? styles.fanCardDimmed : ''} ${selected ? styles.fanCardSelected : ''} ${calibrating ? styles.fanCardCalibrating : ''} ${roleMenuOpen ? styles.fanCardMenuOpen : ''} ${dragClasses}`}
+      className={`${styles.fanCard} ${presetTarget ? styles.fanCardTarget : ''} ${selected ? styles.fanCardSelected : ''} ${calibrating ? styles.fanCardCalibrating : ''} ${roleMenuOpen ? styles.fanCardMenuOpen : ''} ${dragClasses}`}
       onClick={onSelect ? e => {
         // Controls inside the card own their own clicks; only bare card
         // surface toggles selection. Matched via the same [data-no-dnd] marker
@@ -633,6 +635,7 @@ export const FanCard = memo(function FanCard({
           onClose={() => setMenuAt(null)}
         />
       )}
+      {sheenSeq !== undefined && sheenSeq !== mountSheenSeq && <span key={sheenSeq} className={styles.fanCardSheen} aria-hidden />}
     </div>
   );
 });

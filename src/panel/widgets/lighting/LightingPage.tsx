@@ -35,7 +35,6 @@ import { controlGroupOf } from './page/controlGroupOf';
 import { stackLayoutOf, type StackLayout } from '../../../lib/stackSlots';
 import { useTranslation } from '../../../lib/i18n';
 import { publishControlSync, subscribeControlSync } from '../../../lib/controlSync';
-import { emitRadialBloomFromElement } from '../../../lib/backgroundEffects';
 import { LIGHTING_MODE_ICONS } from '../../../lib/lightingModeIcons';
 import { pluralKey } from '../../../lib/pluralKey';
 import { Badge } from '../../../components/common/Badge/Badge';
@@ -59,7 +58,7 @@ import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
 import { usePersistentState } from '../../../hooks/usePersistentState';
 import {
   staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex,
-  isPickTarget, pickerMarks, pinMode, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
+  pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pressReach, tabPressChangesNothing, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
@@ -1936,6 +1935,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const simpleCustomActive = synced && effectiveMode !== 'none' && !simpleAnimation
     && selectableIds.length > 0 && simplePaletteId === null;
 
+  // A press sweeps a sheen across the cards it changed; a new seq replays it.
+  const [sheen, setSheen] = useState<{ ids: ReadonlySet<string>; seq: number }>({ ids: new Set(), seq: 0 });
+  const sheenCards = (ids: ReadonlySet<string>) => setSheen(s => ({ ids, seq: s.seq + 1 }));
   // Pause/freeze applies to the three modes that drive a continuous output
   // (animate shader, media playback, screen mirror) - Off has nothing to
   // freeze and Game Sync is driven by the foreground game, not us.
@@ -1951,10 +1953,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     advancedDescription: t('lighting.modeMenu.advancedDesc'),
     // Simple mode never shows the device list, so Off claims what it can reach
     // first - the same claim the palette runs, so the page's counts agree.
-    onOff: origin => {
+    onOff: () => {
       // Already off: asking again would re-run the claim and re-issue the stop.
       if (synced && effectiveMode === 'none') return;
-      emitRadialBloomFromElement(origin, true);
+      sheenCards(pressReach(visibleDevices, pins, selectedDeviceIds, true));
       if (simpleDashboard) claimAllDevices();
       void handleModeChange('none');
     },
@@ -2027,28 +2029,33 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       default: return null;
     }
   };
-  // Hovering a mode tab or the scope chip previews the reach of a press or pick.
-  // A press or the advanced page unmounting skips the pointerleave, so both clear it.
+  // Hovering a mode tab, the scope chip or a pick control (color field, effect
+  // or media tile) previews the reach of its press. A press or the advanced
+  // page unmounting skips the pointerleave, so both clear it.
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [scopeHovered, setScopeHovered] = useState(false);
+  const [pickHovered, setPickHovered] = useState(false);
   const advancedHeader = serviceOnline && !simpleDashboard;
   const [hoverHeader, setHoverHeader] = useState(advancedHeader);
   if (hoverHeader !== advancedHeader) {
     setHoverHeader(advancedHeader);
     setHoveredTab(null);
     setScopeHovered(false);
+    setPickHovered(false);
   }
   // A tab press either opens the mode menu or applies a mode: to the selected
   // cards when there are any, else to every unpinned one. A mode switch also
   // drops the menu, which the tab row keeps "inside" its anchor.
-  const handleTabChange = (key: string, origin?: HTMLButtonElement) => {
+  const handleTabChange = (key: string) => {
     setHoveredTab(null);
     if (key === MODE_MENU_TAB_KEY) {
       setModeMenuOpen(open => !open);
       return;
     }
     closeModeMenu();
-    if (origin && key !== activeTabKey) emitRadialBloomFromElement(origin, false);
+    if (!tabPressChangesNothing(key, activeTabKey, selectedDeviceIds.size, scoped.kind === 'pin')) {
+      sheenCards(pressReach(visibleDevices, pins, selectedDeviceIds, key === 'gamesync'));
+    }
     const pin = selectedDeviceIds.size > 0 ? tabPinFor(key as LightingMode) : null;
     if (pin) {
       // Cards already pinned to this mode keep their own look.
@@ -2062,22 +2069,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The preview stands for the selection; with nothing selected it is every
   // unpinned device, and the chip says how many pins a pick skips.
   const pinnedShown = visibleDevices.filter(d => d.id in pins).length;
-  // The cards a hovered press or pick reaches; the rest dim. A pick reaches the
-  // selection, or with none every unpinned lit, controlled card; Game Sync every
-  // lit, controlled card. The tab already showing previews nothing when its
-  // press leaves every card as it is. Off and Game Sync have no picks.
+  // The cards a hovered press or pick reaches, outlined. Off and Game Sync have no picks.
   const pickTargetIds = useMemo(() => {
-    const pickReach = () => (selectedDeviceIds.size > 0 ? new Set(selectedDeviceIds)
-      : new Set(visibleDevices.filter(d => isPickTarget(d, pins, selectedDeviceIds)).map(d => d.id)));
-    if (scopeHovered) return viewMode === 'none' || viewMode === 'gamesync' ? undefined : pickReach();
-    if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
-    if (hoveredTab === activeTabKey
-      && (selectedDeviceIds.size === 0 || hoveredTab === 'gamesync' || scoped.kind === 'pin')) return undefined;
-    if (hoveredTab === 'gamesync') {
-      return new Set(visibleDevices.filter(d => d.ledsOn !== false && d.controlled !== false).map(d => d.id));
+    if (scopeHovered || pickHovered) {
+      return viewMode === 'none' || viewMode === 'gamesync' ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
     }
-    return pickReach();
-  }, [scopeHovered, viewMode, hoveredTab, activeTabKey, scoped.kind, pins, selectedDeviceIds, visibleDevices]);
+    if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
+    if (tabPressChangesNothing(hoveredTab, activeTabKey, selectedDeviceIds.size, scoped.kind === 'pin')) return undefined;
+    return pressReach(visibleDevices, pins, selectedDeviceIds, hoveredTab === 'gamesync');
+  }, [scopeHovered, pickHovered, viewMode, hoveredTab, activeTabKey, scoped.kind, pins, selectedDeviceIds, visibleDevices]);
   const pinnedNames = useMemo(() => visibleDevices.filter(d => d.id in pins).map(canvasLabelName), [visibleDevices, pins]);
   const previewBadgeLabel = selectedDeviceIds.size > 0
     ? t(pluralKey('lighting.pane.selectedCount', language, selectedDeviceIds.size), { count: selectedDeviceIds.size })
@@ -2187,7 +2187,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         : effectiveMode === 'none' ? 'lighting.pin.disabledOff'
           : 'lighting.pin.disabledUnavailable',
   );
-  const pinTargetName = useCallback((pin: Pin): string => pinTargetLabel(pin, t), [t]);
+  const pinTargetName = useCallback((pin: Pin): string => pinModeTargetLabel(pin, t), [t]);
   const handleSetPin = useCallback((ids: string[], pinned: boolean) => {
     if (!pinned) { void applyPins(ids, null); return; }
     if (globalPin) void applyPins(ids, globalPin.pin);
@@ -2463,6 +2463,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             pinTargetName={pinTargetName}
             onSetPin={handleSetPin}
             pickTargetIds={pickTargetIds}
+            sheen={sheen}
             selectedIds={selectedDeviceIds}
             onSetSelection={handleSetSelection}
             onTogglePower={handleTogglePower}
@@ -2492,7 +2493,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             rgbRunning={rgb.running}
           />
         </div>
-        <div className={styles.main}>
+        <div
+          className={styles.main}
+          onPointerOver={e => { if (e.pointerType === 'mouse') setPickHovered(!!(e.target as Element).closest('[data-pick]')); }}
+          onPointerLeave={e => { if (e.pointerType === 'mouse') setPickHovered(false); }}
+        >
           {viewMode === 'gamesync' ? (
             <>
               <div className={styles.canvasArea}>
@@ -2608,7 +2613,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                       open={paletteOpen}
                       onToggle={() => setPaletteOpen(o => !o)}
                     >
-                      <div className={styles.animateGridSection}>
+                      <div data-pick className={styles.animateGridSection}>
                         <EffectCard
                           overlay
                           label={t('lighting.static.pickerSegmented')}

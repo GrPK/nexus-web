@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   animatePin, colorPin, MIRROR_PIN, paletteColorPin, pickerMarks, pinGridKey, pinHex, pinnedNamesByEffect,
-  clearLegacyLightingKeys, pinSignature, pinStripPick, pinTargetLabel, selectionPin, staticLookPin, withPins,
+  clearLegacyLightingKeys, pinModeTargetLabel, pinSignature, pinStripPick, pinTargetLabel, pressReach, selectionPin, staticLookPin,
+  tabPressChangesNothing, withPins,
 } from './pins';
 import { defaultStateFor } from '../../../types/lighting';
 import { paletteColor, paletteKey } from '../../../types/lightingPalette';
@@ -158,6 +159,36 @@ describe('pinnedNamesByEffect', () => {
     const m = pinnedNamesByEffect(pins, 'animate', id => (id === 'a' ? 'Fan A' : undefined));
     expect(m.get('plasma')).toEqual(['Fan A']);
     expect(m.has('aurora')).toBe(false);
+  });
+});
+
+describe('pinModeTargetLabel', () => {
+  const t = (key: string, params?: Record<string, string>) => (params ? `${params.mode}: ${params.name}` : key);
+
+  it('names a static or animate pin by mode and target, Mirror and Media by mode alone', () => {
+    expect(pinModeTargetLabel(paletteColorPin(paletteColor('red-3')!), t)).toBe('lighting.mode.static: lighting.palette.red 3');
+    expect(pinModeTargetLabel(animatePin('plasma'), t)).toBe('lighting.mode.animate: lighting.controls.plasma');
+    expect(pinModeTargetLabel(MIRROR_PIN, t)).toBe('lighting.mode.screen');
+    expect(pinModeTargetLabel({ kind: 'animate', effect: '' }, t)).toBe('lighting.mode.animate');
+  });
+});
+
+describe('pressReach', () => {
+  const devices = [{ id: 'a' }, { id: 'b' }, { id: 'c', ledsOn: false }, { id: 'd', controlled: false }];
+  const pins = { a: animatePin('plasma') };
+
+  it('reaches the unpinned lit, controlled cards, the selection once there is one, every lit card when pins are overridden', () => {
+    expect([...pressReach(devices, pins, new Set())]).toEqual(['b']);
+    expect([...pressReach(devices, pins, new Set(['a', 'c']))]).toEqual(['a']);
+    expect([...pressReach(devices, pins, new Set(['a']), true)]).toEqual(['a', 'b']);
+  });
+
+  it('knows when a press on the tab already showing changes nothing', () => {
+    expect(tabPressChangesNothing('static', 'static', 0, false)).toBe(true);
+    expect(tabPressChangesNothing('static', 'static', 1, false)).toBe(false);
+    expect(tabPressChangesNothing('static', 'static', 1, true)).toBe(true);
+    expect(tabPressChangesNothing('gamesync', 'gamesync', 1, false)).toBe(true);
+    expect(tabPressChangesNothing('animate', 'static', 0, false)).toBe(false);
   });
 });
 

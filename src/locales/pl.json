@@ -2929,6 +2929,7 @@
   "lighting.pin.disabledGameSync": "Game Sync nie można przypiąć",
   "lighting.pin.disabledOff": "Oświetlenie jest wyłączone, nie ma czego przypiąć",
   "lighting.pin.disabledUnavailable": "Na razie nie ma do czego przypiąć",
+  "lighting.pin.modeTarget": "{mode}: {name}",
   "lighting.pin.pinnedTo": "Przypięto do: {name}",
   "lighting.renderGpu.auto": "Automatycznie",
   "lighting.renderGpu.confirmButton": "Uruchom ponownie",

@@ -46,7 +46,6 @@ import type { ConnectionState } from '../../../hooks/useServiceStatus';
 import { useTranslation } from '../../../lib/i18n';
 import { useUiSettings } from '../../../hooks/useUiSettings';
 import { publishControlSync, subscribeControlSync } from '../../../lib/controlSync';
-import { emitRadialBloomFromElement } from '../../../lib/backgroundEffects';
 import { ViewHeader } from '../../../components/common/ViewHeader/ViewHeader';
 import { PresetToolbar } from '../../../components/common/PresetToolbar/PresetToolbar';
 import { IconLabelButton } from '../../../components/common/IconLabelButton/IconLabelButton';
@@ -129,6 +128,12 @@ const coolingHistoryStore = {
 // `pointer-events: none` stops the mouse; a keyboard user still reaches the
 // controls, so this is what actually keeps the edit from landing.
 const noopCurveEdit = () => {};
+
+/** The fans a preset retargets (skipping pinned ones), or with `includePinned` the ones Off hands back. */
+const presetReach = (channels: readonly FanChannel[], includePinned = false): Set<string> => new Set(channels
+  .filter(ch => (includePinned || !ch.pinned) && ch.controlled !== false && !ch.readOnly
+    && ch.classification !== 'Fixed' && !isFanDisconnected(ch))
+  .map(ch => ch.id));
 
 export function CoolingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '' }: CoolingViewProps) {
   const { t, language } = useTranslation();
@@ -1290,6 +1295,9 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     return s;
   }, [effectiveCurveId, fanStates]);
 
+  // A press sweeps a sheen across the fans it changed; a new seq replays it.
+  const [sheen, setSheen] = useState<{ ids: ReadonlySet<string>; seq: number }>({ ids: new Set(), seq: 0 });
+  const sheenFans = (ids: ReadonlySet<string>) => setSheen(s => ({ ids, seq: s.seq + 1 }));
   // Off is not a tab any more: it shares the first tab with the simple /
   // advanced swap, which the tab opens as a menu instead of switching mode.
   const modeMenu = usePageModeMenu({
@@ -1300,8 +1308,8 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     offDescription: t('cooling.modeMenu.offDesc'),
     simpleDescription: t('cooling.modeMenu.simpleDesc'),
     advancedDescription: t('cooling.modeMenu.advancedDesc'),
-    onOff: origin => {
-      emitRadialBloomFromElement(origin, true);
+    onOff: () => {
+      if (activeMode !== 'off') sheenFans(presetReach(channels, true));
       void handleModeChange('off');
     },
     onModeChange: setDashboardMode,
@@ -1325,20 +1333,17 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
   // The strip marks the mode tab while cooling is off - it is the tab Off now
   // lives on. Every other mode still marks its own tab.
   const activeTabKey = activeMode === 'off' ? MODE_MENU_TAB_KEY : (activeMode ?? undefined);
-  // Hovering a preset tab outlines the fans it would retarget and dims the
-  // rest: presets skip pinned fans and fans with Nexus Control off. The active
+  // Hovering a preset tab outlines the fans it would retarget: presets skip
+  // pinned fans and fans with Nexus Control off. The active
   // preset's press retargets nothing, so it previews nothing. Only the advanced
   // header reports hovers, so its absence must not leave a stale one behind.
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const hoverHeaderShown = serviceOnline && !simpleDashboard;
   const presetPreview = hoverHeaderShown && !!hoveredTab && isCoolingModeKey(hoveredTab) && hoveredTab !== activeMode;
-  const presetTargets = useMemo(() => new Set(presetPreview
-    ? channels.filter(ch => !ch.pinned && ch.controlled !== false && !ch.readOnly
-      && ch.classification !== 'Fixed' && !isFanDisconnected(ch)).map(ch => ch.id)
-    : []), [channels, presetPreview]);
+  const presetTargets = useMemo(() => (presetPreview ? presetReach(channels) : new Set<string>()), [channels, presetPreview]);
   // A tab press either opens the mode menu or switches mode; a mode switch
   // also drops the menu, which the tab row keeps "inside" its anchor.
-  const handleTabChange = (key: string, origin?: HTMLButtonElement) => {
+  const handleTabChange = (key: string) => {
     // A press can remount the tab before its pointerleave.
     setHoveredTab(null);
     if (key === MODE_MENU_TAB_KEY) {
@@ -1346,7 +1351,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
       return;
     }
     closeModeMenu();
-    if (origin && isCoolingModeKey(key) && key !== activeMode) emitRadialBloomFromElement(origin, false);
+    if (isCoolingModeKey(key) && key !== activeMode) sheenFans(presetReach(channels));
     void handleModeChange(key);
   };
   // The mode tab leads the strip in both dashboard modes; simple mode carries
@@ -1738,7 +1743,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                 <FanCard key={ch.id} channel={ch} state={fanStates[ch.id]} curves={curves} hazard={hazardByFan[ch.id]}
                   compact
                   presetTarget={presetTargets.has(ch.id)}
-                  presetDimmed={presetPreview && !presetTargets.has(ch.id)}
+                  sheenSeq={sheen.ids.has(ch.id) ? sheen.seq : undefined}
                   selected={selectedFanIds.has(ch.id)}
                   onSelect={additive => selectFan(ch.id, additive)}
                   calibrating={calibrating}

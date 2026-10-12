@@ -2894,6 +2894,7 @@
   "lighting.pin.disabledGameSync": "Game Sync can't be pinned",
   "lighting.pin.disabledOff": "Lighting is off, so nothing can be pinned",
   "lighting.pin.disabledUnavailable": "Nothing to pin to right now",
+  "lighting.pin.modeTarget": "{mode}: {name}",
   "lighting.pin.pinnedTo": "Pinned to {name}",
   "lighting.renderGpu.auto": "Automatic",
   "lighting.renderGpu.confirmButton": "Restart now",

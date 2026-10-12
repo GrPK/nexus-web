@@ -140,6 +140,26 @@ export const isPickTarget = (d: { id: string; ledsOn?: boolean; controlled?: boo
   selectedIds.size === 0 && !(d.id in pins) && d.ledsOn !== false && d.controlled !== false;
 
 /**
+ * The lit, controlled cards a press or pick changes: the selection, or with none
+ * every unpinned one. Game Sync and Off override pins, so they reach them all.
+ */
+export function pressReach(
+  devices: readonly { id: string; ledsOn?: boolean; controlled?: boolean }[],
+  pins: Pins,
+  selectedIds: ReadonlySet<string>,
+  overridesPins = false,
+): Set<string> {
+  const lit = devices.filter(d => d.ledsOn !== false && d.controlled !== false);
+  if (overridesPins) return new Set(lit.map(d => d.id));
+  if (selectedIds.size > 0) return new Set(lit.filter(d => selectedIds.has(d.id)).map(d => d.id));
+  return new Set(lit.filter(d => !(d.id in pins)).map(d => d.id));
+}
+
+/** A press on the tab already showing changes no card with nothing selected, on Game Sync, or when the selection already wears that mode's pin. */
+export const tabPressChangesNothing = (key: string, activeKey: string | undefined, selectedCount: number, selectionPinned: boolean): boolean =>
+  key === activeKey && (selectedCount === 0 || key === 'gamesync' || selectionPinned);
+
+/**
  * The Static picker's marks, on the color each device wears (an unpinned one
  * wears the global color), named as the canvas frames are: the selection, or
  * with none, every lit and controlled device. Pinned ones are flagged.
@@ -178,6 +198,14 @@ export function pinnedNamesByEffect(
     if (names) names.push(name); else out.set(pin.effect, [name]);
   }
   return out;
+}
+
+/** A pinned card's tooltip name: "{mode}: {target}" for a static or animate pin, the mode alone for Mirror and Media. */
+export function pinModeTargetLabel(pin: Pin, t: (key: string, params?: Record<string, string>) => string): string {
+  if (pin.kind === 'mirror' || pin.kind === 'media') return pinTargetLabel(pin, t);
+  const mode = t(pin.kind === 'static' ? 'lighting.mode.static' : 'lighting.mode.animate');
+  const name = pinTargetLabel(pin, t);
+  return name ? t('lighting.pin.modeTarget', { mode, name }) : mode;
 }
 
 /** What a pin points at, for tooltips: the shader or simple sweep, the palette swatch or hex, or Mirror. */

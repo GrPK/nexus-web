@@ -2894,6 +2894,7 @@
   "lighting.pin.disabledGameSync": "Game Sync não pode ser fixado",
   "lighting.pin.disabledOff": "A iluminação está desligada, não há nada a fixar",
   "lighting.pin.disabledUnavailable": "No momento não há nada a que fixar",
+  "lighting.pin.modeTarget": "{mode}: {name}",
   "lighting.pin.pinnedTo": "Fixado em {name}",
   "lighting.renderGpu.auto": "Automático",
   "lighting.renderGpu.confirmButton": "Reiniciar agora",
