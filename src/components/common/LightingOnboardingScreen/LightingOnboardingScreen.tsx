@@ -16,7 +16,6 @@ import {
 } from '../../../api/lighting';
 import { DEFAULT_STATIC_EFFECT } from '../../../types/lighting';
 import { paletteColor, paletteKey } from '../../../types/lightingPalette';
-import { paletteColorPin, pushPins } from '../../../panel/widgets/lighting/pins';
 import { SIMPLE_ANIMATION_KEYS, simpleAnimationState } from '../../../panel/widgets/lighting/simpleAnimations';
 import { ZoneCard, zoneCardUnavailable } from '../../../panel/widgets/lighting/page/ZoneCard';
 import { visibleCards } from '../../../panel/widgets/lighting/page/zoneUtils';
@@ -165,11 +164,6 @@ export function LightingOnboardingScreen({ open, onComplete, onBack, onSkipOnboa
     return () => clearInterval(timer);
   }, [open, settled, refresh]);
 
-  // Every device this screen leaves driven: all of them in simple mode.
-  const drivenIds = useCallback((): string[] => (devicesRef.current ?? [])
-    .filter(d => !zoneCardUnavailable(d) && (mode === 'simple' || d.controlled !== false))
-    .map(d => d.id), [mode]);
-
   // Picks are saved, not previewed: Finish keeps whatever the lights show.
   // They run one at a time and only the latest runs at all, so a slow earlier
   // pick can never land on top of the one the dots show.
@@ -195,10 +189,10 @@ export function LightingOnboardingScreen({ open, onComplete, onBack, onSkipOnboa
     const color = paletteColor(id);
     if (!color) return;
     applyPick(id, async () => {
-      await startStatic(DEFAULT_STATIC_EFFECT);
-      await pushPins(drivenIds(), paletteColorPin(color));
+      // The exact global flat colour: every device that follows the global mode wears it.
+      await startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, color.hex);
     });
-  }, [applyPick, drivenIds]);
+  }, [applyPick]);
 
   if (!open) return null;
 
@@ -253,10 +247,8 @@ export function LightingOnboardingScreen({ open, onComplete, onBack, onSkipOnboa
           await Promise.allSettled(off.map(d => setLightingDeviceControlled(d.id, true)));
         }
       }
-      // A device detected after the colour was picked has no pick of its own
-      // and would wear the shared Static effect instead.
+      // A device detected after the colour was picked follows the global colour.
       await pickChainRef.current;
-      if (pickColor) await pushPins(drivenIds(), paletteColorPin(pickColor));
       updateUiSettings({ lightingDashboardMode: mode });
       const result = await completeLightingOnboarding();
       if (result?.lightingCompleted) {

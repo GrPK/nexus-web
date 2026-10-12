@@ -48,12 +48,12 @@ import {
 } from '../../../types/lighting';
 import { mergeTemplates, slotThumbSignature } from '../../../types/lightingTemplates';
 import { normalizeSync as resolveImmersiveMode } from '../../../hooks/useLightingSync';
-import { usePersistentState, usePersistentIdSet } from '../../../hooks/usePersistentState';
+import { usePersistentState } from '../../../hooks/usePersistentState';
+import { PinNotice } from './page/PinNotice';
 import { useTranslation } from '../../../lib/i18n';
 import { isPaletteKey } from '../../../types/lightingPalette';
 import {
-  staticLookPin, colorPin, animatePin, MIRROR_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pinnedNamesByEffect, nearestFillKey,
-  SELECTED_DEVICES_STORAGE_KEY, PRIMARY_DEVICE_STORAGE_KEY,
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
 } from './pins';
 import type { WidgetProps } from '../types';
 import styles from './LightingPage.module.scss';
@@ -72,8 +72,10 @@ const DEFAULT_PP: PostProcessState = { hue: 0, colorize: 0, saturation: 1, contr
  */
 export function LightingTouch({ widget, surface, immersiveGrid }: WidgetProps) {
   const fullsizeWidget = useMemo(() => ({ ...widget, size: '4x4' as const }), [widget]);
-  const { mode, animate, deviceSelect } = useImmersiveAnimateState();
-  const post = useImmersivePostProcess(mode);
+  const { mode, animate, deviceSelect, scope, scopeLabel } = useImmersiveAnimateState();
+  const { t } = useTranslation();
+  // Mirror's filters are global, so a Mirror-pinned selection edits them from any tab.
+  const post = useImmersivePostProcess(scope === 'mirror' ? 'screen' : mode);
   const panelUsage = usePanelBackgroundUsage();
 
   const cells: ReactNode[] = [
@@ -87,7 +89,7 @@ export function LightingTouch({ widget, surface, immersiveGrid }: WidgetProps) {
   // Always keep a second (fill) cell below the fixed 4x4 preview so the preview
   // stays a 4x4 even when there's no editor (off mode). The spacer just holds
   // the leftover height; otherwise the lone preview becomes the fill cell.
-  const editor = renderImmersiveEditor(mode, animate, post, panelUsage, deviceSelect);
+  const editor = renderImmersiveEditor(mode, animate, post, panelUsage, deviceSelect, scope, scopeLabel, t);
   cells.push(editor ?? <div key="imm-fill" />);
 
   return (
@@ -165,14 +167,22 @@ function renderImmersiveEditor(
   post: ImmersivePostProcess,
   panelUsage: PanelBackgroundUsage,
   deviceSelect: React.ComponentProps<typeof StaticDeviceSelect>,
+  scope: EditorScope,
+  scopeLabel: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
 ): ReactNode | null {
+  const mirrorPostProcess = (
+    <PostProcessControls value={post.value} onChange={post.onChange} onCommit={post.onCommit} onReset={post.onReset} />
+  );
   if (mode === 'animate' || mode === 'static') {
     if (!animate) return null;
     const isStatic = mode === 'static';
     return (
       <EffectEditor
         devices={<StaticDeviceSelect {...animate.deviceSelect} />}
-        options={(
+        // A mixed selection or a palette colour has no single set of controls.
+        effectDisabled={scope === 'mixed' || scope === 'palette'}
+        options={scope === 'mirror' ? <PinNotice>{t('lighting.pin.mirrorHint')}</PinNotice> : (
           <AnimateGrid
             // The highlight belongs to what the SELECTION wears, not to what was
             // last browsed: a pattern tile left lit after a colour pick reads as
@@ -189,7 +199,7 @@ function renderImmersiveEditor(
             leading={isStatic ? <ImmersivePicker animate={animate} /> : undefined}
           />
         )}
-        effect={(
+        effect={scope === 'mirror' ? mirrorPostProcess : (
           <EffectControls
             effect={animate.effect}
             state={animate.state}
@@ -207,24 +217,23 @@ function renderImmersiveEditor(
       />
     );
   }
-  if (mode === 'gif') {
-    return (
-      <EffectEditor
-        options={<MediaList />}
-        effect={(
-          <PostProcessControls value={post.value} onChange={post.onChange} onCommit={post.onCommit} onReset={post.onReset} />
-        )}
-      />
-    );
-  }
-  if (mode === 'screen') {
+  // A selection pinned to a shader or static look has no editor on these tabs.
+  if (mode === 'gif' || mode === 'screen') {
+    const pinnedElsewhere = scope === 'pin' || scope === 'palette';
+    const notice = <PinNotice>{t('lighting.pin.pinnedNotice', { name: scopeLabel })}</PinNotice>;
+    if (mode === 'gif') {
+      return (
+        <EffectEditor
+          options={pinnedElsewhere ? notice : <MediaList />}
+          effect={pinnedElsewhere ? undefined : mirrorPostProcess}
+        />
+      );
+    }
     return (
       <EffectEditor
         devices={<StaticDeviceSelect {...deviceSelect} />}
-        options={<ScreenControls screenPP={post.value} onScreenPPChange={post.onScreenPPChange} />}
-        effect={(
-          <PostProcessControls value={post.value} onChange={post.onChange} onCommit={post.onCommit} onReset={post.onReset} />
-        )}
+        options={pinnedElsewhere ? notice : <ScreenControls screenPP={post.value} onScreenPPChange={post.onScreenPPChange} />}
+        effect={pinnedElsewhere ? undefined : mirrorPostProcess}
       />
     );
   }
@@ -274,8 +283,13 @@ interface ImmersiveAnimateController {
  */
 function useImmersiveDevices(enabled: boolean) {
   const [devices, setDevices] = useState<LightingDevice[]>([]);
-  const [selectedIds, setSelectedIds] = usePersistentIdSet(SELECTED_DEVICES_STORAGE_KEY);
-  const [, setPrimaryId] = usePersistentState<string | null>(PRIMARY_DEVICE_STORAGE_KEY, null);
+  // Not persisted: a restored selection would silently turn the next pick into a
+  // pin, so every visit starts at "All devices".
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    clearLegacyLightingKeys();
+    return new Set();
+  });
+  const [, setPrimaryId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const list = await fetchLightingDevices();
@@ -295,16 +309,24 @@ function useImmersiveDevices(enabled: boolean) {
   return { devices, selectedIds, onSetSelection };
 }
 
+/** What the selection wears, for the editor: nothing, mixed pins, a palette colour, Mirror, or a shader or static look. */
+type EditorScope = 'none' | 'mixed' | 'palette' | 'mirror' | 'pin';
+
 function useImmersiveAnimateState(): {
   mode: LightingMode;
   animate: ImmersiveAnimateController | null;
   deviceSelect: React.ComponentProps<typeof StaticDeviceSelect>;
+  scope: EditorScope;
+  scopeLabel: string;
 } {
   const { t } = useTranslation();
   const [active, setActive] = useState<string>('rainbow');
   const [templates, setTemplates] = useState<Record<string, EffectTemplateBundle>>({});
   const [mode, setMode] = useState<LightingMode>('none');
-  const stagedRef = useRef<EffectState | null>(null);
+  // The edit in progress, tagged with the target it belongs to: after the
+  // selection or a pinned pick moves the editor to another effect or preset it
+  // is simply not that target's staged state any more.
+  const stagedRef = useRef<{ target: string; state: EffectState } | null>(null);
   const [, force] = useState(0);
   const { devices, selectedIds, onSetSelection } = useImmersiveDevices(mode === 'static' || mode === 'animate' || mode === 'screen');
   const { pins, refresh: refreshPins, applyPins, recordPins } = usePins();
@@ -313,9 +335,16 @@ function useImmersiveAnimateState(): {
   const [segmented, setSegmented] = usePersistentState('nexus.lighting.pickerSegmented', true);
   const queueColorWrite = useColorWriteQueue(useCallback((ids: string[], pin: Pin) => applyPins(ids, pin, false), [applyPins]));
   const [customStaticColor, setCustomStaticColor] = usePersistentState('nexus.lighting.customColor', '');
+  // The exact flat colour the global Static look is, from the service; '' when it is an effect.
+  const [globalColor, setGlobalColor] = useState('');
 
   const selectionIds = useMemo(() => [...selectedIds], [selectedIds]);
   const selection = useMemo(() => selectionPin(pins, selectionIds), [pins, selectionIds]);
+  const scope: EditorScope = selection.kind === 'none' ? 'none'
+    : selection.kind === 'mixed' ? 'mixed'
+      : selection.pin.kind === 'mirror' ? 'mirror'
+        : isPaletteKey(pinGridKey(selection.pin)) ? 'palette' : 'pin';
+  const scopeLabel = selection.kind === 'pin' ? pinTargetLabel(selection.pin, t) : '';
   // A selection wearing one shader or static pin shows that target in the
   // editor; the running effect is untouched.
   const pinnedKey = selection.kind === 'pin' && selection.pin.kind !== 'mirror' && !isPaletteKey(pinGridKey(selection.pin))
@@ -326,6 +355,7 @@ function useImmersiveAnimateState(): {
 
   // The colour the selection shares, which is where the picker marks it.
   const selectedHex = useMemo(() => {
+    if (selectedIds.size === 0) return globalColor;
     let hex = '';
     for (const id of selectedIds) {
       const pin = pins[id];
@@ -335,7 +365,7 @@ function useImmersiveAnimateState(): {
       hex = h;
     }
     return hex;
-  }, [pins, selectedIds]);
+  }, [globalColor, pins, selectedIds]);
 
   const hydrate = useCallback(async () => {
     const [sync, settings, staticSettings, defaults] = await Promise.all([
@@ -349,6 +379,7 @@ function useImmersiveAnimateState(): {
       next[e.key] = mergeTemplates(e.key, settings?.templates?.[e.key], defaults);
     }
     setTemplates(next);
+    setGlobalColor(staticSettings?.color ?? '');
     const rawSync = sync?.sync || 'none';
     const nextMode = resolveImmersiveMode(rawSync);
     setMode(nextMode);
@@ -395,6 +426,7 @@ function useImmersiveAnimateState(): {
     }
     if (pinnedKey && pinnedKey !== active) return;
     if (mode === 'static') {
+      setGlobalColor('');
       void startStatic(key, s.intensity, s.hue, s.colorize, s.saturation, s.contrast, s.params, true);
       return;
     }
@@ -448,9 +480,10 @@ function useImmersiveAnimateState(): {
 
   const onSelectCustom = useCallback((hex: string) => {
     setCustomStaticColor(hex);
-    // Nothing selected: the colour is global, run as the nearest static fill.
+    // Nothing selected: the colour is the exact global flat colour.
     if (selectionIds.length === 0) {
-      onSelectEffect(nearestFillKey(hex));
+      setGlobalColor(hex);
+      void startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, hex);
       return;
     }
     // Record without pushing and queue the write, so a commit cannot race a
@@ -458,7 +491,7 @@ function useImmersiveAnimateState(): {
     const pin = colorPin(hex);
     recordPins(selectionIds, pin);
     queueColorWrite(pin, selectionIds);
-  }, [onSelectEffect, queueColorWrite, recordPins, selectionIds, setCustomStaticColor]);
+  }, [queueColorWrite, recordPins, selectionIds, setCustomStaticColor]);
 
   const onPreviewCustom = useCallback((hex: string) => {
     if (selectionIds.length === 0) return;
@@ -468,19 +501,21 @@ function useImmersiveAnimateState(): {
   }, [queueColorWrite, recordPins, selectionIds]);
   // Ref-backed staged state bypasses the render cycle on slider drag; `force`
   // a render after mutation.
-  const liveState = stagedRef.current ?? baseState;
+  const targetKey = `${shown}#${slotShown}`;
+  const stagedFor = useCallback((target: string) => (stagedRef.current?.target === target ? stagedRef.current.state : null), []);
+  const liveState = stagedFor(targetKey) ?? baseState;
 
   const onChange = useCallback((patch: Partial<EffectState>, commit?: boolean) => {
-    const next = { ...(stagedRef.current ?? baseState), ...patch };
-    stagedRef.current = next;
+    const next = { ...(stagedFor(targetKey) ?? baseState), ...patch };
+    stagedRef.current = { target: targetKey, state: next };
     force(n => n + 1);
     if (commit) {
       applyLook(shown, next, slotShown);
     }
-  }, [applyLook, baseState, shown, slotShown]);
+  }, [applyLook, baseState, shown, slotShown, stagedFor, targetKey]);
 
   const onCommit = useCallback(() => {
-    const s = stagedRef.current;
+    const s = stagedFor(targetKey);
     if (!s) return;
     applyLook(shown, s, slotShown);
     if (bundle) {
@@ -491,7 +526,7 @@ function useImmersiveAnimateState(): {
       setTemplates(nextTemplates);
       saveAnimateTemplates(nextTemplates).catch(() => { /* best-effort */ });
     }
-  }, [applyLook, bundle, shown, slotShown, templates]);
+  }, [applyLook, bundle, shown, slotShown, stagedFor, targetKey, templates]);
 
   const onTemplateSelect = useCallback((idx: number) => {
     if (!bundle) return;
@@ -540,7 +575,7 @@ function useImmersiveAnimateState(): {
     pins,
     pinSource: globalPin?.name ?? null,
     pinDisabledReason: globalPin ? undefined : t('lighting.pin.disabledUnavailable'),
-    pinTargetName: (pin: Pin) => pin.kind === 'mirror' ? t('lighting.mode.screen') : (pin.effect === 'flat' ? (pin.color ?? '').toUpperCase() : sourceLabel(pin.effect ?? '')),
+    pinTargetName: (pin: Pin) => pinTargetLabel(pin, t),
     onSetPin: (ids, pinned) => { if (!pinned) void applyPins(ids, null); else if (globalPin) void applyPins(ids, globalPin.pin); },
     onUnpinAll: () => { void applyPins(Object.keys(pins), null); },
     onPinSelectedToMirror: mode === 'screen' ? () => { void applyPins(selectionIds, MIRROR_PIN); } : undefined,
@@ -569,7 +604,7 @@ function useImmersiveAnimateState(): {
       pickerDevices,
       state: liveState,
       bundle: pinnedSlot === null ? bundle : { ...bundle, selected: slotShown },
-      canReset: stagedRef.current !== null,
+      canReset: stagedFor(targetKey) !== null,
       slotFor: (e: string) => templates[e]?.selected ?? 0,
       versionFor: (e: string) => versionForSlot(e, templates[e]?.selected ?? 0),
       versionForSlot,
@@ -581,7 +616,7 @@ function useImmersiveAnimateState(): {
     }
     : null;
 
-  return { mode, animate, deviceSelect };
+  return { mode, animate, deviceSelect, scope, scopeLabel };
 }
 
 interface ImmersivePostProcess {

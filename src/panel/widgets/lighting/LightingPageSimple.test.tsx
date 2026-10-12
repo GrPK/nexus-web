@@ -91,6 +91,7 @@ function renderPage() {
 describe('LightingPage simple mode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(lightingApi.fetchStaticSettings).mockResolvedValue({ effect: 'gradientlinear', states: {} });
     // Fresh install: no stored settings, both page modes default to 'simple'.
     localStorage.clear();
     syncState.mode = 'none';
@@ -159,7 +160,7 @@ describe('LightingPage simple mode', () => {
     expect(vi.mocked(lightingApi.setLightingDeviceControlled).mock.calls.some(c => c[0] === 'dev-1')).toBe(false);
   });
 
-  it('pins every device to a picked colour, entering static first', async () => {
+  it('runs a picked colour as the exact global colour, entering static first', async () => {
     const { container } = renderPage();
     // Wait for the device fetch: a colour has nowhere to land until it lands.
     await waitFor(() => {
@@ -169,8 +170,19 @@ describe('LightingPage simple mode', () => {
     fireEvent.click(swatch);
     await waitFor(() => {
       expect(vi.mocked(lightingApi.startStatic)).toHaveBeenCalled();
-      expect(vi.mocked(lightingApi.setPins).mock.calls.some(c => c[0].includes('dev-1'))).toBe(true);
+      expect(vi.mocked(lightingApi.startStatic).mock.calls.some(c => c[8] === PALETTE.find(p => p.id === 'red-3')!.hex)).toBe(true);
     });
+    expect(vi.mocked(lightingApi.setPins)).not.toHaveBeenCalled();
+  });
+
+  it('marks the swatch the exact global colour matches', async () => {
+    syncState.mode = 'static';
+    vi.mocked(lightingApi.fetchStaticSettings).mockResolvedValue({ effect: 'gradientlinear', states: {}, color: PALETTE.find(p => p.id === 'blue-3')!.hex });
+    const { container } = renderPage();
+    await waitFor(() => {
+      expect(container.querySelector('[data-palette-id="blue-3"]')?.getAttribute('aria-pressed')).toBe('true');
+    });
+    expect(container.querySelector('[data-palette-id="red-3"]')?.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('the mode menu stops lighting when a mode is running', async () => {

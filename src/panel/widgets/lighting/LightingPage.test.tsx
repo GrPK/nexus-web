@@ -292,6 +292,22 @@ describe('LightingPage selection in a drive-everything mode', () => {
     expect(await findByText('lighting.pane.allDevices')).toBeTruthy();
   });
 
+  it('does not restore a stored selection, and clears the keys of the old model', async () => {
+    // A restored selection would silently turn the next pick into a pin.
+    for (const key of ['nexus.lighting.selectedDevices', 'nexus.lighting.pinSelection']) {
+      localStorage.setItem(key, JSON.stringify(['dev-a']));
+    }
+    localStorage.setItem('nexus.lighting.devicePicks', JSON.stringify({ 'dev-a': { key: 'flat:red-3' } }));
+    localStorage.setItem('nexus.lighting.selectionSeeded', 'true');
+    const { findByLabelText } = renderPage();
+
+    expect(await findByLabelText('lightingOnboarding.selectNone')).toBeDisabled();
+    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+    for (const key of ['nexus.lighting.selectedDevices', 'nexus.lighting.pinSelection', 'nexus.lighting.devicePicks', 'nexus.lighting.selectionSeeded']) {
+      expect(localStorage.getItem(key)).toBeNull();
+    }
+  });
+
   it('offers select all/none, and clearing the selection draws every device again', async () => {
     const { findByLabelText } = renderPage();
 

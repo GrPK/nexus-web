@@ -2074,22 +2074,12 @@
   width: 100%;
 }
 
-// "Unpin all" above the device list: only present while a pin exists.
-.unpinAll {
-  display: flex;
-  align-items: center;
-  align-self: flex-start;
-  margin: 0 0 0.5rem;
-  padding: 0.25rem 0.5rem;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
+// A selection pinned to something the current tab cannot edit.
+.pinNotice {
+  padding: 1rem;
+  text-align: center;
   color: var(--text-dim);
   font-size: var(--type-small);
-  cursor: pointer;
 
-  &:hover { color: var(--accent); background: var(--accent-soft); }
-
-  // Chromium 83 (the Q60 panel floor) has no flex `gap`.
-  svg + span { margin-left: 0.4rem; }
+  p { margin: 0 0 0.6rem; }
 }

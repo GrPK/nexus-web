@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { FolderPlus, PinOff, Plus } from 'lucide-react';
+import { Button } from '../../../../components/common/Button/Button';
 import { identifyLightingDevice, type LightingDevice } from '../../../../api/lighting';
 import { useTranslation } from '../../../../lib/i18n';
 import { usePersistentState } from '../../../../hooks/usePersistentState';
@@ -605,10 +606,9 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
       <div className={styles.deviceList}>
         {header}
         {onUnpinAll && pins && Object.keys(pins).length > 0 && (
-          <button type="button" className={styles.unpinAll} onClick={onUnpinAll}>
-            <PinOff size={14} aria-hidden />
-            <span>{t('lighting.devices.unpinAll')}</span>
-          </button>
+          <Button tone="ghost" size="sm" icon={<PinOff />} onClick={onUnpinAll}>
+            {t('lighting.devices.unpinAll')}
+          </Button>
         )}
         {devices.length === 0 && (
           <p className={styles.deviceEmpty}>{t(filtering ? 'lighting.devices.noMatches' : lightingOff ? 'lighting.devices.selectModeHint' : 'lighting.devices.empty')}</p>

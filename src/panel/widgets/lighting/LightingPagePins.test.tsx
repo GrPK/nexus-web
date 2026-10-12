@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchPins, saveAnimateTemplates, setPins, startAnimate, startStatic, type Pin } from '../../../api/lighting';
+import { fetchPins, fetchStaticSettings, saveAnimateTemplates, setPins, startAnimate, startStatic, type Pin } from '../../../api/lighting';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
+import { ANIMATE_EFFECTS } from '../../../types/lighting';
 import { LightingPage } from './LightingPage';
 
 const topicHandlers = vi.hoisted(() => ({ lighting: [] as (() => void)[] }));
@@ -63,8 +64,9 @@ vi.mock('./page/ModeControls', () => ({
   ModeControls: ({ mode }: { mode: string }) => <div data-testid="mode-controls" data-mode={mode} />,
 }));
 vi.mock('./page/StaticPickerCanvas', () => ({
-  StaticPickerCanvas: ({ onCommit, onPreview }: { onCommit: (hex: string) => void; onPreview: (hex: string) => void }) => (
+  StaticPickerCanvas: ({ onCommit, onPreview, hex }: { onCommit: (hex: string) => void; onPreview: (hex: string) => void; hex: string }) => (
     <div>
+      <span data-testid="picker-hex">{hex}</span>
       <button type="button" onClick={() => onCommit('#00ff00')}>pick-green</button>
       <button type="button" onClick={() => onPreview('#0000ff')}>preview-blue</button>
     </div>
@@ -92,6 +94,7 @@ vi.mock('./page/DevicePanel', () => ({
       <button type="button" onClick={() => onSetPin?.(['a'], !pins?.a)}>toggle</button>
       <button type="button" onClick={() => onUnpinAll?.()}>unpin-all</button>
       <button type="button" onClick={() => onSetSelection(new Set(['a']), 'a')}>select-a</button>
+      <button type="button" onClick={() => onSetSelection(new Set(['a', 'b']), 'a')}>select-ab</button>
       <button type="button" onClick={() => onSetSelection(new Set(), null)}>clear-selection</button>
     </div>
   ),
@@ -175,6 +178,7 @@ describe('LightingPage pins', () => {
     vi.mocked(setPins).mockClear();
     vi.mocked(setPins).mockImplementation(() => Promise.resolve(true));
     vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({}));
+    vi.mocked(fetchStaticSettings).mockImplementation(() => Promise.resolve({ effect: 'checker', states: {} }));
     vi.mocked(startAnimate).mockClear();
     vi.mocked(startStatic).mockClear();
     vi.mocked(saveAnimateTemplates).mockClear();
@@ -213,6 +217,15 @@ describe('LightingPage pins', () => {
       await waitFor(() => expect(screen.getByTestId('rail').dataset.source).not.toBe(''));
       fireEvent.click(screen.getByText('toggle'));
       expect(lastPinsCall()).toEqual([['a'], { kind: 'mirror' }]);
+    });
+
+    it('keeps the pin enabled for a Simple-mode sweep and pins it as an animate shader', async () => {
+      syncState.rawSync = 'sweeprainbow';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail').dataset.source).not.toBe(''));
+      expect(screen.getByTestId('rail').dataset.disabled).toBe('');
+      fireEvent.click(screen.getByText('toggle'));
+      expect(lastPinsCall()).toEqual([['a'], { kind: 'animate', effect: 'sweeprainbow' }]);
     });
 
     it.each([
@@ -307,7 +320,7 @@ describe('LightingPage pins', () => {
       expect(setPins).not.toHaveBeenCalled();
     });
 
-    it('with nothing selected a picked colour runs the nearest fill globally', async () => {
+    it('with nothing selected a picked colour is the exact global colour', async () => {
       syncState.mode = 'static';
       syncState.rawSync = 'static';
       renderPage();
@@ -315,8 +328,31 @@ describe('LightingPage pins', () => {
       vi.mocked(startStatic).mockClear();
       fireEvent.click(screen.getByText('pick-green'));
       await waitFor(() => expect(startStatic).toHaveBeenCalled());
-      expect(vi.mocked(startStatic).mock.calls.at(-1)?.[0]).toBe('simplegreen');
+      expect(vi.mocked(startStatic).mock.calls.at(-1)?.[8]).toBe('#00ff00');
       expect(setPins).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.getByTestId('picker-hex').textContent).toBe('#00ff00'));
+    });
+
+    it('shows the service\'s global flat colour as the selected look, with no effect tile lit', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      vi.mocked(fetchStaticSettings).mockResolvedValue({ effect: 'checker', states: {}, color: '#336699' });
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('picker-hex').textContent).toBe('#336699'));
+      expect(screen.getByTestId('grid-effect').textContent).toBe('');
+    });
+
+    it('picking an effect after a global colour leaves the colour out of the start', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      vi.mocked(fetchStaticSettings).mockResolvedValue({ effect: 'checker', states: {}, color: '#336699' });
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('picker-hex').textContent).toBe('#336699'));
+      vi.mocked(startStatic).mockClear();
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      await waitFor(() => expect(startStatic).toHaveBeenCalled());
+      expect(vi.mocked(startStatic).mock.calls.at(-1)?.[8]).toBeUndefined();
+      await waitFor(() => expect(screen.getByTestId('picker-hex').textContent).toBe(''));
     });
 
     it('with nothing selected an Animate pick is global', async () => {
@@ -448,28 +484,93 @@ describe('LightingPage pins', () => {
       expect(startStatic).not.toHaveBeenCalled();
     });
 
-    it('shows the global Mirror controls for a mirror pin, from any tab', async () => {
+    it.each(['animate', 'static', 'gif'])('shows only the global Mirror filters for a mirror pin on the %s tab, never the screen picker', async mode => {
       localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
+      syncState.mode = mode;
+      syncState.rawSync = mode === 'animate' ? 'fire' : mode;
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
       await waitFor(() => expect(pinOf()?.kind).toBe('mirror'));
-      expect(screen.queryByTestId('mode-controls')).toBeNull();
       fireEvent.click(screen.getByText('select-a'));
-      await waitFor(() => expect(screen.getByTestId('mode-controls').dataset.mode).toBe('screen'));
-      expect(screen.getByTestId('type-intensity').dataset.mode).toBe('screen');
+      await waitFor(() => expect(screen.getByTestId('type-intensity').dataset.mode).toBe('screen'));
+      // The monitor picker and the reactive toggle start Mirror, which would switch the global mode.
+      expect(screen.queryByTestId('mode-controls')).toBeNull();
+      expect(screen.getByText('lighting.pin.mirrorHint')).toBeTruthy();
       expect(screen.queryByTestId('grid-effect')).toBeNull();
     });
 
-    it('a fullscreen arrow re-pins the selection instead of doing nothing', async () => {
+    it('keeps the full Mirror controls on the Mirror tab itself', async () => {
+      syncState.mode = 'screen';
+      syncState.rawSync = 'screen';
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.kind).toBe('mirror'));
+      fireEvent.click(screen.getByText('select-a'));
+      expect(screen.getByTestId('mode-controls').dataset.mode).toBe('screen');
+      expect(screen.queryByText('lighting.pin.mirrorHint')).toBeNull();
+    });
+
+    it.each(['screen', 'gif'])('says where the editor is for a shader pin on the %s tab, and opens it', async mode => {
+      localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
+      syncState.mode = mode;
+      syncState.rawSync = mode;
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByText('lighting.pin.pinnedNotice')).toBeTruthy());
+      expect(screen.queryByTestId('mode-controls')).toBeNull();
+      expect(screen.queryByTestId('type-intensity')).toBeNull();
+
+      vi.mocked(startAnimate).mockClear();
+      fireEvent.click(screen.getByText('lighting.pin.openTab'));
+      await waitFor(() => expect(startAnimate).toHaveBeenCalled());
+    });
+
+    it('a fullscreen arrow steps from the pinned target on screen and re-pins the selection', async () => {
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
       renderPage();
       await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
       fireEvent.click(screen.getByText('select-a'));
       await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('aurora'));
       fireEvent.click(screen.getByRole('button', { name: 'lighting.fullscreen' }));
+      const at = ANIMATE_EFFECTS.findIndex(e => e.key === 'aurora');
       fireEvent.click(screen.getByText('fs-prev'));
-      expect(lastPinsCall()[0]).toEqual(['a']);
-      expect(lastPinsCall()[1]).toMatchObject({ kind: 'animate' });
+      expect(lastPinsCall()).toEqual([['a'], { kind: 'animate', effect: ANIMATE_EFFECTS[at - 1].key }]);
+      // The pin moved, so the screen moves with it and the next press steps on from there.
+      await waitFor(() => expect(screen.getByTestId('fullscreen').dataset.effect).toBe(ANIMATE_EFFECTS[at - 1].key));
+      fireEvent.click(screen.getByText('fs-prev'));
+      expect(lastPinsCall()[1]).toEqual({ kind: 'animate', effect: ANIMATE_EFFECTS[at - 2].key });
+    });
+
+    it('a fullscreen arrow with nothing selected steps the global effect, as before', async () => {
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('fire'));
+      fireEvent.click(screen.getByRole('button', { name: 'lighting.fullscreen' }));
+      const at = ANIMATE_EFFECTS.findIndex(e => e.key === 'fire');
+      vi.mocked(startAnimate).mockClear();
+      fireEvent.click(screen.getByText('fs-prev'));
+      await waitFor(() => expect(vi.mocked(startAnimate).mock.calls.some(c => c[0] === ANIMATE_EFFECTS[at - 1].key)).toBe(true));
+      expect(setPins).not.toHaveBeenCalled();
+    });
+
+    it('offers no fullscreen on a mixed selection, and closes it when the selection becomes mixed', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'lighting.fullscreen' })).toBeTruthy());
+      fireEvent.click(screen.getByRole('button', { name: 'lighting.fullscreen' }));
+      expect(screen.getByTestId('fullscreen')).toBeTruthy();
+
+      // Pinned beside a device that follows the global mode: no single value to edit.
+      fireEvent.click(screen.getByText('select-ab'));
+      await waitFor(() => expect(screen.queryByTestId('fullscreen')).toBeNull());
+      expect(screen.queryByRole('button', { name: 'lighting.fullscreen' })).toBeNull();
+
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'lighting.fullscreen' })).toBeTruthy());
+      expect(screen.queryByTestId('fullscreen')).toBeNull();
     });
   });
 

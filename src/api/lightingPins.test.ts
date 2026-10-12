@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchPins, setPins, startScreenMirror } from './lighting';
+import { fetchPins, setPins, startScreenMirror, startStatic } from './lighting';
 import { setActiveTransport } from './service';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -68,6 +68,22 @@ describe('fetchPins', () => {
   it('is null from a service that predates the route', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => indexResponse()));
     await expect(fetchPins()).resolves.toBeNull();
+  });
+});
+
+describe('startStatic', () => {
+  it('carries the exact global colour when one is given', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { error: false, msg: 'Ok' }));
+    vi.stubGlobal('fetch', fetchMock);
+    await startStatic('gradientlinear', 1, 0, 0, 1, 1, {}, true, '#12ab34');
+    expect(bodyOf(fetchMock).color).toBe('#12ab34');
+  });
+
+  it('sends no colour for an effect pick, which clears a global colour', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { error: false, msg: 'Ok' }));
+    vi.stubGlobal('fetch', fetchMock);
+    await startStatic('stripes');
+    expect(bodyOf(fetchMock)).not.toHaveProperty('color');
   });
 });
 

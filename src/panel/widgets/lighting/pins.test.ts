@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  animatePin, colorPin, MIRROR_PIN, nearestFillKey, paletteColorPin, pinGridKey, pinHex, pinnedNamesByEffect,
-  pinSignature, pinStripPick, selectionPin, staticLookPin, withPins,
+  animatePin, colorPin, MIRROR_PIN, paletteColorPin, pinGridKey, pinHex, pinnedNamesByEffect,
+  clearLegacyLightingKeys, pinSignature, pinStripPick, pinTargetLabel, selectionPin, staticLookPin, withPins,
 } from './pins';
 import { defaultStateFor } from '../../../types/lighting';
 import { paletteColor, paletteKey } from '../../../types/lightingPalette';
@@ -68,6 +68,20 @@ describe('selectionPin', () => {
     expect(selectionPin(pins, ['x', 'a'])).toEqual({ kind: 'mixed' });
   });
 
+  // The drawer edits a static pin's (effect, slot), so devices on the same
+  // preset share a scope even when their tint snapshots differ.
+  it('treats static pins on one effect and preset as one target, whatever their tint', () => {
+    const a = { ...staticLookPin('stripes', 1, defaultStateFor('stripes')), intensity: 0.4 };
+    const b = { ...staticLookPin('stripes', 1, defaultStateFor('stripes')), intensity: 0.9, hue: 0.5 };
+    expect(selectionPin({ a, b }, ['a', 'b'])).toEqual({ kind: 'pin', pin: a });
+  });
+
+  it('keeps two flat colours apart and one colour together', () => {
+    const pins = { a: colorPin('#ff0000'), b: colorPin('#FF0000'), c: colorPin('#00ff00') };
+    expect(selectionPin(pins, ['a', 'b']).kind).toBe('pin');
+    expect(selectionPin(pins, ['a', 'c']).kind).toBe('mixed');
+  });
+
   it('counts the same effect on two presets as a disagreement', () => {
     const state = defaultStateFor('stripes');
     const two = { a: staticLookPin('stripes', 0, state), b: staticLookPin('stripes', 1, state) };
@@ -120,10 +134,31 @@ describe('pinnedNamesByEffect', () => {
   });
 });
 
-describe('nearestFillKey', () => {
-  it('picks the closest of the solid fills', () => {
-    expect(nearestFillKey('#ff0000')).toBe('simplered');
-    expect(nearestFillKey('#fafafa')).toBe('simplewhite');
-    expect(nearestFillKey('#0010ee')).toBe('simpleblue');
+describe('pinTargetLabel', () => {
+  const t = (key: string) => key;
+
+  it('names a palette swatch by family and shade, and an off-palette colour by hex', () => {
+    const c = paletteColor('red-3')!;
+    expect(pinTargetLabel(paletteColorPin(c), t)).toBe('lighting.palette.red 3');
+    expect(pinTargetLabel(colorPin('#010203'), t)).toMatch(/^#010203$|^lighting\.palette\./);
+  });
+
+  it('names a simple sweep by its own label, a shader by its effect label, and Mirror', () => {
+    expect(pinTargetLabel(animatePin('sweeprainbow'), t)).toBe('lighting.simple.anim.rainbow');
+    expect(pinTargetLabel(animatePin('plasma'), t)).toBe('lighting.controls.plasma');
+    expect(pinTargetLabel(MIRROR_PIN, t)).toBe('lighting.mode.screen');
+  });
+});
+
+describe('clearLegacyLightingKeys', () => {
+  it('removes the keys of the per-device-pick model and of a stored selection', () => {
+    for (const k of ['nexus.lighting.selectedDevices', 'nexus.lighting.devicePicks', 'nexus.lighting.selectionSeeded', 'nexus.lighting.pinSelection', 'nexus.lighting.primaryDevice']) {
+      localStorage.setItem(k, '1');
+    }
+    localStorage.setItem('nexus.lighting.customColor', '"#fff"');
+    clearLegacyLightingKeys();
+    expect(localStorage.getItem('nexus.lighting.selectedDevices')).toBeNull();
+    expect(localStorage.getItem('nexus.lighting.pinSelection')).toBeNull();
+    expect(localStorage.getItem('nexus.lighting.customColor')).toBe('"#fff"');
   });
 });

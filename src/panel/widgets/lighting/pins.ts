@@ -1,21 +1,30 @@
-import { setPins, type Pin } from '../../../api/lighting';
+import type { Pin } from '../../../api/lighting';
 import { hexToHsv, hsvToHex } from '../../../lib/settings';
-import { nearestPaletteId, paletteKey, type PaletteColor } from '../../../types/lightingPalette';
-import type { EffectState } from '../../../types/lighting';
+import { nearestPaletteId, paletteColorForKey, paletteFamilyKey, paletteKey, type PaletteColor } from '../../../types/lightingPalette';
+import { EFFECTS, type EffectState } from '../../../types/lighting';
+import { isSimpleAnimation, simpleAnimationLabelKey } from './simpleAnimations';
 
 /** Device id to the pin it wears. Absent means following the global mode. */
 export type Pins = Readonly<Record<string, Pin>>;
 
 /**
- * The selection the lighting page and the immersive editor share. An empty
- * selection means "all devices": a pick then applies globally and pins nothing.
- * Browser-local, and keyed apart from the old per-device-pick selection, which
- * was seeded with every device.
+ * Keys of the per-device-pick era and of a persisted selection. The selection is
+ * not stored any more: a restored one would silently turn the next pick into a
+ * pin, so every visit starts at "All devices".
  */
-export const SELECTED_DEVICES_STORAGE_KEY = 'nexus.lighting.pinSelection';
+const LEGACY_LIGHTING_KEYS = [
+  'nexus.lighting.selectedDevices',
+  'nexus.lighting.devicePicks',
+  'nexus.lighting.selectionSeeded',
+  'nexus.lighting.pinSelection',
+  'nexus.lighting.primaryDevice',
+];
 
-/** The selection's anchor device, read by the page's scoped editor. */
-export const PRIMARY_DEVICE_STORAGE_KEY = 'nexus.lighting.primaryDevice';
+export function clearLegacyLightingKeys(): void {
+  try {
+    for (const key of LEGACY_LIGHTING_KEYS) localStorage.removeItem(key);
+  } catch { /* storage blocked: nothing was kept there */ }
+}
 
 /** `pins` with every id set to `pin`, or removed for a null pin. */
 export function withPins(prev: Pins, ids: readonly string[], pin: Pin | null): Pins {
@@ -69,11 +78,13 @@ export const MIRROR_PIN: Pin = { kind: 'mirror' };
 
 /** Stable identity of a pin's target, for "do these devices share one pin". */
 export function pinSignature(pin: Pin): string {
-  return JSON.stringify([
-    pin.kind, pin.effect ?? '', pin.color ?? '', pin.slot ?? 0,
-    pin.intensity ?? 1, pin.hue ?? 0, pin.colorize ?? 0, pin.saturation ?? 1, pin.contrast ?? 1,
-    pin.params ? Object.entries(pin.params).sort(([a], [b]) => a.localeCompare(b)) : [],
-  ]);
+  // A static pin on a template slot is (effect, slot), the identity the drawer
+  // edits; a flat colour is its colour; a shader pin is the shader alone.
+  if (pin.kind === 'static') {
+    return pin.effect === 'flat' ? JSON.stringify(['static', 'flat', (pin.color ?? '').toLowerCase()])
+      : JSON.stringify(['static', pin.effect ?? '', pin.slot ?? 0]);
+  }
+  return JSON.stringify([pin.kind, pin.effect ?? '']);
 }
 
 /**
@@ -139,32 +150,15 @@ export function pinnedNamesByEffect(
   return out;
 }
 
-/** Pins every id to `pin`. Fire-and-forget callers use {@link setPins} directly. */
-export const pushPins = (ids: string[], pin: Pin | null): Promise<boolean> =>
-  ids.length === 0 ? Promise.resolve(true) : setPins(ids, pin).catch(() => false);
-
-/**
- * The solid fill nearest a colour, hue first. Static has no global solid-colour
- * source beyond these shaders, so a colour picked with nothing selected runs
- * the closest of them; a colour picked WITH a selection is a pin and keeps its
- * exact value. The reference colours are the fills' nominal ones.
- */
-const FILL_REFERENCE: ReadonlyArray<readonly [key: string, hex: string]> = [
-  ['simplewhite', '#ffffff'], ['simplesoftpink', '#ffb6c8'], ['simplepink', '#ff69b4'],
-  ['simplered', '#ff0000'], ['simpleorange', '#ff8000'], ['simpleyellow', '#ffff00'],
-  ['simplegreen', '#00ff00'], ['simpledarkgreen', '#008040'], ['simplecyan', '#00ffff'],
-  ['simpleblue', '#0000ff'], ['simpleviolet', '#8000ff'],
-];
-
-export function nearestFillKey(hex: string): string {
-  const parse = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
-  const [r, g, b] = parse(hex.length === 7 ? hex : '#ffffff');
-  let best = FILL_REFERENCE[0][0];
-  let bestD = Infinity;
-  for (const [key, ref] of FILL_REFERENCE) {
-    const [rr, gg, bb] = parse(ref);
-    const d = (r - rr) ** 2 + (g - gg) ** 2 + (b - bb) ** 2;
-    if (d < bestD) { bestD = d; best = key; }
+/** What a pin points at, for tooltips: the shader or simple sweep, the palette swatch or hex, or Mirror. */
+export function pinTargetLabel(pin: Pin, t: (key: string) => string): string {
+  if (pin.kind === 'mirror') return t('lighting.mode.screen');
+  if (pin.kind === 'static' && pin.effect === 'flat') {
+    const palette = paletteColorForKey(pinGridKey(pin));
+    return palette ? `${t(paletteFamilyKey(palette.family))} ${palette.shade}` : (pin.color ?? '').toUpperCase();
   }
-  return best;
+  if (!pin.effect) return '';
+  if (isSimpleAnimation(pin.effect)) return t(simpleAnimationLabelKey(pin.effect));
+  const def = EFFECTS.find(e => e.key === pin.effect);
+  return def ? t(def.labelKey) : pin.effect;
 }

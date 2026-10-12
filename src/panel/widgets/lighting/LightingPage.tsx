@@ -55,11 +55,11 @@ import { DeviceCanvas } from '../../../components/common/DeviceCanvas/DeviceCanv
 import { SCENE_3D } from '../../../lib/scene/sceneFeature';
 import { useLightingScene } from './scene/useLightingScene';
 import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
-import { usePersistentState, usePersistentIdSet } from '../../../hooks/usePersistentState';
+import { usePersistentState } from '../../../hooks/usePersistentState';
+import { PinNotice } from './page/PinNotice';
 import {
-  staticLookPin, colorPin, paletteColorPin, animatePin, MIRROR_PIN, selectionPin, pinGridKey, pinHex,
-  pinnedNamesByEffect, nearestFillKey,
-  SELECTED_DEVICES_STORAGE_KEY, PRIMARY_DEVICE_STORAGE_KEY,
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, selectionPin, pinGridKey, pinHex,
+  pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
@@ -68,7 +68,7 @@ import {
   type EffectState, type EffectTemplateBundle, type LightingMode,
 } from '../../../types/lighting';
 import {
-  isPaletteKey, paletteColorForKey, paletteFamilyKey, paletteIdFromKey,
+  PALETTE, isPaletteKey, paletteColorForKey, paletteFamilyKey,
   type PaletteColor,
 } from '../../../types/lightingPalette';
 import { defaultTemplatesFor, mergeTemplates, slotMatchesDefault, slotThumbSignature } from '../../../types/lightingTemplates';
@@ -222,8 +222,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // pick lands on. `primaryDeviceId` is the one device a Static pick lands on
   // and the member a stacked frame's label names; every focused frame shows
   // its LED dots.
-  const [selectedDeviceIds, setSelectedDeviceIds] = usePersistentIdSet(SELECTED_DEVICES_STORAGE_KEY);
-  const [primaryDeviceId, setPrimaryDeviceId] = usePersistentState<string | null>(PRIMARY_DEVICE_STORAGE_KEY, null);
+  // Not persisted: a restored selection would silently turn the next pick into a
+  // pin, so every visit starts at "All devices".
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(() => {
+    clearLegacyLightingKeys();
+    return new Set();
+  });
+  const [primaryDeviceId, setPrimaryDeviceId] = useState<string | null>(null);
   // Canvas focus: which of the drawn frames take the frame-level edits (drag,
   // resize, rotate, power, LED dots). Kept apart from the list selection so a
   // click on empty canvas recedes the frames instead of clearing the canvas.
@@ -324,6 +329,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const [paletteOpen, setPaletteOpen] = useState(true);
   const [pickerSegmented, setPickerSegmented] = usePersistentState('nexus.lighting.pickerSegmented', true);
   const [customStaticColor, setCustomStaticColor] = usePersistentState('nexus.lighting.customColor', '');
+  // The exact flat colour the global Static look is, from the service; '' when it is an effect.
+  const [globalColor, setGlobalColor] = useState('');
   // Which way simple mode's sweeps travel. Browser-local, like the picks:
   // the service stores only the resulting speed sign.
   const [simpleReversed, setSimpleReversed] = usePersistentState('nexus.lighting.simpleReversed', false);
@@ -682,6 +689,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     fetchStaticSettings().then(data => {
       if (cancelled || !data) return;
       if (isStaticEffect(data.effect)) staticEffectRef.current = data.effect;
+      setGlobalColor(data.color ?? '');
     });
     return () => { cancelled = true; };
   }, [serviceOnline]);
@@ -693,6 +701,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (rawSync === 'static') {
       fetchStaticSettings().then(data => {
         if (cancelled || !data) return;
+        setGlobalColor(data.color ?? '');
         if (isStaticEffect(data.effect)) {
           staticEffectRef.current = data.effect;
           setActiveEffect(data.effect);
@@ -752,6 +761,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // A pin set from another client arrives on this frame; ids with a write
     // still in flight here keep their local value.
     void refreshPins();
+    // A remote change of the global flat colour.
+    if (mode === 'static') {
+      fetchStaticSettings().then(data => { if (data) setGlobalColor(data.color ?? ''); }).catch(() => {});
+    }
     // Static edits the same template slots, so both modes follow a remote edit.
     if (mode === 'animate' || mode === 'static') {
       if (Date.now() < localAnimateEditUntilRef.current) return;
@@ -909,6 +922,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       }
       return;
     }
+    // Picking an effect clears a global flat colour (the service does the same).
+    if (modeRef.current === 'static') setGlobalColor('');
     if (activeEffect !== key) {
       setActiveEffect(key);
       applyAnimate(key, stateFor(key), true);
@@ -933,10 +948,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const handleCustomSelect = useCallback((hex: string) => {
     setCustomStaticColor(hex);
     const ids = [...selectedDeviceIds];
-    // Nothing selected: the colour is global. Static has no solid-colour source
-    // beyond its fills, so the nearest fill runs.
+    // Nothing selected: the colour is the exact global flat colour.
     if (ids.length === 0) {
-      handleEffectSelect(nearestFillKey(hex));
+      setGlobalColor(hex);
+      void startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, hex).catch(() => {});
       return;
     }
     // Record without pushing and queue the write, so the commit cannot race a
@@ -944,7 +959,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const pin = colorPin(hex);
     recordPins(ids, pin);
     queueColorWrite(pin, ids);
-  }, [handleEffectSelect, queueColorWrite, recordPins, selectedDeviceIds, setCustomStaticColor]);
+  }, [queueColorWrite, recordPins, selectedDeviceIds, setCustomStaticColor]);
 
   // Records as well as writes: the marks and the device cards read the pin, so
   // a drag has to move them with the pointer, not on release.
@@ -958,19 +973,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
 
   const effectPool = mode === 'static' ? STATIC_EFFECTS : ANIMATE_EFFECTS;
 
-  const handlePrevEffect = useCallback(() => {
-    if (!effectPool.length) return;
-    const raw = effectPool.findIndex(e => e.key === activeEffect);
-    const idx = raw < 0 ? 0 : raw;
-    handleEffectSelect(effectPool[(idx - 1 + effectPool.length) % effectPool.length].key);
-  }, [activeEffect, effectPool, handleEffectSelect]);
-
-  const handleNextEffect = useCallback(() => {
-    if (!effectPool.length) return;
-    const raw = effectPool.findIndex(e => e.key === activeEffect);
-    const idx = raw < 0 ? 0 : raw;
-    handleEffectSelect(effectPool[(idx + 1) % effectPool.length].key);
-  }, [activeEffect, effectPool, handleEffectSelect]);
 
   // What the effect grid, the dock and the preview are pointed at. Devices
   // selected and all wearing one pin: that pin's target (identity includes the
@@ -993,6 +995,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       hex: pin.kind === 'static' ? pinHex(pin) : '',
     };
   }, [pins, selectionIds, slotOf]);
+  // Fullscreen edits one value; a mixed selection has none, so it closes.
+  useEffect(() => { if (scoped.kind === 'mixed') setFullscreenOpen(false); }, [scoped.kind]);
   // A mirror pin has nothing of its own: the controls are the global Mirror ones.
   const mirrorScoped = scoped.kind === 'pin' && scoped.pin.kind === 'mirror';
   const pinTarget = scoped.kind === 'pin' && !mirrorScoped ? scoped : null;
@@ -1000,6 +1004,25 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // to Mirror edits the global Mirror ones from any tab.
   const ppMode = mirrorScoped ? 'screen' : mode;
   const postProcess = ppMode === 'screen' ? screenPP : mediaPP;
+
+  // The fullscreen arrows step through the effects. Under a pin scope they step
+  // from the pinned target on screen and re-pin the selection; with no
+  // selection they step the global effect.
+  const stepEffect = useCallback((dir: 1 | -1) => {
+    const stepFrom = pinTarget && (pinTarget.pin.kind === 'animate' || pinTarget.pin.kind === 'static')
+      ? { pool: pinTarget.pin.kind === 'static' ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS, key: pinTarget.key }
+      : { pool: effectPool, key: activeEffect };
+    if (!stepFrom.pool.length) return;
+    const raw = stepFrom.pool.findIndex(e => e.key === stepFrom.key);
+    // A key outside the pool (a palette colour) enters it at the first entry.
+    const idx = raw < 0 ? (dir === 1 ? -1 : 0) : raw;
+    const next = stepFrom.pool[(idx + dir + stepFrom.pool.length) % stepFrom.pool.length].key;
+    if (!pinTarget) { handleEffectSelect(next); return; }
+    if (pinTarget.pin.kind === 'static') pinStaticLook(next, slotOf(next), selectionIds);
+    else void applyPins(selectionIds, animatePin(next));
+  }, [activeEffect, applyPins, effectPool, handleEffectSelect, pinStaticLook, pinTarget, selectionIds, slotOf]);
+  const handlePrevEffect = useCallback(() => stepEffect(-1), [stepEffect]);
+  const handleNextEffect = useCallback(() => stepEffect(1), [stepEffect]);
 
   // The dock always edits a single (effect, slot). Scoped, that is the pin's
   // target; otherwise the running effect's selected preset.
@@ -1777,7 +1800,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           const key = isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
           setActiveEffect(key);
           const state = stateFor(key);
-          await startStatic(key, state.intensity, state.hue, state.colorize, state.saturation, state.contrast, state.params);
+          // Entering Static keeps a global flat colour: an effect start without one would clear it.
+          await startStatic(key, state.intensity, state.hue, state.colorize, state.saturation, state.contrast, state.params, true, globalColor || undefined);
           publishControlSync({ domain: 'lighting', mode: m, rawSync: 'static', effect: key });
           break;
         }
@@ -1802,15 +1826,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         publishControlSync({ domain: 'lighting', mode: m, rawSync: m });
       }
     } catch { /* best-effort; backend state becomes source of truth */ }
-  }, [activeEffect, rawSync, setMode, setRawSync, screenPP, stateFor, setPausedState]);
+  }, [activeEffect, globalColor, rawSync, setMode, setRawSync, screenPP, stateFor, setPausedState]);
 
-  // Simple mode has no device rail, so a colour pins every device at once.
-  // Static has to own the output before the pins land.
-  const handleSimplePaletteSelect = useCallback(async (color: PaletteColor, targets?: string[]) => {
+  // Simple mode has no device rail, so a colour is the exact global flat colour.
+  // Static has to own the output first.
+  const handleSimplePaletteSelect = useCallback(async (color: PaletteColor) => {
     if (effectiveMode !== 'static') await handleModeChange('static');
-    const ids = targets ?? selectableIds;
-    if (ids.length > 0) void applyPins(ids, paletteColorPin(color));
-  }, [applyPins, effectiveMode, handleModeChange, selectableIds]);
+    setGlobalColor(color.hex);
+    void startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, color.hex).catch(() => {});
+  }, [effectiveMode, handleModeChange]);
 
   // Simple mode has no per-device toggle, so a device left un-driven or dark on
   // the advanced page would sit black here with nothing on the page saying why.
@@ -1898,21 +1922,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     return () => { cancelled = true; };
   }, [simpleAnimation, setSimpleReversed]);
 
-  // The swatch simple mode marks active: the colour every device is wearing.
-  // A mixed set (or a device with no pin, which wears the shared effect) has
-  // no single answer, so nothing reads as active.
+  // The swatch simple mode marks active: the exact global colour, when it is
+  // one of the palette's.
   const simplePaletteId = useMemo(() => {
-    if (effectiveMode !== 'static' || selectableIds.length === 0) return null;
-    let shared: string | null = null;
-    for (const deviceId of selectableIds) {
-      const pin = pins[deviceId];
-      const colorId = pin && pin.kind === 'static' ? paletteIdFromKey(pinGridKey(pin)) : null;
-      if (!colorId) return null;
-      if (shared === null) shared = colorId;
-      else if (shared !== colorId) return null;
-    }
-    return shared;
-  }, [pins, effectiveMode, selectableIds]);
+    if (effectiveMode !== 'static' || !globalColor) return null;
+    return PALETTE.find(c => c.hex.toLowerCase() === globalColor.toLowerCase())?.id ?? null;
+  }, [effectiveMode, globalColor]);
 
   // The simple page can only show Off or one palette swatch; anything else
   // leaves nothing marked active. `synced` gates it: an unsynced mode is a guess.
@@ -2015,9 +2030,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const names = new Map(devices.map(d => [d.id, d.name]));
     return pinnedNamesByEffect(pins, effectiveMode === 'static' ? 'static' : 'animate', id => names.get(id));
   }, [pins, devices, effectiveMode]);
-  const gridEffect = scoped.kind === 'pin' ? scoped.key : (scoped.kind === 'mixed' ? '' : activeEffect);
+  // A global flat colour is what Static is showing, so no effect tile reads as selected beside it.
+  const gridEffect = scoped.kind === 'pin' ? scoped.key
+    : (scoped.kind === 'mixed' || (scoped.kind === 'none' && effectiveMode === 'static' && globalColor) ? '' : activeEffect);
   // The colour the selection wears, which is where its dots sit on the field.
-  const scopedHex = scoped.kind === 'pin' ? scoped.hex : '';
+  const scopedHex = scoped.kind === 'pin' ? scoped.hex : (scoped.kind === 'none' ? globalColor : '');
   // Selected devices wearing different pins have no single value for the
   // controls to edit, so the dock locks until the selection agrees.
   const mixedSelection = scoped.kind === 'mixed';
@@ -2044,8 +2061,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     ? { key: pinTarget.key, slot: pinTarget.slot }
     : null;
   // The picker tiles stand for "this selection's colour was chosen by hand", so
-  // only a colour pin lights one.
-  const colorScoped = effectiveMode === 'static' && pinTarget?.pin.kind === 'static' && isPaletteKey(pinTarget.key);
+  // only a colour pin, or the global flat colour, lights one.
+  const colorScoped = effectiveMode === 'static' && (pinTarget?.pin.kind === 'static'
+    ? isPaletteKey(pinTarget.key)
+    : scoped.kind === 'none' && globalColor !== '');
   const pickerDevices = useMemo(
     () => canvasDevices.map(d => ({ id: d.id, name: d.name, hex: pins[d.id]?.kind === 'static' ? pinHex(pins[d.id]) : '' })),
     [canvasDevices, pins],
@@ -2091,15 +2110,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         : effectiveMode === 'none' ? 'lighting.pin.disabledOff'
           : 'lighting.pin.disabledUnavailable',
   );
-  const pinTargetName = useCallback((pin: Pin): string => {
-    if (pin.kind === 'mirror') return t('lighting.mode.screen');
-    if (pin.kind === 'static' && pin.effect === 'flat') {
-      const palette = paletteColorForKey(pinGridKey(pin));
-      return palette ? `${t(paletteFamilyKey(palette.family))} ${palette.shade}` : (pin.color ?? '').toUpperCase();
-    }
-    if (pin.effect && isSimpleAnimation(pin.effect)) return t(simpleAnimationLabelKey(pin.effect));
-    return pin.effect ? effectLabel(pin.effect) : '';
-  }, [effectLabel, t]);
+  const pinTargetName = useCallback((pin: Pin): string => pinTargetLabel(pin, t), [t]);
+  // A selection pinned to a shader or a static look while the tab is Mirror or
+  // Media: that tab has no editor for it, so it says where the editor is.
+  const offTabPin = pinTarget && (effectiveMode === 'screen' || effectiveMode === 'gif') ? pinTarget : null;
   const handleSetPin = useCallback((ids: string[], pinned: boolean) => {
     if (!pinned) { void applyPins(ids, null); return; }
     if (globalPin) void applyPins(ids, globalPin.pin);
@@ -2185,7 +2199,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             <SectionHeader className={styles.simpleSectionHeader}>{t('lighting.mode.static')}</SectionHeader>
             <StaticPalette
               selectedId={simplePaletteId}
-              onSelect={color => { void handleSimplePaletteSelect(color, claimAllDevices()); }}
+              onSelect={color => { claimAllDevices(); void handleSimplePaletteSelect(color); }}
             />
           </div>
           <div className={styles.simpleSection}>
@@ -2460,7 +2474,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   <DeviceCanvas devices={canvasDevices} selectedIds={canvasFocusShown} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
                 )}
                 {effectiveMode === 'gif' && <MediaCanvasNotice />}
-                {shaderMode && activeEffect && currentState && (
+                {shaderMode && activeEffect && currentState && !mixedSelection && (
                   <>
                     {EFFECTS.find(e => e.key === activeEffect)?.audio && (
                       <div className={styles.musicReactive}>
@@ -2500,7 +2514,21 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               )}
               {/* Off renders no picker at all; Static and Animation each own an
                   effect pool; Screen and Media get their source controls. */}
-              {(effectiveMode === 'animate' || effectiveMode === 'static') && !mirrorScoped ? (
+              {offTabPin ? (
+                <PinNotice
+                  action={(
+                    <Button size="sm" onClick={() => { void handleModeChange(offTabPin.pin.kind === 'animate' ? 'animate' : 'static'); }}>
+                      {t('lighting.pin.openTab', { tab: t(offTabPin.pin.kind === 'animate' ? 'lighting.mode.animate' : 'lighting.mode.static') })}
+                    </Button>
+                  )}
+                >
+                  {t('lighting.pin.pinnedNotice', { name: pinTargetName(offTabPin.pin) })}
+                </PinNotice>
+              ) : mirrorScoped && effectiveMode !== 'screen' && effectiveMode !== 'none' ? (
+                // The screen and the reactive toggle start Mirror, which would switch
+                // the global mode; the filters in the dock are the only controls here.
+                <PinNotice>{t('lighting.pin.mirrorHint')}</PinNotice>
+              ) : (effectiveMode === 'animate' || effectiveMode === 'static') ? (
                 <>
                 <div className={styles.browserWrap}>
                 <AnimateGrid
@@ -2551,7 +2579,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     </Button>
                   )}
                   <ModeControls
-                    mode={mirrorScoped ? 'screen' : effectiveMode}
+                    mode={effectiveMode}
                     screenPP={screenPP}
                     onScreenPPChange={setScreenPP}
                   />
@@ -2570,7 +2598,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               inert={mixedSelection || undefined}
               aria-hidden={mixedSelection || undefined}
             >
-              {dockPalette ? (
+              {offTabPin ? null : dockPalette ? (
                 <div className={styles.paletteDetail}>
                   <div className={styles.paletteDetailSwatch} style={{ backgroundColor: dockPalette.hex }} />
                   <span className={styles.paletteDetailName}>
@@ -2600,7 +2628,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         </div>
         )}
       </div>
-      {fullscreenOpen && dockEffect && dockState && dockBundle && (
+      {fullscreenOpen && !mixedSelection && dockEffect && dockState && dockBundle && (
         // Shows and edits what the dock edits, so its handlers always write to
         // the effect on screen (a pinned target, or the running one).
         <FullscreenShader

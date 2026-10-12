@@ -82,18 +82,18 @@ describe('LightingPage simple mode device claiming', () => {
     expect(lightingApi.setLightingDevicePower).toHaveBeenCalledWith('openrgb-0', true);
   });
 
-  it('pins the device it just claimed, on the first press', async () => {
+  it('claims the device and sets the global colour, on the first press', async () => {
     const { container } = renderSimple();
     await waitFor(() => expect(lightingApi.fetchLightingDevices).toHaveBeenCalled());
 
     const swatch = container.querySelector('[data-palette-id="red-3"]') as HTMLButtonElement;
     fireEvent.click(swatch);
 
-    // The claim and the pin have to agree about which devices are driven;
-    // reading the ids captured before the claim skips everything it claimed.
-    await waitFor(() => expect(lightingApi.setPins).toHaveBeenCalled());
-    const pinned = vi.mocked(lightingApi.setPins).mock.calls.flatMap(c => c[0]);
-    expect(pinned).toContain('openrgb-0');
+    // The colour is global, so it reaches the claimed device without a write for it.
+    await waitFor(() => expect(lightingApi.startStatic).toHaveBeenCalled());
+    expect(vi.mocked(lightingApi.startStatic).mock.calls.at(-1)?.[8]).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(lightingApi.setLightingDeviceControlled).toHaveBeenCalledWith('openrgb-0', true);
+    expect(lightingApi.setPins).not.toHaveBeenCalled();
   });
 
   it('claims nothing when Off is picked while already off', async () => {

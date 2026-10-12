@@ -127,6 +127,8 @@ export const fetchAnimateSettings = () =>
 /** Static-mode selection plus its per-key looks; slots stay in AnimateSettings. */
 export interface StaticSettings {
   effect: string;
+  /** "#rrggbb" when the global look is an exact flat colour; absent otherwise. */
+  color?: string;
   states: Record<string, AnimateEffectState>;
 }
 
@@ -204,11 +206,14 @@ export const startStatic = (
   contrast = 1,
   params?: Record<string, number>,
   persist = true,
+  /** Exact global flat colour for every unpinned device. Left out, picking an effect clears it. */
+  color?: string,
 ) =>
   postService('/lighting/static/headless-start', {
     effect, intensity, hue, colorize, saturation, contrast,
     params: params ? Object.entries(params).map(([name, value]) => ({ name, value })) : [],
     persist,
+    ...(color !== undefined ? { color } : {}),
   });
 
 /**
