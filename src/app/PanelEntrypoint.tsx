@@ -20,7 +20,12 @@ import { UiSettingsProvider } from '../hooks/useUiSettings';
 import { TouchViaPointerContext, readTouchViaPointerFlag } from '../panel/engine/touchViaPointer';
 import { useTranslation } from '../lib/i18n';
 import { useMonitoringStoreBridge } from './monitoringBridge';
-import { PANEL_DEVICE_ID_KEY, PHONE_PANEL_PWA_KEY } from './panelRouting';
+import {
+  PHONE_PANEL_PWA_KEY,
+  forgetCachedPanelDeviceId,
+  readCachedPanelDeviceId,
+  writeCachedPanelDeviceId,
+} from './panelRouting';
 import styles from '../App.module.scss';
 import { framePacingQuery } from '../lib/framePacer';
 
@@ -161,9 +166,9 @@ export function PanelEntrypoint({ initialDeviceId, isPhonePair, pairToken, pairD
   useEffect(() => {
     if (state !== 'allocating') return;
     let cancelled = false;
-    const finish = (id: string) => {
+    const finish = (id: string, persist = true) => {
       if (cancelled) return;
-      localStorage.setItem(PANEL_DEVICE_ID_KEY, id);
+      if (persist) writeCachedPanelDeviceId(id);
       setDeviceId(id);
       // The kiosk host's frame-pacing hint must survive the move to the device URL.
       const target = `${window.location.origin}/panel/${encodeURIComponent(id)}${framePacingQuery(window.location.search)}`;
@@ -196,7 +201,7 @@ export function PanelEntrypoint({ initialDeviceId, isPhonePair, pairToken, pairD
     };
 
     void (async () => {
-      const cached = localStorage.getItem(PANEL_DEVICE_ID_KEY);
+      const cached = readCachedPanelDeviceId();
       if (!cached) {
         await allocate();
         return;
@@ -212,13 +217,14 @@ export function PanelEntrypoint({ initialDeviceId, isPhonePair, pairToken, pairD
       const result = await patchPanelDeviceWithStatus(cached, patch);
       if (cancelled) return;
       if (!result.ok && result.status === 404) {
-        localStorage.removeItem(PANEL_DEVICE_ID_KEY);
+        forgetCachedPanelDeviceId(cached);
         await allocate();
         return;
       }
       // ok || non-404 failure (network, transient 401): trust the cache. A
-      // blip shouldn't burn the device record and force a fresh allocate.
-      finish(cached);
+      // blip shouldn't burn the device record and force a fresh allocate. An
+      // unverified id may belong to another PC, so it is not cached for this one.
+      finish(cached, result.ok);
     })();
     return () => { cancelled = true; };
   }, [state, inferredSurface, viewportCapabilities, allocAttempt, t, needsPhoneClaim]);

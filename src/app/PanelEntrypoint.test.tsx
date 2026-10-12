@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PANEL_DEVICE_ID_KEY } from './panelRouting';
 
@@ -6,6 +6,7 @@ const allocateMock = vi.fn();
 const patchMock = vi.fn();
 const claimMock = vi.fn();
 const storePhoneTokenMock = vi.fn();
+let sessionToken: string | null = null;
 
 vi.mock('../api/panel', () => ({
   allocatePanelDeviceWithStatus: (...args: unknown[]) => allocateMock(...args),
@@ -18,7 +19,7 @@ vi.mock('../api/auth', () => ({
   // pairedPcs.ts's migration check reads these - no legacy single-slot token
   // to migrate in any of these tests.
   hasSessionToken: () => false,
-  getTokenSync: () => null,
+  getTokenSync: () => sessionToken,
 }));
 
 // PanelApp + simulator + overlay drag in the whole panel tree; replace with
@@ -177,6 +178,42 @@ describe('PanelEntrypoint allocate-or-recover', () => {
     );
     expect(allocateMock).not.toHaveBeenCalled();
     expect(localStorage.getItem(PANEL_DEVICE_ID_KEY)).toBe(STALE_ID);
+  });
+
+  it('keeps each PC\'s device id across switches on a shared origin', async () => {
+    const renderEntry = () => render(
+      <PanelEntrypoint
+        initialDeviceId={null}
+        isPhonePair={false}
+        pairToken={null}
+        pairDeviceId={null}
+        pairSpki={null}
+      />,
+    );
+    try {
+      sessionToken = 'token-pc-a';
+      allocateMock.mockResolvedValueOnce({ ok: true, record: { id: 'id-pc-a' } });
+      renderEntry();
+      await waitFor(() => expect(screen.getByTestId('panel-app').getAttribute('data-device-id')).toBe('id-pc-a'));
+      cleanup();
+
+      sessionToken = 'token-pc-b';
+      patchMock.mockResolvedValueOnce({ ok: false, status: 404 });
+      allocateMock.mockResolvedValueOnce({ ok: true, record: { id: 'id-pc-b' } });
+      renderEntry();
+      await waitFor(() => expect(screen.getByTestId('panel-app').getAttribute('data-device-id')).toBe('id-pc-b'));
+      cleanup();
+
+      sessionToken = 'token-pc-a';
+      patchMock.mockResolvedValueOnce({ ok: true, record: { id: 'id-pc-a' } });
+      renderEntry();
+      await waitFor(() => expect(screen.getByTestId('panel-app').getAttribute('data-device-id')).toBe('id-pc-a'));
+      expect(patchMock).toHaveBeenLastCalledWith('id-pc-a', expect.any(Object));
+      expect(allocateMock).toHaveBeenCalledTimes(2);
+    } finally {
+      sessionToken = null;
+      localStorage.clear();
+    }
   });
 
   it('allocates fresh when nothing is cached', async () => {
