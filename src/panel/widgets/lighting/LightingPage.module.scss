@@ -1895,6 +1895,10 @@
   border-style: dashed;
 }
 
+.staticPinDotImplied {
+  border-style: dotted;
+}
+
 .staticPinLabel {
   position: absolute;
   left: 50%;
@@ -2054,6 +2058,10 @@
 // The device wears a colour this cell only stands in for.
 .staticCellInexact {
   border-style: dashed;
+}
+
+.staticCellImplied {
+  border-style: dotted;
 }
 
 // Bottom-row cells have no room under them for the name.

@@ -129,6 +129,23 @@ export function pinStripPick(pin: Pin): { key: string; slot: number; hex: string
 /** Ids of `ids` that wear a pin. */
 export const pinnedAmong = (pins: Pins, ids: readonly string[]): string[] => ids.filter(id => id in pins);
 
+/** The Static picker's marks: the selection, or with none, the unpinned lit and controlled devices a press moves. An unpinned device wears the global color. */
+export function pickerMarks(
+  devices: readonly { id: string; name: string; ledsOn?: boolean; controlled?: boolean }[],
+  pins: Pins,
+  selectedIds: ReadonlySet<string>,
+  globalColor: string,
+): { id: string; name: string; hex: string }[] {
+  return devices
+    .filter(d => (selectedIds.size === 0
+      ? !(d.id in pins) && d.ledsOn !== false && d.controlled !== false
+      : selectedIds.has(d.id)))
+    .map(d => {
+      const pin = pins[d.id];
+      return { id: d.id, name: d.name, hex: !pin ? globalColor : pin.kind === 'static' ? pinHex(pin) : '' };
+    });
+}
+
 /**
  * Device names per target effect, for the thumbnail badge: animate pins
  * (`kind` 'animate') or static pattern pins (`kind` 'static'). Ids with no

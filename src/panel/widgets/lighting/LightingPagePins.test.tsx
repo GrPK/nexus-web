@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchPins, fetchStaticSettings, saveAnimateTemplates, setPins, startAnimate, startStatic, type Pin } from '../../../api/lighting';
+import { fetchLightingDevices, fetchPins, fetchStaticSettings, saveAnimateTemplates, setPins, startAnimate, startStatic, type Pin } from '../../../api/lighting';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { ANIMATE_EFFECTS } from '../../../types/lighting';
 import { LightingPage } from './LightingPage';
+import { colorPin } from './pins';
 
 const topicHandlers = vi.hoisted(() => ({ lighting: [] as (() => void)[] }));
 const syncState = vi.hoisted(() => ({ mode: 'animate', rawSync: 'fire' }));
@@ -64,9 +65,16 @@ vi.mock('./page/ModeControls', () => ({
   ModeControls: ({ mode }: { mode: string }) => <div data-testid="mode-controls" data-mode={mode} />,
 }));
 vi.mock('./page/StaticPickerCanvas', () => ({
-  StaticPickerCanvas: ({ onCommit, onPreview, hex }: { onCommit: (hex: string) => void; onPreview: (hex: string) => void; hex: string }) => (
+  StaticPickerCanvas: ({ onCommit, onPreview, hex, devices, implied }: {
+    onCommit: (hex: string) => void;
+    onPreview: (hex: string) => void;
+    hex: string;
+    devices: { id: string; hex: string }[];
+    implied?: boolean;
+  }) => (
     <div>
       <span data-testid="picker-hex">{hex}</span>
+      <span data-testid="picker-marks" data-implied={implied ? '1' : ''}>{devices.map(d => `${d.id}@${d.hex}`).join(';')}</span>
       <button type="button" onClick={() => onCommit('#00ff00')}>pick-green</button>
       <button type="button" onClick={() => onPreview('#0000ff')}>preview-blue</button>
     </div>
@@ -163,6 +171,11 @@ const renderPage = () => render(
   </UiSettingsProvider>,
 );
 
+const device = (id: string, name: string) => ({ id, name, ledsOn: true, ledCount: 10, canvasX: 0, canvasY: 0, canvasW: 1, canvasH: 1, canvasRotation: 0 });
+const withDevices = (...ids: string[]) => vi.mocked(fetchLightingDevices).mockImplementation(
+  () => Promise.resolve({ isInit: true, devices: ids.map(id => device(id, `Fan ${id.toUpperCase()}`)) }) as never,
+);
+
 const pinOf = () => {
   const raw = screen.getByTestId('rail').dataset.pin;
   return raw ? JSON.parse(raw) as Pin : null;
@@ -179,6 +192,7 @@ describe('LightingPage pins', () => {
     vi.mocked(setPins).mockImplementation(() => Promise.resolve(true));
     vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({}));
     vi.mocked(fetchStaticSettings).mockImplementation(() => Promise.resolve({ effect: 'checker', states: {} }));
+    withDevices('a');
     vi.mocked(startAnimate).mockClear();
     vi.mocked(startStatic).mockClear();
     vi.mocked(saveAnimateTemplates).mockClear();
@@ -261,6 +275,36 @@ describe('LightingPage pins', () => {
       fireEvent.click(screen.getByText('unpin-all'));
       expect(lastPinsCall()).toEqual([['a', 'b'], null]);
       expect(pinOf()).toBeNull();
+    });
+  });
+
+  describe('what a pick with nothing selected reaches', () => {
+    it('says how many pinned devices it skips', async () => {
+      withDevices('a', 'b');
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      expect(await screen.findByText('lighting.pane.allExceptPinned.one')).toBeTruthy();
+    });
+
+    it('says all pinned when every device wears a pin', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      expect(await screen.findByText('lighting.pane.allPinned')).toBeTruthy();
+    });
+
+    it('marks the unpinned devices dotted on the global color, and a selection solid on what each wears', async () => {
+      withDevices('a', 'b');
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      vi.mocked(fetchStaticSettings).mockResolvedValue({ effect: 'checker', states: {}, color: '#336699' });
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: colorPin('#ff0000') }));
+      renderPage();
+      const marks = () => screen.getByTestId('picker-marks');
+      await waitFor(() => expect(marks().textContent).toBe('b@#336699'));
+      expect(marks().dataset.implied).toBe('1');
+      fireEvent.click(screen.getByText('select-ab'));
+      await waitFor(() => expect(marks().textContent).toBe('a@#ff0000;b@#336699'));
+      expect(marks().dataset.implied).toBe('');
     });
   });
 

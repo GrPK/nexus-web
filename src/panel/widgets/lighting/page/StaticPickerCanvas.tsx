@@ -49,11 +49,13 @@ interface Marker extends PickerDevice {
  * whole canvas, drops the marks, and answers a press with a notice instead.
  */
 export function StaticPickerCanvas({
-  devices, hex, segmented, fill, patternEffect, patternSlot, patternVersion, gpuAvailable,
+  devices, implied, hex, segmented, fill, patternEffect, patternSlot, patternVersion, gpuAvailable,
   onPreview, onCommit, notice: externalNotice,
 }: {
   /** Devices whose colour gets a mark, in rail order. */
   devices: PickerDevice[];
+  /** The marks are the devices a press moves, not a selection, so they read dotted. */
+  implied?: boolean;
   /** The colour the selection shares; '' when they disagree. */
   hex: string;
   /** Sample the field on the coarse grid instead of continuously. */
@@ -255,12 +257,12 @@ export function StaticPickerCanvas({
           <div key={m.id} className={styles.staticPin} style={{ left: `${m.left}px`, top: `${m.top}px` }}>
             {m.cell ? (
               <span
-                className={`${styles.staticCell} ${m.inexact ? styles.staticCellInexact : ''}`}
+                className={`${styles.staticCell} ${m.inexact ? styles.staticCellInexact : ''} ${implied ? styles.staticCellImplied : ''}`}
                 style={{ width: `${m.cell.w}px`, height: `${m.cell.h}px` }}
               />
             ) : (
               <span
-                className={`${styles.staticPinDot} ${m.inexact ? styles.staticPinDotOff : ''}`}
+                className={`${styles.staticPinDot} ${m.inexact ? styles.staticPinDotOff : ''} ${implied ? styles.staticPinDotImplied : ''}`}
                 style={{ backgroundColor: m.hex }}
               />
             )}

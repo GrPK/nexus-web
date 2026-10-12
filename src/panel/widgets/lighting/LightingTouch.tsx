@@ -12,6 +12,7 @@ import { StaticPickerCanvas } from './page/StaticPickerCanvas';
 import { PICKER_FIELD_SVG, PICKER_SEGMENTED_SVG, pickerHexAt, pickerPointFor, snapToSegment } from './page/staticPickerField';
 import { useColorWriteQueue } from './page/useColorWriteQueue';
 import { usePins } from './page/usePins';
+import { visibleCards } from './page/zoneUtils';
 import { EffectCard } from '../../../components/common/EffectCard/EffectCard';
 import { CollapsibleSection } from '../../../components/common/CollapsibleSection/CollapsibleSection';
 import { PostProcessControls } from './effecteditor/PostProcessControls';
@@ -53,7 +54,7 @@ import { PinNotice } from './page/PinNotice';
 import { useTranslation } from '../../../lib/i18n';
 import { isPaletteKey } from '../../../types/lightingPalette';
 import {
-  staticLookPin, colorPin, animatePin, MIRROR_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pickerMarks, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
 } from './pins';
 import type { WidgetProps } from '../types';
 import styles from './LightingPage.module.scss';
@@ -107,6 +108,7 @@ function ImmersivePickerCanvas({ animate }: { animate: ImmersiveAnimateControlle
     <StaticPickerCanvas
       fill
       devices={animate.pickerDevices}
+      implied={animate.selectedIds.size === 0}
       hex={animate.selectedHex}
       segmented={animate.segmented}
       patternEffect={animate.staticPattern?.key ?? null}
@@ -455,10 +457,8 @@ function useImmersiveAnimateState(): {
   );
 
   const pickerDevices = useMemo(
-    () => devices
-      .filter(d => selectedIds.has(d.id))
-      .map(d => ({ id: d.id, name: d.name, hex: pins[d.id]?.kind === 'static' ? pinHex(pins[d.id]) : '' })),
-    [devices, pins, selectedIds],
+    () => pickerMarks(visibleCards(devices), pins, selectedIds, globalColor),
+    [devices, globalColor, pins, selectedIds],
   );
 
   // Static and animate share this editor; only the target differs. A pick with

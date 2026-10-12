@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  animatePin, colorPin, MIRROR_PIN, paletteColorPin, pinGridKey, pinHex, pinnedNamesByEffect,
+  animatePin, colorPin, MIRROR_PIN, paletteColorPin, pickerMarks, pinGridKey, pinHex, pinnedNamesByEffect,
   clearLegacyLightingKeys, pinSignature, pinStripPick, pinTargetLabel, selectionPin, staticLookPin, withPins,
 } from './pins';
 import { defaultStateFor } from '../../../types/lighting';
@@ -105,6 +105,19 @@ describe('grid key and strip pick', () => {
   it('reads a static pin\'s colour from the colour or the hue', () => {
     expect(pinHex(colorPin('#123456'))).toBe('#123456');
     expect(pinHex({ kind: 'static', effect: 'stripes', hue: 0, saturation: 1 }).toLowerCase()).toBe('#ff0000');
+  });
+});
+
+describe('pickerMarks', () => {
+  const devices = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }, { id: 'd', name: 'D', ledsOn: false }, { id: 'e', name: 'E', controlled: false }];
+  const pins = { a: colorPin('#ff0000'), b: animatePin('plasma') };
+
+  it('with nothing selected marks only the unpinned lit, controlled devices, on the global color', () => {
+    expect(pickerMarks(devices, pins, new Set(), '#336699')).toEqual([{ id: 'c', name: 'C', hex: '#336699' }]);
+  });
+
+  it('marks a selection on what each wears, with no color for a non-static pin', () => {
+    expect(pickerMarks(devices, pins, new Set(['a', 'b', 'c']), '#336699').map(d => d.hex)).toEqual(['#ff0000', '', '#336699']);
   });
 });
 

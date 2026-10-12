@@ -59,7 +59,7 @@ import { usePersistentState } from '../../../hooks/usePersistentState';
 import { PinNotice } from './page/PinNotice';
 import {
   staticLookPin, colorPin, animatePin, MIRROR_PIN, selectionPin, pinGridKey, pinHex,
-  pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
+  pickerMarks, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
@@ -2022,10 +2022,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
 
   const shaderMode = effectiveMode === 'animate' || effectiveMode === 'static';
   // The preview stands for the selection; with nothing selected it is every
-  // device, and the chip says so.
-  const previewBadgeLabel = selectedDeviceIds.size === 0
-    ? t('lighting.pane.allDevices')
-    : t(pluralKey('lighting.pane.selectedCount', language, selectedDeviceIds.size), { count: selectedDeviceIds.size });
+  // unpinned device, and the chip says how many pins a pick skips.
+  const pinnedShown = visibleDevices.filter(d => d.id in pins).length;
+  const previewBadgeLabel = selectedDeviceIds.size > 0
+    ? t(pluralKey('lighting.pane.selectedCount', language, selectedDeviceIds.size), { count: selectedDeviceIds.size })
+    : pinnedShown === 0 ? t('lighting.pane.allDevices')
+      : pinnedShown === visibleDevices.length ? t('lighting.pane.allPinned')
+        : t(pluralKey('lighting.pane.allExceptPinned', language, pinnedShown), { count: pinnedShown });
   const pinnedDevices = useMemo(() => {
     const names = new Map(devices.map(d => [d.id, d.name]));
     return pinnedNamesByEffect(pins, effectiveMode === 'static' ? 'static' : 'animate', id => names.get(id));
@@ -2066,8 +2069,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     ? isPaletteKey(pinTarget.key)
     : scoped.kind === 'none' && globalColor !== '');
   const pickerDevices = useMemo(
-    () => canvasDevices.map(d => ({ id: d.id, name: d.name, hex: pins[d.id]?.kind === 'static' ? pinHex(pins[d.id]) : '' })),
-    [canvasDevices, pins],
+    () => pickerMarks(canvasDevices, pins, selectedDeviceIds, globalColor),
+    [canvasDevices, globalColor, pins, selectedDeviceIds],
   );
   // The picker tiles re-flatten the selection onto the colour it already shows,
   // the way the palette's custom slot did; the segmented one conforms it to the
@@ -2440,6 +2443,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               <div className={styles.canvasArea}>
                 <StaticPickerCanvas
                   devices={pickerDevices}
+                  implied={selectedDeviceIds.size === 0}
                   hex={scopedHex}
                   segmented={pickerSegmented}
                   patternEffect={staticPattern?.key ?? null}
