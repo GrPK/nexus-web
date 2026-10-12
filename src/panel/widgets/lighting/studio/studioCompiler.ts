@@ -237,7 +237,9 @@ export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: b
   const blocks = orderedBlocks(recipe);
   const defs = blocks.map(b => studioBlock(b.type)!);
   const uniforms: string[] = [];
-  // Audio inputs are declared only when a mod reads them: the service starts audio capture for any shader that declares one.
+  // Audio inputs are declared only when a mod reads them. The service starts
+  // audio capture for a shader with an active audio uniform, and whether a
+  // declared-but-unused one stays active after linking differs by driver.
   const audioInputs = new Set<string>();
   const params: Record<string, number> = {};
   const body: string[] = [];
