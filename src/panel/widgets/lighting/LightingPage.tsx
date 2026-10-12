@@ -865,19 +865,39 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     screenPP.colorize,
   ]);
 
+  // Settles the static start still waiting on the throttle; a newer call drops
+  // that callback, so the newer write settles the older one's registration.
+  const pendingStaticWriteRef = useRef<(() => void) | null>(null);
   const applyAnimate = useCallback((effect: string, state: EffectState, persist: boolean) => {
     if (!effect) return;
     const expectedProfileKey = activeProfileKeyRef.current;
+    // A start without a color clears the global flat color service side. It
+    // counts as in flight from now, not from when the throttle fires, so a
+    // refetch in between cannot land the look this call replaces.
+    const write = { settle: () => {} };
+    const registered = modeRef.current === 'static';
+    if (registered) {
+      pendingStaticWriteRef.current?.();
+      setGlobalColor('', new Promise<void>(resolve => { write.settle = resolve; }));
+      pendingStaticWriteRef.current = write.settle;
+    }
+    const done = () => {
+      if (pendingStaticWriteRef.current === write.settle) pendingStaticWriteRef.current = null;
+      write.settle();
+    };
     throttleAnimate(() => {
-      if (activeProfileKeyRef.current !== expectedProfileKey) return;
+      if (activeProfileKeyRef.current !== expectedProfileKey) { done(); return; }
       if (modeRef.current === 'static') {
-        // A start without a color clears the global flat color service side.
-        setGlobalColor('', startStatic(
+        const started = startStatic(
           effect, state.intensity, state.hue, state.colorize,
           state.saturation, state.contrast, state.params, persist,
-        ));
+        );
+        // Static only since the call: register the write now.
+        if (!registered) setGlobalColor('', started);
+        started.catch(() => {}).finally(done);
         return;
       }
+      done();
       startAnimate(
         effect, state.speed, state.intensity, state.hue, state.colorize,
         state.saturation, state.contrast, state.params, persist,
