@@ -171,9 +171,9 @@ export function upsertPairedPc(input: UpsertPairedPcInput): PairedPcRecord {
 
 /**
  * Applies a stored record's token + relay region to the live single-slot
- * session state and clears the cached panel-device-id (that id names a
- * layout record on the PREVIOUS active PC, meaningless on this one -
- * PanelEntrypoint's allocate-or-recover flow allocates a fresh one). Callers
+ * session state and clears the legacy panel-device-id slot, which names a
+ * layout record on the PREVIOUS active PC; PanelEntrypoint restores this PC's
+ * id from its per-PC cache (panelRouting.ts). Callers
  * still need to navigate/reload into /panel/phone for the new transport
  * state to take effect - this only updates the persisted state.
  */
@@ -186,8 +186,7 @@ export function activatePairedPc(id: string): PairedPcRecord | null {
   try {
     localStorage.removeItem(PANEL_DEVICE_ID_KEY);
   } catch {
-    // Not critical - a stale cached id costs one extra 404+reallocate round
-    // trip in PanelEntrypoint's allocate-or-recover flow.
+    // Not critical - the per-PC cache takes priority over this slot.
   }
   localStorage.setItem(ACTIVE_ID_KEY, id);
   return record;
