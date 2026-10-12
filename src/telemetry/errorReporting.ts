@@ -137,14 +137,20 @@ function gateOpen(): boolean {
   return true;
 }
 
-export function reportError(error: unknown, kind: ErrorKind, context?: string): void {
+export function reportError(error: unknown, kind: ErrorKind, context?: string, recoveryTried = false): void {
+  if (!recoveryTried && installed && staleChunkMessageOf(error)) {
+    // A reload onto a new build makes the error moot; otherwise report it as usual.
+    void recoverFromStaleChunkNow().then((reloaded) => {
+      if (!reloaded) reportError(error, kind, context, true);
+    });
+    return;
+  }
   if (!installed || reporting || !gateOpen()) return;
   reporting = true;
   try {
     const d = describe(error);
     const stack = stripUrlSecrets(d.stack);
     if (isNoise(d.message, stack)) return;
-    if (isStaleChunkMessage(d.message) && recoverFromStaleChunkNow()) return;
     const message = stripUrlSecrets(d.message);
     const fingerprint = cap(fingerprintOf(d.type, d.message), CAPS.fingerprint);
     const existing = records.get(fingerprint);
@@ -186,18 +192,32 @@ export function reportError(error: unknown, kind: ErrorKind, context?: string): 
   }
 }
 
+function staleChunkMessageOf(error: unknown): boolean {
+  if (reporting) return false;
+  // describe() reads error getters, which may raise error events themselves.
+  reporting = true;
+  try {
+    return isStaleChunkMessage(describe(error).message);
+  } catch {
+    return false;
+  } finally {
+    reporting = false;
+  }
+}
+
 function stripUrlSuffix(url: string): string {
   return url.replace(/[?#].*$/, '');
 }
 
 // Wallet extensions and in-app browsers inject scripts into the page. Their
-// frames never come from our hashed /assets/ bundle (or the dev server's
-// /src/ modules). The one exception is our own inline index.html polyfills,
+// frames never come from our hashed /assets/ bundle (the dev server serves
+// modules from other paths, so onWindowError skips the filter there). The one
+// exception is our own inline index.html polyfills,
 // which report the page URL as filename but always sit past line 1, whereas
 // an injected snippet evaluated against the page starts at line 1.
 export function isForeignScriptError(filename: string, lineno: number, pageHref: string): boolean {
   if (!filename) return false;
-  if (filename.indexOf('/assets/') !== -1 || filename.indexOf('/src/') !== -1) return false;
+  if (filename.indexOf('/assets/') !== -1) return false;
   if (stripUrlSuffix(filename) === stripUrlSuffix(pageHref)) return lineno <= 1;
   return true;
 }
@@ -205,7 +225,7 @@ export function isForeignScriptError(filename: string, lineno: number, pageHref:
 function onWindowError(event: ErrorEvent): void {
   let foreign = false;
   try {
-    foreign = isForeignScriptError(event.filename, event.lineno, window.location.href);
+    foreign = !import.meta.env.DEV && isForeignScriptError(event.filename, event.lineno, window.location.href);
   } catch {
     foreign = false;
   }

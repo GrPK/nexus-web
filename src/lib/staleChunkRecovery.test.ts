@@ -6,16 +6,17 @@ import {
   type RecoverDeps,
 } from './staleChunkRecovery';
 
-function makeDeps(over: Partial<RecoverDeps> & { stamp?: number } = {}): RecoverDeps & { writeStamp: ReturnType<typeof vi.fn>; reload: ReturnType<typeof vi.fn> } {
+function makeDeps(over: Partial<RecoverDeps> & { stamp?: number } = {}) {
   const { stamp = 0, ...rest } = over;
-  return {
+  const deps = {
     now: 1_000_000,
-    oneShotToken: false,
+    check: vi.fn(async () => 'reload' as const),
     readStamp: () => stamp,
-    writeStamp: vi.fn(),
+    writeStamp: vi.fn(() => true),
     reload: vi.fn(),
     ...rest,
-  } as RecoverDeps & { writeStamp: ReturnType<typeof vi.fn>; reload: ReturnType<typeof vi.fn> };
+  };
+  return deps as typeof deps & RecoverDeps;
 }
 
 describe('isStaleChunkMessage', () => {
@@ -30,28 +31,40 @@ describe('isStaleChunkMessage', () => {
 });
 
 describe('recoverFromStaleChunk', () => {
-  it('reloads and stamps on the first failure', () => {
+  it('reloads and stamps when the watcher check confirms a new build', async () => {
     const deps = makeDeps();
-    expect(recoverFromStaleChunk(deps)).toBe(true);
+    expect(await recoverFromStaleChunk(deps)).toBe(true);
     expect(deps.writeStamp).toHaveBeenCalledWith(1_000_000);
     expect(deps.reload).toHaveBeenCalledTimes(1);
   });
 
-  it('does not reload again inside the lock window', () => {
+  it.each(['noop', 'same', 'locked', 'unverified'] as const)('does not reload when the watcher check says %s', async (result) => {
+    const deps = makeDeps({ check: vi.fn(async () => result) });
+    expect(await recoverFromStaleChunk(deps)).toBe(false);
+    expect(deps.reload).not.toHaveBeenCalled();
+  });
+
+  it('does not reload when the watcher check throws', async () => {
+    const deps = makeDeps({ check: vi.fn(async () => { throw new Error('offline'); }) });
+    expect(await recoverFromStaleChunk(deps)).toBe(false);
+    expect(deps.reload).not.toHaveBeenCalled();
+  });
+
+  it('does not reload when the loop-guard stamp cannot be stored', async () => {
+    const deps = makeDeps({ writeStamp: vi.fn(() => false) });
+    expect(await recoverFromStaleChunk(deps)).toBe(false);
+    expect(deps.reload).not.toHaveBeenCalled();
+  });
+
+  it('does not check or reload again inside the lock window', async () => {
     const deps = makeDeps({ stamp: 1_000_000 - (STALE_CHUNK_RELOAD_LOCK_MS - 1) });
-    expect(recoverFromStaleChunk(deps)).toBe(false);
+    expect(await recoverFromStaleChunk(deps)).toBe(false);
+    expect(deps.check).not.toHaveBeenCalled();
     expect(deps.reload).not.toHaveBeenCalled();
   });
 
-  it('reloads again once the window has passed', () => {
+  it('reloads again once the window has passed', async () => {
     const deps = makeDeps({ stamp: 1_000_000 - STALE_CHUNK_RELOAD_LOCK_MS });
-    expect(recoverFromStaleChunk(deps)).toBe(true);
-    expect(deps.reload).toHaveBeenCalledTimes(1);
-  });
-
-  it('never reloads while a one-shot URL token is present', () => {
-    const deps = makeDeps({ oneShotToken: true });
-    expect(recoverFromStaleChunk(deps)).toBe(false);
-    expect(deps.reload).not.toHaveBeenCalled();
+    expect(await recoverFromStaleChunk(deps)).toBe(true);
   });
 });

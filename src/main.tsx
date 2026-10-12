@@ -15,10 +15,8 @@ import { initMemoryProbe } from './diag/memoryProbe';
 import { initBuildReloadWatcher } from './lib/buildReloadWatcher';
 import { initHoverGuard } from './lib/hoverGuard';
 import { installGlobalErrorReporting } from './telemetry/errorReporting';
-import { installStaleChunkRecovery } from './lib/staleChunkRecovery';
 
 installGlobalErrorReporting();
-installStaleChunkRecovery();
 
 // Apply persisted theme mode + accent color before first paint so there's
 // no flash of the default violet.
