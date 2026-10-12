@@ -3099,6 +3099,7 @@
   "lighting.studio.done": "完了",
   "lighting.studio.live": "すべてのデバイスに表示",
   "lighting.studio.liveFailed": "このエフェクトをデバイスに表示できませんでした",
+  "lighting.studio.liveOff": "ライティングモードが実行されていません。デバイスで表示するにはモードを選択してください。",
   "lighting.studio.mod.amount": "オーディオ強度",
   "lighting.studio.mod.bass": "低音",
   "lighting.studio.mod.beat": "ビート",

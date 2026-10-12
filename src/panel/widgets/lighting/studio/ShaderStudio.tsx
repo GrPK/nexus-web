@@ -9,6 +9,7 @@ import { Badge } from '../../../../components/common/Badge/Badge';
 import { SearchInput } from '../../../../components/common/SearchInput/SearchInput';
 import { SettingsSection } from '../../../../components/common/SettingsSection/SettingsSection';
 import { InlineError } from '../../../../components/common/InlineError/InlineError';
+import { Notice } from '../../../../components/common/Notice/Notice';
 import { PromptModal } from '../../../../components/common/PromptModal/PromptModal';
 import { ConfirmModal } from '../../../../components/common/ConfirmModal/ConfirmModal';
 import { SortableList, type SortableRowArgs } from '../../../../components/common/SortableList/SortableList';
@@ -110,6 +111,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
   // Off on every open; the session ends on toggle-off and on close (unmount).
   const [live, setLive] = useState(false);
   const [liveFailed, setLiveFailed] = useState(false);
+  const [liveOff, setLiveOff] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   // The recipe as last saved or loaded; null when nothing saved backs it. Any
@@ -225,6 +227,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
       if (res?.sessionId) liveServerId.current = res.sessionId;
       if (session !== counter.id) return;
       if (res?.leaseMs) liveLease.current = res.leaseMs;
+      setLiveOff(res?.lightingOff === true);
       // A refusal ends live mode: re-sending would retake devices another client just changed.
       if (!res || res.error === true || res.active === false) {
         setLiveFailed(true);
@@ -244,7 +247,6 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
     const counter = liveSession.current;
     const waiting = liveWaiting;
     counter.id++;
-    setLiveFailed(false);
     let heartbeat = 0;
     const beat = () => {
       sendLiveRef.current();
@@ -401,7 +403,13 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
         className={`${mapStyles.modeBtn} ${live ? mapStyles.modeBtnActive : ''}`}
         aria-pressed={live}
         disabled={varying}
-        onClick={() => setLive(v => !v)}
+        onClick={() => {
+          if (!live) {
+            setLiveFailed(false);
+            setLiveOff(false);
+          }
+          setLive(!live);
+        }}
       >
         {t('lighting.studio.live')}
       </button>
@@ -509,6 +517,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
                 action={<Badge label={`${t(`lighting.studio.cost.${costLevel}`)} ${cost}/${STUDIO_COST_BUDGET}`} compact />}>
                 <StudioPreview effectKey={compiled.key} stateRef={stateRef} audioRef={audioRef} />
                 {liveFailed && <InlineError className={styles.liveError}>{t('lighting.studio.liveFailed')}</InlineError>}
+                {live && liveOff && <Notice tone="info" role="status" className={styles.liveError}>{t('lighting.studio.liveOff')}</Notice>}
               </SettingsSection>
               <div className={styles.myEffects}>
                 <div className={pageStyles.effectToolbar}>

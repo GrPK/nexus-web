@@ -3099,6 +3099,7 @@
   "lighting.studio.done": "Concluído",
   "lighting.studio.live": "Mostrar em todos os dispositivos",
   "lighting.studio.liveFailed": "Não foi possível mostrar este efeito nos seus dispositivos",
+  "lighting.studio.liveOff": "Nenhum modo de iluminação está ativo. Selecione um para ver isso nos seus dispositivos.",
   "lighting.studio.mod.amount": "Intensidade do áudio",
   "lighting.studio.mod.bass": "Graves",
   "lighting.studio.mod.beat": "Ritmo",

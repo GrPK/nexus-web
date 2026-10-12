@@ -3099,6 +3099,7 @@
   "lighting.studio.done": "完成",
   "lighting.studio.live": "在所有裝置上顯示",
   "lighting.studio.liveFailed": "無法在你的裝置上顯示此效果",
+  "lighting.studio.liveOff": "目前沒有執行中的燈光模式。選擇一種模式即可在裝置上看到效果。",
   "lighting.studio.mod.amount": "音訊強度",
   "lighting.studio.mod.bass": "低音",
   "lighting.studio.mod.beat": "節拍",

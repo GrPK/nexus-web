@@ -3099,6 +3099,7 @@
   "lighting.studio.done": "완료",
   "lighting.studio.live": "모든 장치에 표시",
   "lighting.studio.liveFailed": "이 효과를 장치에 표시하지 못했습니다",
+  "lighting.studio.liveOff": "실행 중인 조명 모드가 없습니다. 장치에서 보려면 조명 모드를 선택하세요.",
   "lighting.studio.mod.amount": "오디오 강도",
   "lighting.studio.mod.bass": "저음",
   "lighting.studio.mod.beat": "비트",

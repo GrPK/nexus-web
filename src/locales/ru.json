@@ -3137,6 +3137,7 @@
   "lighting.studio.done": "Готово",
   "lighting.studio.live": "Показать на всех устройствах",
   "lighting.studio.liveFailed": "Не удалось показать этот эффект на ваших устройствах",
+  "lighting.studio.liveOff": "Режим подсветки не запущен. Выберите режим, чтобы увидеть это на устройствах.",
   "lighting.studio.mod.amount": "Интенсивность звука",
   "lighting.studio.mod.bass": "Басы",
   "lighting.studio.mod.beat": "Такт",

@@ -224,14 +224,16 @@ export interface StudioLiveResponse {
   leaseMs?: number;
   /** Identifies the session; renewals and the stop carry it. */
   sessionId?: string;
+  /** No lighting mode is running, so the devices show nothing until one starts. */
+  lightingOff?: boolean;
 }
 
 /**
- * Plays Shader Studio GLSL on every device, full canvas, until stopStudioLive
- * or a lapsed lease. Nothing is persisted, and ending the session restores
- * what the devices showed before. Without `sessionId` it starts a session;
- * with one it renews that session and is refused once it has ended. Null when
- * the request failed or was refused.
+ * Plays Shader Studio GLSL on every device, full canvas, over the running
+ * mode until stopStudioLive or a lapsed lease. Nothing is persisted, and
+ * ending the session restores what the devices showed before. Without
+ * `sessionId` it starts a session; with one it renews that session and is
+ * refused once it has ended. Null when the request failed or was refused.
  */
 export const startStudioLive = (frag: string, s: EffectState, sessionId?: string | null) =>
   postService<StudioLiveResponse>('/lighting/studio-live', {

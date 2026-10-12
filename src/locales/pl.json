@@ -3137,6 +3137,7 @@
   "lighting.studio.done": "Gotowe",
   "lighting.studio.live": "Pokaż na wszystkich urządzeniach",
   "lighting.studio.liveFailed": "Nie udało się pokazać tego efektu na twoich urządzeniach",
+  "lighting.studio.liveOff": "Żaden tryb podświetlenia nie jest aktywny. Wybierz tryb, aby zobaczyć to na urządzeniach.",
   "lighting.studio.mod.amount": "Wpływ dźwięku",
   "lighting.studio.mod.bass": "Bas",
   "lighting.studio.mod.beat": "Rytm",

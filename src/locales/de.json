@@ -3099,6 +3099,7 @@
   "lighting.studio.done": "Fertig",
   "lighting.studio.live": "Auf allen Geräten zeigen",
   "lighting.studio.liveFailed": "Effekt konnte nicht auf deinen Geräten angezeigt werden",
+  "lighting.studio.liveOff": "Es läuft kein Beleuchtungsmodus. Wähle einen, um das auf deinen Geräten zu sehen.",
   "lighting.studio.mod.amount": "Audio-Intensität",
   "lighting.studio.mod.bass": "Bass",
   "lighting.studio.mod.beat": "Beat",

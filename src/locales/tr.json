@@ -3099,6 +3099,7 @@
   "lighting.studio.done": "Bitti",
   "lighting.studio.live": "Tüm cihazlarda göster",
   "lighting.studio.liveFailed": "Bu efekt cihazlarınızda gösterilemedi",
+  "lighting.studio.liveOff": "Çalışan bir aydınlatma modu yok. Bunu cihazlarında görmek için bir mod seç.",
   "lighting.studio.mod.amount": "Ses yoğunluğu",
   "lighting.studio.mod.bass": "Bas",
   "lighting.studio.mod.beat": "Ritim",

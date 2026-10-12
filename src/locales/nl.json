@@ -3099,6 +3099,7 @@
   "lighting.studio.done": "Klaar",
   "lighting.studio.live": "Op alle apparaten tonen",
   "lighting.studio.liveFailed": "Kon dit effect niet op je apparaten tonen",
+  "lighting.studio.liveOff": "Er draait geen verlichtingsmodus. Kies er een om dit op je apparaten te zien.",
   "lighting.studio.mod.amount": "Audio-intensiteit",
   "lighting.studio.mod.bass": "Bas",
   "lighting.studio.mod.beat": "Beat",

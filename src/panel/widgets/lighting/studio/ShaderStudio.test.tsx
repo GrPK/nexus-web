@@ -160,6 +160,31 @@ describe('ShaderStudio live on devices', () => {
     expect(screen.queryByText('lighting.studio.liveFailed')).not.toBeInTheDocument();
   });
 
+  it('says lighting is off while the service reports no running mode, and clears it once one runs', async () => {
+    startLive.mockResolvedValue({ active: true, leaseMs: 15000, sessionId: 's2', lightingOff: true });
+    render(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    const toggle = screen.getByRole('button', { name: 'lighting.studio.live' });
+    fireEvent.click(toggle);
+    expect(await screen.findByText('lighting.studio.liveOff')).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    startLive.mockResolvedValue({ active: true, leaseMs: 15000, sessionId: 's2', lightingOff: false });
+    // An edit sends the next renewal.
+    fireEvent.click(screen.getByRole('button', { name: /lighting\.studio\.surprise/ }));
+    await waitFor(() => expect(screen.queryByText('lighting.studio.liveOff')).not.toBeInTheDocument());
+    // Off again, then a new session that the service answers with lighting on: no stale notice.
+    startLive.mockResolvedValue({ active: true, leaseMs: 15000, sessionId: 's3', lightingOff: true });
+    fireEvent.click(screen.getByRole('button', { name: /lighting\.studio\.surprise/ }));
+    expect(await screen.findByText('lighting.studio.liveOff')).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.queryByText('lighting.studio.liveOff')).not.toBeInTheDocument();
+    startLive.mockResolvedValue({ active: true, leaseMs: 15000, sessionId: 's4', lightingOff: false });
+    fireEvent.click(toggle);
+    await waitFor(() => expect(startLive.mock.calls.at(-1)?.[2]).toBeNull());
+    await act(async () => {});
+    expect(screen.queryByText('lighting.studio.liveOff')).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+  });
+
   it('stops only after a send still in flight, and ignores its late refusal', async () => {
     let finish!: (v: unknown) => void;
     startLive.mockReturnValueOnce(new Promise(r => { finish = r; }));
