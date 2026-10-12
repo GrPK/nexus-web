@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { DeviceCanvas, canvasLabelName } from './DeviceCanvas';
+import { DeviceCanvas } from './DeviceCanvas';
+import { canvasLabelName } from '../../../lib/canvasLabelName';
 import styles from './DeviceCanvas.module.scss';
 import type { LightingDevice } from '../../../api/lighting';
 
@@ -25,6 +26,39 @@ function dragDevice(id: string, name: string): LightingDevice {
 }
 
 describe('DeviceCanvas', () => {
+  it('reports a gesture over when the frames hide mid-drag', () => {
+    const onDragActiveChange = vi.fn();
+    const props = {
+      devices: [dragDevice('a', 'A')], selectedIds: new Set(['a']), primaryDeviceId: null,
+      onSelectDevice: vi.fn(), onSetSelection: vi.fn(), onDragActiveChange,
+    };
+    const { container, rerender } = render(<DeviceCanvas {...props} />);
+    fireEvent.pointerDown(container.querySelector(`.${styles.device}`)!, { button: 0, clientX: 10, clientY: 10 });
+    expect(onDragActiveChange).toHaveBeenLastCalledWith(true);
+    rerender(<DeviceCanvas {...props} hideFrames />);
+    expect(onDragActiveChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('draws no frames or names when asked to hide them', () => {
+    const drawn = (hideFrames: boolean) => {
+      const { container, unmount } = render(
+        <DeviceCanvas
+          devices={[dragDevice('a', 'A'), dragDevice('b', 'B')]}
+          selectedIds={new Set(['a'])}
+          hideFrames={hideFrames}
+          primaryDeviceId={null}
+          onSelectDevice={vi.fn()}
+          onSetSelection={vi.fn()}
+        />,
+      );
+      const out = [container.querySelectorAll(`.${styles.device}`).length, container.querySelectorAll(`.${styles.deviceLabel}`).length];
+      unmount();
+      return out;
+    };
+    expect(drawn(true)).toEqual([0, 0]);
+    expect(drawn(false)).toEqual([2, 2]);
+  });
+
   it('fires onBeforeLayoutSave with pre-rotation canvasRotation on rotate', () => {
     const device = {
       id: 'dev1',

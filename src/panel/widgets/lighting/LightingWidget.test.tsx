@@ -408,6 +408,8 @@ describe('LightingWidget', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Next' }));
       await waitFor(() => expect(startScreenMirror).toHaveBeenCalled());
+      // Not a screen choice: no monitor, so the service keeps the persisted one.
+      expect(vi.mocked(startScreenMirror).mock.calls[0][2]).toBeUndefined();
       expect(setScreenEffect).not.toHaveBeenCalled();
       expect(setMusicReactive).not.toHaveBeenCalled();
     });

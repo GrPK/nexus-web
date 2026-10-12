@@ -62,4 +62,56 @@ describe('DeviceLedStrip', () => {
     expect(ctx.putImageData).not.toHaveBeenCalled();
     expect(ctx.fillStyle).toBe('#0000ff');
   });
+
+  describe('real device bytes', () => {
+    const withIndex: LightingDevice = { ...device, frameIndex: 7 };
+    // 4 LEDs: red, green, blue, white.
+    const bytes = new Uint8Array([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]);
+    const lastImage = () => ctx.putImageData.mock.calls.at(-1)![0].data as Uint8ClampedArray;
+
+    it('paints every strip from its device bytes in LED order, locked or not', () => {
+      publishLedFrame(new Uint8Array(3 * 4), 2, 2, new Map([[7, bytes]]));
+      render(<DeviceLedStrip device={withIndex} />);
+      expect([...lastImage()]).toEqual([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
+    });
+
+    it('prefers the bytes over the canvas, a pick and the per-device blank', () => {
+      publishRed();
+      publishLedFrame(new Uint8Array(3 * 4).fill(9), 2, 2, new Map([[7, bytes]]));
+      render(<DeviceLedStrip device={withIndex} fullscreen pickOnly pick={{ key: 'flat:blue-3', hex: '#0000ff', slot: 0, version: '1' }} />);
+      expect(lastImage()[0]).toBe(255);
+      expect(lastImage()[1]).toBe(0);
+      expect(ctx.fillRect).not.toHaveBeenCalled();
+    });
+
+    it('applies the device brightness', () => {
+      publishLedFrame(null, 0, 0, new Map([[7, bytes]]));
+      render(<DeviceLedStrip device={{ ...withIndex, brightness: 50 }} />);
+      expect(lastImage()[0]).toBe(128);
+    });
+
+    it('reads a matrix device in wiring order, evenly across its LEDs', () => {
+      // 96 LEDs, each tagged by its own index in the red channel.
+      const keys = new Uint8Array(96 * 3);
+      for (let i = 0; i < 96; i++) keys[i * 3] = i;
+      publishLedFrame(null, 0, 0, new Map([[7, keys]]));
+      render(<DeviceLedStrip device={{ ...withIndex, ledCount: 96 }} />);
+      const reds = Array.from({ length: 24 }, (_, c) => lastImage()[c * 4]);
+      expect(reds[0]).toBe(0);
+      expect(reds[23]).toBe(95);
+      expect([...reds].sort((a, b) => a - b)).toEqual(reds);
+    });
+
+    it('falls back to sampling the canvas when the frame has no bytes for it', () => {
+      publishRed();
+      render(<DeviceLedStrip device={withIndex} />);
+      expect([...lastImage().slice(0, 4)]).toEqual([255, 0, 0, 255]);
+    });
+
+    it('falls back when the device has no frame index', () => {
+      publishLedFrame(new Uint8Array(3 * 4).fill(9), 2, 2, new Map([[7, bytes]]));
+      render(<DeviceLedStrip device={device} />);
+      expect([...lastImage().slice(0, 3)]).toEqual([9, 9, 9]);
+    });
+  });
 });

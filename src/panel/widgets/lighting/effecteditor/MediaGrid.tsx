@@ -133,7 +133,7 @@ export function MediaGrid({ items, activeId, thumbs, onPlay, onDelete, deleteAri
 
   if (!onReorder) {
     return (
-      <div className={styles.mediaGrid}>
+      <div data-pick className={styles.mediaGrid}>
         {prepend}
         {items.map(item => <Fragment key={item.id}>{card(item)}</Fragment>)}
       </div>
@@ -158,7 +158,7 @@ export function MediaGrid({ items, activeId, thumbs, onPlay, onDelete, deleteAri
       onDragCancel={() => setDraggingId(null)}
     >
       <SortableContext items={ids} strategy={rectSortingStrategy}>
-        <div className={styles.mediaGrid}>
+        <div data-pick className={styles.mediaGrid}>
           {prepend}
           {items.map(item => (
             <SortableMediaCard key={item.id} id={item.id}>{card(item)}</SortableMediaCard>

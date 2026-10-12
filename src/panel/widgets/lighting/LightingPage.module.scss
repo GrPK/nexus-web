@@ -105,6 +105,12 @@
   justify-content: flex-start;
 }
 
+// Hover target around the scope Badge; flex keeps the Badge's own box.
+.scopeChip,
+.scopeChip > span {
+  display: flex;
+}
+
 .paneTitle {
   font-size: var(--type-body);
   font-weight: 600;
@@ -521,27 +527,13 @@
   color: var(--text-dim);
 }
 
-// Effect browser shell. Static with nothing selected has nowhere to put a
-// colour, so it dims and stops taking input rather than silently doing nothing.
+// Effect browser shell.
 .browserWrap {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   transition: opacity var(--ease-fast) ease;
-}
-
-.browserLocked {
-  opacity: var(--alpha-medium);
-}
-
-.browserHint {
-  flex-shrink: 0;
-  margin: 0.6rem 0 0;
-  padding: 0 0.3rem;
-  font-size: var(--type-small);
-  color: var(--text-dim);
-  text-align: center;
 }
 
 // Rail tail card: why the list may be short, plus the subprocess dot the
@@ -594,6 +586,28 @@
     color: #fff;
     filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.85));
   }
+}
+
+// One tooltip target inside the cell badges: the usage icons, or the pinned count.
+.cellBadgeGroup {
+  display: flex;
+  align-items: center;
+
+  // Chromium 83 (the Q60 panel floor) has no flex `gap`.
+  svg + svg {
+    margin-left: 3px;
+  }
+}
+
+.cellPinCount {
+  color: #fff;
+  font-size: var(--type-mini);
+  line-height: 1;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.85);
+}
+
+.cellPinName {
+  display: block;
 }
 
 .effectCard {
@@ -1150,6 +1164,30 @@
     border-color: var(--border-strong);
   }
 
+  // The selection's border without its fill: a pick lands here. After :hover,
+  // like the selected state, so hovering does not drop the accent.
+  &.deviceCardTarget {
+    border-color: var(--accent);
+  }
+
+  // Covers a card a press or pick just changed, border included; the light highlight inside plays.
+  .deviceCardPulse {
+    position: absolute;
+    top: calc(-1 * var(--border-width));
+    right: calc(-1 * var(--border-width));
+    bottom: calc(-1 * var(--border-width));
+    left: calc(-1 * var(--border-width));
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+
+    > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+    }
+  }
+
   &.deviceCardSelected {
     border-color: var(--accent);
     background: var(--accent-soft);
@@ -1286,26 +1324,35 @@
   svg { width: 13px; height: 13px; }
 }
 
-// Colour lock after the LED strip, only on a locked card.
-// Always visible: a lock the user has to hover to find is a lock they will
+// Badge buttons after the LED strip (pin, LED colors, key reactions).
+// Always visible: a state the user has to hover to find is a state they will
 // not know is set. Same dim ink as the stack badge, so it reads as card
 // chrome rather than a state light.
-.deviceLockBtn {
+.deviceBadgeBtn {
   opacity: 1;
   flex-shrink: 0;
 }
 
-// A pick aimed at the locked card: off, on, off, on - hard steps, no fade.
-// Runs once per mount; ZoneCard remounts the badge per flash.
-.deviceLockBtnFlash {
-  // Two off/on cycles of 1.5x the slow ease each: ~225 ms per phase.
-  animation: lockBadgeFlash calc(var(--ease-slow) * 1.5) step-end 2;
+.devicePinBtn {
+  opacity: 1;
+  color: var(--text-dim);
+
+  // Lit on a selected card, as the stack badge is; hover keeps its accent.
+  .deviceCardSelected &:not(:hover) { color: var(--text); }
 }
 
-@keyframes lockBadgeFlash {
-  0% { opacity: 0; }
-  50%, 100% { opacity: 1; }
+.devicePinOff,
+.devicePinBtn:hover .devicePinMode {
+  display: none;
 }
+
+.devicePinBtn:hover .devicePinOff {
+  display: block;
+}
+
+// Own rules: Chromium 83 lacks :focus-visible and would drop a list holding it.
+.devicePinBtn:focus-visible .devicePinMode { display: none; }
+.devicePinBtn:focus-visible .devicePinOff { display: block; }
 
 // Stays visible (overrides .deviceSettingsBtn's opacity:0) when the
 // device is off, so the power-on control is always reachable. When on,
@@ -1372,7 +1419,9 @@
 
 // The stack badge on a card stacked with others; sits in the name row's
 // corner, as wide as the menu button below it so the two glyphs share a column.
-.deviceStackBadge {
+// The color-tuning mark sits just left of it, same size and dimming.
+.deviceStackBadge,
+.deviceTuneBadge {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -1381,11 +1430,18 @@
   margin-top: 0.15rem;
   margin-left: auto;
   color: var(--text-dim);
-  transition: color var(--ease-fast);
-
-  // Lit on a selected card, so the reason the whole stack lit up is in view.
-  .deviceCardSelected & { color: var(--text); }
+  opacity: var(--alpha-medium);
+  transition: color var(--ease-fast), opacity var(--ease-fast);
 }
+
+// Lit on a selected card, so the reason the whole stack lit up is in view.
+// The tuning mark stays dim.
+.deviceStackBadge {
+  .deviceCardSelected & { color: var(--text); opacity: 1; }
+}
+
+// Only the first mark takes the free space, so the two sit side by side.
+.deviceTuneBadge + .deviceStackBadge { margin-left: 0; }
 
 // The (i) notice icon at the end of a device label or group title. Bare icon
 // (no button) so it can nest inside the group-header toggle; HoverTooltip owns
@@ -1874,14 +1930,19 @@
   border-style: dashed;
 }
 
+.staticPinDotImplied {
+  border-style: dotted;
+}
+
+// The name ellipsizes; the pin and the "+N" count never clip.
 .staticPinLabel {
   position: absolute;
   left: 50%;
   top: calc(100% + 5px);
   transform: translateX(-50%);
+  display: flex;
+  align-items: center;
   max-width: 11rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   padding: 1px 6px;
   border-radius: var(--radius-pill);
@@ -1936,8 +1997,23 @@
   transform: none;
 }
 
+// A pinned device's mark.
+.staticPinLabelPin {
+  flex-shrink: 0;
+  width: 0.8em;
+  height: 0.8em;
+  margin-right: 0.25rem;
+}
+
+.staticPinName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 // Devices sharing the labelled dot's colour.
 .staticPinCount {
+  flex-shrink: 0;
   margin-left: 0.3rem;
   opacity: var(--alpha-strong);
 }
@@ -2033,6 +2109,10 @@
 // The device wears a colour this cell only stands in for.
 .staticCellInexact {
   border-style: dashed;
+}
+
+.staticCellImplied {
+  border-style: dotted;
 }
 
 // Bottom-row cells have no room under them for the name.

@@ -17,8 +17,9 @@ export const fetchMediaLibrary = () =>
 export const fetchMediaCurrent = () =>
   fetchService<{ mediaId: string | null; item: MediaItem | null }>('/media/current');
 
-export async function playMedia(id: string): Promise<boolean> {
-  const resp = await postService<{ error?: boolean }>('/media/' + encodeURIComponent(id) + '/play', {});
+// keepMode changes the one shared media item without switching the global mode to Media.
+export async function playMedia(id: string, keepMode = false): Promise<boolean> {
+  const resp = await postService<{ error?: boolean }>('/media/' + encodeURIComponent(id) + '/play', keepMode ? { keepMode } : {});
   return !!resp && resp.error !== true;
 }
 

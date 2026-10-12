@@ -3,17 +3,18 @@ import { Button } from '../../../../components/common/Button/Button';
 import { EmptyState } from '../../../../components/common/EmptyState/EmptyState';
 import { usePersistentState } from '../../../../hooks/usePersistentState';
 import { useTranslation } from '../../../../lib/i18n';
-import type { LightingDevice } from '../../../../api/lighting';
-import { ZoneCard, ZoneCardStack, zoneCardSelectable, type StackPosition } from '../page/ZoneCard';
+import type { LightingDevice, Pin } from '../../../../api/lighting';
+import { ZoneCard, ZoneCardStack, zoneCardSelectable, type DevicePin, type StackPosition } from '../page/ZoneCard';
 import { MotherboardGroup } from '../page/MotherboardGroup';
 import { buildDeviceBlocks, stripParentPrefix, type ZoneBlock } from '../page/deviceBlocks';
 import { visibleCards } from '../page/zoneUtils';
+import { isPickTarget } from '../pins';
 import type { LedPick } from '../page/DeviceLedStrip';
 import styles from './StaticDeviceSelect.module.scss';
 
 /**
- * Static-mode device picker for the immersive editor. Static assigns a colour
- * per device, so a pick needs a target; this is the tab that supplies one.
+ * Device picker for the immersive editor. With devices selected a pick pins
+ * them; with none it is global. Every card carries the pin button.
  *
  * Cards are the lighting page's own ZoneCards in `selectOnly` mode, grouped by
  * the page's own blocks and MotherboardGroup headers, and the selection Set is
@@ -21,13 +22,20 @@ import styles from './StaticDeviceSelect.module.scss';
  * vice versa. Group headers collapse only; power and Nexus Control belong to
  * the page, not to a picker.
  */
-export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPickFor }: {
+export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPickFor, pins, pinSource, pinDisabledReason, pinTargetName, onSetPin }: {
   devices: LightingDevice[];
   selectedIds: Set<string>;
   /** Receives the whole next selection, matching DevicePanel's onSetSelection. */
   onSetSelection: (ids: Set<string>, primary: string | null) => void;
   /** This device's own assignment, so each card reads what IT wears. */
   ledPickFor?: (id: string) => LedPick | undefined;
+  /** Pinned devices keyed by device id. */
+  pins?: Readonly<Record<string, Pin>>;
+  /** The global source a press on a following card pins it to; null when nothing can be pinned. */
+  pinSource?: string | null;
+  pinDisabledReason?: string;
+  pinTargetName?: (pin: Pin) => string;
+  onSetPin?: (ids: string[], pinned: boolean) => void;
 }) {
   const { t } = useTranslation();
   // Its own collapse state: this picker is a different shape from the rail, so
@@ -59,6 +67,18 @@ export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPi
     onSetSelection(next, primary);
   };
 
+  const pinFor = (id: string): DevicePin | undefined => {
+    if (!onSetPin) return undefined;
+    const pin = pins?.[id];
+    return {
+      pinned: !!pin,
+      targetName: pin ? pinTargetName?.(pin) : undefined,
+      kind: pin?.kind,
+      disabledReason: pinSource == null ? pinDisabledReason : undefined,
+      setPinned: value => onSetPin([id], value),
+    };
+  };
+
   const card = (d: LightingDevice, indent: boolean, displayName?: string, stacked?: StackPosition) => (
     <ZoneCard
       key={d.id}
@@ -69,6 +89,8 @@ export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPi
       ledFullscreen
       ledPickOnly
       ledPick={ledPickFor?.(d.id)}
+      pin={pinFor(d.id)}
+      target={!!pins && isPickTarget(d, pins, selectedIds)}
       selected={selectedIds.has(d.id)}
       indent={indent}
       onSelect={() => toggle(d.id)}
