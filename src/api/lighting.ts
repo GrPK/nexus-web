@@ -211,9 +211,15 @@ export const startStatic = (
     persist,
   });
 
-export const startScreenMirror = (saturation = 1, contrast = 1, monitor = '', hue = 0, colorize = 0) =>
+/**
+ * Starts Mirror. `monitor` is sent only by the caller that is choosing a screen:
+ * left out, the service keeps the persisted one, while '' would select the
+ * default screen and persist that.
+ */
+export const startScreenMirror = (saturation = 1, contrast = 1, monitor?: string, hue = 0, colorize = 0) =>
   postService('/lighting/screen/headless-start', {
-    monitor, effect: 'average', saturation, contrast, blur: 0, hue, colorize,
+    ...(monitor !== undefined ? { monitor } : {}),
+    effect: 'average', saturation, contrast, blur: 0, hue, colorize,
   });
 
 // Post-process params persisted across sessions, shared by Mirror + Media:
@@ -291,6 +297,8 @@ export interface ScreenSyncOptions {
   // 'app' = pick a monitor from the list; 'system' = the OS picker chooses
   // (Linux/Wayland), so show a "Change screen" action instead of a dropdown.
   selectionMode?: 'app' | 'system';
+  /** The persisted screen's id, when the service reports it. */
+  selectedMonitor?: string;
 }
 
 export const fetchScreenMonitors = () =>
@@ -546,87 +554,54 @@ export const setLightingDeviceBrightness = (id: string, brightness: number) =>
 // Per-device color for color-capable smart lights. Hue + saturation are floats
 // in 0..1; both are sent on every call so the service has the full HS pair.
 /**
- * Assign one device its own Static look. The whole effect goes over the wire,
- * not a flattened colour: the service renders it per device, so patterns
- * (gradients, two-tone, spectrum) and the tint controls (hue shift, warmth,
- * contrast) reach the hardware. Pass effect '' to clear the assignment.
+ * Per-device colour for color-capable smart lights: hue and saturation, both
+ * 0..1. Not a pin; a pin carries the whole look and goes through
+ * {@link setPins}.
  */
-export const setLightingDeviceColor = (
-  id: string,
-  hue: number,
-  saturation: number,
-  look?: { effect: string; color?: string; intensity: number; colorize: number; contrast: number; params?: Record<string, number>; slot?: number },
-) =>
-  postService('/devices/lighting-devices/color', {
-    id, hue, saturation,
-    effect: look?.effect ?? '',
-    // A palette pick is just this colour; the service skips the shader for it.
-    color: look?.color ?? '',
-    intensity: look?.intensity ?? 1,
-    colorize: look?.colorize ?? 0,
-    contrast: look?.contrast ?? 1,
-    params: look?.params ?? {},
-    // Round-tripped so a preset restores which slot the pick came from; the
-    // service carries it without reading it.
-    slot: look?.slot ?? 0,
-  });
+export const setLightingDeviceColor = (id: string, hue: number, saturation: number) =>
+  postService('/devices/lighting-devices/color', { id, hue, saturation });
 
-/** One device's stored Static assignment, as the service holds it. */
-export interface StaticDeviceLookDto {
-  effect: string;
-  color: string;
-  intensity: number;
-  hue: number;
-  colorize: number;
-  saturation: number;
-  contrast: number;
-  slot: number;
-  /** Held in every mode and refused a new pick until unlocked. Absent from a
-   *  service predating the lock, so readers treat it as false. */
-  locked?: boolean;
+/** What a pinned device wears, whatever the global mode is. */
+export type PinKind = 'static' | 'animate' | 'mirror';
+
+/**
+ * One device's pin as the service holds it. A static pin carries the full
+ * static look; an animate pin carries the shader key and wears that shader's
+ * global settings; a mirror pin carries nothing and wears the global Mirror
+ * settings.
+ */
+export interface Pin {
+  kind: PinKind;
+  effect?: string;
+  color?: string;
+  intensity?: number;
+  hue?: number;
+  colorize?: number;
+  saturation?: number;
+  contrast?: number;
+  params?: Record<string, number>;
+  slot?: number;
 }
 
-/**
- * Lock a device onto its Static look: the service paints it in every mode
- * and answers 409 to any pick for it until it is unlocked. Resolves false
- * when the service refused (404: no look of its own to hold) or is a build
- * without the route, so the caller can put its optimistic record back;
- * authFetch would fold both into null.
- */
-export const setStaticDeviceLock = async (id: string, locked: boolean): Promise<boolean> => {
-  const { status } = await authFetchWithStatus('/devices/lighting-devices/static-lock', {
-    method: 'POST', body: { id, locked },
-  });
-  return status === 200;
-};
-
-/** Every per-device Static assignment. The service owns these, so this is how a
- *  client rebuilds them after a preset activate or on a machine that has never
- *  seen them. */
-export const fetchStaticDeviceLooks = () =>
-  fetchService<{ looks: Record<string, StaticDeviceLookDto> }>('/devices/lighting-devices/static-looks');
-
-/**
- * Lock a device onto an Animate effect, or release it with a null effect. The
- * service keeps painting that shader on the device in every mode and refuses a
- * new animation for it until it is unlocked. Resolves false when the service
- * refused (409: the device holds a Static lock, or lighting is off; 400: not a
- * shader) or is a build without the route, so the caller can roll back.
- */
-export const setAnimateDeviceLock = async (id: string, effect: string | null): Promise<boolean> => {
-  const { status } = await authFetchWithStatus('/devices/lighting-devices/animate-lock', {
-    method: 'POST', body: { id, effect },
-  });
-  return status === 200;
-};
-
-/** Every device locked onto an Animate effect, keyed by device id. Null when the
- *  answer is unreadable (a service predating the route replies with the SPA
- *  index, so the JSON parse throws), so the caller leaves what it has alone. */
-export const fetchAnimateDeviceLocks = async (): Promise<Record<string, string> | null> => {
-  const res = await fetchService<{ locks?: Record<string, string> }>('/devices/lighting-devices/animate-locks')
+/** Every pinned device, keyed by device id. Null when the answer is unreadable
+ *  (a service predating the route replies with the SPA index, so the JSON parse
+ *  throws), so the caller leaves what it has alone. */
+export const fetchPins = async (): Promise<Record<string, Pin> | null> => {
+  const res = await fetchService<{ pins?: Record<string, Pin> }>('/devices/lighting-devices/pins')
     .catch(() => null);
-  return res?.locks ?? null;
+  return res?.pins ?? null;
+};
+
+/**
+ * Pins every id to `pin`, replacing whatever pin it held, or clears them with a
+ * null pin. Resolves false when the service refused (400 invalid kind or
+ * effect, 409 lighting off) or lacks the route, so the caller can roll back.
+ */
+export const setPins = async (ids: string[], pin: Pin | null): Promise<boolean> => {
+  const { status } = await authFetchWithStatus('/devices/lighting-devices/pins', {
+    method: 'POST', body: { ids, pin },
+  });
+  return status === 200;
 };
 
 // --- Per-device colour tuning ---
