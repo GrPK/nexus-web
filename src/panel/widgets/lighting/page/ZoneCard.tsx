@@ -3,7 +3,10 @@ import { Power, PowerOff, Ban, Blend, Eye, Keyboard, Lightbulb, Users, Cpu, Chec
 import {
   identifyLightingDevice,
   type LightingDevice,
+  type PinKind,
 } from '../../../../api/lighting';
+import { LIGHTING_MODE_ICONS } from '../../../../lib/lightingModeIcons';
+import { pinMode } from '../pins';
 import { DeviceContextMenu, menuSections, type DeviceMenuItem } from '../../../../components/common/DeviceCanvas/DeviceContextMenu';
 import { MenuArrowButton } from '../../../../components/common/DeviceCanvas/MenuArrowButton';
 import { DEVICE_NAME_MAX_LENGTH, EditableText, type EditableTextHandle } from '../../../../components/common/Editable/EditableText';
@@ -85,6 +88,8 @@ export interface DevicePin {
   pinned: boolean;
   /** Display name of what the card is pinned to (tooltip). */
   targetName?: string;
+  /** What the card is pinned to; the button wears that mode's tab icon. */
+  kind?: PinKind;
   /** Why this card cannot be pinned right now (Media, Game Sync, Off). */
   disabledReason?: string;
   setPinned: (pinned: boolean) => void;
@@ -380,6 +385,7 @@ export function ZoneCard({
   const isZone = device.parentDeviceId != null && device.zoneIndex != null;
   const resizable = device.zoneResizable === true && isZone;
   const unavailable = zoneCardUnavailable(device);
+  const PinIcon = pin?.kind ? LIGHTING_MODE_ICONS[pinMode(pin.kind)] : Pin;
   // seq remounts the menu on every open: it latches its own closing state, so
   // a reused instance would fade the reopened menu straight back out.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; seq: number } | null>(null);
@@ -687,10 +693,11 @@ export function ZoneCard({
         {!unavailable && !firmwareControlled && controlled && device.ledsOn && (
           <DeviceLedStrip device={device} slot={stackSlot} pick={ledPick} fullscreen={ledFullscreen} pickOnly={ledPickOnly} />
         )}
-        {/* Only a pinned card carries the pin; a press unpins it. Pinning a
-            following card is the menu's Pin, or a pick with it selected. */}
+        {/* Only a pinned card carries the button, in its mode's tab icon; hover
+            shows PinOff and a press unpins. Pinning a following card is the
+            menu's Pin, or a pick with it selected. */}
         {pin?.pinned && !toggleMode && !unavailable && !firmwareControlled && (
-          <HoverTooltip body={t('lighting.pin.pinnedTo', { name: pin.targetName ?? '' })} side="top">
+          <HoverTooltip title={t('lighting.pin.pinnedTo', { name: pin.targetName ?? '' })} body={t('lighting.pin.clickToUnpin')} side="top">
             <button
               type="button"
               className={`${styles.deviceSettingsBtn} ${styles.deviceBadgeBtn} ${styles.devicePinBtn}`}
@@ -701,7 +708,8 @@ export function ZoneCard({
                 pin.setPinned(false);
               }}
             >
-              <Pin />
+              <PinIcon className={styles.devicePinMode} />
+              <PinOff className={styles.devicePinOff} />
             </button>
           </HoverTooltip>
         )}

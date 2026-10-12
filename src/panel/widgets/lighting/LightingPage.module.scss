@@ -1313,7 +1313,23 @@
 .devicePinBtn {
   opacity: 1;
   color: var(--text-dim);
+
+  // Lit on a selected card, as the stack badge is; hover keeps its accent.
+  .deviceCardSelected &:not(:hover) { color: var(--text); }
 }
+
+.devicePinOff,
+.devicePinBtn:hover .devicePinMode {
+  display: none;
+}
+
+.devicePinBtn:hover .devicePinOff {
+  display: block;
+}
+
+// Own rules: Chromium 83 lacks :focus-visible and would drop a list holding it.
+.devicePinBtn:focus-visible .devicePinMode { display: none; }
+.devicePinBtn:focus-visible .devicePinOff { display: block; }
 
 // Stays visible (overrides .deviceSettingsBtn's opacity:0) when the
 // device is off, so the power-on control is always reachable. When on,

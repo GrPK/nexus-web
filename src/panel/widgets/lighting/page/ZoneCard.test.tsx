@@ -824,6 +824,15 @@ describe('ZoneCard pin', () => {
     expect(setPinned).toHaveBeenCalledWith(false);
   });
 
+  it.each([
+    ['static', 'lucide-palette'], ['animate', 'lucide-sparkles'], ['mirror', 'lucide-monitor'], ['media', 'lucide-film'],
+  ] as const)('wears the tab icon of a %s pin, with PinOff for the hover', (kind, icon) => {
+    renderPin({ pinned: true, targetName: 'Aurora', kind });
+    const btn = button('lighting.pin.pinnedTo:{"name":"Aurora"}')!;
+    expect(btn.querySelector(`.${styles.devicePinMode}`)?.classList.contains(icon)).toBe(true);
+    expect(btn.querySelector(`.${styles.devicePinOff}`)?.classList.contains('lucide-pin-off')).toBe(true);
+  });
+
   it('keeps the button after the strip and does not select the card when pressed', () => {
     const onSelect = vi.fn();
     renderPin({ pinned: true, targetName: 'Aurora' }, { onSelect });

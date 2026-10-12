@@ -2925,6 +2925,7 @@
   "lighting.panel.prev": "Назад",
   "lighting.panel.screenActive": "Зеркало активно",
   "lighting.pause": "Пауза",
+  "lighting.pin.clickToUnpin": "Нажмите, чтобы открепить",
   "lighting.pin.disabledGameSync": "Game Sync нельзя закрепить",
   "lighting.pin.disabledOff": "Подсветка выключена, закреплять нечего",
   "lighting.pin.disabledUnavailable": "Сейчас не к чему закреплять",

@@ -1,7 +1,7 @@
-import type { Pin } from '../../../api/lighting';
+import type { Pin, PinKind } from '../../../api/lighting';
 import { hexToHsv, hsvToHex } from '../../../lib/settings';
 import { nearestPaletteId, paletteColorForKey, paletteFamilyKey, paletteKey, type PaletteColor } from '../../../types/lightingPalette';
-import { EFFECTS, type EffectState } from '../../../types/lighting';
+import { EFFECTS, type EffectState, type LightingMode } from '../../../types/lighting';
 import { isSimpleAnimation, simpleAnimationLabelKey } from './simpleAnimations';
 
 /** Device id to the pin it wears. Absent means following the global mode. */
@@ -73,6 +73,9 @@ export const paletteColorPin = (color: PaletteColor): Pin => ({
 });
 
 export const animatePin = (effect: string): Pin => ({ kind: 'animate', effect });
+
+/** The mode tab a pin kind belongs to, whose icon the pinned card wears. */
+export const pinMode = (kind: PinKind): LightingMode => kind === 'mirror' ? 'screen' : kind === 'media' ? 'gif' : kind;
 
 export const MIRROR_PIN: Pin = { kind: 'mirror' };
 /** The one shared Media source, as Mirror is the one shared capture. */

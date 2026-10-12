@@ -2890,6 +2890,7 @@
   "lighting.panel.prev": "上一個",
   "lighting.panel.screenActive": "鏡射已啟用",
   "lighting.pause": "暫停",
+  "lighting.pin.clickToUnpin": "點擊取消釘選",
   "lighting.pin.disabledGameSync": "Game Sync 無法釘選",
   "lighting.pin.disabledOff": "燈光已關閉，沒有可釘選的內容",
   "lighting.pin.disabledUnavailable": "目前沒有可釘選的目標",

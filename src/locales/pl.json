@@ -2925,6 +2925,7 @@
   "lighting.panel.prev": "Poprzedni",
   "lighting.panel.screenActive": "Lustro jest aktywne",
   "lighting.pause": "Pauza",
+  "lighting.pin.clickToUnpin": "Kliknij, aby odpiąć",
   "lighting.pin.disabledGameSync": "Game Sync nie można przypiąć",
   "lighting.pin.disabledOff": "Oświetlenie jest wyłączone, nie ma czego przypiąć",
   "lighting.pin.disabledUnavailable": "Na razie nie ma do czego przypiąć",

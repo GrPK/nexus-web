@@ -2890,6 +2890,7 @@
   "lighting.panel.prev": "Précédent",
   "lighting.panel.screenActive": "Le miroir est actif",
   "lighting.pause": "Pause",
+  "lighting.pin.clickToUnpin": "Cliquez pour désépingler",
   "lighting.pin.disabledGameSync": "Game Sync ne peut pas être épinglé",
   "lighting.pin.disabledOff": "L'éclairage est éteint, il n'y a rien à épingler",
   "lighting.pin.disabledUnavailable": "Rien sur quoi épingler pour le moment",

@@ -2890,6 +2890,7 @@
   "lighting.panel.prev": "Zurück",
   "lighting.panel.screenActive": "Spiegel ist aktiv",
   "lighting.pause": "Pause",
+  "lighting.pin.clickToUnpin": "Klicken zum Lösen",
   "lighting.pin.disabledGameSync": "Game Sync kann nicht angeheftet werden",
   "lighting.pin.disabledOff": "Beleuchtung ist aus, es lässt sich nichts anheften",
   "lighting.pin.disabledUnavailable": "Im Moment gibt es nichts zum Anheften",

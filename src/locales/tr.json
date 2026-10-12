@@ -2890,6 +2890,7 @@
   "lighting.panel.prev": "Önceki",
   "lighting.panel.screenActive": "Yansıtma etkin",
   "lighting.pause": "Duraklat",
+  "lighting.pin.clickToUnpin": "Sabitlemeyi kaldırmak için tıklayın",
   "lighting.pin.disabledGameSync": "Game Sync sabitlenemez",
   "lighting.pin.disabledOff": "Aydınlatma kapalı, sabitlenecek bir şey yok",
   "lighting.pin.disabledUnavailable": "Şu anda sabitlenecek bir hedef yok",

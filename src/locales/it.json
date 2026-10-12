@@ -2890,6 +2890,7 @@
   "lighting.panel.prev": "Indietro",
   "lighting.panel.screenActive": "Il mirror è attivo",
   "lighting.pause": "Pausa",
+  "lighting.pin.clickToUnpin": "Fai clic per staccare",
   "lighting.pin.disabledGameSync": "Game Sync non può essere fissato",
   "lighting.pin.disabledOff": "L'illuminazione è spenta, non c'è nulla da fissare",
   "lighting.pin.disabledUnavailable": "Al momento non c'è nulla a cui fissare",

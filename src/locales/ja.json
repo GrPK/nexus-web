@@ -2890,6 +2890,7 @@
   "lighting.panel.prev": "前へ",
   "lighting.panel.screenActive": "ミラーが有効です",
   "lighting.pause": "一時停止",
+  "lighting.pin.clickToUnpin": "クリックでピン留めを解除",
   "lighting.pin.disabledGameSync": "Game Sync にはピン留めできません",
   "lighting.pin.disabledOff": "ライティングがオフのため、ピン留めできません",
   "lighting.pin.disabledUnavailable": "現在ピン留めできる対象がありません",

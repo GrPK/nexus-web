@@ -2890,6 +2890,7 @@
   "lighting.panel.prev": "Previous",
   "lighting.panel.screenActive": "Mirror is active",
   "lighting.pause": "Pause",
+  "lighting.pin.clickToUnpin": "Click to unpin",
   "lighting.pin.disabledGameSync": "Game Sync can't be pinned",
   "lighting.pin.disabledOff": "Lighting is off, so nothing can be pinned",
   "lighting.pin.disabledUnavailable": "Nothing to pin to right now",

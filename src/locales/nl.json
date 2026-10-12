@@ -2890,6 +2890,7 @@
   "lighting.panel.prev": "Vorige",
   "lighting.panel.screenActive": "Spiegelen is actief",
   "lighting.pause": "Pauzeren",
+  "lighting.pin.clickToUnpin": "Klik om los te maken",
   "lighting.pin.disabledGameSync": "Game Sync kan niet worden vastgezet",
   "lighting.pin.disabledOff": "Verlichting staat uit, er valt niets vast te zetten",
   "lighting.pin.disabledUnavailable": "Er is nu niets om aan vast te zetten",

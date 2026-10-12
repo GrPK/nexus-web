@@ -2890,6 +2890,7 @@
   "lighting.panel.prev": "Anterior",
   "lighting.panel.screenActive": "O espelho está ativo",
   "lighting.pause": "Pausar",
+  "lighting.pin.clickToUnpin": "Clique para desafixar",
   "lighting.pin.disabledGameSync": "Game Sync não pode ser fixado",
   "lighting.pin.disabledOff": "A iluminação está desligada, não há nada a fixar",
   "lighting.pin.disabledUnavailable": "No momento não há nada a que fixar",

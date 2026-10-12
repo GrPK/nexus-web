@@ -393,6 +393,7 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
     return {
       pinned: !!pin,
       targetName: pin ? pinTargetName?.(pin) : undefined,
+      kind: pin?.kind,
       disabledReason: pinSource == null ? pinDisabledReason : undefined,
       setPinned: value => onSetPin([id], value),
     };
