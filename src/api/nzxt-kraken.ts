@@ -20,6 +20,8 @@ export interface KrakenState {
   lcdBrightness: number;
   lcdOrientation: number;
   lcdMode: 'liquid' | 'image' | 'off';
+  /** Absent/null = on. */
+  lcdSleepWhenLocked?: boolean | null;
   channels: KrakenChannel[];
 }
 
@@ -27,6 +29,7 @@ export interface KrakenLcdPatch {
   brightness?: number;
   orientation?: number;
   mode?: KrakenState['lcdMode'];
+  sleepWhenLocked?: boolean;
 }
 
 export function getKrakenState(): Promise<KrakenState | null> {

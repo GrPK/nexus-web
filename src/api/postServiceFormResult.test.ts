@@ -38,23 +38,23 @@ describe('postServiceFormResult', () => {
   it("carries a refusal's own message where postServiceForm returns null", async () => {
     const refused = () => new Response(JSON.stringify({ error: true, msg: 'Unsupported file format' }), { status: 400 });
     vi.stubGlobal('fetch', vi.fn(async () => refused()));
-    expect(await postServiceFormResult<Stage>('/x/stage', new FormData())).toEqual({ error: true, msg: 'Unsupported file format' });
+    expect(await postServiceFormResult<Stage>('/x/stage', new FormData())).toEqual({ error: true, msg: 'Unsupported file format', status: 400 });
     expect(await postServiceForm<Stage>('/x/stage', new FormData())).toBeNull();
   });
 
   it('treats an accepted answer without a body as a refusal by status, never as unreachable', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })));
-    expect(await postServiceFormResult<Stage>('/x/stage', new FormData())).toEqual({ error: true, msg: 'HTTP 204' });
+    expect(await postServiceFormResult<Stage>('/x/stage', new FormData())).toEqual({ error: true, msg: 'HTTP 204', status: 204 });
   });
 
   it('falls back to the status when a refusal has no readable message', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>oops</html>', { status: 502 })));
-    expect(await postServiceFormResult<Stage>('/x/stage', new FormData())).toEqual({ error: true, msg: 'HTTP 502' });
+    expect(await postServiceFormResult<Stage>('/x/stage', new FormData())).toEqual({ error: true, msg: 'HTTP 502', status: 502 });
   });
 
   it('reports a problem body by its detail', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ title: 'Error', detail: 'ffmpeg exited 1' }), { status: 500 })));
-    expect(await postServiceFormResult<Stage>('/x/stage', new FormData())).toEqual({ error: true, msg: 'ffmpeg exited 1' });
+    expect(await postServiceFormResult<Stage>('/x/stage', new FormData())).toEqual({ error: true, msg: 'ffmpeg exited 1', status: 500 });
   });
 
   it('is null only when the request never got an answer', async () => {

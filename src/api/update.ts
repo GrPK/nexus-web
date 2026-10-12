@@ -1,8 +1,8 @@
-import { fetchService, postService } from './service';
+import { authFetchWithStatus, fetchService, postService } from './service';
 
 export type UpdateChannel = 'production' | 'beta';
 export type UpdateMode = 'notify' | 'download' | 'always';
-export type UpdateState = 'idle' | 'checking' | 'downloading' | 'verifying' | 'installing' | 'failed';
+export type UpdateState = 'idle' | 'checking' | 'downloading' | 'verifying' | 'installing' | 'ready' | 'failed';
 export type UpdatePhase = 'idle' | 'downloading' | 'verifying' | 'launching' | 'installing' | 'failed' | 'done';
 
 export interface UpdateStatus {
@@ -64,3 +64,39 @@ export const startUpdate = (version?: string, options?: { reopenAfter?: boolean 
 
 export const getUpdateProgress = () =>
   fetchService<UpdateProgress>('/update/progress');
+
+export type ChannelDirection = 'upgrade' | 'downgrade' | 'none';
+
+// What switching to a channel would install. version is empty when the
+// channel has no release; error is empty unless the lookup failed.
+export interface ChannelTarget {
+  channel: UpdateChannel;
+  currentVersion: string;
+  version: string;
+  direction: ChannelDirection;
+  canAutoInstall: boolean;
+  downloadUrl: string;
+  releaseNotes: string;
+  error: string;
+}
+
+export const getChannelTarget = (channel: UpdateChannel) =>
+  fetchService<ChannelTarget>(`/update/channel-target?channel=${channel}`);
+
+// started: the install is running. refused: the service answered and declined
+// (a 409 carries why in msg). unreachable: no answer, worth retrying.
+export type SwitchChannelResult =
+  | { kind: 'started' }
+  | { kind: 'refused'; msg: string }
+  | { kind: 'unreachable' };
+
+export async function switchChannel(channel: UpdateChannel, version: string): Promise<SwitchChannelResult> {
+  const { response, status } = await authFetchWithStatus('/update/switch-channel', { method: 'POST', body: { channel, version } });
+  if (!response || status === 0) return { kind: 'unreachable' };
+  let body: { started?: boolean; msg?: string } | null = null;
+  try {
+    body = (await response.json()) as { started?: boolean; msg?: string };
+  } catch { /* a refusal without a JSON body still refuses */ }
+  if (response.ok && body?.started) return { kind: 'started' };
+  return { kind: 'refused', msg: body?.msg ?? '' };
+}

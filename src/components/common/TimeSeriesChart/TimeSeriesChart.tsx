@@ -43,6 +43,12 @@ export const CHART_EVENT_ICONS: Record<MonitoringEventKind, LucideIcon> = {
   custom: Pencil,
 };
 
+/** Wire kinds are only cast to MonitoringEventKind, so a kind this build does
+ *  not know (older web against a newer service) must still render. */
+export function chartEventIcon(kind: string): LucideIcon {
+  return (CHART_EVENT_ICONS as Record<string, LucideIcon | undefined>)[kind] ?? Pencil;
+}
+
 /** A privacy session (endT non-null, or still-open with endT null) draws a
  *  duration bar in the event lane instead of just a point marker. Stored
  *  events never carry a duration - their endT is always null. */
@@ -632,7 +638,7 @@ export function TimeSeriesChart({
         {eventClusters.map(cluster => {
           const anchor = cluster.events[0];
           const count = cluster.events.length;
-          const Icon = CHART_EVENT_ICONS[anchor.kind];
+          const Icon = chartEventIcon(anchor.kind);
           const activate = () => onEventClick?.(anchor);
           return (
             <g key={anchor.key}>

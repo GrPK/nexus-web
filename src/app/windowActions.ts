@@ -52,12 +52,17 @@ export const NEXUS_GALLERY_DROP_PATHS = 'nexus:gallery-drop-paths';
 /**
  * Hand dropped files to the shell so it can resolve their disk paths.
  * Returns false when no path-capable shell bridge is present (plain
- * browser tabs) - the caller shows a "use the picker" hint instead.
+ * browser tabs) or WebView2 refuses a File with no disk path (dragged from a
+ * browser, pasted, generated) - the caller shows a "use the picker" hint instead.
  */
 export function postGalleryDrop(files: File[]): boolean {
   const wv = (window as Window & { chrome?: { webview?: NexusShellWebView } }).chrome?.webview;
   if (!wv?.postMessageWithAdditionalObjects) return false;
-  wv.postMessageWithAdditionalObjects(NEXUS_GALLERY_DROP, files);
+  try {
+    wv.postMessageWithAdditionalObjects(NEXUS_GALLERY_DROP, files);
+  } catch {
+    return false;
+  }
   return true;
 }
 

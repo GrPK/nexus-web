@@ -1,6 +1,6 @@
 import { Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
+import { SettingSelect, SettingSlider, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { Button } from '../../common/Button/Button';
 import { Notice } from '../../common/Notice/Notice';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
@@ -58,13 +58,19 @@ export function CorsairLcdSettings() {
   // Set while the brightness thumb is being dragged, so the poll below keeps the local
   // value instead of snapping it back to whatever the service last reported.
   const brightnessDirtyRef = useRef(false);
+  // Same guard for the sleep toggle while its write is in flight.
+  const sleepDirtyRef = useRef(false);
 
   const refresh = useCallback(async () => {
     const s = await getCorsairLcdState();
     if (!aliveRef.current || s === null) return;
-    setState(prev => (prev && brightnessDirtyRef.current
-      ? { ...s, brightness: prev.brightness }
-      : s));
+    setState(prev => {
+      if (!prev) return s;
+      let merged = s;
+      if (brightnessDirtyRef.current) merged = { ...merged, brightness: prev.brightness };
+      if (sleepDirtyRef.current) merged = { ...merged, sleepWhenLocked: prev.sleepWhenLocked };
+      return merged;
+    });
   }, []);
 
   const refreshMedia = useCallback(async () => {
@@ -164,6 +170,22 @@ export function CorsairLcdSettings() {
             value: String(r.value),
             label: localizeNumbers(`${r.degrees}°`, numberFormat),
           }))}
+          disabled={!loaded}
+        />
+
+        <SettingToggle
+          label={t('devices.lcd.sleepWhenLocked')}
+          checked={state?.sleepWhenLocked ?? true}
+          onChange={() => {
+            if (!state) return;
+            const next = !(state.sleepWhenLocked ?? true);
+            setState({ ...state, sleepWhenLocked: next });
+            sleepDirtyRef.current = true;
+            void commit({ sleepWhenLocked: next }).finally(() => {
+              sleepDirtyRef.current = false;
+              void refresh();
+            });
+          }}
           disabled={!loaded}
         />
       </SettingsSection>

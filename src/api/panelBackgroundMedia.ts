@@ -17,6 +17,15 @@ export interface BackgroundMediaItem {
 export const fetchBackgroundMediaLibrary = (deviceId: string) =>
   fetchService<{ items: BackgroundMediaItem[] }>(`/panel/devices/${encodeURIComponent(deviceId)}/background-media/library`);
 
+// Mirrors the service's request body cap on the stage route.
+export const BACKGROUND_MEDIA_MAX_BYTES = 500 * 1024 * 1024;
+export const BACKGROUND_MEDIA_MAX_MB = BACKGROUND_MEDIA_MAX_BYTES / (1024 * 1024);
+
+export const isBackgroundMediaTooLarge = (file: { size: number }): boolean => file.size > BACKGROUND_MEDIA_MAX_BYTES;
+
+/** True when the service refused the stage for size (HTTP 413). */
+export const isStageTooLargeRefusal = (r: object & { status?: number }): boolean => r.status === 413;
+
 export interface BackgroundMediaStageResult { stageId: string; alpha: boolean; mediaKind?: StageMediaKind; error: boolean; msg: string }
 
 // Stage and commit answer a refusal (oversize, unsupported, unreadable) with

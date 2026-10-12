@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Lock, Palette, Plus, QrCode, ShieldAlert } from 'lucide-react';
+import { Image, Lock, Palette, Plus, QrCode, Settings, ShieldAlert } from 'lucide-react';
 import { usePanelTraySwipe } from '../engine/usePanelTraySwipe';
 import { cssPxPerMm } from '../engine/panelGrid';
 import { TRAY_COMMIT_FLICK_MM_PER_MS, TRAY_COMMIT_TRAVEL_MM, TRAY_ENGAGE_TRAVEL_MM } from '../engine/gestureThresholds';
@@ -21,8 +21,8 @@ interface PanelActionsTrayProps {
   pairAvailable: boolean;
   // Opens the in-panel pairing sheet: on a local hardwired kiosk (Y70, touch
   // monitor) this PC's authorized-devices list, on a phone surface the
-  // phone's own remembered-PCs list. Distinct from onPair, which triggers the
-  // native app's OS dialog.
+  // phone's own remembered-PCs list. Distinct from onPair, which opens the
+  // native app's Settings sheet.
   onPairSheet?: () => void;
   pairSheetAvailable?: boolean;
   // Surface element the swipe-up gesture binds to. The hook walks
@@ -111,12 +111,13 @@ export function PanelActionsTray({
   const dragProgress = dragging ? Math.min(1, swipe.offset / 80) : 0;
   const showScrim = (open && !pinnedOpen) || dragging;
 
-  // The pairing button shows on two surfaces with different actions: inside the
-  // native app wrapper it triggers the OS pairing dialog (onPair); everywhere
-  // else it opens the in-panel pairing sheet (onPairSheet) - the host's
-  // authorized-devices list on a local hardwired kiosk, or the phone's own
-  // remembered-PCs list on a phone surface.
-  const pairAction = isNativeApp()
+  // Inside the native app wrapper this tile opens the app's Settings sheet
+  // (onPair) and is labeled Settings; everywhere else it is Pairing and opens
+  // the in-panel pairing sheet (onPairSheet) - the host's authorized-devices
+  // list on a local hardwired kiosk, or the phone's own remembered-PCs list on
+  // a phone surface.
+  const nativeApp = isNativeApp();
+  const pairAction = nativeApp
     ? (pairAvailable && onPair ? onPair : undefined)
     : (pairSheetAvailable && onPairSheet ? onPairSheet : undefined);
 
@@ -214,8 +215,8 @@ export function PanelActionsTray({
           {pairAction && (
             <IconLabelButton
               className={styles.tile}
-              icon={<QrCode />}
-              label={t('panel.actions.pairing')}
+              icon={nativeApp ? <Settings /> : <QrCode />}
+              label={t(nativeApp ? 'panel.actions.settings' : 'panel.actions.pairing')}
               onPress={() => { pairAction(); onClose(); }}
             />
           )}

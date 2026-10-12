@@ -11,17 +11,23 @@ const api = vi.hoisted(() => ({
   rejected: new Set<string>(),
   // File names whose stage never gets an answer (the transport's null).
   unreachable: new Set<string>(),
+  // File names the service answers with 413.
+  tooLarge: new Set<string>(),
   // When set, every stage waits on it: lets a test unmount mid-batch.
   gate: null as Promise<void> | null,
   refresh: vi.fn(() => Promise.resolve()),
   library: [] as BackgroundMediaItem[],
 }));
 
-vi.mock('../../api/panelBackgroundMedia', () => ({
+vi.mock('../../api/panelBackgroundMedia', async () => ({
+  isBackgroundMediaTooLarge: (await vi.importActual<typeof import('../../api/panelBackgroundMedia')>('../../api/panelBackgroundMedia')).isBackgroundMediaTooLarge,
+  isStageTooLargeRefusal: (await vi.importActual<typeof import('../../api/panelBackgroundMedia')>('../../api/panelBackgroundMedia')).isStageTooLargeRefusal,
+  BACKGROUND_MEDIA_MAX_MB: 500,
   stageBackgroundMedia: vi.fn(async (_deviceId: string, file: File) => {
     if (api.gate) await api.gate;
     if (api.unreachable.has(file.name)) return null;
     if (api.rejected.has(file.name)) return { error: true, msg: 'Unsupported file format' };
+    if (api.tooLarge.has(file.name)) return { error: true, msg: 'HTTP 413', status: 413 };
     const ext = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase();
     const mediaKind = ext === 'mp4' || ext === 'webm' ? 'video' : ext === 'gif' ? 'gif' : 'image';
     return { stageId: `stage-${file.name}`, mediaKind, error: false, msg: '' };
@@ -115,6 +121,7 @@ beforeEach(() => {
   api.library = [];
   api.rejected = new Set();
   api.unreachable = new Set();
+  api.tooLarge = new Set();
   api.gate = null;
 });
 
@@ -200,6 +207,26 @@ describe('BackgroundMediaPicker multi-file import', () => {
 
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith('item-stage-b.jpg', 'static', false));
     expect(screen.getByText('lighting.controls.importFolderPartial:failed=1:total=2')).toBeInTheDocument();
+  });
+
+  it('skips a file over the size cap without uploading it', async () => {
+    const big = new File(['x'], 'big.mp4', { type: 'video/mp4' });
+    Object.defineProperty(big, 'size', { value: 500 * 1024 * 1024 + 1 });
+    renderPicker();
+
+    pickFiles([big]);
+
+    await waitFor(() => expect(screen.getByText('lighting.controls.importTooLarge:limit=500')).toBeInTheDocument());
+    expect(stageBackgroundMedia).not.toHaveBeenCalled();
+  });
+
+  it('treats a 413 from the service as too large', async () => {
+    api.tooLarge.add('a.jpg');
+    renderPicker();
+
+    pickFiles([new File(['x'], 'a.jpg', { type: 'image/jpeg' })]);
+
+    await waitFor(() => expect(screen.getByText('lighting.controls.importTooLarge:limit=500')).toBeInTheDocument());
   });
 
   it('stops at an unreachable service and says so', async () => {

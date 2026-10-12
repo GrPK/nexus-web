@@ -1,5 +1,5 @@
 import { formatDuration } from '../../../../lib/formatDuration';
-import type { MonitoringEventKind, TimelineEvent } from '../../../../api/monitoringEvents';
+import { MONITORING_EVENT_KINDS, type MonitoringEventKind, type TimelineEvent } from '../../../../api/monitoringEvents';
 import { hour12OptionFor, type TimeFormat } from '../../../../lib/units';
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
@@ -7,7 +7,9 @@ type Translate = (key: string, vars?: Record<string, string | number>) => string
 /** Translated name for an event kind, shared by the chart tooltip, the events
  *  modal, and the per-kind settings rows so the three cannot drift. */
 export function eventKindLabel(t: Translate, kind: MonitoringEventKind): string {
-  return t(`monitoring.events.kind.${kind}`);
+  // A kind from a newer service has no translation; show the generic label
+  // like the chart does for its icon.
+  return t(`monitoring.events.kind.${MONITORING_EVENT_KINDS.includes(kind) ? kind : 'custom'}`);
 }
 
 /** Clock time for an event marker. Always carries seconds: an event is a

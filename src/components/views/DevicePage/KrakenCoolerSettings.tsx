@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image as ImageIcon, Lightbulb, Unplug } from 'lucide-react';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
-import { SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
+import { SettingSelect, SettingSlider, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { Button } from '../../common/Button/Button';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import {
@@ -54,6 +54,8 @@ export function KrakenCoolerSettings({ onSectionNavigate, screenStreamed = false
   // Set while the brightness thumb is being dragged, so the poll below keeps the local
   // value instead of snapping it back to whatever the cooler last reported.
   const brightnessDirtyRef = useRef(false);
+  // Same guard for the sleep toggle while its write is in flight.
+  const sleepDirtyRef = useRef(false);
 
   const refresh = useCallback(async () => {
     const s = await getKrakenState();
@@ -64,9 +66,13 @@ export function KrakenCoolerSettings({ onSectionNavigate, screenStreamed = false
       return;
     }
     setConnection('connected');
-    setState(prev => (prev && brightnessDirtyRef.current
-      ? { ...s, lcdBrightness: prev.lcdBrightness }
-      : s));
+    setState(prev => {
+      if (!prev) return s;
+      let merged = s;
+      if (brightnessDirtyRef.current) merged = { ...merged, lcdBrightness: prev.lcdBrightness };
+      if (sleepDirtyRef.current) merged = { ...merged, lcdSleepWhenLocked: prev.lcdSleepWhenLocked };
+      return merged;
+    });
   }, []);
 
   useEffect(() => {
@@ -202,6 +208,22 @@ export function KrakenCoolerSettings({ onSectionNavigate, screenStreamed = false
                 value: String(deg),
                 label: localizeNumbers(`${deg}°`, numberFormat),
               }))}
+              disabled={!loaded}
+            />
+
+            <SettingToggle
+              label={t('devices.lcd.sleepWhenLocked')}
+              checked={state?.lcdSleepWhenLocked ?? true}
+              onChange={() => {
+                if (!state) return;
+                const next = !(state.lcdSleepWhenLocked ?? true);
+                setState({ ...state, lcdSleepWhenLocked: next });
+                sleepDirtyRef.current = true;
+                void commitLcd({ sleepWhenLocked: next }).finally(() => {
+                  sleepDirtyRef.current = false;
+                  void refresh();
+                });
+              }}
               disabled={!loaded}
             />
 

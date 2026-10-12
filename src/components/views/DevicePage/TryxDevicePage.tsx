@@ -30,6 +30,7 @@ import {
   installTryxCloudMaterial,
   setTryxEnabled,
   setTryxBrightness,
+  setTryxSleepWhenLocked,
   setTryxPreset,
   selectTryxMedia,
   deleteTryxMedia,
@@ -176,6 +177,7 @@ export function TryxDevicePage() {
   const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [screenOverride, setScreenOverride] = useState<boolean | null>(null);
+  const [sleepLockedOverride, setSleepLockedOverride] = useState<boolean | null>(null);
   const [slideshowOverride, setSlideshowOverride] = useState<TryxSlideshow | null>(null);
   const [overlayItems, setOverlayItems] = useState<OverlayItemState[]>(DEFAULT_OVERLAY_ITEMS);
   const [overlayFont, setOverlayFont] = useState<string>(TRYX_FONTS[0]);
@@ -417,9 +419,13 @@ export function TryxDevicePage() {
   const hasEnabledOverlayItem = overlayItems.some(item => item.enabled);
   // Optimistic screen toggle wins until the poll confirms it.
   const screenEnabled = screenOverride ?? (status?.state?.screenEnabled ?? true);
+  const sleepWhenLocked = sleepLockedOverride ?? (status?.sleepWhenLocked ?? true);
   useEffect(() => {
     if (screenOverride != null && status?.state?.screenEnabled === screenOverride) setScreenOverride(null);
   }, [status?.state?.screenEnabled, screenOverride]);
+  useEffect(() => {
+    if (sleepLockedOverride != null && (status?.sleepWhenLocked ?? true) === sleepLockedOverride) setSleepLockedOverride(null);
+  }, [status?.sleepWhenLocked, sleepLockedOverride]);
   // Optimistic slideshow edit wins until the poll reports it back.
   const slideshow = slideshowOverride ?? status?.slideshow ?? DEFAULT_TRYX_SLIDESHOW;
   useEffect(() => {
@@ -773,6 +779,16 @@ export function TryxDevicePage() {
                     const rounded = Math.round(v);
                     setBrightness(rounded);
                     void setTryxBrightness(rounded);
+                  }}
+                />
+                <SettingToggle
+                  label={t('devices.lcd.sleepWhenLocked')}
+                  checked={sleepWhenLocked}
+                  onChange={enabled => {
+                    setSleepLockedOverride(enabled);
+                    void setTryxSleepWhenLocked(enabled).then(ok => {
+                      if (!ok) setSleepLockedOverride(cur => (cur === enabled ? null : cur));
+                    });
                   }}
                 />
               </SettingsSection>

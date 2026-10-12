@@ -73,6 +73,8 @@ export interface TryxStatus {
   overlay: TryxOverlay;
   /** Absent from a service that predates the slideshow. */
   slideshow?: TryxSlideshow;
+  /** Absent/null = on. */
+  sleepWhenLocked?: boolean | null;
 }
 
 export interface TryxPreset {
@@ -151,6 +153,11 @@ export async function setTryxEnabled(enable: boolean): Promise<boolean> {
 export async function setTryxBrightness(value: number): Promise<boolean> {
   if (isTryxSimulated()) return true;
   return isOk(await postService<OkResponse>('/tryx/brightness', { value }));
+}
+
+export async function setTryxSleepWhenLocked(enable: boolean): Promise<boolean> {
+  if (isTryxSimulated()) return true;
+  return isOk(await postService<OkResponse>('/tryx/sleep-when-locked', { enable }));
 }
 
 export async function getTryxPresets(): Promise<TryxPreset[]> {

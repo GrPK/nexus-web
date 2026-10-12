@@ -21,6 +21,9 @@ import {
   deleteBackgroundMedia,
   openBackgroundMediaFolder,
   stageBackgroundMedia,
+  isBackgroundMediaTooLarge,
+  isStageTooLargeRefusal,
+  BACKGROUND_MEDIA_MAX_MB,
 } from '../../api/panelBackgroundMedia';
 import { stageKlipyBackground, type KlipyGif } from '../../api/klipy';
 import { stagePreviewFor, type MediaItem } from '../../api/mediaLibrary';
@@ -106,14 +109,18 @@ export function BackgroundMediaPicker({
   // a queue, and each confirm or cancel stages the next. The tally decides
   // what to select and whether to start a slideshow once the queue is empty.
   const queueRef = useRef<File[]>([]);
-  const batchRef = useRef({ total: 0, imported: 0, failed: 0, first: null as BackgroundMediaItem | null });
+  const batchRef = useRef({ total: 0, imported: 0, failed: 0, tooLarge: 0, first: null as BackgroundMediaItem | null });
 
   const finishBatch = async () => {
-    const { total, imported, failed, first } = batchRef.current;
+    const { total, imported, failed, tooLarge, first } = batchRef.current;
     setImporting(false);
     setImportingName(null);
     setImportProgress(null);
-    setImportError(failed > 0 ? t('lighting.controls.importFolderPartial', { failed, total }) : null);
+    setImportError(
+      failed === 0 ? null
+        : tooLarge === failed ? t('lighting.controls.importTooLarge', { limit: BACKGROUND_MEDIA_MAX_MB })
+        : t('lighting.controls.importFolderPartial', { failed, total }),
+    );
     if (!first) return;
     await refresh();
     if (!aliveRef.current) return;
@@ -133,6 +140,12 @@ export function BackgroundMediaPicker({
     setImporting(true);
     setImportingName(file.name);
     setImportProgress(total > 1 ? { n, total } : null);
+    if (isBackgroundMediaTooLarge(file)) {
+      batchRef.current.failed += 1;
+      batchRef.current.tooLarge += 1;
+      await stageNext();
+      return;
+    }
     const staged = await stageBackgroundMedia(deviceId, file);
     if (!aliveRef.current) {
       // Unmounted mid-upload: nothing will commit this stage, so drop it now
@@ -149,6 +162,7 @@ export function BackgroundMediaPicker({
     }
     if (staged.error) {
       batchRef.current.failed += 1;
+      if (isStageTooLargeRefusal(staged)) batchRef.current.tooLarge += 1;
       await stageNext();
       return;
     }
@@ -174,7 +188,7 @@ export function BackgroundMediaPicker({
     }
     setImportError(null);
     queueRef.current = files;
-    batchRef.current = { total: files.length, imported: 0, failed: 0, first: null };
+    batchRef.current = { total: files.length, imported: 0, failed: 0, tooLarge: 0, first: null };
     await stageNext();
   };
 
@@ -196,7 +210,7 @@ export function BackgroundMediaPicker({
     }
     setKlipyOpen(false);
     queueRef.current = [];
-    batchRef.current = { total: 1, imported: 0, failed: 0, first: null };
+    batchRef.current = { total: 1, imported: 0, failed: 0, tooLarge: 0, first: null };
     setCropState({
       stageId: staged.stageId,
       ...stagePreviewFor(
