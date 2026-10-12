@@ -70,15 +70,17 @@ vi.mock('./page/ModeControls', () => ({
   ),
 }));
 vi.mock('./page/StaticPickerCanvas', () => ({
-  StaticPickerCanvas: ({ onCommit, onPreview, hex, devices, implied }: {
+  StaticPickerCanvas: ({ onCommit, onPreview, hex, devices, implied, patternEffect }: {
     onCommit: (hex: string) => void;
     onPreview: (hex: string) => void;
     hex: string;
     devices: { id: string; hex: string; pinned?: boolean }[];
     implied?: boolean;
+    patternEffect?: string | null;
   }) => (
     <div data-pick data-testid="picker-field">
       <span data-testid="picker-hex">{hex}</span>
+      <span data-testid="picker-pattern">{patternEffect ?? ''}</span>
       <span data-testid="picker-marks" data-implied={implied ? '1' : ''}>{devices.map(d => `${d.id}@${d.hex}${d.pinned ? '(pinned)' : ''}`).join(';')}</span>
       <button type="button" onClick={() => onCommit('#00ff00')}>pick-green</button>
       <button type="button" onClick={() => onPreview('#0000ff')}>preview-blue</button>
@@ -594,6 +596,27 @@ describe('LightingPage pins', () => {
       await waitFor(() => expect(startStatic).toHaveBeenCalled());
       expect(vi.mocked(startStatic).mock.calls.at(-1)?.[8]).toBeUndefined();
       await waitFor(() => expect(screen.getByTestId('picker-hex').textContent).toBe(''));
+    });
+
+    it('with nothing selected the preview shows the global pattern, and follows a pattern pick after a color', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('picker-pattern').textContent).toBe('checker'));
+      fireEvent.click(screen.getByText('pick-green'));
+      await waitFor(() => expect(screen.getByTestId('picker-pattern').textContent).toBe(''));
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      await waitFor(() => expect(screen.getByTestId('picker-pattern').textContent).toBe('stripes'));
+    });
+
+    it('follows a pattern another client picked', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('picker-pattern').textContent).toBe('checker'));
+      vi.mocked(fetchStaticSettings).mockResolvedValue({ effect: 'stripes', states: {} });
+      for (const h of topicHandlers.lighting) h();
+      await waitFor(() => expect(screen.getByTestId('picker-pattern').textContent).toBe('stripes'));
     });
 
     it('with nothing selected an Animate pick is global', async () => {

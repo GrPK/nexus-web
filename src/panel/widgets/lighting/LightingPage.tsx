@@ -762,10 +762,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // A pin set from another client arrives on this frame; ids with a write
     // still in flight here keep their local value.
     void refreshPins();
-    // A remote change of the global flat color.
+    // A remote change of the global flat color or pattern. A local pick clears
+    // the color, so the same guard keeps a stale reply off the pattern too.
     if (mode === 'static') {
       const land = readGlobalColor();
-      fetchStaticSettings().then(data => { if (data) land(data.color ?? ''); }).catch(() => {});
+      fetchStaticSettings().then(data => {
+        if (!data || !land(data.color ?? '') || !isStaticEffect(data.effect)) return;
+        staticEffectRef.current = data.effect;
+        setActiveEffect(data.effect);
+      }).catch(() => {});
     }
     // Static edits the same template slots, so both modes follow a remote edit.
     if (mode === 'animate' || mode === 'static') {
@@ -2158,11 +2163,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     [visibleDevices, selectedDeviceIds],
   );
 
-  // Static's canvas is the color picker. A pattern pin replaces the field
-  // with the effect's own render; a color pin (or none yet) keeps the field.
-  const staticPattern = viewMode === 'static' && pinTarget?.pin.kind === 'static' && !isPaletteKey(pinTarget.key)
-    ? { key: pinTarget.key, slot: pinTarget.slot }
-    : null;
+  // Static's canvas is the color picker. A pattern replaces the field with the
+  // effect's own render: a selection's pattern pin, or with nothing selected
+  // (or a following selection) the global pattern while no global color is set.
+  const staticPattern = viewMode !== 'static' ? null
+    : pinTarget ? (pinTarget.pin.kind === 'static' && !isPaletteKey(pinTarget.key) ? { key: pinTarget.key, slot: pinTarget.slot } : null)
+      : scoped.kind === 'none' && !globalColor && isStaticEffect(activeEffect) && !isPaletteKey(activeEffect)
+        ? { key: activeEffect, slot: slotOf(activeEffect) }
+        : null;
   // The picker tiles stand for "this selection's colour was chosen by hand", so
   // only a color pin, or the global flat color, lights one.
   const colorScoped = viewMode === 'static' && (pinTarget?.pin.kind === 'static'
