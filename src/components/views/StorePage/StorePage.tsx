@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  ChevronLeft, ChevronRight, Hand, HardDrive, LayoutGrid, Lightbulb, Ruler, ShieldCheck, Sparkles, Tag,
+  ChevronLeft, ChevronRight, Hand, HardDrive, LayoutGrid, Ruler, ShieldCheck, Sparkles, Tag,
 } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { Badge } from '../../common/Badge/Badge';
@@ -9,6 +9,7 @@ import { Notice, NoticeSecondary } from '../../common/Notice/Notice';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { Tabs } from '../../common/Tabs/Tabs';
 import { useTranslation } from '../../../lib/i18n';
+import { LIGHTING_MODE_ICONS } from '../../../lib/lightingModeIcons';
 import { formatDateTime, hour12OptionFor, type DateFormat, type TimeFormat } from '../../../lib/units';
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import {
@@ -31,6 +32,8 @@ import { resolveHttp } from '../../../api/service';
 import { openExternalUrl } from '../../../sandbox/ui/openExternal';
 import { widgetLayoutSize, type PanelWidgetSize } from '../../../panel/types';
 import styles from './StorePage.module.scss';
+
+const AnimationIcon = LIGHTING_MODE_ICONS.animate;
 
 // Raw defines, not DEV_TOOLS: only the literal folds far enough to drop the import() from production.
 const EffectsMarket = (import.meta.env.DEV || __DEV_TOOLS__)
@@ -686,7 +689,7 @@ export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES }: 
           ariaLabel={t('apps.tabs.store')}
           tabs={[
             { key: APPS_TAB, label: t('store.section.apps'), icon: <LayoutGrid size={14} /> },
-            { key: EFFECTS_ROUTE, label: t('store.effects.tab'), icon: <Lightbulb size={14} /> },
+            { key: EFFECTS_ROUTE, label: t('store.effects.tab'), icon: <AnimationIcon size={14} /> },
           ]}
           activeKey={effectsPath === null ? APPS_TAB : EFFECTS_ROUTE}
           onChange={key => open(key === EFFECTS_ROUTE ? EFFECTS_ROUTE : null)}

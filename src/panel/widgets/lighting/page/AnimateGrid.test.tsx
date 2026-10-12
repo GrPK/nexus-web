@@ -129,6 +129,12 @@ describe('AnimateGrid search', () => {
     expect(keys(container)).toEqual([]);
     expect(screen.getByText('lighting.effects.noMatches')).toBeInTheDocument();
   });
+
+  it('keeps the hint away when the leading saved effects match', () => {
+    render(<AnimateGrid effect="plasma" onSelect={() => {}} query="zzzz-no-such-effect" leading={<span>Mine</span>} leadingMatches />);
+    expect(screen.getByText('Mine')).toBeInTheDocument();
+    expect(screen.queryByText('lighting.effects.noMatches')).not.toBeInTheDocument();
+  });
 });
 
 describe('AnimateGrid pin badge', () => {

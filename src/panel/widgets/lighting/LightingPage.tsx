@@ -124,6 +124,8 @@ interface LightingViewProps {
   platform?: string;
   /** Navigate to a sibling dashboard section (e.g. the smart-lights app). */
   onSectionNavigate?: DashboardSectionNavigate;
+  /** Signed-in cloud account, which tells the user's own Studio effects from Marketplace downloads. */
+  accountUsername?: string | null;
 }
 
 const DEFAULT_POST_PROCESS: PostProcessState = { hue: 0, colorize: 0, saturation: 1, contrast: 1 };
@@ -171,15 +173,12 @@ const LightingScene3D = lazy(() => import('./scene/LightingScene3D'));
 const ShaderStudio = (import.meta.env.DEV || __DEV_TOOLS__)
   ? lazy(() => import('./studio/ShaderStudio').then(m => ({ default: m.ShaderStudio })))
   : null;
-const CustomEffectsGrid = (import.meta.env.DEV || __DEV_TOOLS__)
-  ? lazy(() => import('./studio/CustomEffectsGrid').then(m => ({ default: m.CustomEffectsGrid })))
+const SavedEffectSections = (import.meta.env.DEV || __DEV_TOOLS__)
+  ? lazy(() => import('./studio/CustomEffectsGrid').then(m => ({ default: m.SavedEffectSections })))
   : null;
-const SOURCE_BUILTIN = 'builtin';
-const SOURCE_CUSTOM = 'custom';
-type EffectSource = typeof SOURCE_BUILTIN | typeof SOURCE_CUSTOM;
 const VIEW_2D = '2d';
 const VIEW_3D = '3d';
-export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate }: LightingViewProps) {
+export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate, accountUsername = null }: LightingViewProps) {
   const { t, language } = useTranslation();
   const { mode, setMode, rawSync, setRawSync, synced, paused: syncedPaused } = useLightingSync(serviceOnline, activeProfileId);
   // gpuCanSwitch comes from the same enumeration the Settings picker gates on,
@@ -358,7 +357,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Saved effect to open in the studio; id null starts a new one.
   const [studioTarget, setStudioTarget] = useState<{ id: string | null } | null>(null);
   const [effectQuery, setEffectQuery] = useState('');
-  const [effectSource, setEffectSource] = useState<EffectSource>(SOURCE_BUILTIN);
   const sceneApi = useLightingScene(SCENE_3D);
   const [sceneEditorOpen, setSceneEditorOpen] = useState(false);
   const scene3d = SCENE_3D && !!sceneApi.scene?.view.enabled;
@@ -1089,6 +1087,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const customEntryFor = (key: string | null) =>
     (isCustomEffectKey(key) ? customEffects.find(e => e.id === customEffectId(key)) : undefined);
   const activeCustom = customEntryFor(activeEffect);
+  // A saved effect matching the search keeps the browser's no-matches hint away.
+  const savedMatch = !!SavedEffectSections && viewMode === 'animate' && effectQuery.trim() !== ''
+    && customEffects.some(e => matchesAllWords(effectQuery, [e.name]));
   const dockCustom = customEntryFor(dockEffect);
   const dockCustomDef = useMemo(() => (dockCustom ? customEffectDef(dockCustom, t) : undefined), [dockCustom, t]);
   // A custom effect has no service-authored presets; seed default slots so the dock can edit it.
@@ -2724,30 +2725,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     placeholder={t('lighting.effects.search')}
                     ariaLabel={t('lighting.effects.search')}
                   />
-                  {CustomEffectsGrid && viewMode === 'animate' && (
-                    <ChipGroup
-                      ariaLabel={t('lighting.effects.source')}
-                      options={[
-                        { key: SOURCE_BUILTIN, label: t('lighting.effects.builtIn') },
-                        { key: SOURCE_CUSTOM, label: t('lighting.effects.custom') },
-                      ]}
-                      activeKey={effectSource}
-                      onChange={key => setEffectSource(key as EffectSource)}
-                    />
+                  {ShaderStudio && viewMode === 'animate' && (
+                    <Button size="sm" icon={<SprayCan size={14} />} onClick={() => setStudioTarget({ id: null })}>
+                      {t('lighting.studio.title')}
+                    </Button>
                   )}
                 </div>
                 <div className={styles.browserWrap}>
-                {CustomEffectsGrid && viewMode === 'animate' && effectSource === SOURCE_CUSTOM ? (
-                  <Suspense fallback={null}>
-                    <CustomEffectsGrid
-                      effect={activeEffect}
-                      query={effectQuery}
-                      gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
-                      onSelect={handleEffectPick}
-                      onCreate={() => setStudioTarget({ id: null })}
-                    />
-                  </Suspense>
-                ) : (
                 <AnimateGrid
                   effect={gridEffect}
                   onSelect={handleEffectPick}
@@ -2759,7 +2743,18 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   panelEffects={panelUsage.effects}
                   pinnedDevices={pinnedDevices}
                   gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
-                  leading={viewMode === 'static' ? (
+                  leadingMatches={savedMatch}
+                  leading={viewMode === 'animate' ? (SavedEffectSections && (
+                    <Suspense fallback={null}>
+                      <SavedEffectSections
+                        effect={activeEffect}
+                        query={effectQuery}
+                        username={accountUsername}
+                        gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
+                        onSelect={handleEffectPick}
+                      />
+                    </Suspense>
+                  )) : viewMode === 'static' ? (
                     <CollapsibleSection
                       compact
                       title={t('lighting.static.pickerGroup')}
@@ -2785,7 +2780,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     </CollapsibleSection>
                   ) : undefined}
                 />
-                )}
                 </div>
                 </>
               ) : viewMode === 'none' ? (
@@ -2873,6 +2867,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           <ShaderStudio
             open
             effectId={studioTarget.id}
+            username={accountUsername}
             gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
             onSaved={handleCustomSaved}
             onViewListing={id => onSectionNavigate?.('store', { tab: `effects/${id}` })}

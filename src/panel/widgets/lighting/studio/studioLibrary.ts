@@ -17,6 +17,7 @@ export interface SavedEffect {
   updatedAt: number;
   marketId: string | null;
   marketAuthor: string | null;
+  downloaded: boolean | null;
 }
 
 const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
@@ -77,7 +78,7 @@ function toSaved(entry: CustomEffectEntry): SavedEffect | null {
     /* unreadable: skipped */
   }
   const saved = isRecipe(recipe)
-    ? { id: entry.id, name: entry.name, recipe, updatedAt: entry.updatedAt, marketId: entry.marketId ?? null, marketAuthor: entry.marketAuthor ?? null }
+    ? { id: entry.id, name: entry.name, recipe, updatedAt: entry.updatedAt, marketId: entry.marketId ?? null, marketAuthor: entry.marketAuthor ?? null, downloaded: entry.downloaded ?? null }
     : null;
   parsed.set(entry, saved);
   return saved;
@@ -99,6 +100,8 @@ export const newEffectId = () => `fx${Date.now().toString(36)}`;
 export interface MarketLink {
   marketId: string;
   marketAuthor: string;
+  /** Installed from the Marketplace (true) or published from this account (false). */
+  downloaded?: boolean;
 }
 
 /** Stores the recipe with its baked shader; resolves to the service's error text when it rejects the shader. */

@@ -165,6 +165,42 @@ function watch(): IntersectionObserver | null {
   return observer;
 }
 
+// The service's thumbnail size and frame time (LightingProvider.CaptureAnimateThumbnail).
+const STILL_W = 160;
+const STILL_H = 90;
+const STILL_TIME_S = 0.957;
+
+/** One frame of `recipe` as the service renders a custom effect's thumbnail, as a data URL; null without WebGL2 or when it fails to compile. */
+export function renderRecipeStill(recipe: StudioRecipe): string | null {
+  const g = context();
+  if (!g || !glCanvas) return null;
+  // Unbaked, so a knob edit reuses the linked program: the shader multiplies
+  // (adds, for hue) these uniforms with its neutral base constants.
+  const { frag, params } = compileStudio(recipe);
+  const base: Record<string, number> = {
+    u_speed: recipe.speed / 50, u_hue: recipe.hue, u_saturation: recipe.saturation, u_contrast: recipe.contrast,
+  };
+  const program = compile(g, frag);
+  if (!program) return null;
+  if (glCanvas.width < STILL_W) glCanvas.width = STILL_W;
+  if (glCanvas.height < STILL_H) glCanvas.height = STILL_H;
+  g.viewport(0, 0, STILL_W, STILL_H);
+  g.useProgram(program.prog);
+  for (const [name, loc] of program.locs) {
+    if (name === 'u_resolution') g.uniform2f(loc, STILL_W, STILL_H);
+    else if (name === 'u_time') g.uniform1f(loc, STILL_TIME_S);
+    else g.uniform1f(loc, params[name] ?? base[name] ?? NEUTRAL[name] ?? 0);
+  }
+  g.drawArrays(g.TRIANGLE_STRIP, 0, 4);
+  const out = document.createElement('canvas');
+  out.width = STILL_W;
+  out.height = STILL_H;
+  const ctx = out.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(glCanvas, 0, glCanvas.height - STILL_H, STILL_W, STILL_H, 0, 0, STILL_W, STILL_H);
+  return out.toDataURL();
+}
+
 /** Animates `recipe` into `canvas` until the returned detach runs. */
 export function attachRecipePreview(canvas: HTMLCanvasElement, recipe: StudioRecipe): () => void {
   const { frag, params } = compileStudio(recipe, { bake: true });

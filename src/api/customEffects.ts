@@ -25,6 +25,8 @@ export interface CustomEffectEntry {
   marketId?: string | null;
   /** That listing's author; equal to the signed-in username when this account published it. */
   marketAuthor?: string | null;
+  /** True when installed from the Marketplace; null on effects saved before the service recorded it. */
+  downloaded?: boolean | null;
 }
 
 let snapshot: CustomEffectEntry[] = [];
@@ -59,7 +61,7 @@ export function refreshCustomEffects(): Promise<void> {
 export async function putCustomEffect(
   id: string,
   // Omitted market fields keep the stored link.
-  body: { name: string; recipe: string; frag: string; marketId?: string; marketAuthor?: string },
+  body: { name: string; recipe: string; frag: string; marketId?: string; marketAuthor?: string; downloaded?: boolean },
 ): Promise<{ entry: CustomEffectEntry } | { error: string }> {
   const { response, status } = await authFetchWithStatus(`/lighting/custom-effects/${encodeURIComponent(id)}`, { method: 'PUT', body });
   if (!response) return { error: `HTTP ${status || 'unreachable'}` };

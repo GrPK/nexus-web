@@ -926,7 +926,7 @@ export function Dashboard() {
       case 'monitoring': return <FeatureGate feature="monitoring"><MonitoringPage serviceOnline={online} connectionState={status.state} tab={subtab} onTabChange={setSubtab} /></FeatureGate>;
       case 'screentime': return <ScreentimePage serviceOnline={online} connectionState={status.state} tab={subtab} onTabChange={setSubtab} />;
       case 'benchmark':  return <BenchmarkPage serviceOnline={online} connectionState={status.state} tab={subtab} onTabChange={setSubtab} />;
-      case 'lighting':   return <FeatureGate feature="lighting"><LightingPage serviceOnline={online} serviceState={serviceState} connectionState={status.state} activeProfileId={profilesHook.activeId} platform={status.ping?.platform ?? ''} onSectionNavigate={(target, payload) => {
+      case 'lighting':   return <FeatureGate feature="lighting"><LightingPage serviceOnline={online} serviceState={serviceState} accountUsername={cloudAccounts.activeAccount?.username ?? null} connectionState={status.state} activeProfileId={profilesHook.activeId} platform={status.ping?.platform ?? ''} onSectionNavigate={(target, payload) => {
         // The LED-map hub composition panel deep-links to a device page.
         if (target === 'device' && payload?.deviceKey) { navigate('system', 'device', payload.deviceKey); return; }
         // The canvas GPU notice deep-links to the render-GPU picker.

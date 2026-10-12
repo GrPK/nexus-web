@@ -78,11 +78,13 @@ function AnimateGridCell({ fx, slot, version, active, live, panel, pinnedNames, 
  * hardware gets a bulb. Effects are listed in pre-expanded category groups
  * (EFFECT_CATEGORIES order), each under a header in the cooling-panel style.
  */
-export function AnimateGrid({ effect, onSelect, effects = EFFECTS, query = '', slotFor, versionFor, rgbActiveEffect, panelEffects, pinnedDevices, gpuAvailable, frozen, leading }: {
+export function AnimateGrid({ effect, onSelect, effects = EFFECTS, query = '', slotFor, versionFor, rgbActiveEffect, panelEffects, pinnedDevices, gpuAvailable, frozen, leading, leadingMatches }: {
   effect: string;
   onSelect: (key: string) => void;
   /** Rendered above the category groups, inside the same scroll container. */
   leading?: ReactNode;
+  /** `leading` shows a search match, so no-matches stays hidden. */
+  leadingMatches?: boolean;
   /** Effect pool to show. Defaults to the full RGB set; panel backgrounds pass
    *  their own narrower pool, so categories it drops render no section. */
   effects?: EffectDef[];
@@ -183,7 +185,7 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, query = '', s
             </CollapsibleSection>
           );
         })}
-        {searching && groups.length === 0 && <p className={styles.browserHint}>{t('lighting.effects.noMatches')}</p>}
+        {searching && groups.length === 0 && !leadingMatches && <p className={styles.browserHint}>{t('lighting.effects.noMatches')}</p>}
       </div>
     </div>
   );

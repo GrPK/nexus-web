@@ -104,7 +104,7 @@ describe('EffectsMarket', () => {
     downloadEffect.mockResolvedValueOnce({ ok: true, value: { ...listing, downloads: 4 } });
     onNeedsSignIn.mock.calls[0][0]();
     await waitFor(() => expect(put).toHaveBeenCalled());
-    expect(put.mock.calls[0][1]).toMatchObject({ name: 'Fan spin', marketId: ID, marketAuthor: 'alice' });
+    expect(put.mock.calls[0][1]).toMatchObject({ name: 'Fan spin', marketId: ID, marketAuthor: 'alice', downloaded: true });
   });
 
   it('uninstalls every local copy of the listing after a confirmation', async () => {

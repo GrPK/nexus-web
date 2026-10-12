@@ -301,7 +301,7 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
     setListing(res.value);
     const parsed = recipeOf(res.value);
     const error = parsed
-      ? await saveEffect(newEffectId(), res.value.name, parsed, { marketId: res.value.id, marketAuthor: res.value.author })
+      ? await saveEffect(newEffectId(), res.value.name, parsed, { marketId: res.value.id, marketAuthor: res.value.author, downloaded: true })
       : 'unsupported';
     setState(error ? 'failed' : 'idle');
   };
@@ -348,7 +348,7 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
           </Button>
         )}
       </div>
-      {(installed.length > 0 || mine) && <span className={storeStyles.installedVersion}>{t('store.effects.whereToFind')}</span>}
+      {(installed.length > 0 || mine) && <span className={storeStyles.installedVersion}>{t(mine ? 'store.effects.whereToFind' : 'store.effects.whereToFindMarket')}</span>}
       {state === 'failed' && <InlineError>{t(installed.length > 0 ? 'store.effects.uninstallFailed' : 'store.effects.getFailed')}</InlineError>}
       {unpublishFailed && <InlineError>{t('store.effects.unpublishFailed')}</InlineError>}
     </header>

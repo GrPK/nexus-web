@@ -39,7 +39,7 @@ import styles from './ShaderStudio.module.scss';
 const STACKED = 'stacked' as const;
 
 const HISTORY_LIMIT = 50;
-const NEW_EFFECT_STARTER = 'neonKaleido';
+const NEW_EFFECT_STARTER = 'breathing';
 const VARIATION_COUNT = 6;
 // Live on devices: slider drags reach the LEDs at most this often. An idle
 // session is re-sent at a third of the lease the service last reported.
@@ -81,9 +81,11 @@ function VariationTile({ recipe, label, onPick }: { recipe: StudioRecipe; label:
 }
 
 /** `effectId` opens that saved effect; null starts a new one. */
-export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onViewListing, onClose }: {
+export function ShaderStudio({ open, effectId, username, gpuAvailable = true, onSaved, onViewListing, onClose }: {
   open: boolean;
   effectId: string | null;
+  /** Signed-in account, which tells My effects' own effects from Marketplace downloads. */
+  username?: string | null;
   /** False when the service renders without a GPU: My effects then skips rendered thumbnails. */
   gpuAvailable?: boolean;
   /** After a successful save: the effect id and the uniforms whose saved value changed or were unpinned. */
@@ -521,7 +523,9 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
                 <CustomEffectsGrid
                   effect={currentId ? customEffectKey(currentId) : null}
                   query={effectQuery}
+                  username={username}
                   gpuAvailable={gpuAvailable}
+                  draft={{ id: currentId, recipe }}
                   onSelect={key => loadSaved(customEffectId(key))}
                   onCreate={newEffect}
                   onDeleted={forgetDeleted}

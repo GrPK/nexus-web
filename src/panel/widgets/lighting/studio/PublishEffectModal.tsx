@@ -89,7 +89,7 @@ export function PublishEffectModal({ open, initialName, recipe, link, save, onVi
       setError(t(ERROR_KEYS[res.error] ?? 'lighting.studio.publish.failed'));
       return;
     }
-    const linkError = await save(trimmed, { marketId: res.value.id, marketAuthor: res.value.author });
+    const linkError = await save(trimmed, { marketId: res.value.id, marketAuthor: res.value.author, downloaded: false });
     setWorking(false);
     if (linkError) { setError(linkError); return; }
     setPublished(res.value);

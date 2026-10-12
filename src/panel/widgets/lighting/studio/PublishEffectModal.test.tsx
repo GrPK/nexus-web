@@ -46,7 +46,7 @@ describe('PublishEffectModal', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'lighting.studio.publish.confirm' }));
     expect(await screen.findByText('lighting.studio.publish.doneTitle')).toBeInTheDocument();
     expect(publishEffect).toHaveBeenCalledWith({ name: 'Spin', recipe });
-    expect(save.mock.calls).toEqual([['Spin'], ['Spin', { marketId: 'L1', marketAuthor: 'alice' }]]);
+    expect(save.mock.calls).toEqual([['Spin'], ['Spin', { marketId: 'L1', marketAuthor: 'alice', downloaded: false }]]);
   });
 
   it("updates the author's own listing, and publishes anew when it was removed", async () => {
