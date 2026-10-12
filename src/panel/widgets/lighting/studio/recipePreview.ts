@@ -1,0 +1,182 @@
+import { compileStudio, type StudioRecipe } from './studioCompiler';
+
+// Many previews share ONE WebGL2 context: Chromium caps live contexts per page
+// and evicts the oldest, so a grid of per-card contexts would black out cards
+// (and possibly the lighting page's own canvas). Each frame renders every
+// visible preview into the shared canvas and copies it to the card's 2D canvas.
+
+const QUAD_VERT = `#version 300 es
+layout (location = 0) in vec2 a_pos;
+void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const FRAME_MS = 1000 / 30;
+const MAX_DPR = 1.5;
+const PROGRAM_CACHE = 48;
+const NEUTRAL: Record<string, number> = { u_speed: 1, u_hue: 0, u_colorize: 0, u_saturation: 1, u_contrast: 1 };
+
+interface Program {
+  prog: WebGLProgram;
+  locs: Map<string, WebGLUniformLocation>;
+}
+
+interface Entry {
+  canvas: HTMLCanvasElement;
+  frag: string;
+  params: Record<string, number>;
+  visible: boolean;
+  failed: boolean;
+  drawn: boolean;
+}
+
+const entries = new Set<Entry>();
+const byCanvas = new WeakMap<Element, Entry>();
+const programs = new Map<string, Program | null>();
+let glCanvas: HTMLCanvasElement | null = null;
+let gl: WebGL2RenderingContext | null = null;
+let ready = false;
+let raf = 0;
+let lastFrame = 0;
+let observer: IntersectionObserver | null = null;
+
+function context(): WebGL2RenderingContext | null {
+  if (!glCanvas) {
+    glCanvas = document.createElement('canvas');
+    glCanvas.addEventListener('webglcontextlost', e => {
+      e.preventDefault();
+      programs.clear();
+      ready = false;
+      for (const entry of entries) entry.failed = false;
+    });
+    gl = glCanvas.getContext('webgl2', { antialias: false, alpha: false });
+  }
+  if (!gl || gl.isContextLost()) return null;
+  if (!ready) {
+    gl.bindVertexArray(gl.createVertexArray());
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    ready = true;
+  }
+  return gl;
+}
+
+function compile(g: WebGL2RenderingContext, frag: string): Program | null {
+  if (programs.has(frag)) {
+    const cached = programs.get(frag)!;
+    programs.delete(frag);
+    programs.set(frag, cached);
+    return cached;
+  }
+  const shader = (type: number, src: string) => {
+    const s = g.createShader(type)!;
+    g.shaderSource(s, src);
+    g.compileShader(s);
+    return s;
+  };
+  const vs = shader(g.VERTEX_SHADER, QUAD_VERT);
+  const fs = shader(g.FRAGMENT_SHADER, frag.replace('#version 330 core', '#version 300 es\nprecision highp float;'));
+  const prog = g.createProgram()!;
+  g.attachShader(prog, vs);
+  g.attachShader(prog, fs);
+  g.linkProgram(prog);
+  g.deleteShader(vs);
+  g.deleteShader(fs);
+  let result: Program | null = null;
+  if (g.getProgramParameter(prog, g.LINK_STATUS)) {
+    const locs = new Map<string, WebGLUniformLocation>();
+    const count = g.getProgramParameter(prog, g.ACTIVE_UNIFORMS) as number;
+    for (let i = 0; i < count; i++) {
+      const name = g.getActiveUniform(prog, i)?.name;
+      const loc = name ? g.getUniformLocation(prog, name) : null;
+      if (name && loc) locs.set(name, loc);
+    }
+    result = { prog, locs };
+  } else {
+    g.deleteProgram(prog);
+  }
+  programs.set(frag, result);
+  while (programs.size > PROGRAM_CACHE) {
+    const [oldest, p] = programs.entries().next().value!;
+    if (p) g.deleteProgram(p.prog);
+    programs.delete(oldest);
+  }
+  return result;
+}
+
+/** A stand-in music signal, so audio-reactive effects move in a preview without capturing audio. */
+function syntheticAudio(t: number): Record<string, number> {
+  const beatPhase = (t / 0.6) % 1;
+  return {
+    u_audioBeat: Math.exp(-beatPhase * 6),
+    u_audioBass: 0.5 + 0.45 * Math.sin(t * 2.3),
+    u_audioMid: 0.45 + 0.35 * Math.sin(t * 3.1 + 1),
+    u_audioHigh: 0.35 + 0.3 * Math.sin(t * 5.3 + 2),
+    u_audioLevel: 0.55 + 0.3 * Math.sin(t * 1.7),
+  };
+}
+
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function draw(ts: number) {
+  raf = 0;
+  if (entries.size === 0) return;
+  raf = requestAnimationFrame(draw);
+  if (ts - lastFrame < FRAME_MS) return;
+  lastFrame = ts;
+  const g = context();
+  if (!g || !glCanvas) return;
+  const still = reducedMotion();
+  const t = still ? 12 : (Date.now() % 86_400_000) / 1000;
+  const audio = syntheticAudio(t);
+  const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+  for (const e of entries) {
+    if (!e.visible || e.failed || (still && e.drawn)) continue;
+    const w = Math.max(1, Math.round(e.canvas.clientWidth * dpr));
+    const h = Math.max(1, Math.round(e.canvas.clientHeight * dpr));
+    const program = compile(g, e.frag);
+    if (!program) { e.failed = true; continue; }
+    if (glCanvas.width < w) glCanvas.width = w;
+    if (glCanvas.height < h) glCanvas.height = h;
+    if (e.canvas.width !== w || e.canvas.height !== h) { e.canvas.width = w; e.canvas.height = h; }
+    g.viewport(0, 0, w, h);
+    g.useProgram(program.prog);
+    for (const [name, loc] of program.locs) {
+      if (name === 'u_resolution') g.uniform2f(loc, w, h);
+      else if (name === 'u_time') g.uniform1f(loc, t);
+      else g.uniform1f(loc, e.params[name] ?? NEUTRAL[name] ?? audio[name] ?? 0);
+    }
+    g.drawArrays(g.TRIANGLE_STRIP, 0, 4);
+    // GL rows start at the bottom of the drawing buffer; the copy reads the top-left-origin image.
+    e.canvas.getContext('2d')?.drawImage(glCanvas, 0, glCanvas.height - h, w, h, 0, 0, w, h);
+    e.drawn = true;
+  }
+}
+
+function watch(): IntersectionObserver | null {
+  if (observer || typeof IntersectionObserver !== 'function') return observer;
+  observer = new IntersectionObserver(records => {
+    for (const r of records) {
+      const e = byCanvas.get(r.target);
+      if (e) e.visible = r.isIntersecting;
+    }
+  });
+  return observer;
+}
+
+/** Animates `recipe` into `canvas` until the returned detach runs. */
+export function attachRecipePreview(canvas: HTMLCanvasElement, recipe: StudioRecipe): () => void {
+  const { frag, params } = compileStudio(recipe, { bake: true });
+  const obs = watch();
+  const entry: Entry = { canvas, frag, params, visible: !obs, failed: false, drawn: false };
+  entries.add(entry);
+  byCanvas.set(canvas, entry);
+  obs?.observe(canvas);
+  if (!raf) raf = requestAnimationFrame(draw);
+  return () => {
+    entries.delete(entry);
+    obs?.unobserve(canvas);
+    byCanvas.delete(canvas);
+  };
+}

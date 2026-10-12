@@ -21,6 +21,10 @@ export interface CustomEffectEntry {
   /** Unix ms; also the thumbnail cache version. */
   updatedAt: number;
   audio: boolean;
+  /** The Marketplace listing this effect was downloaded from or published as. */
+  marketId?: string | null;
+  /** That listing's author; equal to the signed-in username when this account published it. */
+  marketAuthor?: string | null;
 }
 
 let snapshot: CustomEffectEntry[] = [];
@@ -54,7 +58,8 @@ export function refreshCustomEffects(): Promise<void> {
 /** Saves (creates or replaces) an effect; the service compile-checks `frag` and returns its error text on a reject. */
 export async function putCustomEffect(
   id: string,
-  body: { name: string; recipe: string; frag: string },
+  // Omitted market fields keep the stored link.
+  body: { name: string; recipe: string; frag: string; marketId?: string; marketAuthor?: string },
 ): Promise<{ entry: CustomEffectEntry } | { error: string }> {
   const { response, status } = await authFetchWithStatus(`/lighting/custom-effects/${encodeURIComponent(id)}`, { method: 'PUT', body });
   if (!response) return { error: `HTTP ${status || 'unreachable'}` };

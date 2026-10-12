@@ -925,6 +925,8 @@ export function Dashboard() {
           if (payload.settingsAnchor) requestSearchScroll(payload.settingsAnchor);
           return;
         }
+        // The Studio links a just-published effect's Marketplace page.
+        if (target === 'store' && payload?.tab) { navigate('system', 'store', payload.tab); return; }
         setView(target);
       }} /></FeatureGate>;
       case 'smart-lights': return <SmartLightsPage onSectionNavigate={(target) => setView(target)} />;

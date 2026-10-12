@@ -75,4 +75,33 @@ describe('studioLibrary', () => {
     await lib.migrateLegacyEffects();
     expect(localStorage.getItem('nexus.studio.saved')).not.toBeNull();
   });
+
+  describe('parseMarketRecipe', () => {
+    it('accepts a Studio recipe and keeps only knobs that name a real param', async () => {
+      const lib = await fresh();
+      const r = recipe();
+      const uid = r.blocks[0].uid;
+      r.knobs = [{ uid, key: 'scale' }, { uid, key: 'nope' }, { uid: 'missing', key: 'scale' }];
+      expect(lib.parseMarketRecipe(r)?.knobs).toEqual([{ uid, key: 'scale' }]);
+    });
+
+    it('rejects recipes this build cannot run as the Studio would build them', async () => {
+      const lib = await fresh();
+      const unknown = recipe();
+      unknown.blocks[0].type = 'hologram';
+      const overStage = { ...recipe(), blocks: ['rings', 'stripes', 'plasma', 'dots', 'palette'].map(makeBlock) };
+      const overBudget = { ...recipe(), blocks: ['warp', 'warp', 'warp', 'cells', 'palette'].map(makeBlock) };
+      const dupUid = recipe();
+      dupUid.blocks[1].uid = dupUid.blocks[0].uid;
+      for (const r of [unknown, overStage, overBudget, dupUid, null, 'x', { v: 2 }]) expect(lib.parseMarketRecipe(r)).toBeNull();
+    });
+  });
+
+  it('sends the Marketplace link with the save only when given', async () => {
+    const lib = await fresh();
+    await lib.saveEffect('fx1', 'one', recipe());
+    await lib.saveEffect('fx1', 'one', recipe(), { marketId: 'm1', marketAuthor: 'alice' });
+    expect(put.mock.calls[0][1]).not.toHaveProperty('marketId');
+    expect(put.mock.calls[1][1]).toMatchObject({ marketId: 'm1', marketAuthor: 'alice' });
+  });
 });

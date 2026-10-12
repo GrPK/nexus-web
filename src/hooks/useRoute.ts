@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback, useRef, startTransition } from 'react
  *   /system/:view              → MonitoringView, LightingView, etc.
  *   /system/:view/:subtab      → e.g. /system/monitoring/cpu
  *   /store, /store/:appId      → the storefront, top-level rather than under /system
+ *   /store/effects[/...]       → its lighting effects; the subtab keeps every segment
  *   /touch                     → panel kiosk entrypoint (handled before this hook)
  */
 
@@ -41,7 +42,7 @@ function parsePath(): Route {
   // The store is a storefront, not a system surface, so it owns a top-level
   // path: /store and /store/<appId>. Everything else stays under /system.
   if (rawSection === STORE_VIEW) {
-    return { section: 'system', view: STORE_VIEW, subtab: parts[1] || null };
+    return { section: 'system', view: STORE_VIEW, subtab: parts.slice(1).join('/') || null };
   }
 
   // Handle legacy flat routes (e.g. /monitoring, /cooling, /settings)

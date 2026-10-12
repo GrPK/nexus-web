@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Dices, LayoutGrid, Redo2, Save, Trash2, Undo2, WandSparkles } from 'lucide-react';
+import { Dices, LayoutGrid, Redo2, Save, Trash2, Undo2, Upload, WandSparkles } from 'lucide-react';
 import { DeviceModal } from '../../../../components/common/DeviceModal/DeviceModal';
 import { Button } from '../../../../components/common/Button/Button';
 import { Card } from '../../../../components/common/Card/Card';
@@ -22,7 +22,8 @@ import {
   type CompiledStudio, type StudioBlock, type StudioRecipe,
 } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, shuffleRecipe } from './studioRecipes';
-import { deleteEffect, getSavedEffects, newEffectId, saveEffect, useSavedEffects } from './studioLibrary';
+import { deleteEffect, getSavedEffects, newEffectId, saveEffect, useSavedEffects, type MarketLink } from './studioLibrary';
+import { PublishEffectModal } from './PublishEffectModal';
 import { StudioBlockCard } from './StudioBlockCard';
 import { StudioPreview } from './StudioPreview';
 import styles from './ShaderStudio.module.scss';
@@ -67,11 +68,13 @@ function VariationTile({ recipe, label, onPick }: { recipe: StudioRecipe; label:
 }
 
 /** `effectId` opens that saved effect; null starts a new one. */
-export function ShaderStudio({ open, effectId, onSaved, onClose }: {
+export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }: {
   open: boolean;
   effectId: string | null;
   /** After a successful save: the effect id and the uniforms whose saved value changed or were unpinned. */
   onSaved?: (id: string, staleParams: string[]) => void;
+  /** Opens a Marketplace listing this Studio just published. */
+  onViewListing?: (listingId: string) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -87,12 +90,15 @@ export function ShaderStudio({ open, effectId, onSaved, onClose }: {
   const [future, setFuture] = useState<StudioRecipe[]>([]);
   const [variations, setVariations] = useState<StudioRecipe[] | null>(null);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   // The recipe as last saved or loaded; null when nothing saved backs it. Any
   // difference counts as unsaved, so closing or loading another effect asks first.
   const [baseline, setBaseline] = useState<string | null>(() => JSON.stringify(recipe));
   // What runs once the user agrees to drop unsaved edits (close, or load another effect).
   const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(null);
-  const currentName = saved.find(s => s.id === currentId)?.name;
+  const current = saved.find(s => s.id === currentId);
+  const currentName = current?.name;
+  const currentLink = current?.marketId && current.marketAuthor ? { marketId: current.marketId, marketAuthor: current.marketAuthor } : null;
   const committedRef = useRef(recipe);
   const recipeRef = useRef(recipe);
 
@@ -199,6 +205,22 @@ export function ShaderStudio({ open, effectId, onSaved, onClose }: {
     return undefined;
   };
 
+  // One id per publish: the dialog saves twice (plain, then linked) before currentId updates.
+  const publishIdRef = useRef<string | null>(null);
+  // Publishing renames the open effect rather than copying it, so its listing stays linked.
+  const savePublished = async (name: string, link?: MarketLink): Promise<string | null> => {
+    const id = publishIdRef.current ?? currentId ?? newEffectId();
+    publishIdRef.current = id;
+    const snapshot = recipe;
+    const previous = getSavedEffects().find(e => e.id === id)?.recipe;
+    const error = await saveEffect(id, name, snapshot, link);
+    if (error) return t('lighting.studio.saveFailed', { error });
+    setCurrentId(id);
+    setBaseline(JSON.stringify(snapshot));
+    onSaved?.(id, previous ? staleParamsBetween(previous, snapshot) : []);
+    return null;
+  };
+
   const togglePin = (uid: string, key: string) => {
     const knobs = recipe.knobs ?? [];
     const pinned = knobs.some(k => k.uid === uid && k.key === key);
@@ -242,6 +264,9 @@ export function ShaderStudio({ open, effectId, onSaved, onClose }: {
       </Button>
       <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} aria-label={t('lighting.studio.undo')} disabled={!past.length} onClick={undo} />
       <Button size="sm" tone="ghost" icon={<Redo2 size={14} />} aria-label={t('lighting.studio.redo')} disabled={!future.length} onClick={redo} />
+      <Button size="sm" icon={<Upload size={14} />} onClick={() => { publishIdRef.current = null; setPublishing(true); }}>
+        {t('lighting.studio.publish.button')}
+      </Button>
       <Button size="sm" tone="accent" icon={<Save size={14} />} onClick={() => setSaving(true)}>
         {t('lighting.studio.save')}
       </Button>
@@ -401,6 +426,15 @@ export function ShaderStudio({ open, effectId, onSaved, onClose }: {
         validate={v => (v.trim() ? null : t('lighting.studio.nameRequired'))}
         onConfirm={saveCurrent}
         onCancel={() => setSaving(false)}
+      />
+      <PublishEffectModal
+        open={publishing}
+        initialName={currentName ?? ''}
+        recipe={recipe}
+        link={currentLink}
+        save={savePublished}
+        onViewListing={onViewListing}
+        onClose={() => setPublishing(false)}
       />
     </DeviceModal>
   );

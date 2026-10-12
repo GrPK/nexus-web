@@ -4,8 +4,8 @@ import {
   customEffectKey, deleteCustomEffect, getCustomEffects, putCustomEffect, refreshCustomEffects, useCustomEffects,
   type CustomEffectEntry,
 } from '../../../../api/customEffects';
-import { studioBlock } from './studioBlocks';
-import { STUDIO_MOD_SOURCES, compileStudio, stageCount, type StudioBlock, type StudioRecipe } from './studioCompiler';
+import { STUDIO_COST_BUDGET, STUDIO_STAGES, STUDIO_STAGE_LIMIT, studioBlock } from './studioBlocks';
+import { STUDIO_MOD_SOURCES, blockParams, compileStudio, recipeCost, stageCount, type StudioBlock, type StudioRecipe } from './studioCompiler';
 
 // Where the prototype kept effects before the service stored them; migrated once, then removed.
 const LEGACY_KEY = 'nexus.studio.saved';
@@ -15,6 +15,8 @@ export interface SavedEffect {
   name: string;
   recipe: StudioRecipe;
   updatedAt: number;
+  marketId: string | null;
+  marketAuthor: string | null;
 }
 
 const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
@@ -36,6 +38,33 @@ export function isRecipe(x: unknown): x is StudioRecipe {
   return stageCount(r, 'pattern') >= 1 && stageCount(r, 'color') === 1;
 }
 
+const MARKET_BLOCK_LIMIT = 16;
+
+/**
+ * A recipe from another account, or null when this build cannot run it as
+ * the Studio would build it: unknown blocks, stage limits, the cost budget.
+ * Base adjustments are clamped to the Studio's slider ranges, and knobs naming
+ * no param are dropped so the effect controls list real sliders.
+ */
+export function parseMarketRecipe(x: unknown): StudioRecipe | null {
+  if (!isRecipe(x) || x.blocks.length > MARKET_BLOCK_LIMIT) return null;
+  if (new Set(x.blocks.map(b => b.uid)).size !== x.blocks.length) return null;
+  if (recipeCost(x) > STUDIO_COST_BUDGET || STUDIO_STAGES.some(s => stageCount(x, s) > STUDIO_STAGE_LIMIT[s])) return null;
+  const keys = new Map(x.blocks.map(b => {
+    const def = studioBlock(b.type)!;
+    return [b.uid, new Set([...blockParams(def, true), ...blockParams(def, false)].map(p => p.key))];
+  }));
+  const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+  return {
+    ...x,
+    speed: clamp(x.speed, -100, 100),
+    hue: clamp(x.hue, 0, 1),
+    saturation: clamp(x.saturation, 0, 2),
+    contrast: clamp(x.contrast, 0, 2),
+    knobs: x.knobs?.filter(k => keys.get(k.uid)?.has(k.key)),
+  };
+}
+
 // Parsed per entry object, so an unchanged entry keeps its SavedEffect identity.
 const parsed = new WeakMap<CustomEffectEntry, SavedEffect | null>();
 
@@ -47,7 +76,9 @@ function toSaved(entry: CustomEffectEntry): SavedEffect | null {
   } catch {
     /* unreadable: skipped */
   }
-  const saved = isRecipe(recipe) ? { id: entry.id, name: entry.name, recipe, updatedAt: entry.updatedAt } : null;
+  const saved = isRecipe(recipe)
+    ? { id: entry.id, name: entry.name, recipe, updatedAt: entry.updatedAt, marketId: entry.marketId ?? null, marketAuthor: entry.marketAuthor ?? null }
+    : null;
   parsed.set(entry, saved);
   return saved;
 }
@@ -65,10 +96,15 @@ export function useSavedEffects(): SavedEffect[] {
 
 export const newEffectId = () => `fx${Date.now().toString(36)}`;
 
+export interface MarketLink {
+  marketId: string;
+  marketAuthor: string;
+}
+
 /** Stores the recipe with its baked shader; resolves to the service's error text when it rejects the shader. */
-export async function saveEffect(id: string, name: string, recipe: StudioRecipe): Promise<string | null> {
+export async function saveEffect(id: string, name: string, recipe: StudioRecipe, link?: MarketLink): Promise<string | null> {
   const frag = compileStudio(recipe, { bake: true }).frag;
-  const result = await putCustomEffect(id, { name, recipe: JSON.stringify(recipe), frag });
+  const result = await putCustomEffect(id, { name, recipe: JSON.stringify(recipe), frag, ...link });
   if ('error' in result) return result.error;
   invalidateShaderSource(customEffectKey(id));
   return null;

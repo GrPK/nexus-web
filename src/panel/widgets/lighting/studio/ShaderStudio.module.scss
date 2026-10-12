@@ -278,3 +278,9 @@
 .createTile {
   aspect-ratio: 16 / 9;
 }
+
+.publishFields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}

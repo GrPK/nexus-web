@@ -2803,7 +2803,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       )}
       {ShaderStudio && studioTarget && (
         <Suspense fallback={null}>
-          <ShaderStudio open effectId={studioTarget.id} onSaved={handleCustomSaved} onClose={() => setStudioTarget(null)} />
+          <ShaderStudio
+            open
+            effectId={studioTarget.id}
+            onSaved={handleCustomSaved}
+            onViewListing={id => onSectionNavigate?.('store', { tab: `effects/${id}` })}
+            onClose={() => setStudioTarget(null)}
+          />
         </Suspense>
       )}
       {editorTarget && (
