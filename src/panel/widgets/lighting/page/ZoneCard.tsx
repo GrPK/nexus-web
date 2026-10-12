@@ -288,6 +288,7 @@ export function ZoneCard({
   onTakeControl,
   groupMove,
   inStack,
+  colorTuned,
   onUnstack,
   notice,
   toggleMode,
@@ -354,6 +355,9 @@ export function ZoneCard({
   /** Set on a card stacked with others (not the zone-card stack below): the
    *  badge in the name row counts the stack. */
   inStack?: { count: number };
+  /** Some color-tuning control is off neutral for this card: a dim mark in the
+   *  name row, beside the stack badge. */
+  colorTuned?: boolean;
   /** Takes this card out of its stack. */
   onUnstack?: () => void;
   /** Optional advisory shown via an (i) next to the device name. */
@@ -652,6 +656,13 @@ export function ZoneCard({
           <span className={styles.deviceName}>{displayName ?? device.name}</span>
         )}
         {notice != null && !unavailable && <DeviceNotice notice={notice} />}
+        {colorTuned && (
+          <HoverTooltip body={t('lighting.colorTuning.title')} side="top">
+            <span className={styles.deviceTuneBadge} aria-label={t('lighting.colorTuning.title')}>
+              <Blend size={12} aria-hidden />
+            </span>
+          </HoverTooltip>
+        )}
         {inStack && (
           <HoverTooltip body={t(pluralKey('lighting.devices.stackedCount', language, inStack.count), { count: inStack.count })} side="top">
             <span className={styles.deviceStackBadge} aria-label={t(pluralKey('lighting.devices.stackedCount', language, inStack.count), { count: inStack.count })}>

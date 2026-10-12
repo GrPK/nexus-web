@@ -625,7 +625,7 @@ describe('DevicePanel stacks', () => {
   const board = [port('0', 'ARGB_V2_1'), port('1', 'ARGB_V2_2'), port('2', 'LED_C')];
   const stacks = [{ id: 'l1', name: '', members: ['d1', 'd2'] }];
 
-  function renderRail(list: LightingDevice[], stackList: typeof stacks, selectedIds = new Set<string>()) {
+  function renderRail(list: LightingDevice[], stackList: typeof stacks, selectedIds = new Set<string>(), over: Partial<React.ComponentProps<typeof DevicePanel>> = {}) {
     const onStacksChange = vi.fn();
     const onSetSelection = vi.fn();
     const onSetPower = vi.fn();
@@ -644,6 +644,7 @@ describe('DevicePanel stacks', () => {
         onGroupsChange={() => {}}
         stacks={stackList}
         onStacksChange={onStacksChange}
+        {...over}
       />,
     );
     return { onStacksChange, onSetSelection, onSetPower };
@@ -653,6 +654,12 @@ describe('DevicePanel stacks', () => {
   it('badges a stacked card and not a loose one', () => {
     renderRail(devices, stacks);
     expect(screen.getAllByLabelText('lighting.devices.stackedCount.other:{"count":2}')).toHaveLength(2);
+  });
+
+  it('marks a color-tuned card beside its stack badge', () => {
+    renderRail(devices, stacks, new Set(), { colorTunedIds: new Set(['d1']) });
+    const mark = screen.getByLabelText('lighting.colorTuning.title');
+    expect(mark.nextElementSibling?.getAttribute('aria-label')).toBe('lighting.devices.stackedCount.other:{"count":2}');
   });
 
   it('selects the whole stack from one card, and clears it from one card', () => {

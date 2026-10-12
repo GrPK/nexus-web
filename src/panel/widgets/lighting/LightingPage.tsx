@@ -11,7 +11,8 @@ import {
   fetchCurrentSync, fetchAvailableMappings, fetchGameSyncState, fetchGameSyncGames,
   steamArtworkUrl, resolveActiveGame, setLightingPaused,
   resetDeviceLayouts, applyDeviceLayouts, setActiveLayoutPreset, updateLayoutPreset, identifyLightingDevice,
-  type LightingDevice, type LedMapEntry, type Pin, type PostProcessSettings, type GameSyncDevice,
+  fetchLightingColorAdjust,
+  type LightingDevice, type LightingColorAdjust, type LedMapEntry, type Pin, type PostProcessSettings, type GameSyncDevice,
   type GameSyncGame, type DeviceLayoutDto, type PresetApp,
 } from '../../../api/lighting';
 import { groupNamesOf, type DeviceGroup } from '../../../lib/deviceGroups';
@@ -1413,6 +1414,22 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     [orderedDevices],
   );
   const [colorTuningIds, setColorTuningIds] = useState<string[] | null>(null);
+  // The service answers only the cards it holds trims for. Its write publishes
+  // no topic, so this refetches with the device list and once the modal's last
+  // write lands. Only the newest request's answer is kept.
+  const [colorAdjusts, setColorAdjusts] = useState<Record<string, LightingColorAdjust>>({});
+  const colorAdjustSeqRef = useRef(0);
+  const refreshColorAdjust = useCallback(async () => {
+    const seq = ++colorAdjustSeqRef.current;
+    const data = await fetchLightingColorAdjust().catch(() => null);
+    if (data && seq === colorAdjustSeqRef.current) setColorAdjusts(data.adjustments ?? {});
+  }, []);
+  // Brightness counts: it is one of the modal's controls, and Reset restores it
+  // with the rest.
+  const colorTunedIds = useMemo(
+    () => new Set(devices.filter(d => colorAdjusts[d.id] || (d.brightness ?? 100) < 100).map(d => d.id)),
+    [devices, colorAdjusts],
+  );
   // Key reactions. The service lists every per-key keyboard card it can react
   // on; only those get the menu row. Fetched on mount and after each device
   // refresh, since a keyboard can appear or leave with the device list. The
@@ -1510,7 +1527,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     setDeviceGroups(data.groups ?? []);
     setDeviceStacks(data.stacks ?? []);
     void refreshKeyReactive();
-  }, [refreshKeyReactive]);
+    void refreshColorAdjust();
+  }, [refreshKeyReactive, refreshColorAdjust]);
 
   useEffect(() => {
     if (!serviceOnline) return;
@@ -2491,6 +2509,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             lightingOff={effectiveMode === 'none'}
             onOpenSettings={handleOpenSettings}
             onOpenColorTuning={handleOpenColorTuning}
+            colorTunedIds={colorTunedIds}
             keyReactiveIds={keyReactiveIds}
             keyReactiveOnIds={keyReactiveOnIds}
             onOpenKeyReactions={setKeyReactionsId}
@@ -2748,7 +2767,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         <ColorTuningModal
           devices={tunableDevices}
           deviceIds={colorTuningIds}
-          onClose={() => setColorTuningIds(null)}
+          onClose={lastWrite => { setColorTuningIds(null); void lastWrite.then(refreshDevices); }}
         />
       )}
       {keyReactionsId && keyReactionsDevice && (

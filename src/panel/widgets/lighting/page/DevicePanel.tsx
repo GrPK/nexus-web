@@ -35,7 +35,7 @@ import styles from '../LightingPage.module.scss';
  * using the same component/styling as a motherboard group: a chevron, the brand
  * name, a group power switch, and its lights as indented child cards.
  */
-export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
+export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, colorTunedIds, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
   devices: LightingDevice[];
   /** Optional control rendered at the top of the scrolling list (master brightness). */
   /** Every device before the Nexus-Control-off filter, so a group header can
@@ -88,6 +88,8 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   /** Opens the colour-tuning modal scoped to this card (or, when it is part of
    *  a multi-selection, to the whole selection). */
   onOpenColorTuning?: (id: string) => void;
+  /** Cards with any color tuning off neutral; they carry a dim mark by the name. */
+  colorTunedIds?: ReadonlySet<string>;
   /** Cards that are per-key keyboards the engine can react on; only these get
    *  the key-reactions row on their menu. */
   keyReactiveIds?: ReadonlySet<string>;
@@ -431,6 +433,7 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
       bulk={bulkFor(d)}
       groupMove={groupMoveFor(d.id)}
       inStack={stackBadge(d)}
+      colorTuned={colorTunedIds?.has(d.id)}
       stackSlot={stackSlotOf(stacks, d.id)}
       pin={pinFor(d.id)}
       target={pickTargetIds?.has(d.id)}
