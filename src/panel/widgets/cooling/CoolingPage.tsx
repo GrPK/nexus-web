@@ -26,7 +26,7 @@ import {
 } from '../../../api/qseries';
 import {
   fetchFanChannels, fetchTemperatureSources, fetchCurves,
-  setFanSpeed, releaseFanAuto, renameFan, setFanLock, setFanControlled, setFanRole, setFanOffset,
+  setFanSpeed, releaseFanAuto, renameFan, setFanPin, setFanControlled, setFanRole, setFanOffset,
   fetchCoolingPresets, createCoolingPreset, updateCoolingPreset, deleteCoolingPreset,
   activateCoolingPreset, type CoolingPreset,
   startCalibration, fetchCalibrationResults, fetchProfiles, applyProfile,
@@ -720,9 +720,9 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     }));
   }, []);
 
-  const handleToggleLock = useCallback(async (id: string, locked: boolean) => {
-    setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, locked } : ch));
-    await setFanLock(id, locked);
+  const handleTogglePin = useCallback(async (id: string, pinned: boolean) => {
+    setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, pinned } : ch));
+    await setFanPin(id, pinned);
     const fans = await fetchFanChannels();
     if (fans?.channels) setChannels(fans.channels);
   }, []);
@@ -893,12 +893,12 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     if (members.length < 2) return undefined;
     return {
       count: members.length,
-      locked: members.some(c => c.locked === true),
+      pinned: members.some(c => c.pinned === true),
       controlled: members.some(c => c.controlled !== false),
-      setLocked: (locked: boolean) => { for (const c of members) void handleToggleLock(c.id, locked); },
+      setPinned: (pinned: boolean) => { for (const c of members) void handleTogglePin(c.id, pinned); },
       setControlled: (controlled: boolean) => { for (const c of members) void handleSetFanControlled(c.id, controlled); },
     };
-  }, [channels, selectedFanIds, handleToggleLock, handleSetFanControlled]);
+  }, [channels, selectedFanIds, handleTogglePin, handleSetFanControlled]);
 
   // The curve the selection is wearing: shared across every selected fan, or
   // null when they disagree - there is no single curve to highlight then.
@@ -1318,7 +1318,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     key: p.key,
     // Plain mode names, matching the simple-mode tiles. They used to read
     // "All <mode>", which stopped being true once pumps and GPU fans started
-    // defaulting out of a preset apply (FanProfiles.IsLockedByDefault).
+    // defaulting out of a preset apply (FanProfiles.IsPinnedByDefault).
     label: t(p.i18nKey),
     icon: <p.Icon size={14} />,
   }))];
@@ -1735,7 +1735,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                   onCreateCurve={() => createCurveAndAssign(ch.id)}
                   onRename={handleRename}
                   onSpeedChange={handleSpeedChange}
-                  onToggleLock={handleToggleLock}
+                  onTogglePin={handleTogglePin}
                   onToggleControlled={handleSetFanControlled}
                   onSelectOnly={() => setSelectedFanIds(new Set([ch.id]))}
                   bulk={bulkFor(ch)}
@@ -1790,10 +1790,10 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                       const target = !members.some(c => c.controlled !== false);
                       for (const c of members) handleSetFanControlled(c.id, target);
                     }}
-                    groupLocked={members.some(c => c.locked)}
-                    onToggleLock={() => {
-                      const target = !members.some(c => c.locked);
-                      for (const c of members) handleToggleLock(c.id, target);
+                    groupPinned={members.some(c => c.pinned)}
+                    onTogglePin={() => {
+                      const target = !members.some(c => c.pinned);
+                      for (const c of members) handleTogglePin(c.id, target);
                     }}
                     onRename={name => setFanGroups(renameGroup(fanGroups, groupId, name))}
                     onDelete={() => setFanGroups(removeGroup(fanGroups, groupId))}
@@ -1843,10 +1843,10 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                       const target = !list.some(c => c.controlled !== false);
                       for (const c of list) handleSetFanControlled(c.id, target);
                     }}
-                    groupLocked={list.some(c => c.locked)}
-                    onToggleLock={() => {
-                      const target = !list.some(c => c.locked);
-                      for (const c of list) handleToggleLock(c.id, target);
+                    groupPinned={list.some(c => c.pinned)}
+                    onTogglePin={() => {
+                      const target = !list.some(c => c.pinned);
+                      for (const c of list) handleTogglePin(c.id, target);
                     }}
                     onRename={name => handleRename(blockId, name)}
                     onResetName={(isBoard ? custom != null : list[0]?.originalDeviceName != null)
@@ -1918,7 +1918,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                           onCreateCurve={() => createCurveAndAssign(ch.id)}
                           onRename={handleRename}
                           onSpeedChange={handleSpeedChange}
-                          onToggleLock={handleToggleLock}
+                          onTogglePin={handleTogglePin}
                           onToggleControlled={handleSetFanControlled}
                           onSelectOnly={() => setSelectedFanIds(new Set([ch.id]))}
                           bulk={bulkForFan(ch)}

@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { isMultiSelectModifier } from '../../../../lib/platform';
-import { CircleSlash, Cpu, Fan, GaugeCircle, Gpu, Link2, Link2Off, Lock, LockOpen, MousePointerClick, Pencil, Plus, RotateCcw, Unplug } from 'lucide-react';
+import { CircleSlash, Cpu, Fan, GaugeCircle, Gpu, Link2, Link2Off, MousePointerClick, Pencil, Pin, PinOff, Plus, RotateCcw, Unplug } from 'lucide-react';
 import { type FanChannel, type FanRole, isFanDisconnected } from '../../../../api/cooling';
 import { useUnitPrefs } from '../../../../hooks/useUiSettings';
 import { useTranslation } from '../../../../lib/i18n';
@@ -48,9 +48,9 @@ export type FanCardHubMode = 'software' | 'motherboard' | 'firmware';
  *  still is, so one press lands every member on the same state. */
 export interface FanBulkSelection {
   count: number;
-  locked: boolean;
+  pinned: boolean;
   controlled: boolean;
-  setLocked: (locked: boolean) => void;
+  setPinned: (pinned: boolean) => void;
   setControlled: (controlled: boolean) => void;
   /** Wraps the selection in a new group where it sits. Absent when the fans
    *  sit in different containers, or the nesting limit or group cap forbids. */
@@ -63,7 +63,7 @@ export const FanCard = memo(function FanCard({
   hubMode, hubSupportsFirmware,
   hubSupportsBios = true,
   nubRef, cardRef: cardRefProp, onWirePointerDown, onWireHover,
-  onSetMode, onCreateCurve, onRename, onSpeedChange, onToggleLock, onToggleControlled, onSetRole, onClearOffset, drag,
+  onSetMode, onCreateCurve, onRename, onSpeedChange, onTogglePin, onToggleControlled, onSetRole, onClearOffset, drag,
   onSelectOnly, bulk, groupMove, hazard,
 }: {
   channel: FanChannel;
@@ -107,7 +107,7 @@ export const FanCard = memo(function FanCard({
   onCreateCurve: () => void;
   onRename: (id: string, name: string) => void;
   onSpeedChange: (id: string, speed: number) => void;
-  onToggleLock: (id: string, locked: boolean) => void;
+  onTogglePin: (id: string, pinned: boolean) => void;
   /** Nexus Control on/off for this channel. Off releases it to the motherboard
    *  and keeps every preset apply off it. Absent on surfaces that cannot set it. */
   onToggleControlled?: (id: string, controlled: boolean) => void;
@@ -180,7 +180,7 @@ export const FanCard = memo(function FanCard({
     : isFixed ? { icon: <CircleSlash size={11} />, label: t('cooling.fan.fixed') }
     : !controlled ? { icon: <Link2Off size={11} />, label: t('cooling.fan.notControlled') }
     : null;
-  const locked = channel.locked ?? false;
+  const pinned = channel.pinned ?? false;
   // An offset shifts this fan off whatever drives it, so it says so on the
   // card: an import can set one, and nothing else would show why the fan sits
   // above its curve.
@@ -296,7 +296,7 @@ export const FanCard = memo(function FanCard({
   const rolePickerLabel = t('cooling.fanRole.picker');
 
   // NP50 lists only FW Control (no BIOS hand-off); a Q-series pump lists both;
-  // everything else lists only BIOS. Modes only - Lock and Nexus Control are
+  // everything else lists only BIOS. Modes only - Pin and Nexus Control are
   // states rather than modes and live in the card's overflow menu, which is
   // what keeps this dropdown narrow.
   const baseModeOptions: SelectOption[] = [
@@ -310,10 +310,10 @@ export const FanCard = memo(function FanCard({
     ] : []),
   ];
   // Select renders the selected option's icon in its trigger, so hanging the
-  // lock on the current mode is what puts it inside the dropdown ("[lock]
+  // pin on the current mode is what puts it inside the dropdown ("[pin]
   // Silent"). The fan icon no longer carries it.
-  const modeOptions: SelectOption[] = locked
-    ? baseModeOptions.map(o => o.value === modeValue ? { ...o, icon: <Lock size={14} /> } : o)
+  const modeOptions: SelectOption[] = pinned
+    ? baseModeOptions.map(o => o.value === modeValue ? { ...o, icon: <Pin size={14} /> } : o)
     : baseModeOptions;
 
   const handleModeChange = (v: string) => {
@@ -348,15 +348,15 @@ export const FanCard = memo(function FanCard({
     }
     // Aggregates read "any member still is", so one press lands the whole
     // selection on the same state.
-    const isLocked = bulk ? bulk.locked : locked;
+    const isPinned = bulk ? bulk.pinned : pinned;
     const isControlled = bulk ? bulk.controlled : controlled;
-    const setLocked = (next: boolean) => bulk ? bulk.setLocked(next) : onToggleLock(channel.id, next);
+    const setPinned = (next: boolean) => bulk ? bulk.setPinned(next) : onTogglePin(channel.id, next);
     const label = (single: string, counted: string) => bulkMenuLabel(t, language, bulk, single, counted);
 
     if (isControlled) {
-      items.push(isLocked
-        ? { key: 'lock', icon: <LockOpen size={14} />, label: label('cooling.lock.unlock', 'cooling.lock.unlockCount'), onSelect: () => setLocked(false) }
-        : { key: 'lock', icon: <Lock size={14} />, label: label('cooling.lock.lock', 'cooling.lock.lockCount'), onSelect: () => setLocked(true) });
+      items.push(isPinned
+        ? { key: 'pin', icon: <PinOff size={14} />, label: label('cooling.pin.unpin', 'cooling.pin.unpinCount'), onSelect: () => setPinned(false) }
+        : { key: 'pin', icon: <Pin size={14} />, label: label('cooling.pin.pin', 'cooling.pin.pinCount'), onSelect: () => setPinned(true) });
       // An offset belongs to one fan, so a selection has nothing to clear -
       // the same rule the lighting menu applies to the LED map row.
       if (!bulk && offset !== 0 && onClearOffset) {
@@ -406,11 +406,11 @@ export const FanCard = memo(function FanCard({
   // exposes no controls at all.
   const menuEnabled = !isHwDisconnected && !isReadOnly && menuItems().length > 0;
 
-  // The lock normally rides the selected mode option's icon, so a branch with
+  // The pin normally rides the selected mode option's icon, so a branch with
   // no dropdown (disconnected, fixed, read-only, Nexus Control off) would show
-  // no lock at all - and the menu still offers Lock/Unlock there. Carry it
+  // no pin at all - and the menu still offers Pin/Unpin there. Carry it
   // beside the state badge in those rows instead.
-  const lockGlyph = locked ? <Lock size={12} className={styles.fanLockGlyph} aria-hidden="true" /> : null;
+  const pinGlyph = pinned ? <Pin size={12} className={styles.fanPinGlyph} aria-hidden="true" /> : null;
 
   return (
     <div
@@ -450,7 +450,7 @@ export const FanCard = memo(function FanCard({
       <div className={styles.fanCardBody}>
       <div className={styles.fanCardHeader}>
         {/* Fan icon opens the device-role picker (Generic fan / CPU / GPU) and
-            reflects the current role. Lock is shown inside the mode dropdown,
+            reflects the current role. Pin is shown inside the mode dropdown,
             not here. When this fan is bound to the curve shown in the graph,
             the highlight lives on the dropdown value (accentValue). */}
         <div ref={roleAnchorRef} className={styles.fanRoleAnchor} data-no-dnd={isReadOnly ? undefined : true}>
@@ -462,7 +462,7 @@ export const FanCard = memo(function FanCard({
             ) : (
               <button
                 type="button"
-                className={`${styles.fanKindToggle} ${styles.fanLockToggle}`}
+                className={`${styles.fanKindToggle} ${styles.fanPinToggle}`}
                 aria-haspopup="menu"
                 aria-expanded={roleMenuOpen}
                 aria-label={rolePickerLabel}
@@ -541,7 +541,7 @@ export const FanCard = memo(function FanCard({
           <div className={styles.fanStateBadge}>
             <Badge label={stateBadge!.label} icon={stateBadge!.icon} compact uppercase color="var(--text-dim)" />
           </div>
-          {lockGlyph}
+          {pinGlyph}
         </div>
       ) : isReadOnly ? null : isFixed ? (
         // Fixed speed: the RPM readout stays in the header and the duty bar
@@ -553,7 +553,7 @@ export const FanCard = memo(function FanCard({
               <Badge label={stateBadge!.label} icon={stateBadge!.icon} compact uppercase color="var(--text-dim)" />
             </div>
           </HoverTooltip>
-          {lockGlyph}
+          {pinGlyph}
         </div>
       ) : (
         <>
