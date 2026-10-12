@@ -532,7 +532,6 @@ input[type="range"][data-range-knob] {
   // muted-accent mixed fill: between idle and the solid active accent.
   &.chip-partial {
     background: var(--mixed-fill);
-    border-color: var(--control-border-accent);
     color: var(--text);
   }
 }

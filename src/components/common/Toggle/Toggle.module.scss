@@ -50,7 +50,6 @@
    --mixed-knob): muted-accent track, ghosted gray knob centered. */
 .toggle[data-on='mixed'] {
   background: var(--mixed-fill);
-  border-color: var(--control-border-accent);
 }
 
 .toggle[data-on='mixed'] .thumb {
