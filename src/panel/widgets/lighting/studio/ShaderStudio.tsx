@@ -1,15 +1,20 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Dices, LayoutGrid, Redo2, Save, Trash2, Undo2, Upload, WandSparkles } from 'lucide-react';
+import { Dices, Dna, Redo2, Save, Undo2, SprayCan, Upload } from 'lucide-react';
 import { DeviceModal } from '../../../../components/common/DeviceModal/DeviceModal';
 import { Button } from '../../../../components/common/Button/Button';
 import { Card } from '../../../../components/common/Card/Card';
 import { Select } from '../../../../components/common/Select/Select';
 import { Slider } from '../../../../components/common/Slider/Slider';
 import { Badge } from '../../../../components/common/Badge/Badge';
+import { SearchInput } from '../../../../components/common/SearchInput/SearchInput';
+import { SettingsSection } from '../../../../components/common/SettingsSection/SettingsSection';
+import { Toggle } from '../../../../components/common/Toggle/Toggle';
+import { InlineError } from '../../../../components/common/InlineError/InlineError';
 import { PromptModal } from '../../../../components/common/PromptModal/PromptModal';
 import { ConfirmModal } from '../../../../components/common/ConfirmModal/ConfirmModal';
 import { SortableList, type SortableRowArgs } from '../../../../components/common/SortableList/SortableList';
-import { forgetShaderSource, primeShaderSource } from '../../../../api/lighting';
+import { forgetShaderSource, primeShaderSource, startStudioLive, stopStudioLive } from '../../../../api/lighting';
+import { customEffectId, customEffectKey } from '../../../../api/customEffects';
 import { useAudioState } from '../../../../hooks/useAudioState';
 import { useTranslation } from '../../../../lib/i18n';
 import { isApplePlatform } from '../../../../lib/platform';
@@ -23,10 +28,12 @@ import {
   type CompiledStudio, type StudioBlock, type StudioRecipe,
 } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, randomRecipe } from './studioRecipes';
-import { deleteEffect, getSavedEffects, newEffectId, saveEffect, useSavedEffects, type MarketLink } from './studioLibrary';
+import { getSavedEffects, newEffectId, saveEffect, useSavedEffects, type MarketLink } from './studioLibrary';
 import { PublishEffectModal } from './PublishEffectModal';
 import { StudioBlockCard } from './StudioBlockCard';
 import { StudioPreview } from './StudioPreview';
+import { CustomEffectsGrid } from './CustomEffectsGrid';
+import pageStyles from '../LightingPage.module.scss';
 import styles from './ShaderStudio.module.scss';
 
 const STACKED = 'stacked' as const;
@@ -34,6 +41,10 @@ const STACKED = 'stacked' as const;
 const HISTORY_LIMIT = 50;
 const NEW_EFFECT_STARTER = 'neonKaleido';
 const VARIATION_COUNT = 6;
+// Live on devices: slider drags reach the LEDs at most this often. An idle
+// session is re-sent at a third of the lease the service last reported.
+const LIVE_SEND_MS = 100;
+const LIVE_LEASE_FALLBACK_MS = 15000;
 const NON_TEXT_INPUTS = new Set(['range', 'checkbox', 'radio', 'button']);
 
 // Keys this editor primed; evicted on close so the module-level shader cache stays bounded.
@@ -70,9 +81,11 @@ function VariationTile({ recipe, label, onPick }: { recipe: StudioRecipe; label:
 }
 
 /** `effectId` opens that saved effect; null starts a new one. */
-export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }: {
+export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onViewListing, onClose }: {
   open: boolean;
   effectId: string | null;
+  /** False when the service renders without a GPU: My effects then skips rendered thumbnails. */
+  gpuAvailable?: boolean;
   /** After a successful save: the effect id and the uniforms whose saved value changed or were unpinned. */
   onSaved?: (id: string, staleParams: string[]) => void;
   /** Opens a Marketplace listing this Studio just published. */
@@ -91,6 +104,10 @@ export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }
   const [past, setPast] = useState<StudioRecipe[]>([]);
   const [future, setFuture] = useState<StudioRecipe[]>([]);
   const [variations, setVariations] = useState<StudioRecipe[] | null>(null);
+  const [effectQuery, setEffectQuery] = useState('');
+  // Off on every open; the session ends on toggle-off and on close (unmount).
+  const [live, setLive] = useState(false);
+  const [liveFailed, setLiveFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   // The recipe as last saved or loaded; null when nothing saved backs it. Any
@@ -157,7 +174,7 @@ export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }
   };
 
   const historyKeysRef = useRef({ undo, redo, blocked: false });
-  historyKeysRef.current = { undo, redo, blocked: saving || publishing || !!pendingDiscard };
+  historyKeysRef.current = { undo, redo, blocked: saving || publishing || !!pendingDiscard || !!variations };
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -175,6 +192,66 @@ export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
+
+  const fragRef = useRef(compiled.frag);
+  fragRef.current = compiled.frag;
+  const liveSentAt = useRef(0);
+  const liveLease = useRef(LIVE_LEASE_FALLBACK_MS);
+  // Sends run one at a time, so a stop is never overtaken by an earlier send still in flight.
+  const liveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const enqueueLive = (job: () => Promise<unknown>) => {
+    liveQueue.current = liveQueue.current.then(job).catch(() => {});
+  };
+  // Bumped when a session starts and ends; work queued for an ended session is dropped.
+  const liveSession = useRef({ id: 0 });
+  // At most one send waits behind the one in flight; it reads the latest state when it runs.
+  const liveWaiting = useRef(false);
+  const sendLive = () => {
+    liveSentAt.current = Date.now();
+    if (liveWaiting.current) return;
+    liveWaiting.current = true;
+    const counter = liveSession.current;
+    const session = counter.id;
+    enqueueLive(async () => {
+      liveWaiting.current = false;
+      const state = stateRef.current;
+      if (session !== counter.id || !state) return;
+      const res = await startStudioLive(fragRef.current, state);
+      if (session !== counter.id) return;
+      if (res?.leaseMs) liveLease.current = res.leaseMs;
+      // A refusal ends live mode: re-sending would retake devices another client just changed.
+      if (!res || res.error === true || res.active === false) {
+        setLiveFailed(true);
+        setLive(false);
+      }
+    });
+  };
+  const sendLiveRef = useRef(sendLive);
+  sendLiveRef.current = sendLive;
+  useEffect(() => {
+    if (!live) return;
+    const timer = setTimeout(() => sendLiveRef.current(), Math.max(0, LIVE_SEND_MS - (Date.now() - liveSentAt.current)));
+    return () => clearTimeout(timer);
+  }, [live, compiled.frag, recipe]);
+  useEffect(() => {
+    if (!live) return;
+    const counter = liveSession.current;
+    const waiting = liveWaiting;
+    counter.id++;
+    setLiveFailed(false);
+    let heartbeat = 0;
+    const beat = () => {
+      sendLiveRef.current();
+      heartbeat = window.setTimeout(beat, liveLease.current / 3);
+    };
+    heartbeat = window.setTimeout(beat, liveLease.current / 3);
+    return () => {
+      clearTimeout(heartbeat);
+      counter.id++;
+      waiting.current = false;
+      enqueueLive(() => stopStudioLive());
+    };
+  }, [live]);
 
   const cost = recipeCost(recipe);
   const fitsBudget = (delta: number) => cost + delta <= STUDIO_COST_BUDGET;
@@ -257,17 +334,34 @@ export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }
     setBaseline(JSON.stringify(s.recipe));
   });
 
-  const deleteSaved = async (id: string) => {
-    if (!(await deleteEffect(id)) || currentId !== id) return;
+  // Read at delete-resolve time: another effect may have been loaded while the delete was in flight.
+  const currentIdRef = useRef(currentId);
+  currentIdRef.current = currentId;
+  // The open effect was deleted from My effects: what is on screen is no longer saved.
+  const forgetDeleted = (id: string) => {
+    if (currentIdRef.current !== id) return;
     setCurrentId(null);
     setBaseline(null);
   };
 
+  const newEffect = () => unlessDirty(() => {
+    const starter = (STUDIO_STARTERS.find(s => s.id === NEW_EFFECT_STARTER) ?? STUDIO_STARTERS[0]).build();
+    apply(starter, true);
+    setCurrentId(null);
+    setBaseline(JSON.stringify(starter));
+  });
+
   const costLevel = cost <= 4 ? 'light' : cost <= 8 ? 'medium' : 'heavy';
 
+  const varying = !!variations;
   const toolbar = (
     <div className={styles.toolbar}>
+      <label className={styles.liveToggle}>
+        <span>{t('lighting.studio.live')}</span>
+        <Toggle checked={live} onChange={setLive} disabled={varying} />
+      </label>
       <Select
+        disabled={varying}
         ariaLabel={t('lighting.studio.starters')}
         placeholder={t('lighting.studio.starters')}
         value=""
@@ -278,18 +372,20 @@ export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }
         }}
         height={32}
       />
-      <Button size="sm" icon={<Dices size={14} />} onClick={() => { setVariations(null); apply(randomRecipe(), true); }}>
+      <Button size="sm" icon={<Dices size={14} />} disabled={varying} onClick={() => apply(randomRecipe(), true)}>
         {t('lighting.studio.surprise')}
       </Button>
-      <Button size="sm" icon={<LayoutGrid size={14} />} onClick={() => (variations ? setVariations(null) : openVariations(recipe))}>
-        {variations ? t('lighting.studio.done') : t('lighting.studio.variations')}
-      </Button>
-      <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} aria-label={t('lighting.studio.undo')} disabled={!past.length} onClick={undo} />
-      <Button size="sm" tone="ghost" icon={<Redo2 size={14} />} aria-label={t('lighting.studio.redo')} disabled={!future.length} onClick={redo} />
-      <Button size="sm" icon={<Upload size={14} />} onClick={() => { publishIdRef.current = null; setPublishing(true); }}>
+      {varying ? (
+        <Button size="sm" tone="accent" onClick={() => setVariations(null)}>{t('lighting.studio.done')}</Button>
+      ) : (
+        <Button size="sm" icon={<Dna size={14} />} onClick={() => openVariations(recipe)}>{t('lighting.studio.variations')}</Button>
+      )}
+      <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} aria-label={t('lighting.studio.undo')} disabled={varying || !past.length} onClick={undo} />
+      <Button size="sm" tone="ghost" icon={<Redo2 size={14} />} aria-label={t('lighting.studio.redo')} disabled={varying || !future.length} onClick={redo} />
+      <Button size="sm" icon={<Upload size={14} />} disabled={varying} onClick={() => { publishIdRef.current = null; setPublishing(true); }}>
         {t('lighting.studio.publish.button')}
       </Button>
-      <Button size="sm" tone="accent" icon={<Save size={14} />} onClick={() => setSaving(true)}>
+      <Button size="sm" tone="accent" icon={<Save size={14} />} disabled={varying} onClick={() => setSaving(true)}>
         {t('lighting.studio.save')}
       </Button>
     </div>
@@ -326,21 +422,22 @@ export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }
       );
     };
     return (
-      <section key={stage} className={styles.stage}>
-        <div className={styles.stageHeader}>
-          <h4 className={styles.stageTitle}>{t(`lighting.studio.stage.${stage}`)}</h4>
-          {stage !== 'color' && blocks.length < STUDIO_STAGE_LIMIT[stage] && (
-            <Select
-              className={styles.addSelect}
-              ariaLabel={t('lighting.studio.add')}
-              placeholder={t('lighting.studio.add')}
-              value=""
-              options={addOptions}
-              onChange={type => apply({ ...recipe, blocks: [...recipe.blocks, makeBlock(type)] }, true)}
-              height={28}
-            />
-          )}
-        </div>
+      <SettingsSection
+        key={stage}
+        title={t(`lighting.studio.stage.${stage}`)}
+        boxClassName={styles.stageBox}
+        action={stage !== 'color' && blocks.length < STUDIO_STAGE_LIMIT[stage] ? (
+          <Select
+            className={styles.addSelect}
+            ariaLabel={t('lighting.studio.add')}
+            placeholder={t('lighting.studio.add')}
+            value=""
+            options={addOptions}
+            onChange={type => apply({ ...recipe, blocks: [...recipe.blocks, makeBlock(type)] }, true)}
+            height={28}
+          />
+        ) : undefined}
+      >
         {blocks.length > 1 ? (
           <SortableList
             className={styles.blockList}
@@ -352,7 +449,7 @@ export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }
         ) : (
           <div className={styles.blockList}>{blocks.map(b => renderCard(b))}</div>
         )}
-      </section>
+      </SettingsSection>
     );
   };
 
@@ -360,56 +457,53 @@ export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }
     <DeviceModal
       open={open}
       onClose={close}
+      closable={!varying}
       fullscreen
       title={t('lighting.studio.title')}
-      subtitle={currentName}
-      icon={<WandSparkles size={18} />}
+      icon={<SprayCan size={18} />}
       headerRight={toolbar}
     >
       <div className={styles.layout}>
         <div className={styles.viewPane}>
           {variations ? (
-            <>
-              <p className={styles.hint}>{t('lighting.studio.variationsHint')}</p>
+            <SettingsSection title={t('lighting.studio.variations')} description={t('lighting.studio.variationsHint')}
+              className={styles.fill} boxClassName={styles.bareBox}>
               <div className={styles.variationGrid}>
                 {variations.map((v, i) => (
                   <VariationTile key={i} recipe={v} label={`${t('lighting.studio.variations')} ${i + 1}`} onPick={() => pickVariation(v)} />
                 ))}
               </div>
-            </>
+            </SettingsSection>
           ) : (
             <>
-              <StudioPreview effectKey={compiled.key} stateRef={stateRef} audioRef={audioRef} />
-              <div className={styles.underPreview}>
-                <div className={styles.ledColumn}>
-                  <span className={styles.caption}>{t('lighting.studio.ledView')}</span>
-                  <StudioPreview effectKey={compiled.key} stateRef={stateRef} audioRef={audioRef} led />
+              <SettingsSection title={t('lighting.studio.preview')} className={styles.fill} boxClassName={styles.bareBox}
+                action={<Badge label={`${t(`lighting.studio.cost.${costLevel}`)} ${cost}/${STUDIO_COST_BUDGET}`} compact />}>
+                <StudioPreview effectKey={compiled.key} stateRef={stateRef} audioRef={audioRef} />
+                {liveFailed && <InlineError className={styles.liveError}>{t('lighting.studio.liveFailed')}</InlineError>}
+              </SettingsSection>
+              <div className={styles.myEffects}>
+                <div className={pageStyles.effectToolbar}>
+                  <SearchInput
+                    className={pageStyles.effectSearch}
+                    value={effectQuery}
+                    onChange={setEffectQuery}
+                    placeholder={t('lighting.effects.search')}
+                    ariaLabel={t('lighting.effects.search')}
+                  />
                 </div>
-                <div className={styles.savedColumn}>
-                  <div className={styles.savedHeader}>
-                    <span className={styles.caption}>{t('lighting.studio.saved')}</span>
-                    <Badge label={`${t(`lighting.studio.cost.${costLevel}`)} ${cost}/${STUDIO_COST_BUDGET}`} compact />
-                  </div>
-                  {saved.length === 0 ? (
-                    <p className={styles.hint}>{t('lighting.studio.savedEmpty')}</p>
-                  ) : (
-                    <ul className={styles.savedList}>
-                      {saved.map(s => (
-                        <li key={s.id} className={styles.savedRow}>
-                          <Button size="sm" tone="ghost" className={styles.savedName} onClick={() => loadSaved(s.id)}>
-                            {s.name}
-                          </Button>
-                          <Button size="sm" tone="ghost" icon={<Trash2 size={13} />} aria-label={t('lighting.studio.delete')} onClick={() => { void deleteSaved(s.id); }} />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                <CustomEffectsGrid
+                  effect={currentId ? customEffectKey(currentId) : null}
+                  query={effectQuery}
+                  gpuAvailable={gpuAvailable}
+                  onSelect={key => loadSaved(customEffectId(key))}
+                  onCreate={newEffect}
+                  onDeleted={forgetDeleted}
+                />
               </div>
             </>
           )}
         </div>
-        <div className={styles.stackPane}>
+        <div className={`${styles.stackPane} ${varying ? styles.locked : ''}`} inert={varying || undefined}>
           <Card compact className={styles.blockCard}>
             <div className={styles.blockParams}>
               <Slider orientation={STACKED} editable trackFill zeroMarker label={t('lighting.controls.speed')}

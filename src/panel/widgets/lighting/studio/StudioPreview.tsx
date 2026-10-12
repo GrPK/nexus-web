@@ -5,21 +5,17 @@ import type { EffectState } from '../../../../types/lighting';
 import { InlineError } from '../../../../components/common/InlineError/InlineError';
 import styles from './ShaderStudio.module.scss';
 
-const LED_OPTIONS = { maxDevicePixelRatio: 1 };
-
 interface StudioPreviewProps {
   /** A key already primed with primeShaderSource. */
   effectKey: string;
   stateRef: React.RefObject<EffectState | null>;
   audioRef?: React.RefObject<AudioSnapshot | null>;
-  /** Renders at the engine's LED canvas size, scaled up without smoothing. */
-  led?: boolean;
   className?: string;
 }
 
-export function StudioPreview({ effectKey, stateRef, audioRef, led, className }: StudioPreviewProps) {
+export function StudioPreview({ effectKey, stateRef, audioRef, className }: StudioPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { error } = useShaderRenderer(canvasRef, effectKey, stateRef, audioRef, led ? LED_OPTIONS : undefined);
+  const { error } = useShaderRenderer(canvasRef, effectKey, stateRef, audioRef);
   // Chromium caps live WebGL contexts per page and evicts the oldest (possibly the
   // lighting page's own canvas), so release this one on unmount instead of waiting
   // for GC. StrictMode and Fast Refresh re-run setup synchronously on the same
@@ -36,8 +32,8 @@ export function StudioPreview({ effectKey, stateRef, audioRef, led, className }:
     };
   }, []);
   return (
-    <div className={`${led ? styles.ledFrame : styles.previewFrame} ${className ?? ''}`}>
-      <canvas ref={canvasRef} className={led ? styles.ledCanvas : styles.previewCanvas} />
+    <div className={`${styles.previewFrame} ${className ?? ''}`}>
+      <canvas ref={canvasRef} className={styles.previewCanvas} />
       {error && <InlineError className={styles.previewError}>{error}</InlineError>}
     </div>
   );

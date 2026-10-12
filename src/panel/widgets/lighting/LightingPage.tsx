@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Music, Pause, Pencil, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Music, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
   startAnimate, startStatic, startScreenMirror, stopLighting, startGameSync,
   fetchStaticSettings,
@@ -2626,10 +2626,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                         size="sm"
                         pill
                         className={styles.editEffectBtn}
-                        icon={<Pencil size={14} />}
+                        icon={<SprayCan size={14} />}
                         onClick={() => setStudioTarget({ id: activeCustom.id })}
                       >
-                        {t('lighting.studio.editEffect')}
+                        {t('lighting.studio.title')}
                       </Button>
                     )}
                     <HoverTooltip body={t('lighting.fullscreen')} side="left">
@@ -2806,6 +2806,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           <ShaderStudio
             open
             effectId={studioTarget.id}
+            gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
             onSaved={handleCustomSaved}
             onViewListing={id => onSectionNavigate?.('store', { tab: `effects/${id}` })}
             onClose={() => setStudioTarget(null)}

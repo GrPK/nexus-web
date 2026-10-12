@@ -37,13 +37,15 @@ function CustomEffectCell({ effect, active, gpuAvailable, onSelect, onDelete }: 
 }
 
 /** Saved Shader Studio effects plus a create tile, laid out like the built-in effect grid. Clicking one runs it. */
-export function CustomEffectsGrid({ effect, query, gpuAvailable = true, onSelect, onCreate }: {
+export function CustomEffectsGrid({ effect, query, gpuAvailable = true, onSelect, onCreate, onDeleted }: {
   /** Running effect key, highlighted when it is one of these. */
   effect: string | null;
   query: string;
   gpuAvailable?: boolean;
   onSelect: (key: string) => void;
   onCreate: () => void;
+  /** After an effect was deleted from this grid. */
+  onDeleted?: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const saved = useSavedEffects();
@@ -82,7 +84,8 @@ export function CustomEffectsGrid({ effect, query, gpuAvailable = true, onSelect
         confirmLabel={t('lighting.studio.delete')}
         destructive
         onConfirm={() => {
-          if (pendingDelete) void deleteEffect(pendingDelete.id);
+          const target = pendingDelete;
+          if (target) void deleteEffect(target.id).then(ok => { if (ok) onDeleted?.(target.id); });
           setPendingDelete(null);
         }}
         onCancel={() => setPendingDelete(null)}

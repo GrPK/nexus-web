@@ -5,6 +5,7 @@ import { lianLiHubQuery } from './lianli';
 import { type DeviceGroup } from '../lib/deviceGroups';
 import { type DeviceStack } from '../lib/stackSlots';
 import { parseShaderParams, type ShaderParamSpec } from '../lib/shaderParams';
+import type { EffectState } from '../types/lighting';
 
 export async function lightingOutputUrl(): Promise<string> {
   return resolveAuthWs('/lighting/output');
@@ -211,6 +212,28 @@ export const startAnimate = (
     params: params ? Object.entries(params).map(([name, value]) => ({ name, value })) : [],
     persist,
   });
+
+export interface StudioLiveResponse {
+  error?: boolean;
+  msg?: string;
+  /** True while the session runs. */
+  active?: boolean;
+  /** How long the session lasts without another send. */
+  leaseMs?: number;
+}
+
+/**
+ * Plays Shader Studio GLSL on every device, full canvas, until stopStudioLive
+ * or a lapsed lease. Nothing is persisted, and ending the session restores
+ * what the devices showed before. Null when the request failed.
+ */
+export const startStudioLive = (frag: string, s: EffectState) =>
+  postService<StudioLiveResponse>('/lighting/studio-live', {
+    frag, speed: s.speed, intensity: s.intensity, hue: s.hue, colorize: s.colorize,
+    saturation: s.saturation, contrast: s.contrast, params: s.params,
+  });
+
+export const stopStudioLive = () => deleteService<unknown>('/lighting/studio-live');
 
 /** Runs a static fill or frozen pattern. No speed: the service pins it to 0. */
 export const startStatic = (
