@@ -253,6 +253,12 @@
   &:hover { color: var(--text); }
 }
 
+.paramActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .modToggleOn {
   color: var(--accent);
   background: var(--accent-soft);

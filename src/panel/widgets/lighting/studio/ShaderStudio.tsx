@@ -18,12 +18,11 @@ import {
   type StudioStage,
 } from './studioBlocks';
 import {
-  compileStudio, makeBlock, recipeCost, stageCount,
+  compileStudio, makeBlock, recipeCost, stageCount, staleParamsBetween,
   type CompiledStudio, type StudioBlock, type StudioRecipe,
 } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, shuffleRecipe } from './studioRecipes';
-import { deleteSavedEffect, getSavedEffects, putSavedEffect, useSavedEffects } from './studioLibrary';
-import { renderStudioThumbnail } from './studioThumbnail';
+import { deleteEffect, getSavedEffects, newEffectId, saveEffect, useSavedEffects } from './studioLibrary';
 import { StudioBlockCard } from './StudioBlockCard';
 import { StudioPreview } from './StudioPreview';
 import styles from './ShaderStudio.module.scss';
@@ -31,6 +30,7 @@ import styles from './ShaderStudio.module.scss';
 const STACKED = 'stacked' as const;
 
 const HISTORY_LIMIT = 50;
+const NEW_EFFECT_STARTER = 'neonKaleido';
 const VARIATION_COUNT = 6;
 
 // Keys this editor primed; evicted on close so the module-level shader cache stays bounded.
@@ -67,7 +67,13 @@ function VariationTile({ recipe, label, onPick }: { recipe: StudioRecipe; label:
 }
 
 /** `effectId` opens that saved effect; null starts a new one. */
-export function ShaderStudio({ open, effectId, onClose }: { open: boolean; effectId: string | null; onClose: () => void }) {
+export function ShaderStudio({ open, effectId, onSaved, onClose }: {
+  open: boolean;
+  effectId: string | null;
+  /** After a successful save: the effect id and the uniforms whose saved value changed or were unpinned. */
+  onSaved?: (id: string, staleParams: string[]) => void;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const saved = useSavedEffects();
   const [currentId, setCurrentId] = useState<string | null>(
@@ -75,7 +81,7 @@ export function ShaderStudio({ open, effectId, onClose }: { open: boolean; effec
   );
   const [recipe, setRecipe] = useState<StudioRecipe>(() => {
     const existing = getSavedEffects().find(s => s.id === effectId);
-    return existing ? structuredClone(existing.recipe) : STUDIO_STARTERS[0].build();
+    return existing ? structuredClone(existing.recipe) : (STUDIO_STARTERS.find(s => s.id === NEW_EFFECT_STARTER) ?? STUDIO_STARTERS[0]).build();
   });
   const [past, setPast] = useState<StudioRecipe[]>([]);
   const [future, setFuture] = useState<StudioRecipe[]>([]);
@@ -152,13 +158,15 @@ export function ShaderStudio({ open, effectId, onClose }: { open: boolean; effec
   const updateBlock = (uid: string, block: StudioBlock, commit: boolean) =>
     apply({ ...recipe, blocks: recipe.blocks.map(b => (b.uid === uid ? block : b)) }, commit);
 
+  // The swapped block keeps its uid, so pins on params the new type also has survive.
   const changeType = (uid: string, type: string) => {
-    const next = makeBlock(type);
+    const next = { ...makeBlock(type), uid };
     const old = recipe.blocks.find(b => b.uid === uid);
     if (old && studioBlock(type)?.stage === 'pattern') {
       for (const p of PATTERN_BLEND_PARAMS) next.params[p.key] = old.params[p.key] ?? p.def;
     }
-    apply({ ...recipe, blocks: recipe.blocks.map(b => (b.uid === uid ? next : b)) }, true);
+    const knobs = recipe.knobs?.filter(k => k.uid !== uid || k.key in next.params);
+    apply({ ...recipe, knobs, blocks: recipe.blocks.map(b => (b.uid === uid ? next : b)) }, true);
   };
 
   const reorder = (stage: StudioStage, ids: string[]) => {
@@ -175,14 +183,26 @@ export function ShaderStudio({ open, effectId, onClose }: { open: boolean; effec
     openVariations(v);
   };
 
-  // Keeping the name overwrites the open effect; a new name saves a copy.
-  const saveEffect = (name: string) => {
+  // Keeping the name overwrites the open effect; a new name saves a copy. A
+  // returned string is shown in the prompt (the service refused the shader).
+  const saveCurrent = async (name: string): Promise<string | undefined> => {
     const trimmed = name.trim();
-    const id = currentId && currentName === trimmed ? currentId : `fx${Date.now().toString(36)}`;
-    putSavedEffect({ id, name: trimmed, recipe: structuredClone(recipe), thumb: renderStudioThumbnail(recipe) ?? undefined });
+    const id = currentId && currentName === trimmed ? currentId : newEffectId();
+    const snapshot = recipe;
+    const previous = getSavedEffects().find(e => e.id === id)?.recipe;
+    const error = await saveEffect(id, trimmed, snapshot);
+    if (error) return t('lighting.studio.saveFailed', { error });
     setCurrentId(id);
     setSaving(false);
-    setBaseline(JSON.stringify(recipe));
+    setBaseline(JSON.stringify(snapshot));
+    onSaved?.(id, previous ? staleParamsBetween(previous, snapshot) : []);
+    return undefined;
+  };
+
+  const togglePin = (uid: string, key: string) => {
+    const knobs = recipe.knobs ?? [];
+    const pinned = knobs.some(k => k.uid === uid && k.key === key);
+    apply({ ...recipe, knobs: pinned ? knobs.filter(k => !(k.uid === uid && k.key === key)) : [...knobs, { uid, key }] }, true);
   };
 
   const loadSaved = (id: string) => unlessDirty(() => {
@@ -193,9 +213,8 @@ export function ShaderStudio({ open, effectId, onClose }: { open: boolean; effec
     setBaseline(JSON.stringify(s.recipe));
   });
 
-  const deleteSaved = (id: string) => {
-    deleteSavedEffect(id);
-    if (currentId !== id) return;
+  const deleteSaved = async (id: string) => {
+    if (!(await deleteEffect(id)) || currentId !== id) return;
     setCurrentId(null);
     setBaseline(null);
   };
@@ -249,7 +268,13 @@ export function ShaderStudio({ open, effectId, onClose }: { open: boolean; effec
           onChange={(nb, commit) => updateBlock(b.uid, nb, commit)}
           onCommit={commitCurrent}
           onTypeChange={type => changeType(b.uid, type)}
-          onRemove={() => apply({ ...recipe, blocks: recipe.blocks.filter(x => x.uid !== b.uid) }, true)}
+          onRemove={() => apply({
+            ...recipe,
+            blocks: recipe.blocks.filter(x => x.uid !== b.uid),
+            knobs: recipe.knobs?.filter(k => k.uid !== b.uid),
+          }, true)}
+          isPinned={key => !!recipe.knobs?.some(k => k.uid === b.uid && k.key === key)}
+          onTogglePin={key => togglePin(b.uid, key)}
         />
       );
     };
@@ -327,7 +352,7 @@ export function ShaderStudio({ open, effectId, onClose }: { open: boolean; effec
                           <Button size="sm" tone="ghost" className={styles.savedName} onClick={() => loadSaved(s.id)}>
                             {s.name}
                           </Button>
-                          <Button size="sm" tone="ghost" icon={<Trash2 size={13} />} aria-label={t('lighting.studio.delete')} onClick={() => deleteSaved(s.id)} />
+                          <Button size="sm" tone="ghost" icon={<Trash2 size={13} />} aria-label={t('lighting.studio.delete')} onClick={() => { void deleteSaved(s.id); }} />
                         </li>
                       ))}
                     </ul>
@@ -374,7 +399,7 @@ export function ShaderStudio({ open, effectId, onClose }: { open: boolean; effec
         maxLength={40}
         confirmLabel={t('lighting.studio.save')}
         validate={v => (v.trim() ? null : t('lighting.studio.nameRequired'))}
-        onConfirm={saveEffect}
+        onConfirm={saveCurrent}
         onCancel={() => setSaving(false)}
       />
     </DeviceModal>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseShaderParams } from '../../../../lib/shaderParams';
 import { STUDIO_BLOCKS, STUDIO_COST_BUDGET, STUDIO_STAGES, STUDIO_STAGE_LIMIT, studioBlock } from './studioBlocks';
-import { compileStudio, makeBlock, orderedBlocks, recipeCost, stageCount, type StudioRecipe } from './studioCompiler';
+import { compileStudio, makeBlock, orderedBlocks, recipeCost, stageCount, staleParamsBetween, studioUniform, type StudioRecipe } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, shuffleRecipe } from './studioRecipes';
 
 const recipeOf = (...types: string[]): StudioRecipe => ({
@@ -43,7 +43,7 @@ describe('compileStudio', () => {
     r.blocks[0].params.scale = 5;
     const b = compileStudio(r);
     expect(b.key).toBe(a.key);
-    expect(b.params.u_b0_scale).toBe(5);
+    expect(b.params[studioUniform(r.blocks[0].uid, 0, 'scale')]).toBe(5);
   });
 
   it('changes the key and routes the audio uniform when a param is modulated', () => {
@@ -51,15 +51,17 @@ describe('compileStudio', () => {
     const before = compileStudio(r).key;
     r.blocks[0].mods = { scale: { source: 'beat', amount: -0.25 } };
     const compiled = compileStudio(r);
+    const u = studioUniform(r.blocks[0].uid, 0, 'scale');
     expect(compiled.key).not.toBe(before);
-    expect(compiled.params.u_b0_scale_m).toBe(-0.25);
-    expect(compiled.frag).toContain('u_b0_scale_m * 5.7 * u_audioBeat');
+    expect(compiled.params[`${u}_m`]).toBe(-0.25);
+    expect(compiled.frag).toContain(`${u}_m * 5.7 * u_audioBeat`);
   });
 
   it('rounds a modulated whole-number param so it never lands between integers', () => {
     const r = recipeOf('kaleidoscope', 'rings', 'palette');
     r.blocks[0].mods = { sides: { source: 'bass', amount: 0.5 } };
-    expect(compileStudio(r).frag).toMatch(/floor\(clamp\(u_b0_sides \+ u_b0_sides_m \* [\d.]+ \* u_audioBass, 2\.0, 16\.0\) \+ 0\.5\)/);
+    const u = studioUniform(r.blocks[0].uid, 0, 'sides');
+    expect(compileStudio(r).frag).toContain(`floor(clamp(${u} + ${u}_m * 14.0 * u_audioBass, 2.0, 16.0) + 0.5)`);
   });
 
   it('clamps out-of-range and non-finite values to the authored range', () => {
@@ -67,8 +69,9 @@ describe('compileStudio', () => {
     r.blocks[0].params.count = 999;
     r.blocks[0].params.speed = Number.NaN;
     const { params } = compileStudio(r);
-    expect(params.u_b0_count).toBe(40);
-    expect(params.u_b0_speed).toBe(1);
+    const uid = r.blocks[0].uid;
+    expect(params[studioUniform(uid, 0, 'count')]).toBe(40);
+    expect(params[studioUniform(uid, 0, 'speed')]).toBe(1);
   });
 
   it('orders blocks by stage whatever the array order', () => {
@@ -77,10 +80,36 @@ describe('compileStudio', () => {
   });
 
   it('blends only the second and later patterns', () => {
-    const { frag } = compileStudio(recipeOf('rings', 'stripes', 'palette'));
+    const r = recipeOf('rings', 'stripes', 'palette');
+    const { frag } = compileStudio(r);
+    const [first, second] = r.blocks;
     expect(frag).toContain('v = f;');
-    expect(frag).toContain('v = blendV(v, f, u_b1_blend, u_b1_mix);');
-    expect(frag).not.toContain('u_b0_blend');
+    expect(frag).toContain(`v = blendV(v, f, ${studioUniform(second.uid, 1, 'blend')}, ${studioUniform(second.uid, 1, 'mix')});`);
+    expect(frag).not.toContain(studioUniform(first.uid, 0, 'blend'));
+  });
+
+  it('keeps a param\'s uniform name when its block moves', () => {
+    const r = recipeOf('spin', 'zoom', 'plasma', 'palette');
+    const zoom = r.blocks[1];
+    const before = studioUniform(zoom.uid, 1, 'scale');
+    const moved = { ...r, blocks: [r.blocks[1], r.blocks[0], ...r.blocks.slice(2)] };
+    expect(Object.keys(compileStudio(moved).params)).toContain(before);
+  });
+
+  // The saved shader must reproduce the recipe under a neutral EffectState.
+  it('bakes recipe values as defaults and base adjustments as constants', () => {
+    const r = { ...recipeOf('rings', 'palette'), speed: 25, hue: 0.4, saturation: 1.5, contrast: 0.8 };
+    r.blocks[0].params.count = 12.5;
+    const baked = compileStudio(r, { bake: true });
+    const specs = new Map(parseShaderParams(baked.frag).map(s => [s.name, s]));
+    expect(specs.get(studioUniform(r.blocks[0].uid, 0, 'count'))?.defaultValue).toBe(12.5);
+    expect(baked.frag).toContain('const float S_SPEED = 0.5;');
+    expect(baked.frag).toContain('const float S_HUE = 0.4;');
+    expect(baked.frag).toContain('const float S_SAT = 1.5;');
+    expect(baked.frag).toContain('const float S_CON = 0.8;');
+    const live = compileStudio(r);
+    expect(live.frag).toContain('const float S_SPEED = 1.0;');
+    expect(new Map(parseShaderParams(live.frag).map(s => [s.name, s])).get(studioUniform(r.blocks[0].uid, 0, 'count'))?.defaultValue).toBe(8);
   });
 });
 
@@ -95,5 +124,27 @@ describe('studio recipes', () => {
       expectValid(r);
       expectValid(mutateRecipe(r));
     }
+  });
+});
+
+describe('staleParamsBetween', () => {
+  it('lists only params whose saved value changed, disappeared, or lost their pin', () => {
+    const before = recipeOf('rings', 'stripes', 'palette');
+    const [rings, stripes] = before.blocks;
+    before.knobs = [{ uid: rings.uid, key: 'speed' }, { uid: rings.uid, key: 'count' }];
+    const after: StudioRecipe = structuredClone(before);
+    after.blocks[0].params.count = 20;
+    after.blocks = after.blocks.filter(b => b.uid !== stripes.uid);
+    after.knobs = [{ uid: rings.uid, key: 'count' }];
+    const stale = staleParamsBetween(before, after);
+    expect(stale).toContain(studioUniform(rings.uid, 0, 'count'));
+    expect(stale).toContain(studioUniform(rings.uid, 0, 'speed'));
+    expect(stale).toContain(studioUniform(stripes.uid, 1, 'angle'));
+    expect(stale).not.toContain(studioUniform(after.blocks[1].uid, 1, 'spread'));
+  });
+
+  it('is empty when nothing about the saved look changed', () => {
+    const r = recipeOf('plasma', 'palette');
+    expect(staleParamsBetween(r, structuredClone(r))).toEqual([]);
   });
 });

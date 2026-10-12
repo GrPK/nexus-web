@@ -1,5 +1,5 @@
 import { useTranslation } from '../../../../lib/i18n';
-import { EFFECTS, type EffectState, type EffectTemplateBundle, type LightingMode } from '../../../../types/lighting';
+import { EFFECTS, type EffectDef, type EffectState, type EffectTemplateBundle, type LightingMode } from '../../../../types/lighting';
 import { EffectControls } from './EffectControls';
 import { PostProcessControls } from '../effecteditor/PostProcessControls';
 import type { PostProcessState } from '../effecteditor/types';
@@ -18,7 +18,7 @@ export function EffectTab({
   // animate props
   effect, state, bundle, canReset,
   onTemplateSelect, onAnimateChange, onAnimateCommit, onAnimateReset,
-  panelSlots,
+  panelSlots, customDef, customTitle,
   // media + screen props
   postProcess, onPostProcessChange, onPostProcessCommit, onPostProcessReset,
 }: {
@@ -33,6 +33,9 @@ export function EffectTab({
   onAnimateReset: () => void;
   /** Preset slots used as a background by ≥1 panel (panel badge). */
   panelSlots?: Set<number> | null;
+  /** A custom (Shader Studio) effect's definition and name; built-ins come from EFFECTS. */
+  customDef?: EffectDef;
+  customTitle?: string;
   postProcess: PostProcessState;
   onPostProcessChange: (patch: Partial<PostProcessState>, commit: boolean) => void;
   onPostProcessCommit: () => void;
@@ -45,11 +48,13 @@ export function EffectTab({
       return <p className={styles.effectTabEmpty}>{t('lighting.rightPane.effectAnimateHint')}</p>;
     }
     const def = EFFECTS.find(e => e.key === effect);
+    const title = customTitle ?? (def ? t(def.labelKey) : null);
     return (
       <>
-        {def && <h3 className={styles.effectTabTitle}>{t(def.labelKey)}</h3>}
+        {title && <h3 className={styles.effectTabTitle}>{title}</h3>}
         <EffectControls
           effect={effect}
+          customDef={customDef}
           state={state}
           bundle={bundle}
           canReset={canReset}

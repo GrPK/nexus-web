@@ -2,36 +2,55 @@ import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { EffectCard } from '../../../../components/common/EffectCard/EffectCard';
 import { ConfirmModal } from '../../../../components/common/ConfirmModal/ConfirmModal';
+import { customEffectKey } from '../../../../api/customEffects';
+import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import { useTranslation } from '../../../../lib/i18n';
 import { matchesAllWords } from '../../../../search/match';
-import { deleteSavedEffect, putSavedEffect, useSavedEffects, type SavedEffect } from './studioLibrary';
-import { renderStudioThumbnail } from './studioThumbnail';
+import { deleteEffect, migrateLegacyEffects, useSavedEffects, type SavedEffect } from './studioLibrary';
 import pageStyles from '../LightingPage.module.scss';
 import styles from './ShaderStudio.module.scss';
 
-// Entries whose thumbnail failed to render (no WebGL2, compile error); not retried this session.
-const thumbFailed = new Set<string>();
+function CustomEffectCell({ effect, active, gpuAvailable, onSelect, onDelete }: {
+  effect: SavedEffect;
+  active: boolean;
+  gpuAvailable: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  const key = customEffectKey(effect.id);
+  const url = useEffectThumbnail(key, 0, String(effect.updatedAt), !gpuAvailable);
+  return (
+    <EffectCard
+      overlay
+      asDiv
+      dataEffectKey={key}
+      label={effect.name}
+      thumbUrl={url}
+      thumbStatic={!gpuAvailable}
+      active={active}
+      onClick={onSelect}
+      onDelete={onDelete}
+      deleteAriaLabel={t('lighting.studio.delete')}
+    />
+  );
+}
 
-/** Saved Shader Studio effects plus a create tile, laid out like the built-in effect grid. */
-export function CustomEffectsGrid({ query, onCreate, onOpen }: {
+/** Saved Shader Studio effects plus a create tile, laid out like the built-in effect grid. Clicking one runs it. */
+export function CustomEffectsGrid({ effect, query, gpuAvailable = true, onSelect, onCreate }: {
+  /** Running effect key, highlighted when it is one of these. */
+  effect: string | null;
   query: string;
+  gpuAvailable?: boolean;
+  onSelect: (key: string) => void;
   onCreate: () => void;
-  onOpen: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const saved = useSavedEffects();
   const [pendingDelete, setPendingDelete] = useState<SavedEffect | null>(null);
   const shown = saved.filter(s => matchesAllWords(query, [s.name]));
 
-  // Effects saved before thumbnails existed get one rendered once and stored.
-  useEffect(() => {
-    for (const s of saved) {
-      if (s.thumb || thumbFailed.has(s.id)) continue;
-      const thumb = renderStudioThumbnail(s.recipe);
-      if (thumb) putSavedEffect({ ...s, thumb });
-      else thumbFailed.add(s.id);
-    }
-  }, [saved]);
+  useEffect(() => { void migrateLegacyEffects(); }, []);
 
   return (
     <div className={pageStyles.animateGridWrap}>
@@ -42,21 +61,17 @@ export function CustomEffectsGrid({ query, onCreate, onOpen }: {
             <span>{t('lighting.studio.create')}</span>
           </button>
           {shown.map(s => (
-            <EffectCard
+            <CustomEffectCell
               key={s.id}
-              overlay
-              asDiv
-              label={s.name}
-              thumbUrl={s.thumb ?? null}
-              thumbStatic
-              active={false}
-              onClick={() => onOpen(s.id)}
+              effect={s}
+              active={effect === customEffectKey(s.id)}
+              gpuAvailable={gpuAvailable}
+              onSelect={() => onSelect(customEffectKey(s.id))}
               onDelete={() => setPendingDelete(s)}
-              deleteAriaLabel={t('lighting.studio.delete')}
             />
           ))}
         </div>
-        {query && shown.length === 0 && saved.length > 0 && (
+        {query.trim() && shown.length === 0 && saved.length > 0 && (
           <p className={pageStyles.browserHint}>{t('lighting.effects.noMatches')}</p>
         )}
       </div>
@@ -67,7 +82,7 @@ export function CustomEffectsGrid({ query, onCreate, onOpen }: {
         confirmLabel={t('lighting.studio.delete')}
         destructive
         onConfirm={() => {
-          if (pendingDelete) deleteSavedEffect(pendingDelete.id);
+          if (pendingDelete) void deleteEffect(pendingDelete.id);
           setPendingDelete(null);
         }}
         onCancel={() => setPendingDelete(null)}

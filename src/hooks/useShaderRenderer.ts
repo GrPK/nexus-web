@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchShaderSource } from '../api/lighting';
+import { fetchShaderSource, onShaderSourceInvalidated } from '../api/lighting';
 import { createDisplayDivider, createFramePacer, panelDisplayHz, streamFrameCap } from '../lib/framePacer';
 import { BASE_UNIFORM_NAMES, clampToSpec, resolveParamUniforms, type ShaderParamSpec } from '../lib/shaderParams';
 import type { EffectState } from '../types/lighting';
@@ -13,7 +13,7 @@ export function shaderDrewThisFrame(canvas: HTMLCanvasElement, frameTs: number):
   return drawnFrameTs.get(canvas) === frameTs;
 }
 
-export const QUAD_VERT = `#version 300 es
+const QUAD_VERT = `#version 300 es
 layout (location = 0) in vec2 a_pos;
 void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
 `;
@@ -29,7 +29,7 @@ const PULSE_SPEEDUP = 1.5;
 // Per-second easing toward a new track's palette stops.
 const PALETTE_EASING = 2;
 
-export function adaptGlsl(source: string): string {
+function adaptGlsl(source: string): string {
   return source.replace('#version 330 core', '#version 300 es\nprecision highp float;');
 }
 
@@ -122,6 +122,14 @@ export function useShaderRenderer(
       setReady(false);
     };
   }, [canvasRef]);
+
+  // Bumped when this effect's source is replaced (a saved custom effect), forcing a recompile under the same key.
+  const [sourceRev, setSourceRev] = useState(0);
+  useEffect(() => onShaderSourceInvalidated(name => {
+    if (name !== effect) return;
+    compiledRef.current = null;
+    setSourceRev(r => r + 1);
+  }), [effect]);
 
   useEffect(() => {
     const gl = glRef.current;
@@ -350,7 +358,7 @@ export function useShaderRenderer(
       };
       rafRef.current = requestAnimationFrame(render);
     });
-  }, [effect, canvasRef, stateRef, options?.maxDevicePixelRatio, options?.maxFps, options?.screenSize, options?.visibleRef, options?.paletteRef, options?.audioTime, audioRef]);
+  }, [effect, sourceRev, canvasRef, stateRef, options?.maxDevicePixelRatio, options?.maxFps, options?.screenSize, options?.visibleRef, options?.paletteRef, options?.audioTime, audioRef]);
 
   return { ready, loading, error };
 }

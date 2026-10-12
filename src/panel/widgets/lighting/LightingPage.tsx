@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Music, Pause, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Music, Pause, Pencil, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
   startAnimate, startStatic, startScreenMirror, stopLighting, startGameSync,
   fetchStaticSettings,
@@ -65,8 +65,11 @@ import {
 } from './staticPicks';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
+  customEffectDef, customEffectId, customEffectKey, customEffectsLoaded, isCustomEffectKey, refreshCustomEffects, useCustomEffects,
+} from '../../../api/customEffects';
+import {
   EFFECTS, ANIMATE_EFFECTS, STATIC_EFFECTS, STATIC_PATTERN_EFFECTS, DEFAULT_STATIC_EFFECT, MODES,
-  defaultStateFor, isStaticEffect, isStaticFill,
+  TEMPLATE_COUNT, defaultStateFor, isStaticEffect, isStaticFill,
   type EffectState, type EffectTemplateBundle, type LightingMode,
 } from '../../../types/lighting';
 import {
@@ -612,6 +615,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     for (const fx of EFFECTS) {
       merged[fx.key] = mergeTemplates(fx.key, savedTemplates[fx.key], defaults);
     }
+    for (const key of Object.keys(savedTemplates)) {
+      if (isCustomEffectKey(key)) merged[key] = mergeTemplates(key, savedTemplates[key], defaults);
+    }
     if (!data.templates) {
       // Pre-templates service: fold the legacy per-effect states into slot 0
       // and persist, but only when there is something to migrate - the service
@@ -636,16 +642,17 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
     setEffectTemplates(merged);
     setCommittedTemplates(merged);
-    if (ANIMATE_EFFECTS.some(e => e.key === data.effect)) {
+    const runnable = ANIMATE_EFFECTS.some(e => e.key === data.effect) || isCustomEffectKey(data.effect);
+    if (runnable) {
       animateEffectRef.current = data.effect;
     }
-    if (!keepSelection && ANIMATE_EFFECTS.some(e => e.key === data.effect)) {
+    if (!keepSelection && runnable) {
       setActiveEffect(data.effect);
     }
   }, []);
 
   const applyExternalEffectState = useCallback((effect: string, state?: EffectState, templateIndex?: number) => {
-    if (!EFFECTS.some(e => e.key === effect)) return;
+    if (!EFFECTS.some(e => e.key === effect) && !isCustomEffectKey(effect)) return;
     setActiveEffect(effect);
     if (state === undefined && templateIndex === undefined) return;
 
@@ -754,7 +761,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       // cell in the advanced grid, so leaving the last catalogue key selected
       // would mark that cell and draw its shader over a canvas running this.
       setActiveEffect('');
-    } else if (EFFECTS.some(e => e.key === rawSync)) {
+    } else if (EFFECTS.some(e => e.key === rawSync) || isCustomEffectKey(rawSync)) {
       setActiveEffect(rawSync);
       fetchAnimateSettings().then(data => {
         if (cancelled || !data) return;
@@ -804,6 +811,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // flags are taken: replacing the picks wholesale here would put a
     // still-queued colour write's record back to the older look.
     void syncDeviceLocks();
+    // Custom effects are added, renamed or deleted from any client; follow once the list is in use.
+    if (customEffectsLoaded() || isCustomEffectKey(activeEffect)) void refreshCustomEffects();
     // Static edits the same template slots, so both modes follow a remote edit.
     if (mode === 'animate' || mode === 'static') {
       if (Date.now() < localAnimateEditUntilRef.current) return;
@@ -876,7 +885,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (!sync || sync === 'none') { return; }
     restartedProfileRef.current = key;
     (async () => {
-      if (EFFECTS.some(e => e.key === sync)) {
+      if (EFFECTS.some(e => e.key === sync) || isCustomEffectKey(sync)) {
         const state = stateFor(sync);
         await startAnimate(sync, state.speed, state.intensity, state.hue,
           state.colorize, state.saturation, state.contrast, state.params, false);
@@ -1146,8 +1155,30 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // A palette pick is a colour: the dock shows which one, and there is nothing
   // to edit or reset.
   const dockPalette = paletteColorForKey(dockEffect);
+  // A custom effect's default is the neutral state, which renders its saved recipe.
+  const resetDefaults = isCustomEffectKey(dockEffect)
+    ? { [dockEffect]: defaultTemplatesFor(dockEffect, null) }
+    : animateDefaults;
   const dockCanReset = !!(dockEffect && dockState && !dockPalette
-    && !slotMatchesDefault(dockEffect, dockSlot, dockState, animateDefaults));
+    && !slotMatchesDefault(dockEffect, dockSlot, dockState, resetDefaults));
+
+  // Custom (Shader Studio) effects: their name, knobs and audio flag come from the service list.
+  const customEffects = useCustomEffects(isCustomEffectKey(activeEffect) || isCustomEffectKey(dockEffect));
+  const customEntryFor = (key: string | null) =>
+    (isCustomEffectKey(key) ? customEffects.find(e => e.id === customEffectId(key)) : undefined);
+  const activeCustom = customEntryFor(activeEffect);
+  const dockCustom = customEntryFor(dockEffect);
+  const dockCustomDef = useMemo(() => (dockCustom ? customEffectDef(dockCustom, t) : undefined), [dockCustom, t]);
+  // A custom effect has no service-authored presets; seed default slots so the dock can edit it.
+  useEffect(() => {
+    if (!isCustomEffectKey(activeEffect) || effectTemplates[activeEffect]) return;
+    const seeded: EffectTemplateBundle = {
+      selected: 0,
+      slots: Array.from({ length: TEMPLATE_COUNT }, () => defaultStateFor(activeEffect)),
+    };
+    setEffectTemplates(prev => (prev[activeEffect] ? prev : { ...prev, [activeEffect]: seeded }));
+    setCommittedTemplates(prev => (prev[activeEffect] ? prev : { ...prev, [activeEffect]: seeded }));
+  }, [activeEffect, effectTemplates]);
 
   const handleTemplateSelect = useCallback((idx: number) => {
     // Scoped: repoint only the selected devices at this preset. The effect's
@@ -1262,6 +1293,23 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         if (scopedEdit) writeDevicePicks(dockEffect, idx, [...selectedDeviceIds], true);
       });
   }, [animateDefaults, dockEffect, dockSlot, effectTemplates, scoped, selectedDeviceIds, writeDevicePicks, writeTemplates]);
+
+  // After a studio save, slot values for params the save changed or unpinned are
+  // dropped so the LEDs show the saved look; untouched knob tweaks stay.
+  const activeEffectRef = useRef(activeEffect);
+  activeEffectRef.current = activeEffect;
+  const handleCustomSaved = useCallback((id: string, staleParams: readonly string[]) => {
+    if (staleParams.length === 0) return;
+    const key = customEffectKey(id);
+    const templates = effectTemplatesRef.current;
+    const bundle = templates[key];
+    if (!bundle) return;
+    const strip = (params: Record<string, number>) =>
+      Object.fromEntries(Object.entries(params).filter(([name]) => !staleParams.includes(name)));
+    const next = { ...templates, [key]: { ...bundle, slots: bundle.slots.map(slot => ({ ...slot, params: strip(slot.params) })) } };
+    localAnimateEditUntilRef.current = Date.now() + 1500;
+    void writeTemplates(next, activeEffectRef.current === key ? key : null, true).then(() => setCommittedTemplates(next));
+  }, [writeTemplates]);
 
   // Cross-panel usage drives the "used by a panel" badge. No exclusion: the
   // desktop page isn't a panel, so every panel background counts.
@@ -1892,9 +1940,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     try {
       switch (m) {
         case 'animate': {
-          const key = ANIMATE_EFFECTS.some(e => e.key === activeEffect)
+          const runnable = (k: string) => ANIMATE_EFFECTS.some(e => e.key === k) || isCustomEffectKey(k);
+          const key = runnable(activeEffect)
             ? activeEffect
-            : (ANIMATE_EFFECTS.some(e => e.key === rawSync) ? rawSync : animateEffectRef.current);
+            : (runnable(rawSync) ? rawSync : animateEffectRef.current);
           setActiveEffect(key);
           setRawSync(key);
           const state = stateFor(key);
@@ -2548,7 +2597,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 {effectiveMode === 'gif' && <MediaCanvasNotice />}
                 {shaderMode && activeEffect && currentState && (
                   <>
-                    {EFFECTS.find(e => e.key === activeEffect)?.audio && (
+                    {(EFFECTS.find(e => e.key === activeEffect)?.audio || activeCustom?.audio) && (
                       <div className={styles.musicReactive}>
                         <HoverTooltip body={t('lighting.musicReactive')} side="left">
                           <button
@@ -2571,6 +2620,17 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                           />
                         )}
                       </div>
+                    )}
+                    {ShaderStudio && activeCustom && (
+                      <Button
+                        size="sm"
+                        pill
+                        className={styles.editEffectBtn}
+                        icon={<Pencil size={14} />}
+                        onClick={() => setStudioTarget({ id: activeCustom.id })}
+                      >
+                        {t('lighting.studio.editEffect')}
+                      </Button>
                     )}
                     <HoverTooltip body={t('lighting.fullscreen')} side="left">
                       <button type="button" className={styles.fullscreenBtn} onClick={() => setFullscreenOpen(true)} aria-label={t('lighting.fullscreen')}>
@@ -2618,9 +2678,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 {CustomEffectsGrid && effectiveMode === 'animate' && effectSource === SOURCE_CUSTOM ? (
                   <Suspense fallback={null}>
                     <CustomEffectsGrid
+                      effect={activeEffect}
                       query={effectQuery}
+                      gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
+                      onSelect={handleEffectSelect}
                       onCreate={() => setStudioTarget({ id: null })}
-                      onOpen={id => setStudioTarget({ id })}
                     />
                   </Suspense>
                 ) : (
@@ -2707,6 +2769,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 onAnimateCommit={handleStateCommit}
                 onAnimateReset={handleStateReset}
                 panelSlots={panelUsage.slotsByEffect.get(dockEffect)}
+                customDef={dockCustomDef}
+                customTitle={dockCustom?.name}
                 postProcess={postProcess}
                 onPostProcessChange={handlePostProcessChange}
                 onPostProcessCommit={handlePostProcessCommit}
@@ -2739,7 +2803,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       )}
       {ShaderStudio && studioTarget && (
         <Suspense fallback={null}>
-          <ShaderStudio open effectId={studioTarget.id} onClose={() => setStudioTarget(null)} />
+          <ShaderStudio open effectId={studioTarget.id} onSaved={handleCustomSaved} onClose={() => setStudioTarget(null)} />
         </Suspense>
       )}
       {editorTarget && (

@@ -258,6 +258,15 @@
   }
 }
 
+// Always shown (not hover-revealed like fullscreen) while a custom effect runs;
+// the bottom corner keeps it clear of the top-row music and fullscreen controls.
+.editEffectBtn {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  z-index: 20;
+}
+
 .musicReactive {
   position: absolute;
   top: 0.4rem;

@@ -6,15 +6,26 @@ import { makeBlock, recipeCost, stageCount, type StudioBlock, type StudioRecipe 
 
 type BlockSpec = [type: string, params?: Record<string, number>, colors?: Record<string, [number, number, number]>];
 
-function recipe(specs: BlockSpec[], base: Partial<Omit<StudioRecipe, 'v' | 'blocks'>> = {}): StudioRecipe {
+/** `knobs` pin params by block index and key. */
+function recipe(specs: BlockSpec[], knobs: [number, string][] = []): StudioRecipe {
   const blocks = specs.map(([type, params, colors]) => {
     const b = makeBlock(type);
     Object.assign(b.params, params);
     if (colors) b.colors = { ...b.colors, ...colors };
     return b;
   });
-  return { v: 1, blocks, speed: 50, hue: 0, saturation: 1, contrast: 1, ...base };
+  return {
+    v: 1, blocks, speed: 50, hue: 0, saturation: 1, contrast: 1,
+    knobs: knobs.map(([i, key]) => ({ uid: blocks[i].uid, key })),
+  };
 }
+
+const RED: [number, number, number] = [1, 0.1, 0.3];
+const BLUE: [number, number, number] = [0.1, 0.4, 1];
+const CYAN: [number, number, number] = [0, 0.9, 1];
+// Two-color wipes: the spread puts v's top end exactly on c2 of the three-stop gradient.
+const twoColors = (a: [number, number, number], b: [number, number, number]): BlockSpec =>
+  ['colors', { spread: 0.333, shade: 0 }, { c1: a, c2: b, c3: a }];
 
 export interface StudioStarter {
   id: string;
@@ -22,6 +33,72 @@ export interface StudioStarter {
 }
 
 export const STUDIO_STARTERS: readonly StudioStarter[] = [
+  {
+    id: 'colorCycle',
+    build: () => recipe([['solid'], ['palette', { palette: 0, cycle: 1, shade: 0 }]], [[1, 'cycle']]),
+  },
+  {
+    id: 'breathing',
+    build: () => recipe(
+      [['solid'], ['colors', { spread: 0, shade: 0 }, { c1: CYAN, c2: CYAN, c3: CYAN }], ['pulse', { rate: 0.6, depth: 0.9 }]],
+      [[2, 'rate'], [2, 'depth']],
+    ),
+  },
+  {
+    id: 'horizontalWipe',
+    build: () => recipe([['wipe', { shape: 0, angle: 0 }], twoColors(RED, BLUE)], [[0, 'speed'], [0, 'softness']]),
+  },
+  {
+    id: 'verticalWipe',
+    build: () => recipe([['wipe', { shape: 0, angle: 90 }], twoColors(RED, BLUE)], [[0, 'speed'], [0, 'softness']]),
+  },
+  {
+    id: 'radialFill',
+    build: () => recipe([['wipe', { shape: 1 }], twoColors(CYAN, [1, 0.2, 0.8])], [[0, 'speed'], [0, 'softness']]),
+  },
+  {
+    id: 'clockWipe',
+    build: () => recipe([['wipe', { shape: 2 }], twoColors([1, 0.6, 0], [0.5, 0, 1])], [[0, 'speed'], [0, 'softness']]),
+  },
+  {
+    id: 'rainbowWheel',
+    build: () => recipe([['sweep', { tail: 1, speed: 0.5 }], ['palette', { palette: 0, spread: 1, shade: 0 }]], [[0, 'speed'], [0, 'count']]),
+  },
+  {
+    id: 'fanSpinner',
+    build: () => recipe([
+      ['spiral', { arms: 3, twist: 0, speed: 2 }],
+      ['threshold', { level: 0.6, softness: 0.1 }],
+      ['palette', { palette: 3, spread: 0.5, shade: 1 }],
+      ['glow', { amount: 0.5 }],
+    ], [[0, 'arms'], [0, 'speed']]),
+  },
+  {
+    id: 'cometOrbit',
+    build: () => recipe([
+      ['sweep', { speed: 1.5, tail: 6 }],
+      ['shape', { sides: 2, size: 0.7, glow: 8, blend: 1, mix: 1 }],
+      ['palette', { palette: 4, shade: 1 }],
+      ['glow', { amount: 1 }],
+    ], [[0, 'speed'], [0, 'tail']]),
+  },
+  {
+    id: 'pulseRings',
+    build: () => recipe([
+      ['rings', { count: 3, speed: 2 }],
+      ['threshold', { level: 0.75, softness: 0.05 }],
+      ['palette', { palette: 2, shade: 1 }],
+    ], [[0, 'count'], [0, 'speed']]),
+  },
+  {
+    id: 'radar',
+    build: () => recipe([
+      ['sweep', { speed: 1, tail: 5 }],
+      ['rings', { count: 5, speed: 0, blend: 2, mix: 0.25 }],
+      ['palette', { palette: 5, spread: 0.4, shade: 1 }],
+      ['vignette', { amount: 0.3 }],
+    ], [[0, 'speed']]),
+  },
   {
     id: 'neonKaleido',
     build: () => recipe([
@@ -31,7 +108,7 @@ export const STUDIO_STARTERS: readonly StudioStarter[] = [
       ['palette', { palette: 3, spread: 1.2, shade: 0.8 }],
       ['glow', { amount: 0.6 }],
       ['vignette', { amount: 0.5 }],
-    ]),
+    ], [[0, 'sides'], [2, 'speed']]),
   },
   {
     id: 'lavaLamp',
@@ -41,7 +118,7 @@ export const STUDIO_STARTERS: readonly StudioStarter[] = [
       ['threshold', { level: 0.58, softness: 0.12 }],
       ['palette', { palette: 4, spread: 0.9, shade: 0.85 }],
       ['glow', { amount: 0.4 }],
-    ]),
+    ], [[0, 'speed'], [2, 'level']]),
   },
   {
     id: 'hypnoTunnel',
@@ -50,7 +127,7 @@ export const STUDIO_STARTERS: readonly StudioStarter[] = [
       ['checker', { count: 4 }],
       ['palette', { palette: 3, spread: 1, cycle: 0.6, shade: 0.5 }],
       ['vignette', { amount: 0.9 }],
-    ]),
+    ], [[0, 'speed'], [1, 'count']]),
   },
   {
     id: 'oceanCaustics',
@@ -61,7 +138,7 @@ export const STUDIO_STARTERS: readonly StudioStarter[] = [
       ['sharpen', { power: 3 }],
       ['palette', { palette: 2, shade: 0.7 }],
       ['glow', { amount: 0.8 }],
-    ]),
+    ], [[1, 'speed'], [0, 'amount']]),
   },
   {
     id: 'discoGrid',
@@ -70,7 +147,7 @@ export const STUDIO_STARTERS: readonly StudioStarter[] = [
       ['dots', { count: 10, size: 0.32, speed: 2 }],
       ['palette', { palette: 6, cycle: 0.5, shade: 0.9 }],
       ['glow', { amount: 0.5 }],
-    ]),
+    ], [[1, 'count'], [0, 'speed']]),
   },
   {
     id: 'aurora',
@@ -82,7 +159,7 @@ export const STUDIO_STARTERS: readonly StudioStarter[] = [
       ['palette', { palette: 5, spread: 0.7, shade: 0.9 }],
       ['glow', { amount: 1 }],
       ['vignette', { amount: 0.4 }],
-    ]),
+    ], [[2, 'wobble'], [1, 'speed']]),
   },
   {
     id: 'starWarp',
@@ -91,7 +168,7 @@ export const STUDIO_STARTERS: readonly StudioStarter[] = [
       ['sparkle', { density: 20, amount: 0.5, speed: 1.5 }],
       ['palette', { palette: 7, shade: 1 }],
       ['glow', { amount: 1.5 }],
-    ]),
+    ], [[1, 'density'], [0, 'amount']]),
   },
   {
     id: 'retroBands',
@@ -102,7 +179,7 @@ export const STUDIO_STARTERS: readonly StudioStarter[] = [
       ['colors', { spread: 1, shade: 0.4 }, { c1: [1, 0.3, 0.1], c2: [1, 0.85, 0.2], c3: [0.6, 0.1, 0.6] }],
       ['scanlines', { count: 120, amount: 0.3 }],
       ['grain', { amount: 0.05 }],
-    ]),
+    ], [[2, 'steps'], [1, 'speed']]),
   },
 ];
 

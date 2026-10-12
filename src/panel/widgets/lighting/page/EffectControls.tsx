@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { useTranslation } from '../../../../lib/i18n';
-import { EFFECTS, categoryOf, type EffectState, type EffectTemplateBundle } from '../../../../types/lighting';
+import { EFFECTS, categoryOf, type EffectDef, type EffectState, type EffectTemplateBundle } from '../../../../types/lighting';
 import { useShaderParams } from '../../../../hooks/useShaderParams';
 import { clampToSpec } from '../../../../lib/shaderParams';
 import { Slider } from '../../../../components/common/Slider/Slider';
@@ -27,9 +27,11 @@ export const EffectControls = memo(function EffectControls({
   effect, state, bundle,
   onTemplateSelect, canReset,
   onChange, onCommit, onReset,
-  rgbActiveSlot, panelSlots, staticMode,
+  rgbActiveSlot, panelSlots, staticMode, customDef,
 }: {
   effect: string;
+  /** Definition for a custom (Shader Studio) effect, which is not in EFFECTS. */
+  customDef?: EffectDef;
   state: EffectState;
   bundle: EffectTemplateBundle;
   onTemplateSelect: (idx: number) => void;
@@ -45,7 +47,7 @@ export const EffectControls = memo(function EffectControls({
   staticMode?: boolean;
 }) {
   const { t } = useTranslation();
-  const def = EFFECTS.find(e => e.key === effect);
+  const def = customDef ?? EFFECTS.find(e => e.key === effect);
   const { specs, loaded } = useShaderParams(effect);
   if (!def) return null;
   const selected = bundle.selected;

@@ -1,3 +1,4 @@
+import { STUDIO_UID_RE } from '../../../../api/customEffects';
 import {
   PATTERN_BLEND_PARAMS, STUDIO_STAGES, studioBlock,
   type StudioBlockDef, type StudioHelper, type StudioParam, type StudioStage,
@@ -27,9 +28,16 @@ export interface StudioBlock {
   mods?: Record<string, StudioMod>;
 }
 
+/** A block param surfaced as a slider in the Lighting page's effect controls. */
+export interface StudioKnob {
+  uid: string;
+  key: string;
+}
+
 export interface StudioRecipe {
   v: 1;
   blocks: StudioBlock[];
+  knobs?: StudioKnob[];
   /** Wire units, same as EffectState.speed. */
   speed: number;
   hue: number;
@@ -176,21 +184,24 @@ vec3 hsv2rgb(vec3 c) {
   vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
   return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
-vec3 finalize(vec3 col) {
+vec3 finalize(vec3 col, float hue) {
   float luma = dot(max(col, 0.0), vec3(0.2126, 0.7152, 0.0722));
-  vec3 blended = mix(col, luma * hsv2rgb(vec3(u_hue, 1.0, 1.0)) * 1.4, clamp(u_colorize, 0.0, 1.0));
+  vec3 blended = mix(col, luma * hsv2rgb(vec3(hue, 1.0, 1.0)) * 1.4, clamp(u_colorize, 0.0, 1.0));
   float bl = dot(max(blended, 0.0), vec3(0.2126, 0.7152, 0.0722));
-  blended = mix(vec3(bl), blended, clamp(u_saturation, 0.0, 4.0));
-  blended = (blended - 0.5) * clamp(u_contrast, 0.0, 4.0) + 0.5;
+  blended = mix(vec3(bl), blended, clamp(u_saturation * S_SAT, 0.0, 4.0));
+  blended = (blended - 0.5) * clamp(u_contrast * S_CON, 0.0, 4.0) + 0.5;
   return max(blended, 0.0);
 }`;
 
+// Fixed-point so no value prints in exponent form, which hint_range parsing rejects.
 function fmt(n: number): string {
-  return Number.isInteger(n) ? n.toFixed(1) : String(n);
+  const s = n.toFixed(5).replace(/0+$/, '');
+  return s.endsWith('.') ? `${s}0` : s;
 }
 
-function uniformName(index: number, key: string): string {
-  return `u_b${index}_${key}`;
+/** Keyed by block uid, so a slider keeps its uniform (and any saved value) across reorders. */
+export function studioUniform(uid: string, index: number, key: string): string {
+  return `u_${STUDIO_UID_RE.test(uid) ? uid : `b${index}`}_${key}`;
 }
 
 function collectHelpers(defs: StudioBlockDef[], needsBlend: boolean): string[] {
@@ -223,8 +234,11 @@ function clampParam(p: StudioParam, value: number | undefined): number {
  * Compiles a recipe into one self-contained GLSL 330 fragment shader. Every
  * block param is a hint_range uniform, so slider moves only change `params`;
  * the GLSL (and `key`) changes on block add/remove/reorder/type and mod routing.
+ * `bake` writes the recipe's values in as the uniform defaults and its speed,
+ * hue, saturation and contrast as constants, so the saved shader renders the
+ * recipe under a neutral EffectState and the effect controls adjust on top.
  */
-export function compileStudio(recipe: StudioRecipe): CompiledStudio {
+export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: boolean } = {}): CompiledStudio {
   const blocks = orderedBlocks(recipe);
   const defs = blocks.map(b => studioBlock(b.type)!);
   const uniforms: string[] = [];
@@ -238,14 +252,16 @@ export function compileStudio(recipe: StudioRecipe): CompiledStudio {
     const list = blockParams(def, first);
     const exprs: Record<string, string> = {};
     for (const p of list) {
-      const name = uniformName(i, p.key);
-      uniforms.push(`uniform float ${name}; // hint_range(${fmt(p.min)}, ${fmt(p.max)}, ${fmt(p.step)}) = ${fmt(p.def)}`);
-      params[name] = clampParam(p, block.params[p.key]);
+      const name = studioUniform(block.uid, i, p.key);
+      const value = clampParam(p, block.params[p.key]);
+      uniforms.push(`uniform float ${name}; // hint_range(${fmt(p.min)}, ${fmt(p.max)}, ${fmt(p.step)}) = ${fmt(bake ? value : p.def)}`);
+      params[name] = value;
       const mod = p.options ? undefined : block.mods?.[p.key];
       if (mod) {
         const modName = `${name}_m`;
-        uniforms.push(`uniform float ${modName}; // hint_range(-1.0, 1.0, 0.01) = 0.5`);
-        params[modName] = Math.min(1, Math.max(-1, mod.amount));
+        const amount = Math.min(1, Math.max(-1, mod.amount));
+        uniforms.push(`uniform float ${modName}; // hint_range(-1.0, 1.0, 0.01) = ${fmt(bake ? amount : 0.5)}`);
+        params[modName] = amount;
         const swept = `clamp(${name} + ${modName} * ${fmt(p.max - p.min)} * ${MOD_UNIFORM[mod.source]}, ${fmt(p.min)}, ${fmt(p.max)})`;
         // A count between integers seams at the atan wrap (kaleidoscope, spiral).
         exprs[p.key] = p.whole ? `floor(${swept} + 0.5)` : swept;
@@ -255,10 +271,11 @@ export function compileStudio(recipe: StudioRecipe): CompiledStudio {
     }
     for (const c of def.colors ?? []) {
       const rgb = block.colors?.[c.key] ?? c.def;
-      const names = ['r', 'g', 'b'].map(ch => uniformName(i, `${c.key}${ch}`));
+      const names = ['r', 'g', 'b'].map(ch => studioUniform(block.uid, i, `${c.key}${ch}`));
       names.forEach((n, k) => {
-        uniforms.push(`uniform float ${n}; // hint_range(0.0, 1.0, 0.001) = ${fmt(c.def[k])}`);
-        params[n] = Math.min(1, Math.max(0, rgb[k]));
+        const value = Math.min(1, Math.max(0, rgb[k]));
+        uniforms.push(`uniform float ${n}; // hint_range(0.0, 1.0, 0.001) = ${fmt(bake ? value : c.def[k])}`);
+        params[n] = value;
       });
       exprs[c.key] = `vec3(${names.join(', ')})`;
     }
@@ -277,19 +294,27 @@ export function compileStudio(recipe: StudioRecipe): CompiledStudio {
 
   const needsBlend = patternIndex > 1;
   const hasColor = defs.some(d => d.stage === 'color');
+  const base = bake
+    ? [recipe.speed / 50, recipe.hue, recipe.saturation, recipe.contrast]
+    : [1, 0, 1, 1];
   const frag = [
     HEADER,
+    `const float S_SPEED = ${fmt(base[0])};`,
+    `const float S_HUE = ${fmt(base[1])};`,
+    `const float S_SAT = ${fmt(base[2])};`,
+    `const float S_CON = ${fmt(base[3])};`,
     ...uniforms,
     ...collectHelpers(defs, needsBlend),
     FOOTER_HELPERS,
     'void main() {',
     '  vec2 p0 = uvCentered();',
     '  vec2 p = p0;',
-    '  float t = mod(u_time, 3600.0) * u_speed;',
+    '  float t = mod(u_time, 3600.0) * u_speed * S_SPEED;',
+    '  float hue = u_hue + S_HUE;',
     '  float v = 0.0;',
     '  vec3 col = vec3(0.0);',
     ...insertColorDefault(body, defs, hasColor),
-    '  fragColor = vec4(finalize(col), 1.0);',
+    '  fragColor = vec4(finalize(col, hue), 1.0);',
     '}',
   ].join('\n');
 
@@ -314,4 +339,18 @@ export function recipeCost(recipe: StudioRecipe): number {
 
 export function stageCount(recipe: StudioRecipe, stage: StudioStage): number {
   return recipe.blocks.filter(b => studioBlock(b.type)?.stage === stage).length;
+}
+
+/** Uniforms whose saved value changed, that no longer exist, or whose knob was unpinned between two saves. */
+export function staleParamsBetween(previous: StudioRecipe, next: StudioRecipe): string[] {
+  const before = compileStudio(previous, { bake: true }).params;
+  const after = compileStudio(next, { bake: true }).params;
+  const pinned = (r: StudioRecipe) => new Set((r.knobs ?? []).map(k => `${k.uid}:${k.key}`));
+  const nowPinned = pinned(next);
+  const unpinned = [...pinned(previous)].filter(k => !nowPinned.has(k)).map(k => {
+    const [uid, key] = k.split(':');
+    return studioUniform(uid, -1, key);
+  });
+  const changed = Object.keys(before).filter(name => !(name in after) || before[name] !== after[name]);
+  return [...new Set([...changed, ...unpinned])];
 }

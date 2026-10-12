@@ -1,4 +1,4 @@
-import { AudioLines, GripVertical, X } from 'lucide-react';
+import { AudioLines, GripVertical, Pin, X } from 'lucide-react';
 import { Card } from '../../../../components/common/Card/Card';
 import { Select } from '../../../../components/common/Select/Select';
 import { Slider } from '../../../../components/common/Slider/Slider';
@@ -40,10 +40,13 @@ interface StudioBlockCardProps {
   onCommit: () => void;
   onTypeChange: (type: string) => void;
   onRemove: () => void;
+  /** Params shown as knobs in the Lighting page's effect controls. */
+  isPinned: (key: string) => boolean;
+  onTogglePin: (key: string) => void;
 }
 
 export function StudioBlockCard({
-  block, def, firstPattern, removable, canSwitchTo, drag, onChange, onCommit, onTypeChange, onRemove,
+  block, def, firstPattern, removable, canSwitchTo, drag, onChange, onCommit, onTypeChange, onRemove, isPinned, onTogglePin,
 }: StudioBlockCardProps) {
   const { t } = useTranslation();
   const typeOptions = blocksForStage(def.stage).map(d => ({
@@ -87,23 +90,38 @@ export function StudioBlockCard({
     const scale = scaleOf(p);
     const mod = block.mods?.[p.key];
     const modLabel = t('lighting.studio.mod.toggle');
+    const pinLabel = t('lighting.studio.pin');
+    const pinned = isPinned(p.key);
     return (
       <div key={p.key} className={styles.paramBlock}>
         <Slider
           orientation={STACKED} editable trackFill
           label={label}
           labelAction={(
-            <HoverTooltip body={modLabel} side="left">
-              <button
-                type="button"
-                className={`${styles.modToggle} ${mod ? styles.modToggleOn : ''}`}
-                aria-label={modLabel}
-                aria-pressed={!!mod}
-                onClick={() => toggleMod(p.key)}
-              >
-                <AudioLines size={13} strokeWidth={1.75} />
-              </button>
-            </HoverTooltip>
+            <span className={styles.paramActions}>
+              <HoverTooltip body={pinLabel} side="left">
+                <button
+                  type="button"
+                  className={`${styles.modToggle} ${pinned ? styles.modToggleOn : ''}`}
+                  aria-label={pinLabel}
+                  aria-pressed={pinned}
+                  onClick={() => onTogglePin(p.key)}
+                >
+                  <Pin size={13} strokeWidth={1.75} />
+                </button>
+              </HoverTooltip>
+              <HoverTooltip body={modLabel} side="left">
+                <button
+                  type="button"
+                  className={`${styles.modToggle} ${mod ? styles.modToggleOn : ''}`}
+                  aria-label={modLabel}
+                  aria-pressed={!!mod}
+                  onClick={() => toggleMod(p.key)}
+                >
+                  <AudioLines size={13} strokeWidth={1.75} />
+                </button>
+              </HoverTooltip>
+            </span>
           )}
           value={Math.round(value * scale)}
           min={Math.round(p.min * scale)}

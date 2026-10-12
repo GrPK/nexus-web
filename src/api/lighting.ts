@@ -53,6 +53,19 @@ export function forgetShaderSource(name: string): void {
   shaderCache.delete(name);
 }
 
+const sourceListeners = new Set<(name: string) => void>();
+
+/** Drops the cached source and tells mounted renderers of `name` to refetch and recompile. */
+export function invalidateShaderSource(name: string): void {
+  shaderCache.delete(name);
+  sourceListeners.forEach(l => l(name));
+}
+
+export function onShaderSourceInvalidated(listener: (name: string) => void): () => void {
+  sourceListeners.add(listener);
+  return () => { sourceListeners.delete(listener); };
+}
+
 /** Synchronous cache read so a consumer can seed state without a load tick. */
 export function peekShaderSource(name: string): ShaderSource | undefined {
   return shaderCache.get(name);

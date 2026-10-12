@@ -1,73 +1,78 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeBlock, type StudioRecipe } from './studioCompiler';
 
+const put = vi.fn();
+let list: { id: string; name: string; recipe: string; updatedAt: number; audio: boolean }[] = [];
+
+vi.mock('../../../../api/customEffects', () => ({
+  STUDIO_UID_RE: /^[a-z0-9]{1,24}$/,
+  customEffectKey: (id: string) => `custom:${id}`,
+  getCustomEffects: () => list,
+  useCustomEffects: () => list,
+  refreshCustomEffects: async () => {},
+  putCustomEffect: (...args: unknown[]) => put(...args),
+  deleteCustomEffect: async () => {},
+}));
+
 const recipe = (): StudioRecipe => ({
   v: 1, blocks: [makeBlock('plasma'), makeBlock('palette')], speed: 50, hue: 0, saturation: 1, contrast: 1,
 });
 
-// The module caches its snapshot, so each test loads a fresh copy over fresh storage.
-async function freshLibrary() {
+async function fresh() {
   vi.resetModules();
   return import('./studioLibrary');
 }
 
 describe('studioLibrary', () => {
-  beforeEach(() => localStorage.clear());
-
-  it('inserts, replaces in place by id, and deletes', async () => {
-    const lib = await freshLibrary();
-    lib.putSavedEffect({ id: 'a', name: 'one', recipe: recipe() });
-    lib.putSavedEffect({ id: 'b', name: 'two', recipe: recipe() });
-    lib.putSavedEffect({ id: 'a', name: 'one renamed', recipe: recipe() });
-    expect(lib.getSavedEffects().map(e => [e.id, e.name])).toEqual([['a', 'one renamed'], ['b', 'two']]);
-    lib.deleteSavedEffect('a');
-    expect(lib.getSavedEffects().map(e => e.id)).toEqual(['b']);
-    expect(JSON.parse(localStorage.getItem('nexus.studio.saved')!)).toHaveLength(1);
+  beforeEach(() => {
+    localStorage.clear();
+    put.mockReset();
+    put.mockResolvedValue({ entry: {} });
+    list = [];
   });
 
-  it('drops malformed entries on load instead of compiling them', async () => {
+  it('skips service entries whose recipe is malformed', async () => {
     const bad = recipe();
     bad.blocks[0].mods = { scale: { source: 'nope' as never, amount: 0.5 } };
-    const noColor = { ...recipe(), blocks: [makeBlock('plasma')] };
-    localStorage.setItem('nexus.studio.saved', JSON.stringify([
-      { id: 'ok', name: 'ok', recipe: recipe() },
-      { id: 'bad-mod', name: 'x', recipe: bad },
-      { id: 'no-color', name: 'y', recipe: noColor },
-      { id: 'nan', name: 'z', recipe: { ...recipe(), speed: 'fast' } },
-    ]));
-    const lib = await freshLibrary();
+    list = [
+      { id: 'ok', name: 'ok', recipe: JSON.stringify(recipe()), updatedAt: 1, audio: false },
+      { id: 'bad', name: 'bad', recipe: JSON.stringify(bad), updatedAt: 1, audio: false },
+      { id: 'junk', name: 'junk', recipe: '{not json', updatedAt: 1, audio: false },
+    ];
+    const lib = await fresh();
     expect(lib.getSavedEffects().map(e => e.id)).toEqual(['ok']);
   });
-});
 
-describe('studioLibrary across windows', () => {
-  beforeEach(() => localStorage.clear());
-
-  it('re-reads storage when the first subscriber attaches', async () => {
-    const lib = await freshLibrary();
-    lib.putSavedEffect({ id: 'a', name: 'mine', recipe: recipe() });
-    // Another window appends while nothing here is subscribed.
-    const other = JSON.parse(localStorage.getItem('nexus.studio.saved')!);
-    other.push({ id: 'b', name: 'theirs', recipe: recipe() });
-    localStorage.setItem('nexus.studio.saved', JSON.stringify(other));
-    const { renderHook } = await import('@testing-library/react');
-    const { result } = renderHook(() => lib.useSavedEffects());
-    expect(result.current.map(e => e.id)).toEqual(['a', 'b']);
+  it('saves the baked shader and reports the service error', async () => {
+    put.mockResolvedValueOnce({ error: 'fragment: 0:12 syntax error' });
+    const lib = await fresh();
+    const error = await lib.saveEffect('fx1', 'mine', recipe());
+    expect(error).toBe('fragment: 0:12 syntax error');
+    const [id, body] = put.mock.calls[0] as [string, { name: string; recipe: string; frag: string }];
+    expect(id).toBe('fx1');
+    expect(body.frag).toMatch(/^#version 330 core/);
+    expect(body.frag).toContain('const float S_SPEED = 1.0;');
+    expect(JSON.parse(body.recipe).v).toBe(1);
   });
-});
 
-describe('studioLibrary when storage refuses a write', () => {
-  beforeEach(() => localStorage.clear());
+  it('moves effects from browser storage into the service once, then clears them', async () => {
+    localStorage.setItem('nexus.studio.saved', JSON.stringify([
+      { id: 'fxold', name: 'old one', recipe: recipe() },
+      { id: 'fxjunk', name: 'junk', recipe: { v: 2 } },
+    ]));
+    const lib = await fresh();
+    await lib.migrateLegacyEffects();
+    await lib.migrateLegacyEffects();
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(put.mock.calls[0][0]).toBe('fxold');
+    expect(localStorage.getItem('nexus.studio.saved')).toBeNull();
+  });
 
-  it('keeps the in-memory list instead of re-reading storage', async () => {
-    const lib = await freshLibrary();
-    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new DOMException('full', 'QuotaExceededError');
-    });
-    lib.putSavedEffect({ id: 'a', name: 'unsaved to disk', recipe: recipe() });
-    setItem.mockRestore();
-    const { renderHook } = await import('@testing-library/react');
-    const { result } = renderHook(() => lib.useSavedEffects());
-    expect(result.current.map(e => e.id)).toEqual(['a']);
+  it('keeps browser storage when a migration save fails', async () => {
+    put.mockResolvedValueOnce({ error: 'HTTP 500' });
+    localStorage.setItem('nexus.studio.saved', JSON.stringify([{ id: 'fxold', name: 'old one', recipe: recipe() }]));
+    const lib = await fresh();
+    await lib.migrateLegacyEffects();
+    expect(localStorage.getItem('nexus.studio.saved')).not.toBeNull();
   });
 });
