@@ -865,8 +865,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     screenPP.colorize,
   ]);
 
-  // Settles the static start still waiting on the throttle; a newer call drops
-  // that callback, so the newer write settles the older one's registration.
+  // Settles the static start still waiting on the throttle; any newer call drops
+  // that callback, so every call settles the older one's registration.
   const pendingStaticWriteRef = useRef<(() => void) | null>(null);
   const applyAnimate = useCallback((effect: string, state: EffectState, persist: boolean) => {
     if (!effect) return;
@@ -876,8 +876,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // refetch in between cannot land the look this call replaces.
     const write = { settle: () => {} };
     const registered = modeRef.current === 'static';
+    pendingStaticWriteRef.current?.();
+    pendingStaticWriteRef.current = null;
     if (registered) {
-      pendingStaticWriteRef.current?.();
       setGlobalColor('', new Promise<void>(resolve => { write.settle = resolve; }));
       pendingStaticWriteRef.current = write.settle;
     }
