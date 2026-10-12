@@ -99,6 +99,7 @@ const STREAMED_FAMILY_ICONS: Partial<Record<string, string>> = {
   'asus-ryujin-lcd': '/assets/devices/asus.svg',
   'lianli-galahad2-lcd': '/assets/devices/lianli.svg',
   'lianli-hydroshift-lcd': '/assets/devices/lianli.svg',
+  'lianli-tl-lcd': '/assets/devices/lianli.svg',
   'lianli-hydroshift2': '/assets/devices/lianli.svg',
   'lianli-hydroshift2-curve': '/assets/devices/lianli.svg',
   'corsair-link-lcd': '/assets/devices/corsair.svg',
@@ -352,6 +353,11 @@ export function buildPanelDevices({
   // Streamed panels: glass the overlay renders into and the service pushes
   // frames to (the Kraken LCD). Layout + theme edit like any panel; there is no
   // kiosk to launch, no display to control, and no touch digitizer.
+  const streamedPerFamily = new Map<string, number>();
+  for (const record of records) {
+    const family = record.streamed ? record.capabilities?.family : undefined;
+    if (family) streamedPerFamily.set(family, (streamedPerFamily.get(family) ?? 0) + 1);
+  }
   for (const record of records) {
     if (!record.streamed) continue;
     const cssWidth = record.capabilities?.cssWidth ?? 0;
@@ -362,8 +368,11 @@ export function buildPanelDevices({
     const family = record.capabilities?.family;
     const claimed = family && curatedDevices.some(d => d.id === family) ? family : undefined;
     // A claimed panel IS the device's row, so it carries the device's name; the
-    // record's own name describes only the glass ("NZXT Kraken LCD").
-    const claimedName = claimed ? curatedDevices.find(d => d.id === claimed)?.name : undefined;
+    // record's own name describes only the glass ("NZXT Kraken LCD"). A device with
+    // several screens (Uni Fan TL LCD) keeps each record's name to tell them apart.
+    const claimedName = claimed && streamedPerFamily.get(claimed) === 1
+      ? curatedDevices.find(d => d.id === claimed)?.name
+      : undefined;
     devices.push({
       id: streamedPanelId(record.id),
       panelRecordId: record.id,
