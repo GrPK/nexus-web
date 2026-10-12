@@ -3,7 +3,9 @@ import { FolderPlus, Plus } from 'lucide-react';
 import { identifyLightingDevice, type LightingDevice } from '../../../../api/lighting';
 import { useTranslation } from '../../../../lib/i18n';
 import { usePersistentState } from '../../../../hooks/usePersistentState';
-import { ZoneCard, ZoneCardStack, zoneCardSelectable, zoneCardUnavailable, type BulkSelection, type DeviceLock, type StackPosition } from './ZoneCard';
+import { ZoneCard, ZoneCardStack, zoneCardSelectable, zoneCardUnavailable, type BulkSelection, type DevicePin, type StackPosition } from './ZoneCard';
+import { pinStripPick } from '../pins';
+import type { Pin } from '../../../../api/lighting';
 import { type LedPick } from './DeviceLedStrip';
 import { DeviceDiscoveryCard, type DiscoveryState } from './DeviceDiscoveryCard';
 import { startIdentify } from '../../../../lib/identifyFlash';
@@ -33,7 +35,7 @@ import styles from '../LightingPage.module.scss';
  * using the same component/styling as a motherboard group: a chevron, the brand
  * name, a group power switch, and its lights as indented child cards.
  */
-export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, devicePicks, versionForSlot, ledFullscreen, lockable = false, onSetLock, lockFlash, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
+export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, colorTunedIds, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
   devices: LightingDevice[];
   /** Optional control rendered at the top of the scrolling list (master brightness). */
   /** Every device before the Nexus-Control-off filter, so a group header can
@@ -46,22 +48,28 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   /** True while the rail search narrows `devices`: dragging is off, since a drop would rewrite groups and order from only the matches. */
   filtering?: boolean;
   header?: ReactNode;
-  /** Per-device static pick keyed by device id; it overrides what the card's
-   *  LED strip samples from the effect canvas. Each pick names its own preset
-   *  slot, so two devices on one effect can wear different presets. */
-  devicePicks?: Readonly<Record<string, { key: string; slot: number; hex: string; locked?: boolean }>>;
+  /** Pinned devices keyed by device id. A pinned card's LED strip falls back to
+   *  its target's render when the frame carries no bytes for it. */
+  pins?: Readonly<Record<string, Pin>>;
   /** Content hash of one effect's slot, for thumbnail cache-busting. */
   versionForSlot?: (key: string, slot: number) => string;
   /** Static mode: strips sample the whole canvas rather than each device's rect. */
   ledFullscreen?: boolean;
-  /** Static mode: a card with its own pick can be locked onto it. Outside
-   *  Static the menu offers only Unlock, on cards that are locked. */
-  lockable?: boolean;
-  /** Sets the colour lock on these cards. Absent leaves every card lock-less. */
-  onSetLock?: (ids: string[], locked: boolean) => void;
-  /** A pick just aimed at these locked cards: each flashes its badge. `seq`
-   *  changes per burst so the same card can flash again. */
-  lockFlash?: { ids: ReadonlySet<string>; seq: number };
+  /** Display name of the global source a press on a following card pins it to
+   *  (the running shader, the global color or static look, Mirror, Media). Null
+   *  when nothing can be pinned in this mode. */
+  pinSource?: string | null;
+  /** Why nothing can be pinned right now (Game Sync, Off). */
+  pinDisabledReason?: string;
+  /** Display name of what a pin targets, for the pinned tooltip. */
+  pinTargetName?: (pin: Pin) => string;
+  /** Pins these cards to the current global source, or unpins them. Absent
+   *  leaves every card without a pin button. */
+  onSetPin?: (ids: string[], pinned: boolean) => void;
+  /** While a press or pick is hovered, the cards it reaches, outlined. */
+  pickTargetIds?: ReadonlySet<string>;
+  /** The cards a press or pick just changed; a new seq replays their pulse. */
+  pulse?: { ids: ReadonlySet<string>; seq: number };
   /** Device ids currently selected (single-tap → 1-element set, canvas marquee → N-element set). */
   selectedIds: Set<string>;
   /** Bulk set: Cmd/Ctrl+click on a row toggles membership without clobbering the rest. */
@@ -80,6 +88,8 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   /** Opens the colour-tuning modal scoped to this card (or, when it is part of
    *  a multi-selection, to the whole selection). */
   onOpenColorTuning?: (id: string) => void;
+  /** Cards with any color tuning off neutral; they carry a dim mark by the name. */
+  colorTunedIds?: ReadonlySet<string>;
   /** Cards that are per-key keyboards the engine can react on; only these get
    *  the key-reactions row on their menu. */
   keyReactiveIds?: ReadonlySet<string>;
@@ -339,7 +349,7 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
         }),
       group: groupDevices(selectedDevices.map(x => x.id)),
       ...stackFor(selectedDevices.map(x => x.id)),
-      ...lockBulkFor(selectedDevices),
+      ...pinBulkFor(selectedDevices),
     };
   };
 
@@ -362,31 +372,34 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   };
 
   const ledPickFor = (id: string): LedPick | undefined => {
-    const pick = devicePicks?.[id];
+    const pin = pins?.[id];
+    const pick = pin ? pinStripPick(pin) : null;
     if (!pick) return undefined;
     return { ...pick, version: versionForSlot?.(pick.key, pick.slot) ?? '0' };
   };
 
-  // The members each lock row reaches: Lock the unlocked cards with a pick
-  // (only where a lock can be set), Unlock the locked ones.
-  const lockBulkFor = (members: readonly LightingDevice[]): Pick<BulkSelection, 'lockCount' | 'unlockCount' | 'setLocked'> => {
-    if (!onSetLock) return {};
-    const lockableIds = lockable ? members.filter(x => devicePicks?.[x.id] && !devicePicks[x.id].locked).map(x => x.id) : [];
-    const lockedIds = members.filter(x => devicePicks?.[x.id]?.locked).map(x => x.id);
+  // The members each pin row reaches: Pin the cards that follow the global
+  // mode (only where something can be pinned), Unpin the pinned ones.
+  const pinBulkFor = (members: readonly LightingDevice[]): Pick<BulkSelection, 'pinCount' | 'unpinCount' | 'setPinned'> => {
+    if (!onSetPin) return {};
+    const pinnable = pinSource != null && !pinDisabledReason ? members.filter(x => !pins?.[x.id]).map(x => x.id) : [];
+    const pinned = members.filter(x => !!pins?.[x.id]).map(x => x.id);
     return {
-      lockCount: lockableIds.length,
-      unlockCount: lockedIds.length,
-      setLocked: (locked: boolean) => onSetLock(locked ? lockableIds : lockedIds, locked),
+      pinCount: pinnable.length,
+      unpinCount: pinned.length,
+      setPinned: (value: boolean) => onSetPin(value ? pinnable : pinned, value),
     };
   };
 
-  const lockFor = (id: string): DeviceLock | undefined => {
-    if (!onSetLock) return undefined;
-    const pick = devicePicks?.[id];
+  const pinFor = (id: string): DevicePin | undefined => {
+    if (!onSetPin) return undefined;
+    const pin = pins?.[id];
     return {
-      locked: !!pick?.locked, lockable, hasPick: !!pick,
-      setLocked: locked => onSetLock([id], locked),
-      flashSeq: lockFlash?.ids.has(id) ? lockFlash.seq : 0,
+      pinned: !!pin,
+      targetName: pin ? pinTargetName?.(pin) : undefined,
+      kind: pin?.kind,
+      disabledReason: pinSource == null ? pinDisabledReason : undefined,
+      setPinned: value => onSetPin([id], value),
     };
   };
 
@@ -420,8 +433,11 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
       bulk={bulkFor(d)}
       groupMove={groupMoveFor(d.id)}
       inStack={stackBadge(d)}
+      colorTuned={colorTunedIds?.has(d.id)}
       stackSlot={stackSlotOf(stacks, d.id)}
-      lock={lockFor(d.id)}
+      pin={pinFor(d.id)}
+      target={pickTargetIds?.has(d.id)}
+      pulseSeq={pulse?.ids.has(d.id) ? pulse.seq : undefined}
       onUnstack={stackOf(stacks, d.id) ? () => onStacksChange?.(unstackDevices(stacks, [d.id])) : undefined}
     />
   );

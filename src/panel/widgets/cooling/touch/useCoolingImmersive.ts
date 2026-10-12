@@ -6,7 +6,7 @@ import {
   renameFan as apiRenameFan,
   resetPresetCurve as apiResetPresetCurve,
   setFanSpeed as apiSetFanSpeed,
-  setFanLock as apiSetFanLock,
+  setFanPin as apiSetFanPin,
   setFanControlled as apiSetFanControlled,
   setFanRole as apiSetFanRole,
   type CurveHazard, type FanChannel, type FanRole, type HealState, type TemperatureSource,
@@ -94,7 +94,7 @@ export interface CoolingImmersiveController {
   resetPresetCurve: (presetKey: string) => void;
   renameFan: (id: string, name: string) => void;
   setFanSpeed: (id: string, speed: number) => void;
-  setFanLock: (id: string, locked: boolean) => void;
+  setFanPin: (id: string, pinned: boolean) => void;
   setFanControlled: (id: string, controlled: boolean) => void;
   setFanRole: (id: string, role: FanRole) => void;
 }
@@ -522,9 +522,9 @@ export function useCoolingImmersive(): CoolingImmersiveController {
     setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, name } : ch));
   }, []);
 
-  const setFanLockHandler = useCallback(async (id: string, locked: boolean) => {
-    setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, locked } : ch));
-    await apiSetFanLock(id, locked);
+  const setFanPinHandler = useCallback(async (id: string, pinned: boolean) => {
+    setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, pinned } : ch));
+    await apiSetFanPin(id, pinned);
     const fans = await fetchFanChannels();
     if (fans?.channels) setChannels(fans.channels);
   }, []);
@@ -594,12 +594,12 @@ export function useCoolingImmersive(): CoolingImmersiveController {
     if (members.length < 2) return undefined;
     return {
       count: members.length,
-      locked: members.some(c => c.locked === true),
+      pinned: members.some(c => c.pinned === true),
       controlled: members.some(c => c.controlled !== false),
-      setLocked: (locked: boolean) => { for (const c of members) void setFanLockHandler(c.id, locked); },
+      setPinned: (pinned: boolean) => { for (const c of members) void setFanPinHandler(c.id, pinned); },
       setControlled: (controlled: boolean) => { for (const c of members) void setFanControlledHandler(c.id, controlled); },
     };
-  }, [channels, selectedFanIds, setFanLockHandler, setFanControlledHandler]);
+  }, [channels, selectedFanIds, setFanPinHandler, setFanControlledHandler]);
 
   // A mode picked on a selected card lands on the whole selection. Hub hand-off
   // values stay per-fan, since each is its own device call.
@@ -662,7 +662,7 @@ export function useCoolingImmersive(): CoolingImmersiveController {
     resetPresetCurve: (presetKey) => { void resetPresetCurve(presetKey); },
     renameFan: (id, name) => { void renameFan(id, name); },
     setFanSpeed: (id, speed) => { void setFanSpeed(id, speed); },
-    setFanLock: (id, locked) => { void setFanLockHandler(id, locked); },
+    setFanPin: (id, pinned) => { void setFanPinHandler(id, pinned); },
     setFanControlled: (id, controlled) => { void setFanControlledHandler(id, controlled); },
     setFanRole: (id, role) => { void setFanRoleHandler(id, role); },
   };

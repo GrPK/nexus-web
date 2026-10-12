@@ -99,9 +99,9 @@ export function useMediaLibrary() {
     return () => { cancelled = true; };
   }, [items]);
 
-  const play = useCallback(async (id: string) => {
+  const play = useCallback(async (id: string, keepMode = false) => {
     if (id === activeId) return;
-    const ok = await playMedia(id);
+    const ok = await playMedia(id, keepMode);
     if (ok) setActiveId(id);
   }, [activeId]);
 

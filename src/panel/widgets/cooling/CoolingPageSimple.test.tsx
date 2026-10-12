@@ -18,7 +18,7 @@ vi.mock('../../../api/cooling', async (importOriginal) => {
         },
         {
           id: 'fan-rear', name: 'Rear Fan', dutyPercent: 30, rpm: 900, mode: 'Auto',
-          classification: 'Controllable', calibrated: true, locked: true, controlled: false,
+          classification: 'Controllable', calibrated: true, pinned: true, controlled: false,
         },
       ],
     })),
@@ -34,12 +34,12 @@ vi.mock('../../../api/cooling', async (importOriginal) => {
     releaseFanAuto: vi.fn(async () => undefined),
     renameFan: vi.fn(async () => undefined),
     setFanSpeed: vi.fn(async () => undefined),
-    setFanLock: vi.fn(async () => undefined),
+    setFanPin: vi.fn(async () => undefined),
     setFanControlled: vi.fn(async () => undefined),
   };
 });
 
-import { applyProfile, setFanControlled, setFanLock } from '../../../api/cooling';
+import { applyProfile, setFanControlled, setFanPin } from '../../../api/cooling';
 
 const serviceState = { cooling: { calibrating: false } } as unknown as ServiceState;
 
@@ -88,15 +88,15 @@ describe('CoolingPage simple mode', () => {
     expect(vi.mocked(setFanControlled).mock.calls.some(c => c[0] === 'fan-cpu')).toBe(false);
   });
 
-  it('writes no lock override on open or on a mode click', async () => {
+  it('writes no pin override on open or on a mode click', async () => {
     renderPage();
-    // Locked is the service's default for pumps, GPU and AIO channels.
+    // Pinned is the service's default for pumps, GPU and AIO channels.
     await screen.findByText('cooling.simple.controlledOf.other');
     fireEvent.click(screen.getByRole('button', { name: /cooling\.mode\.silent\b/ }));
     await waitFor(() => {
       expect(vi.mocked(applyProfile)).toHaveBeenCalledWith('silent');
     });
-    expect(vi.mocked(setFanLock)).not.toHaveBeenCalled();
+    expect(vi.mocked(setFanPin)).not.toHaveBeenCalled();
   });
 
   it('applies a mode from its tile', async () => {

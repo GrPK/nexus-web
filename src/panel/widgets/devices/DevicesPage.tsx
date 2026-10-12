@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Usb, Monitor, Microchip, FileText, Cable, BookOpen, Link2 } from 'lucide-react';
+import { Usb, Monitor, HardDriveDownload, FileText, Cable, BookOpen, Link2 } from 'lucide-react';
 import type { ConnectionState } from '../../../hooks/useServiceStatus';
 import { useUsbDevices, type UsbDeviceDetail } from '../../../hooks/useUsbDevices';
 import { useUnifiedDevices, isSimulatedDevice, type UnifiedDevice } from '../../../hooks/useUnifiedDevices';
@@ -7,6 +7,7 @@ import { useConflictApps } from '../../../hooks/useConflictApps';
 import { useConflictGuardedEnable } from '../../../hooks/useConflictGuardedEnable';
 import type { DetectedConflict } from '../../../api/conflicts';
 import { useFirmwareStatus, type FirmwareStatusItem, type FlashableImage } from '../../../hooks/useFirmwareStatus';
+import { useFirmwareUpdates } from '../../../hooks/useFirmwareUpdates';
 import { useFlashStatus, type FlashStatus } from '../../../hooks/useFlashStatus';
 import { useRecoverConfirm } from '../../../hooks/useFirmwareRecovery';
 import { findRecoveryRow, flashMatchesRecovery, recoveryAction, recoveryDone } from '../../../lib/firmwareRecovery';
@@ -24,7 +25,8 @@ import { ServiceRequired } from '../../../components/views/ServiceRequired';
 import { SupportedDevicesModal } from '../../../components/common/SupportedDevicesModal/SupportedDevicesModal';
 import { DeviceModal } from '../../../components/common/DeviceModal/DeviceModal';
 import { Notice } from '../../../components/common/Notice/Notice';
-import { DeviceWarningIcon } from '../../../components/common/DeviceWarningIcon/DeviceWarningIcon';
+import { DeviceWarningIcon, isRunningAppWarning } from '../../../components/common/DeviceWarningIcon/DeviceWarningIcon';
+import { DeviceUpdateIcon } from '../../../components/common/DeviceUpdateIcon/DeviceUpdateIcon';
 import { ExperimentalBadge } from '../../../components/common/ExperimentalBadge/ExperimentalBadge';
 import { ConflictRunningBadge } from '../../../components/common/ConflictRunningBadge/ConflictRunningBadge';
 import { NexusControlConflictModal } from '../../../components/common/NexusControlConflictModal/NexusControlConflictModal';
@@ -86,6 +88,7 @@ export function DevicesPage({ serviceOnline, connectionState, onDeviceSelect, ta
   // Single USB subscription, reused for both the catalog "detected" highlight
   // and the Connected Devices modal - no second socket subscription.
   const allUsb = useUsbDevices(serviceOnline);
+  const firmwareUpdates = useFirmwareUpdates(serviceOnline);
   const { items: firmwareItems, refresh: refreshFirmware } = useFirmwareStatus(serviceOnline && tab === 'firmware');
   const systemSpecs = useSystemSpecs(serviceOnline && tab === 'specs');
 
@@ -129,16 +132,17 @@ export function DevicesPage({ serviceOnline, connectionState, onDeviceSelect, ta
         key={d.key}
         device={d}
         runningConflict={d.conflictAppId ? conflicts.find(c => c.id === d.conflictAppId) : undefined}
+        updateAvailable={!!d.curatedId && !isSimulatedDevice(d) && firmwareUpdates.has(d.curatedId)}
         onClick={() => onDeviceSelect(d.key)}
         onToggleControl={onToggleControl}
       />
     );
-  }, [conflicts, controlDevice, onDeviceSelect, requestEnable, toggleLink]);
+  }, [conflicts, controlDevice, firmwareUpdates, onDeviceSelect, requestEnable, toggleLink]);
 
   const tabs = [
     { key: 'available', label: t('devices.tabs.available'), icon: <Usb size={14} /> },
     { key: 'displays', label: t('displays.title'), icon: <Monitor size={14} /> },
-    { key: 'firmware', label: t('devices.tabs.firmware'), icon: <Microchip size={14} /> },
+    { key: 'firmware', label: t('devices.tabs.firmware'), icon: <HardDriveDownload size={14} /> },
     { key: 'specs', label: t('devices.tabs.specs'), icon: <FileText size={14} /> },
   ] as const;
 
@@ -273,11 +277,12 @@ function ConnectedDevicesModal({ open, onClose, devices, loading, onRefresh }: C
 }
 
 function DeviceCard({
-  device, runningConflict, onClick, onToggleControl,
+  device, runningConflict, updateAvailable, onClick, onToggleControl,
 }: {
   device: UnifiedDevice;
   /** The device's competing app, when the watcher reports it running. */
   runningConflict?: DetectedConflict;
+  updateAvailable?: boolean;
   onClick: () => void;
   onToggleControl?: (next: boolean) => void;
 }) {
@@ -306,7 +311,8 @@ function DeviceCard({
         <span className={styles.rowName}>{device.shortName}</span>
         {meta && <span className={styles.rowMeta}>{meta}</span>}
       </div>
-      {device.warning && <DeviceWarningIcon code={device.warning} />}
+      {device.warning && !(runningConflict && isRunningAppWarning(device.warning)) && <DeviceWarningIcon code={device.warning} chip />}
+      {updateAvailable && <DeviceUpdateIcon chip />}
       {runningConflict && <ConflictRunningBadge appName={runningConflict.displayName} />}
       {device.experimental && <ExperimentalBadge />}
       {onToggleControl && (

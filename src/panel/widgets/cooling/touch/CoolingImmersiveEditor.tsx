@@ -162,7 +162,7 @@ function FansSection({ cooling, liveChannels }: {
       onCreateCurve={() => cooling.createCurveAndAssign(ch.id)}
       onRename={cooling.renameFan}
       onSpeedChange={cooling.setFanSpeed}
-      onToggleLock={cooling.setFanLock}
+      onTogglePin={cooling.setFanPin}
       onToggleControlled={cooling.setFanControlled}
       onSetRole={cooling.setFanRole}
     />

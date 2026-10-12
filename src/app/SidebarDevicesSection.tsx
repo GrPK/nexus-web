@@ -3,12 +3,14 @@ import classNames from 'classnames';
 import { Ghost, Link2, Link2Off, Trash2, Usb } from 'lucide-react';
 import { HoverTooltip } from '../components/common/HoverTooltip/HoverTooltip';
 import { DeviceWarningIcon } from '../components/common/DeviceWarningIcon/DeviceWarningIcon';
+import { DeviceUpdateIcon } from '../components/common/DeviceUpdateIcon/DeviceUpdateIcon';
 import { NexusControlOffIcon } from '../components/common/NexusControlOffIcon/NexusControlOffIcon';
 import { NexusControlConflictModal } from '../components/common/NexusControlConflictModal/NexusControlConflictModal';
 import { ExperimentalEnableModal } from '../components/common/ExperimentalEnableModal/ExperimentalEnableModal';
 import { useToastSafe } from '../components/common/Toast/Toast';
 import { useUnifiedDevices, isSimulatedDevice, sidebarDeviceName, sidebarSortName, type UnifiedDevice } from '../hooks/useUnifiedDevices';
 import { useConflictGuardedEnable } from '../hooks/useConflictGuardedEnable';
+import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
 import { promoteDisplayToPanel, demoteDisplayPanel } from '../api/displays';
 import { clearSimulatedStreamDeck } from '../api/streamdeck';
 import { DEV_TOOLS } from '../lib/devTools';
@@ -60,6 +62,7 @@ export function SidebarDevicesSection({
   const { t } = useTranslation();
   const { push } = useToastSafe();
   const { unified, controlDevice } = useUnifiedDevices(serviceOnline);
+  const firmwareUpdates = useFirmwareUpdates(serviceOnline);
   const controlGuard = useConflictGuardedEnable();
   const requestEnable = controlGuard.requestEnable;
   // Right-click menu state, held by key rather than by device object so a row
@@ -210,7 +213,8 @@ export function SidebarDevicesSection({
                     </HoverTooltip>
                   )}
                   {device.warning && <DeviceWarningIcon code={device.warning} />}
-                  {device.supportsNexusControl && !device.nexusControlEnabled && <NexusControlOffIcon />}
+                  {!isSimulated && device.curatedId && firmwareUpdates.has(device.curatedId) && <DeviceUpdateIcon />}
+                  {device.supportsNexusControl && !device.nexusControlEnabled && <NexusControlOffIcon className={styles.controlOff} />}
                 </>
               )}
             </button>

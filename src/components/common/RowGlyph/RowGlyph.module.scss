@@ -1,4 +1,4 @@
-.icon {
+.glyph {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
@@ -6,5 +6,12 @@
   // label a touch more room and pull the glyph nearer the button's right edge.
   margin-left: -0.15rem;
   margin-right: -0.1rem;
+}
+
+.dim {
   color: var(--text-dim);
+}
+
+.accent {
+  color: var(--accent);
 }

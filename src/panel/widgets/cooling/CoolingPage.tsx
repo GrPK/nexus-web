@@ -26,7 +26,7 @@ import {
 } from '../../../api/qseries';
 import {
   fetchFanChannels, fetchTemperatureSources, fetchCurves,
-  setFanSpeed, releaseFanAuto, renameFan, setFanLock, setFanControlled, setFanRole, setFanOffset,
+  setFanSpeed, releaseFanAuto, renameFan, setFanPin, setFanControlled, setFanRole, setFanOffset,
   fetchCoolingPresets, createCoolingPreset, updateCoolingPreset, deleteCoolingPreset,
   activateCoolingPreset, type CoolingPreset,
   startCalibration, fetchCalibrationResults, fetchProfiles, applyProfile,
@@ -46,7 +46,6 @@ import type { ConnectionState } from '../../../hooks/useServiceStatus';
 import { useTranslation } from '../../../lib/i18n';
 import { useUiSettings } from '../../../hooks/useUiSettings';
 import { publishControlSync, subscribeControlSync } from '../../../lib/controlSync';
-import { emitRadialBloomFromElement } from '../../../lib/backgroundEffects';
 import { ViewHeader } from '../../../components/common/ViewHeader/ViewHeader';
 import { PresetToolbar } from '../../../components/common/PresetToolbar/PresetToolbar';
 import { IconLabelButton } from '../../../components/common/IconLabelButton/IconLabelButton';
@@ -129,6 +128,12 @@ const coolingHistoryStore = {
 // `pointer-events: none` stops the mouse; a keyboard user still reaches the
 // controls, so this is what actually keeps the edit from landing.
 const noopCurveEdit = () => {};
+
+/** The fans a preset retargets (skipping pinned ones), or with `includePinned` the ones Off hands back. */
+const presetReach = (channels: readonly FanChannel[], includePinned = false): Set<string> => new Set(channels
+  .filter(ch => (includePinned || !ch.pinned) && ch.controlled !== false && !ch.readOnly
+    && ch.classification !== 'Fixed' && !isFanDisconnected(ch))
+  .map(ch => ch.id));
 
 export function CoolingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '' }: CoolingViewProps) {
   const { t, language } = useTranslation();
@@ -720,9 +725,9 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     }));
   }, []);
 
-  const handleToggleLock = useCallback(async (id: string, locked: boolean) => {
-    setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, locked } : ch));
-    await setFanLock(id, locked);
+  const handleTogglePin = useCallback(async (id: string, pinned: boolean) => {
+    setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, pinned } : ch));
+    await setFanPin(id, pinned);
     const fans = await fetchFanChannels();
     if (fans?.channels) setChannels(fans.channels);
   }, []);
@@ -893,12 +898,12 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     if (members.length < 2) return undefined;
     return {
       count: members.length,
-      locked: members.some(c => c.locked === true),
+      pinned: members.some(c => c.pinned === true),
       controlled: members.some(c => c.controlled !== false),
-      setLocked: (locked: boolean) => { for (const c of members) void handleToggleLock(c.id, locked); },
+      setPinned: (pinned: boolean) => { for (const c of members) void handleTogglePin(c.id, pinned); },
       setControlled: (controlled: boolean) => { for (const c of members) void handleSetFanControlled(c.id, controlled); },
     };
-  }, [channels, selectedFanIds, handleToggleLock, handleSetFanControlled]);
+  }, [channels, selectedFanIds, handleTogglePin, handleSetFanControlled]);
 
   // The curve the selection is wearing: shared across every selected fan, or
   // null when they disagree - there is no single curve to highlight then.
@@ -1290,6 +1295,9 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     return s;
   }, [effectiveCurveId, fanStates]);
 
+  // A press pulses the fans it changed; a new seq replays it.
+  const [pulse, setPulse] = useState<{ ids: ReadonlySet<string>; seq: number }>({ ids: new Set(), seq: 0 });
+  const pulseFans = (ids: ReadonlySet<string>) => setPulse(s => ({ ids, seq: s.seq + 1 }));
   // Off is not a tab any more: it shares the first tab with the simple /
   // advanced swap, which the tab opens as a menu instead of switching mode.
   const modeMenu = usePageModeMenu({
@@ -1300,8 +1308,8 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     offDescription: t('cooling.modeMenu.offDesc'),
     simpleDescription: t('cooling.modeMenu.simpleDesc'),
     advancedDescription: t('cooling.modeMenu.advancedDesc'),
-    onOff: origin => {
-      emitRadialBloomFromElement(origin, true);
+    onOff: () => {
+      if (activeMode !== 'off') pulseFans(presetReach(channels, true));
       void handleModeChange('off');
     },
     onModeChange: setDashboardMode,
@@ -1318,22 +1326,32 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     key: p.key,
     // Plain mode names, matching the simple-mode tiles. They used to read
     // "All <mode>", which stopped being true once pumps and GPU fans started
-    // defaulting out of a preset apply (FanProfiles.IsLockedByDefault).
+    // defaulting out of a preset apply (FanProfiles.IsPinnedByDefault).
     label: t(p.i18nKey),
     icon: <p.Icon size={14} />,
   }))];
   // The strip marks the mode tab while cooling is off - it is the tab Off now
   // lives on. Every other mode still marks its own tab.
   const activeTabKey = activeMode === 'off' ? MODE_MENU_TAB_KEY : (activeMode ?? undefined);
+  // Hovering a preset tab outlines the fans it would retarget: presets skip
+  // pinned fans and fans with Nexus Control off. The active
+  // preset's press retargets nothing, so it previews nothing. Only the advanced
+  // header reports hovers, so its absence must not leave a stale one behind.
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const hoverHeaderShown = serviceOnline && !simpleDashboard;
+  const presetPreview = hoverHeaderShown && !!hoveredTab && isCoolingModeKey(hoveredTab) && hoveredTab !== activeMode;
+  const presetTargets = useMemo(() => (presetPreview ? presetReach(channels) : new Set<string>()), [channels, presetPreview]);
   // A tab press either opens the mode menu or switches mode; a mode switch
   // also drops the menu, which the tab row keeps "inside" its anchor.
-  const handleTabChange = (key: string, origin?: HTMLButtonElement) => {
+  const handleTabChange = (key: string) => {
+    // A press can remount the tab before its pointerleave.
+    setHoveredTab(null);
     if (key === MODE_MENU_TAB_KEY) {
       setModeMenuOpen(open => !open);
       return;
     }
     closeModeMenu();
-    if (origin && isCoolingModeKey(key) && key !== activeMode) emitRadialBloomFromElement(origin, false);
+    if (isCoolingModeKey(key) && key !== activeMode) pulseFans(presetReach(channels));
     void handleModeChange(key);
   };
   // The mode tab leads the strip in both dashboard modes; simple mode carries
@@ -1459,6 +1477,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
               tabs={modeTabs}
               activeTab={activeTabKey}
               onTabChange={handleTabChange}
+              onTabHover={setHoveredTab}
               tabActions={(
                 <PresetToolbar
                   rail
@@ -1723,6 +1742,8 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
               const renderFanCard = (ch: FanChannel, drag: SortableRowArgs) => (
                 <FanCard key={ch.id} channel={ch} state={fanStates[ch.id]} curves={curves} hazard={hazardByFan[ch.id]}
                   compact
+                  presetTarget={presetTargets.has(ch.id)}
+                  pulseSeq={pulse.ids.has(ch.id) ? pulse.seq : undefined}
                   selected={selectedFanIds.has(ch.id)}
                   onSelect={additive => selectFan(ch.id, additive)}
                   calibrating={calibrating}
@@ -1735,7 +1756,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                   onCreateCurve={() => createCurveAndAssign(ch.id)}
                   onRename={handleRename}
                   onSpeedChange={handleSpeedChange}
-                  onToggleLock={handleToggleLock}
+                  onTogglePin={handleTogglePin}
                   onToggleControlled={handleSetFanControlled}
                   onSelectOnly={() => setSelectedFanIds(new Set([ch.id]))}
                   bulk={bulkFor(ch)}
@@ -1790,10 +1811,10 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                       const target = !members.some(c => c.controlled !== false);
                       for (const c of members) handleSetFanControlled(c.id, target);
                     }}
-                    groupLocked={members.some(c => c.locked)}
-                    onToggleLock={() => {
-                      const target = !members.some(c => c.locked);
-                      for (const c of members) handleToggleLock(c.id, target);
+                    groupPinned={members.some(c => c.pinned)}
+                    onTogglePin={() => {
+                      const target = !members.some(c => c.pinned);
+                      for (const c of members) handleTogglePin(c.id, target);
                     }}
                     onRename={name => setFanGroups(renameGroup(fanGroups, groupId, name))}
                     onDelete={() => setFanGroups(removeGroup(fanGroups, groupId))}
@@ -1843,10 +1864,10 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                       const target = !list.some(c => c.controlled !== false);
                       for (const c of list) handleSetFanControlled(c.id, target);
                     }}
-                    groupLocked={list.some(c => c.locked)}
-                    onToggleLock={() => {
-                      const target = !list.some(c => c.locked);
-                      for (const c of list) handleToggleLock(c.id, target);
+                    groupPinned={list.some(c => c.pinned)}
+                    onTogglePin={() => {
+                      const target = !list.some(c => c.pinned);
+                      for (const c of list) handleTogglePin(c.id, target);
                     }}
                     onRename={name => handleRename(blockId, name)}
                     onResetName={(isBoard ? custom != null : list[0]?.originalDeviceName != null)
@@ -1918,7 +1939,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                           onCreateCurve={() => createCurveAndAssign(ch.id)}
                           onRename={handleRename}
                           onSpeedChange={handleSpeedChange}
-                          onToggleLock={handleToggleLock}
+                          onTogglePin={handleTogglePin}
                           onToggleControlled={handleSetFanControlled}
                           onSelectOnly={() => setSelectedFanIds(new Set([ch.id]))}
                           bulk={bulkForFan(ch)}

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Link2, Link2Off, Lock, MousePointerClick, Pencil, RotateCcw, Trash2, Unlock } from 'lucide-react';
+import { Link2, Link2Off, MousePointerClick, Pencil, Pin, PinOff, RotateCcw, Trash2 } from 'lucide-react';
 import { useTranslation } from '../../../../lib/i18n';
 import { pluralKey } from '../../../../lib/pluralKey';
 import { CollapsibleSection } from '../../../../components/common/CollapsibleSection/CollapsibleSection';
@@ -21,7 +21,7 @@ import styles from '../CoolingPage.module.scss';
 export function FanGroupHeader({
   name, count, collapsed, onToggleCollapsed,
   groupControlled, onToggleControlled,
-  groupLocked, onToggleLock,
+  groupPinned, onTogglePin,
   onRename, onDelete, onResetName, drag, dropTarget, children,
   hasUncontrolled = false,
   icon,
@@ -36,12 +36,12 @@ export function FanGroupHeader({
   /** True iff at least one member is controlled, so the menu offers to release the group. */
   groupControlled: boolean;
   onToggleControlled: () => void;
-  /** True iff at least one member is locked, so the menu offers to unlock. */
-  groupLocked: boolean;
+  /** True iff at least one member is pinned, so the menu offers to unpin. */
+  groupPinned: boolean;
   /** True iff at least one member has Nexus Control off, whether or not the eye
    *  is currently hiding it - the badge is how a hidden fan stays accounted for. */
   hasUncontrolled?: boolean;
-  onToggleLock: () => void;
+  onTogglePin: () => void;
   onRename?: (name: string) => void;
   onDelete?: () => void;
   /** Present only on a renamed hardware or board group; puts the header back on
@@ -69,15 +69,15 @@ export function FanGroupHeader({
   const nameRef = useRef<EditableTextHandle>(null);
 
   const menuItems = (): DeviceMenuItem[] => {
-    // Nexus Control and Lock act over the members. An empty group has none, so
+    // Nexus Control and Pin act over the members. An empty group has none, so
     // the rows would be inert; it lists only what it can actually do.
     const items: DeviceMenuItem[] = count === 0 ? [] : [
       groupControlled
         ? { key: 'controlled', icon: <Link2Off size={14} />, label: t('cooling.fan.menuControlOff'), onSelect: onToggleControlled }
         : { key: 'controlled', icon: <Link2 size={14} />, label: t('cooling.fan.menuControlOn'), onSelect: onToggleControlled },
-      groupLocked
-        ? { key: 'lock', icon: <Unlock size={14} />, label: t('cooling.lock.unlock'), onSelect: onToggleLock }
-        : { key: 'lock', icon: <Lock size={14} />, label: t('cooling.lock.lock'), onSelect: onToggleLock },
+      groupPinned
+        ? { key: 'pin', icon: <PinOff size={14} />, label: t('cooling.pin.unpin'), onSelect: onTogglePin }
+        : { key: 'pin', icon: <Pin size={14} />, label: t('cooling.pin.pin'), onSelect: onTogglePin },
     ];
     if (onSelectAll) {
       items.unshift({

@@ -37,27 +37,35 @@ import styles from '../LightingPage.module.scss';
  * the under-canvas rows: mirror monitor picker + filter presets,
  * media library, off message.
  */
-export const ModeControls = memo(function ModeControls({ mode, screenPP, onScreenPPChange }: {
+export const ModeControls = memo(function ModeControls({ mode, screenPP, onScreenPPChange, keepMode = false, onSelectionPick }: {
   mode: LightingMode;
   screenPP: PostProcessSettings;
   onScreenPPChange: (pp: PostProcessSettings) => void;
+  /** Change the shared capture or media item without switching the global mode to it. */
+  keepMode?: boolean;
+  /** Called after every capture or media pick. */
+  onSelectionPick?: () => void;
 }) {
   switch (mode) {
     case 'animate': return null;
-    case 'screen': return <ScreenControls screenPP={screenPP} onScreenPPChange={onScreenPPChange} />;
-    case 'gif': return <MediaControls />;
+    case 'screen': return <ScreenControls screenPP={screenPP} onScreenPPChange={onScreenPPChange} keepMode={keepMode} onSelectionPick={onSelectionPick} />;
+    case 'gif': return <MediaControls keepMode={keepMode} onSelectionPick={onSelectionPick} />;
     case 'none': return <OffControls />;
     case 'gamesync': return null;
   }
 });
 
-export function ScreenControls({ screenPP, onScreenPPChange }: {
+export function ScreenControls({ screenPP, onScreenPPChange, keepMode = false, onSelectionPick }: {
   screenPP: PostProcessSettings;
   onScreenPPChange: (pp: PostProcessSettings) => void;
+  keepMode?: boolean;
+  onSelectionPick?: () => void;
 }) {
   const { t } = useTranslation();
   const [monitors, setMonitors] = useState<ScreenMonitor[]>([]);
   const [selectedMonitor, setSelectedMonitor] = useState('');
+  // Only a screen picked here is sent; otherwise the service keeps its persisted one.
+  const [pickedMonitor, setPickedMonitor] = useState<string | undefined>(undefined);
   const [selectionMode, setSelectionMode] = useState<'app' | 'system'>('app');
 
   useEffect(() => {
@@ -65,13 +73,17 @@ export function ScreenControls({ screenPP, onScreenPPChange }: {
       if (data?.selectionMode) setSelectionMode(data.selectionMode);
       if (data?.monitors?.length) {
         setMonitors(data.monitors);
-        setSelectedMonitor(data.monitors[0].id);
+        // The persisted screen when the service reports it, else the first.
+        setSelectedMonitor(data.selectedMonitor && data.monitors.some(m => m.id === data.selectedMonitor)
+          ? data.selectedMonitor
+          : data.monitors[0].id);
       }
     });
   }, []);
 
   const handleMonitorChange = async (id: string) => {
     setSelectedMonitor(id);
+    setPickedMonitor(id);
     const effect = await fetchScreenEffect();
     await startScreenMirror(
       effect?.saturation ?? 1,
@@ -79,14 +91,17 @@ export function ScreenControls({ screenPP, onScreenPPChange }: {
       id,
       effect?.hue ?? 0,
       effect?.colorize ?? 0,
+      keepMode,
     );
+    onSelectionPick?.();
   };
 
   const applyReactive = async (reactive: boolean) => {
     const nextPP: PostProcessSettings = { ...screenPP, reactive };
     onScreenPPChange(nextPP);
     await setScreenEffect(nextPP, true);
-    await startScreenMirror(nextPP.saturation, nextPP.contrast, selectedMonitor, nextPP.hue, nextPP.colorize);
+    await startScreenMirror(nextPP.saturation, nextPP.contrast, pickedMonitor, nextPP.hue, nextPP.colorize, keepMode);
+    onSelectionPick?.();
   };
 
   return (
@@ -153,9 +168,13 @@ export function ScreenControls({ screenPP, onScreenPPChange }: {
 
 const LIGHTING_CROP_ASPECT = 160 / 90;
 
-function MediaControls() {
+function MediaControls({ keepMode, onSelectionPick }: { keepMode: boolean; onSelectionPick?: () => void }) {
   const { t } = useTranslation();
-  const { items, activeId, thumbs, refresh, play, removeLocal } = useMediaLibrary();
+  const { items, activeId, thumbs, refresh, play: playShared, removeLocal } = useMediaLibrary();
+  const play = useCallback(async (id: string) => {
+    await playShared(id, keepMode);
+    onSelectionPick?.();
+  }, [keepMode, onSelectionPick, playShared]);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importingName, setImportingName] = useState<string | null>(null);
@@ -264,8 +283,9 @@ function MediaControls() {
     await refresh();
     if (isActive) {
       if (nextItem) {
-        await play(nextItem.id);
-      } else {
+        await playShared(nextItem.id, keepMode);
+      } else if (!keepMode) {
+        // Idle starts global Media; away from it the service blanks the media pins instead.
         await mediaIdle();
       }
     }

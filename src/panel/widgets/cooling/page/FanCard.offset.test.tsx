@@ -30,7 +30,7 @@ function renderCard(channel: FanChannel, onClearOffset?: (id: string) => void) {
       onCreateCurve={() => {}}
       onRename={() => {}}
       onSpeedChange={() => {}}
-      onToggleLock={() => {}}
+      onTogglePin={() => {}}
       onSetRole={() => {}}
       onClearOffset={onClearOffset}
     />,
@@ -55,7 +55,7 @@ describe('FanCard duty offset', () => {
 
   it('offers to clear it from the card menu', () => {
     // Clearing an offset is an action, not a mode, so it moved out of the mode
-    // dropdown with Lock when the overflow menu arrived.
+    // dropdown with Pin when the overflow menu arrived.
     const onClear = vi.fn();
     renderCard({ ...CHANNEL, offset: 5 }, onClear);
     fireEvent.click(screen.getByRole('button', { name: 'cooling.fan.moreActions' }));

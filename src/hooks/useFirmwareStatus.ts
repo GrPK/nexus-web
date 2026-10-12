@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchService } from '../api/service';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useTopicCallback } from './useMultiplexSocket';
+import {
+  getFirmwareStatusSnapshot,
+  refreshFirmwareStatus,
+  retainFirmwareStatus,
+  subscribeFirmwareStatus,
+} from './firmwareStatusStore';
 
 export interface FlashableImage {
   firmwareType: string;   // catalog key for this image (pass to the flash endpoint)
@@ -34,37 +39,29 @@ export type RecoveryState = 'ready' | 'identifying' | 'unsupported' | '';
 // over REST then refreshes on the `devices` topic (same diff signal that drives
 // the device list), so plugging/unplugging a device updates the table.
 export function useFirmwareStatus(enabled: boolean) {
-  const [items, setItems] = useState<FirmwareStatusItem[]>([]);
-  // Flips true once the first fetch settles, so consumers can tell "still
+  const { items } = useSyncExternalStore(subscribeFirmwareStatus, getFirmwareStatusSnapshot);
+  // Flips true once this consumer's first fetch settles, so it can tell "still
   // loading" from "loaded, no matching item" (the Q-series install gate).
   const [loaded, setLoaded] = useState(false);
-  const mountedRef = useRef(true);
-
-  const refresh = useCallback(async () => {
-    const data = await fetchService<FirmwareStatusItem[]>('/devices/firmware/status');
-    if (!mountedRef.current) return;
-    if (data) setItems(data);
-    setLoaded(true);
-  }, []);
 
   useEffect(() => {
-    mountedRef.current = true;
     if (!enabled) return;
-    void refresh();
+    let active = true;
+    const release = retainFirmwareStatus();
+    void refreshFirmwareStatus().then(() => { if (active) setLoaded(true); });
     // The devices topic only fires on bus changes, so a transiently failed
     // fetch (or a server-side shell hiccup that omitted an item) would
     // otherwise render a wrong state until the next hotplug. Slow
     // reconciliation re-poll while a consumer is mounted.
-    const intervalId = window.setInterval(() => { void refresh(); }, 30_000);
+    const intervalId = window.setInterval(() => { void refreshFirmwareStatus(); }, 30_000);
     return () => {
+      active = false;
       window.clearInterval(intervalId);
-      mountedRef.current = false;
+      release();
     };
-  }, [enabled, refresh]);
+  }, [enabled]);
 
-  useTopicCallback('devices', enabled, () => {
-    void refresh();
-  });
+  useTopicCallback('devices', enabled, () => { void refreshFirmwareStatus(); });
 
-  return { items, loaded, refresh };
+  return { items, loaded, refresh: refreshFirmwareStatus };
 }

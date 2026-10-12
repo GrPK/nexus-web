@@ -132,6 +132,8 @@
   align-items: center;
   gap: 0.5rem;
   flex-shrink: 0;
+  // Keeps the status chips visibly apart from the Nexus Control switch.
+  margin-left: var(--space-sm);
 }
 
 .controlLabel {

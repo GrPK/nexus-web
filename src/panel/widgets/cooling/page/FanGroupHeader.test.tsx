@@ -18,8 +18,8 @@ function renderHeader(over: Partial<Parameters<typeof FanGroupHeader>[0]> = {}) 
     onToggleCollapsed: vi.fn(),
     groupControlled: true,
     onToggleControlled: vi.fn(),
-    groupLocked: false,
-    onToggleLock: vi.fn(),
+    groupPinned: false,
+    onTogglePin: vi.fn(),
     children: <div>fan</div>,
     ...over,
   };
@@ -30,18 +30,18 @@ function renderHeader(over: Partial<Parameters<typeof FanGroupHeader>[0]> = {}) 
 const openMenu = () => fireEvent.click(screen.getByRole('button', { name: /groupActions/ }));
 
 describe('FanGroupHeader menu', () => {
-  it('names the action for a controlled, unlocked group', () => {
+  it('names the action for a controlled, unpinned group', () => {
     renderHeader();
     openMenu();
     expect(screen.getByRole('button', { name: /menuControlOff/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /lock\.lock/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /pin\.pin/ })).toBeTruthy();
   });
 
-  it('flips both rows when the group is released and locked', () => {
-    renderHeader({ groupControlled: false, groupLocked: true });
+  it('flips both rows when the group is released and pinned', () => {
+    renderHeader({ groupControlled: false, groupPinned: true });
     openMenu();
     expect(screen.getByRole('button', { name: /menuControlOn/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /lock\.unlock/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /pin\.unpin/ })).toBeTruthy();
   });
 
   it('drives the group handlers', () => {
