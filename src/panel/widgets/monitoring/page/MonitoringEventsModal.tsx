@@ -3,7 +3,7 @@ import { useTranslation } from '../../../../lib/i18n';
 import { useUnitPrefs } from '../../../../hooks/useUiSettings';
 import { Overlay } from '../../../../components/common/Overlay/Overlay';
 import { Button } from '../../../../components/common/Button/Button';
-import { CHART_EVENT_ICONS } from '../../../../components/common/TimeSeriesChart/TimeSeriesChart';
+import { chartEventIcon } from '../../../../components/common/TimeSeriesChart/TimeSeriesChart';
 import type { MonitoringEventKind, TimelineEvent } from '../../../../api/monitoringEvents';
 import { useEventKindVisibility } from './useEventKindVisibility';
 import { eventKindLabel, formatEventTime, formatPrivacyDuration } from './monitoringEventLabels';
@@ -54,7 +54,7 @@ export function MonitoringEventsModal({
       ) : (
         <ul className={styles.list}>
           {newestFirst.map(event => {
-            const Icon = CHART_EVENT_ICONS[event.kind];
+            const Icon = chartEventIcon(event.kind);
             const highlighted = event.key === highlightedKey;
             return (
               <li

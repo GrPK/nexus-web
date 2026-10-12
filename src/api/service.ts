@@ -658,7 +658,7 @@ export async function postServiceForm<T>(path: string, form: FormData): Promise<
 }
 
 /** The service answered an upload and did not accept it. */
-export interface ServiceRefusal { error: true; msg: string }
+export interface ServiceRefusal { error: true; msg: string; status?: number }
 
 // postServiceForm for a caller that must tell a refused upload from an
 // unreachable service: any answer the service gave without accepting comes
@@ -677,7 +677,7 @@ export async function postServiceFormResult<T extends { error: boolean; msg: str
     // Not JSON: the status carries what there is.
   }
   if (response.ok && body) return body as T;
-  return { error: true, msg: body?.msg || body?.detail || body?.title || `HTTP ${response.status}` };
+  return { error: true, msg: body?.msg || body?.detail || body?.title || `HTTP ${response.status}`, status: response.status };
 }
 
 /**

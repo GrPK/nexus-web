@@ -1,4 +1,5 @@
 import { authFetchWithStatus } from '../api/service';
+import { isStaleChunkMessage, recoverFromStaleChunkNow } from '../lib/staleChunkRecovery';
 
 export type ErrorKind = 'window-error' | 'unhandled-rejection' | 'render';
 
@@ -136,7 +137,14 @@ function gateOpen(): boolean {
   return true;
 }
 
-export function reportError(error: unknown, kind: ErrorKind, context?: string): void {
+export function reportError(error: unknown, kind: ErrorKind, context?: string, recoveryTried = false): void {
+  if (!recoveryTried && installed && staleChunkMessageOf(error)) {
+    // A reload onto a new build makes the error moot; otherwise report it as usual.
+    void recoverFromStaleChunkNow().then((reloaded) => {
+      if (!reloaded) reportError(error, kind, context, true);
+    });
+    return;
+  }
   if (!installed || reporting || !gateOpen()) return;
   reporting = true;
   try {
@@ -184,7 +192,44 @@ export function reportError(error: unknown, kind: ErrorKind, context?: string): 
   }
 }
 
+function staleChunkMessageOf(error: unknown): boolean {
+  if (reporting) return false;
+  // describe() reads error getters, which may raise error events themselves.
+  reporting = true;
+  try {
+    return isStaleChunkMessage(describe(error).message);
+  } catch {
+    return false;
+  } finally {
+    reporting = false;
+  }
+}
+
+function stripUrlSuffix(url: string): string {
+  return url.replace(/[?#].*$/, '');
+}
+
+// Wallet extensions and in-app browsers inject scripts into the page. Their
+// frames never come from our hashed /assets/ bundle (the dev server serves
+// modules from other paths, so onWindowError skips the filter there). The one
+// exception is our own inline index.html polyfills,
+// which report the page URL as filename but always sit past line 1, whereas
+// an injected snippet evaluated against the page starts at line 1.
+export function isForeignScriptError(filename: string, lineno: number, pageHref: string): boolean {
+  if (!filename) return false;
+  if (filename.indexOf('/assets/') !== -1) return false;
+  if (stripUrlSuffix(filename) === stripUrlSuffix(pageHref)) return lineno <= 1;
+  return true;
+}
+
 function onWindowError(event: ErrorEvent): void {
+  let foreign = false;
+  try {
+    foreign = !import.meta.env.DEV && isForeignScriptError(event.filename, event.lineno, window.location.href);
+  } catch {
+    foreign = false;
+  }
+  if (foreign) return;
   reportError(event.error ?? event.message, 'window-error');
 }
 

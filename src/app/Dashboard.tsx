@@ -88,7 +88,9 @@ import { LightingOnboardingScreen } from '../components/common/LightingOnboardin
 import { ImportOnboardingScreen } from '../components/common/ImportOnboarding/ImportOnboardingScreen';
 import { FeatureGate } from '../components/common/FeatureDisabled/FeatureDisabled';
 import { UpdateModal } from '../components/common/UpdateModal/UpdateModal';
-import { getUpdateStatus, type UpdateStatus } from '../api/update';
+import { ChannelSwitchModal } from '../components/common/ChannelSwitchModal/ChannelSwitchModal';
+import { useChannelSwitchRequests } from '../lib/channelSwitch';
+import { getUpdateStatus, type UpdateChannel, type UpdateStatus } from '../api/update';
 import { IncomingPairModal } from './IncomingPairModal';
 import { ToastProvider } from '../components/common/Toast/Toast';
 import { TransferToasts } from './TransferToasts';
@@ -705,6 +707,8 @@ export function Dashboard() {
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [startedInstall, setStartedInstall] = useState(false);
+  const [channelSwitchTarget, setChannelSwitchTarget] = useState<UpdateChannel | null>(null);
+  useChannelSwitchRequests(useCallback((channel: UpdateChannel) => setChannelSwitchTarget(prev => prev ?? channel), []));
   // Pair Remote killswitch state. Optimistic default of true matches the
   // service default so the dot color does not flicker before the first fetch.
   const [remoteControlEnabled, setRemoteControlEnabled] = useState(true);
@@ -798,7 +802,12 @@ export function Dashboard() {
   const sidebarCompact = manualOverride !== null ? manualOverride : viewportNarrow;
   const compact = hasSidebar && sidebarCompact;
 
+  // Nothing opens the normal update modal over a running channel switch.
+  const channelSwitchActiveRef = useRef(false);
+  channelSwitchActiveRef.current = channelSwitchTarget !== null;
+
   const handleUpdateOpen = useCallback(async (preloaded?: UpdateStatus) => {
+    if (channelSwitchActiveRef.current) return;
     setStartedInstall(false);
     if (preloaded) {
       setUpdateStatus(preloaded);
@@ -811,6 +820,7 @@ export function Dashboard() {
   }, []);
 
   const handleInstall = useCallback(async () => {
+    if (channelSwitchActiveRef.current) return;
     const s = await getUpdateStatus();
     if (s) setUpdateStatus(s);
     setStartedInstall(true);
@@ -1206,7 +1216,7 @@ export function Dashboard() {
             title={t('account.signIn.title')}
           />
         )}
-        {OFFICIAL_BUILD && <UpdateAutoOpener online={online} onOpen={handleUpdateOpen} />}
+        {OFFICIAL_BUILD && !channelSwitchTarget && <UpdateAutoOpener online={online} onOpen={handleUpdateOpen} />}
         <DeckEditAutoOpener online={online} onOpen={handleOpenDeckEditor} />
         <UpdateModalWithDismiss
           open={updateModalOpen}
@@ -1215,6 +1225,9 @@ export function Dashboard() {
           onStatusRefreshed={setUpdateStatus}
           startedInstall={startedInstall}
         />
+        {channelSwitchTarget && (
+          <ChannelSwitchModal open channel={channelSwitchTarget} onClose={() => setChannelSwitchTarget(null)} />
+        )}
       </div>
       </PageChromeProvider>
       </ToastProvider>

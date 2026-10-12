@@ -108,7 +108,7 @@ export async function checkOnce(deps: CheckDeps): Promise<CheckResult> {
   return 'reload';
 }
 
-function liveDeps(loaded: string): CheckDeps {
+export function liveDeps(loaded: string): CheckDeps {
   return {
     loaded,
     oneShotToken: hasOneShotToken(window.location.search),
