@@ -130,3 +130,47 @@ describe('AnimateGrid search', () => {
     expect(screen.getByText('lighting.effects.noMatches')).toBeInTheDocument();
   });
 });
+
+describe('AnimateGrid pin badge', () => {
+  const grid = (pinnedDevices?: Map<string, string[]>) => render(
+    <AnimateGrid
+      effect="plasma"
+      onSelect={() => {}}
+      slotFor={() => 0}
+      versionFor={() => '0'}
+      pinnedDevices={pinnedDevices}
+    />,
+  );
+
+  it('badges exactly the effects with a pinned device, showing the count', () => {
+    const { container } = grid(new Map([['plasma', ['Fan 1', 'Strip']]]));
+    const badges = screen.getAllByTestId('effect-pin-badge');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].textContent).toBe('2');
+    expect(badges[0].closest('[data-effect-key]')?.getAttribute('data-effect-key')).toBe('plasma');
+    expect(container.querySelectorAll('svg.lucide-pin').length).toBe(0);
+  });
+
+  it('shows no count when nothing is pinned', () => {
+    grid(new Map());
+    expect(screen.queryByTestId('effect-pin-badge')).toBeNull();
+  });
+
+  it('lists the device names in the tooltip on hover', async () => {
+    grid(new Map([['plasma', ['Fan 1', 'Strip']]]));
+    fireEvent.pointerEnter(screen.getByTestId('effect-pin-badge'));
+    expect(await screen.findByText('Fan 1')).toBeTruthy();
+    expect(screen.getByText('Strip')).toBeTruthy();
+  });
+
+  it('keeps the usage icons beside the count', () => {
+    const { container } = render(
+      <AnimateGrid
+        effect="plasma" onSelect={() => {}} slotFor={() => 0} versionFor={() => '0'}
+        rgbActiveEffect="plasma" pinnedDevices={new Map([['plasma', ['Fan 1']]])}
+      />,
+    );
+    expect(container.querySelectorAll('svg.lucide-lightbulb').length).toBe(1);
+    expect(screen.getByTestId('effect-pin-badge').textContent).toBe('1');
+  });
+});

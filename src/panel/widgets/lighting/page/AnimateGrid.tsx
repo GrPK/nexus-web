@@ -12,13 +12,15 @@ import { EffectCard } from '../../../../components/common/EffectCard/EffectCard'
 import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import styles from '../LightingPage.module.scss';
 
-function AnimateGridCell({ fx, slot, version, active, live, panel, label, hideLabel, gpuAvailable, frozen, onSelect }: {
+function AnimateGridCell({ fx, slot, version, active, live, panel, pinnedNames, label, hideLabel, gpuAvailable, frozen, onSelect }: {
   fx: EffectDef;
   slot: number;
   version: string;
   active: boolean;
   live: boolean;
   panel: boolean;
+  /** Names of the devices pinned to this effect. */
+  pinnedNames?: readonly string[];
   label: string;
   /** Simple colour swatches drop the on-thumbnail caption. */
   hideLabel?: boolean;
@@ -42,13 +44,28 @@ function AnimateGridCell({ fx, slot, version, active, live, panel, label, hideLa
       active={active}
       onClick={onSelect}
       audio={fx.audio}
-      cornerBadge={hints.length ? (
-        <HoverTooltip title={hints.length > 1 ? hints[0] : undefined} body={hints.length > 1 ? hints[1] : hints[0]} side="top">
-          <span className={styles.cellBadges}>
-            {live && <Lightbulb aria-hidden={true} />}
-            {panel && <Monitor aria-hidden={true} />}
-          </span>
-        </HoverTooltip>
+      cornerBadge={hints.length || pinnedNames?.length ? (
+        <span className={styles.cellBadges}>
+          {hints.length > 0 && (
+            <HoverTooltip title={hints.length > 1 ? hints[0] : undefined} body={hints.length > 1 ? hints[1] : hints[0]} side="top">
+              <span className={styles.cellBadgeGroup}>
+                {live && <Lightbulb aria-hidden={true} />}
+                {panel && <Monitor aria-hidden={true} />}
+              </span>
+            </HoverTooltip>
+          )}
+          {!!pinnedNames?.length && (
+            <HoverTooltip
+              title={t('lighting.badge.pinnedDevices')}
+              body={pinnedNames.map((n, i) => <span key={i} className={styles.cellPinName}>{n}</span>)}
+              side="top"
+            >
+              <span className={styles.cellBadgeGroup} data-testid="effect-pin-badge">
+                <span className={styles.cellPinCount}>{pinnedNames.length}</span>
+              </span>
+            </HoverTooltip>
+          )}
+        </span>
       ) : undefined}
     />
   );
@@ -61,7 +78,7 @@ function AnimateGridCell({ fx, slot, version, active, live, panel, label, hideLa
  * hardware gets a bulb. Effects are listed in pre-expanded category groups
  * (EFFECT_CATEGORIES order), each under a header in the cooling-panel style.
  */
-export function AnimateGrid({ effect, onSelect, effects = EFFECTS, query = '', slotFor, versionFor, rgbActiveEffect, panelEffects, gpuAvailable, frozen, leading }: {
+export function AnimateGrid({ effect, onSelect, effects = EFFECTS, query = '', slotFor, versionFor, rgbActiveEffect, panelEffects, pinnedDevices, gpuAvailable, frozen, leading }: {
   effect: string;
   onSelect: (key: string) => void;
   /** Rendered above the category groups, inside the same scroll container. */
@@ -79,6 +96,8 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, query = '', s
   rgbActiveEffect?: string | null;
   /** Effects used as a background by ≥1 panel - those cells show a panel icon. */
   panelEffects?: Set<string> | null;
+  /** Names of the devices pinned to each effect: a cell with any shows a pin and the count. */
+  pinnedDevices?: ReadonlyMap<string, readonly string[]>;
   /** When false, thumbnail fetches are skipped and a static placeholder is shown. */
   gpuAvailable?: boolean;
   /** Static mode: tiles render frozen so the grid matches the LED output. */
@@ -142,6 +161,7 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, query = '', s
               active={fx.key === effect}
               live={!!rgbActiveEffect && fx.key === rgbActiveEffect}
               panel={!!panelEffects && panelEffects.has(fx.key)}
+              pinnedNames={pinnedDevices?.get(fx.key)}
               label={t(fx.labelKey)}
               hideLabel={g.cat === 'simple'}
               gpuAvailable={gpuAvailable}
@@ -157,7 +177,7 @@ export function AnimateGrid({ effect, onSelect, effects = EFFECTS, query = '', s
               open={searching || !collapsed.has(g.cat)}
               onToggle={() => toggle(g.cat)}
             >
-              <div className={`${styles.animateGridSection} ${g.cat === 'simple' ? styles.animateGridSectionSimple : ''}`}>
+              <div data-pick className={`${styles.animateGridSection} ${g.cat === 'simple' ? styles.animateGridSectionSimple : ''}`}>
                 {cells}
               </div>
             </CollapsibleSection>

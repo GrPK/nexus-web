@@ -31,3 +31,49 @@
   72%  { opacity: 1; }
   100% { background-position: -60% 0, 0 0; opacity: 0; }
 }
+
+/* The light level, for a card a press or pick just changed: a quick, soft sweep
+   over a faint tint pulse while the border, lit in the accent, fades. Its host
+   covers the card's border box, so the border lands on the card's own. */
+.nexus-highlight-light {
+  position: relative;
+}
+
+.nexus-highlight-light::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-image: linear-gradient(110deg,
+    transparent 15%,
+    color-mix(in srgb, var(--accent, #3b82f6) 18%, transparent) 50%,
+    transparent 85%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  animation: nexus-highlight-light 0.5s ease-out forwards;
+}
+
+@keyframes nexus-highlight-light {
+  0% {
+    background-position: 160% 0;
+    background-color: transparent;
+    box-shadow: inset 0 0 0 var(--border-width, 1px) var(--accent, #3b82f6);
+  }
+  30% { background-color: color-mix(in srgb, var(--accent, #3b82f6) 10%, transparent); }
+  100% {
+    background-position: -60% 0;
+    background-color: transparent;
+    box-shadow: inset 0 0 0 var(--border-width, 1px) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-highlight-light::after {
+    animation: none;
+    background-image: none;
+  }
+}

@@ -37,7 +37,7 @@ vi.mock('../../../api/cooling', async (importOriginal) => {
     releaseFanAuto: vi.fn(async () => undefined),
     renameFan: vi.fn(async () => undefined),
     setFanSpeed: vi.fn(async () => undefined),
-    setFanLock: vi.fn(async () => undefined),
+    setFanPin: vi.fn(async () => undefined),
     fetchCoolingPresets: vi.fn(async () => ({
       presets: presetState.presets,
       activeId: presetState.activeId,

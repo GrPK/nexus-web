@@ -9,6 +9,7 @@ interface ViewHeaderProps {
   tabs?: readonly TabDef[];
   activeTab?: string;
   onTabChange?: (key: string, origin?: HTMLButtonElement) => void;
+  onTabHover?: (key: string | null) => void;
   tabsDisabled?: boolean;
   actions?: ReactNode;
   /** Widget sitting immediately beside the tab bar, sharing the row's gap.
@@ -23,7 +24,7 @@ interface ViewHeaderProps {
 // reads as one control. Text-only and icon+text tabs both flow through the
 // single component.
 
-export function ViewHeader({ title, tabs, activeTab, onTabChange, tabsDisabled, actions, tabActions, tabsAdjacent }: ViewHeaderProps) {
+export function ViewHeader({ title, tabs, activeTab, onTabChange, onTabHover, tabsDisabled, actions, tabActions, tabsAdjacent }: ViewHeaderProps) {
   const hasTabs = !!tabs && tabs.length > 0;
   return (
     <header className={styles.header}>
@@ -39,6 +40,7 @@ export function ViewHeader({ title, tabs, activeTab, onTabChange, tabsDisabled, 
               tabs={tabs}
               activeKey={activeTab ?? ''}
               onChange={(k, origin) => onTabChange?.(k, origin)}
+              onHover={onTabHover}
               disabled={tabsDisabled}
               className={styles.viewHeaderTabs}
               ariaLabel={title}

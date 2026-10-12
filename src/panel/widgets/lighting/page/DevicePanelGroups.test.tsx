@@ -625,7 +625,7 @@ describe('DevicePanel stacks', () => {
   const board = [port('0', 'ARGB_V2_1'), port('1', 'ARGB_V2_2'), port('2', 'LED_C')];
   const stacks = [{ id: 'l1', name: '', members: ['d1', 'd2'] }];
 
-  function renderRail(list: LightingDevice[], stackList: typeof stacks, selectedIds = new Set<string>()) {
+  function renderRail(list: LightingDevice[], stackList: typeof stacks, selectedIds = new Set<string>(), over: Partial<React.ComponentProps<typeof DevicePanel>> = {}) {
     const onStacksChange = vi.fn();
     const onSetSelection = vi.fn();
     const onSetPower = vi.fn();
@@ -644,6 +644,7 @@ describe('DevicePanel stacks', () => {
         onGroupsChange={() => {}}
         stacks={stackList}
         onStacksChange={onStacksChange}
+        {...over}
       />,
     );
     return { onStacksChange, onSetSelection, onSetPower };
@@ -653,6 +654,12 @@ describe('DevicePanel stacks', () => {
   it('badges a stacked card and not a loose one', () => {
     renderRail(devices, stacks);
     expect(screen.getAllByLabelText('lighting.devices.stackedCount.other:{"count":2}')).toHaveLength(2);
+  });
+
+  it('marks a color-tuned card beside its stack badge', () => {
+    renderRail(devices, stacks, new Set(), { colorTunedIds: new Set(['d1']) });
+    const mark = screen.getByLabelText('lighting.colorTuning.title');
+    expect(mark.nextElementSibling?.getAttribute('aria-label')).toBe('lighting.devices.stackedCount.other:{"count":2}');
   });
 
   it('selects the whole stack from one card, and clears it from one card', () => {
@@ -710,19 +717,18 @@ describe('DevicePanel stacks', () => {
   });
 });
 
-describe('DevicePanel color lock', () => {
-  const picks = {
-    d1: { key: 'flat:red-3', slot: 0, hex: '#ff0000', locked: true },
-    d2: { key: 'flat:red-3', slot: 0, hex: '#ff0000' },
-    // d3 has no pick: nothing to lock.
+describe('DevicePanel pins', () => {
+  const pins = {
+    d1: { kind: 'animate' as const, effect: 'plasma' },
+    // d2 and d3 follow the global mode.
   };
-  function renderLockPanel(over: { lockable?: boolean; selectedIds?: Set<string>; lockFlash?: { ids: ReadonlySet<string>; seq: number } } = {}) {
-    const onSetLock = vi.fn();
+  function renderPinPanel(over: Partial<React.ComponentProps<typeof DevicePanel>> = {}) {
+    const onSetPin = vi.fn();
     render(
       <DevicePanel
         devices={devices}
-        devicePicks={picks}
-        selectedIds={over.selectedIds ?? new Set()}
+        pins={pins}
+        selectedIds={new Set()}
         onSetSelection={() => {}}
         onTogglePower={() => {}}
         onSetPower={() => {}}
@@ -730,12 +736,13 @@ describe('DevicePanel color lock', () => {
         onSetControlled={() => {}}
         lightingOff={false}
         onOpenSettings={() => {}}
-        lockable={over.lockable ?? true}
-        onSetLock={onSetLock}
-        lockFlash={over.lockFlash}
+        pinSource="Aurora"
+        pinTargetName={pin => pin.effect ?? ''}
+        onSetPin={onSetPin}
+        {...over}
       />,
     );
-    return onSetLock;
+    return { onSetPin };
   }
   const menuOf = (name: string) => {
     const card = screen.getByText(name).closest(`.${styles.deviceCard}`)!;
@@ -743,47 +750,47 @@ describe('DevicePanel color lock', () => {
   };
   const row = (re: RegExp) => screen.queryAllByRole('button').find(b => re.test(b.textContent ?? '')) ?? null;
 
-  it('badges only the locked card, and its badge unlocks that card', () => {
-    const onSetLock = renderLockPanel();
-    const badges = screen.getAllByRole('button', { name: 'lighting.devices.unlockLook' });
-    expect(badges).toHaveLength(1);
-    fireEvent.click(badges[0]);
-    expect(onSetLock).toHaveBeenCalledWith(['d1'], false);
+  it('puts the pin only on the pinned card, and a press unpins it', () => {
+    const { onSetPin } = renderPinPanel();
+    expect(screen.getAllByRole('button', { name: /^lighting\.pin\.(pinTo|pinnedTo)/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.pin.pinnedTo:{"name":"plasma"}' }));
+    expect(onSetPin).toHaveBeenLastCalledWith(['d1'], false);
   });
 
-  it('offers Lock on a card with a pick of its own', () => {
-    const onSetLock = renderLockPanel();
+  it('outlines exactly the cards the next pick lands on', () => {
+    renderPinPanel({ pickTargetIds: new Set(['d2', 'd3']) });
+    const outlined = ['Strip one', 'Strip two', 'Strip three']
+      .filter(n => screen.getByText(n).closest(`.${styles.deviceCard}`)!.className.includes(styles.deviceCardTarget));
+    expect(outlined).toEqual(['Strip two', 'Strip three']);
+  });
+
+  it('offers Pin on a following card and Unpin on a pinned one', () => {
+    const { onSetPin } = renderPinPanel();
     menuOf('Strip two');
-    fireEvent.click(row(/^lighting\.devices\.lockLook$/)!);
-    expect(onSetLock).toHaveBeenLastCalledWith(['d2'], true);
-  });
-
-  it('offers neither row on a card with no pick', () => {
-    renderLockPanel();
-    menuOf('Strip three');
-    expect(row(/lockLook/)).toBeNull();
+    fireEvent.click(row(/^lighting\.devices\.pin$/)!);
+    expect(onSetPin).toHaveBeenLastCalledWith(['d2'], true);
   });
 
   it('counts, and reaches, exactly the members each row can act on in a selection', () => {
-    const onSetLock = renderLockPanel({ selectedIds: new Set(['d1', 'd2', 'd3']) });
+    const { onSetPin } = renderPinPanel({ selectedIds: new Set(['d1', 'd2', 'd3']) });
     menuOf('Strip one');
-    fireEvent.click(row(/lockLookCount\.one:\{"count":1\}/)!);
-    expect(onSetLock).toHaveBeenLastCalledWith(['d2'], true);
-    fireEvent.click(row(/unlockLookCount\.one:\{"count":1\}/)!);
-    expect(onSetLock).toHaveBeenLastCalledWith(['d1'], false);
+    fireEvent.click(row(/pinCount\.other:\{"count":2\}/)!);
+    expect(onSetPin).toHaveBeenLastCalledWith(['d2', 'd3'], true);
+    fireEvent.click(row(/unpinCount\.one:\{"count":1\}/)!);
+    expect(onSetPin).toHaveBeenLastCalledWith(['d1'], false);
   });
 
-  it('offers no Lock outside the Static tab, in a selection or alone', () => {
-    renderLockPanel({ lockable: false, selectedIds: new Set(['d1', 'd2', 'd3']) });
+  it('offers only Unpin where nothing can be pinned', () => {
+    const { onSetPin } = renderPinPanel({
+      pinSource: null,
+      pinDisabledReason: 'lighting.pin.disabledMedia',
+      selectedIds: new Set(['d1', 'd2', 'd3']),
+    });
+    expect(screen.queryByRole('button', { name: 'lighting.pin.disabledMedia' })).toBeNull();
+    expect(onSetPin).not.toHaveBeenCalled();
     menuOf('Strip one');
-    expect(row(/^lighting\.devices\.lockLook/)).toBeNull();
-    expect(row(/unlockLookCount\.one/)).not.toBeNull();
-  });
-
-  it('hands the flash seq only to the cards the burst names', () => {
-    renderLockPanel({ lockFlash: { ids: new Set(['d1']), seq: 0 } });
-    // seq 0 is "no burst yet": nothing flashes.
-    expect(document.querySelector(`.${styles.deviceLockBtnFlash}`)).toBeNull();
+    expect(row(/^lighting\.devices\.pinCount/)).toBeNull();
+    expect(row(/unpinCount\.one/)).not.toBeNull();
   });
 });
 

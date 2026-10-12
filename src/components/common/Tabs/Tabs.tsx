@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import classNames from 'classnames';
 import styles from './Tabs.module.scss';
 
@@ -44,6 +44,8 @@ export interface TabsProps {
   className?: string;
   /** Stretch the bar to 100% width with each tab sharing the width equally. */
   fullWidth?: boolean;
+  /** Mouse hover over a tab, null on leave. Touch and pen never fire it. */
+  onHover?: (key: string | null) => void;
 }
 
 /**
@@ -52,8 +54,12 @@ export interface TabsProps {
  * --tab-active-bg), and inactive tabs are neutral-dim and hover to plain text.
  * Text-only and icon+text tabs both flow through this one component.
  */
-export function Tabs({ tabs, activeKey, onChange, disabled, ariaLabel = 'Tabs', className, fullWidth = false }: TabsProps) {
+export function Tabs({ tabs, activeKey, onChange, disabled, ariaLabel = 'Tabs', className, fullWidth = false, onHover }: TabsProps) {
   const navClass = classNames(styles.tabs, fullWidth && styles.fullWidth, className);
+  const hoverProps = (key: string) => onHover ? {
+    onPointerEnter: (e: ReactPointerEvent) => { if (e.pointerType === 'mouse') onHover(key); },
+    onPointerLeave: (e: ReactPointerEvent) => { if (e.pointerType === 'mouse') onHover(null); },
+  } : {};
   return (
     <nav className={navClass} role="tablist" aria-label={ariaLabel}>
       {tabs.map(tab => {
@@ -73,6 +79,7 @@ export function Tabs({ tabs, activeKey, onChange, disabled, ariaLabel = 'Tabs', 
               className={classNames(styles.tab, { [styles.active]: isActive })}
               disabled={disabled || tab.disabled}
               onClick={e => onChange(tab.key, e.currentTarget)}
+              {...hoverProps(tab.key)}
             >
               <span className={classNames(styles.tabInner, { [styles.tabChip]: tab.chip })}>
                 {tab.icon && <span className={styles.tabIcon} aria-hidden="true">{tab.icon}</span>}
@@ -97,6 +104,7 @@ export function Tabs({ tabs, activeKey, onChange, disabled, ariaLabel = 'Tabs', 
               className={styles.tab}
               disabled={disabled || tab.disabled}
               onClick={e => onChange(tab.key, e.currentTarget)}
+              {...hoverProps(tab.key)}
             >
               <span className={classNames(styles.tabInner, { [styles.tabChip]: tab.chip })}>
                 {tab.icon && <span className={styles.tabIcon} aria-hidden="true">{tab.icon}</span>}

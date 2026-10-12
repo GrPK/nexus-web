@@ -11,6 +11,9 @@ import type { LedPick } from './page/DeviceLedStrip';
 import { StaticPickerCanvas } from './page/StaticPickerCanvas';
 import { PICKER_FIELD_SVG, PICKER_SEGMENTED_SVG, pickerHexAt, pickerPointFor, snapToSegment } from './page/staticPickerField';
 import { useColorWriteQueue } from './page/useColorWriteQueue';
+import { useGlobalColor } from './page/useGlobalColor';
+import { usePins } from './page/usePins';
+import { visibleCards } from './page/zoneUtils';
 import { EffectCard } from '../../../components/common/EffectCard/EffectCard';
 import { CollapsibleSection } from '../../../components/common/CollapsibleSection/CollapsibleSection';
 import { PostProcessControls } from './effecteditor/PostProcessControls';
@@ -27,7 +30,9 @@ import {
   fetchStaticSettings,
   fetchLightingDevices,
   startAnimate,
+  startStatic,
   type LightingDevice,
+  type Pin,
 } from '../../../api/lighting';
 import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
 import { subscribeControlSync } from '../../../lib/controlSync';
@@ -45,14 +50,12 @@ import {
 } from '../../../types/lighting';
 import { mergeTemplates, slotThumbSignature } from '../../../types/lightingTemplates';
 import { normalizeSync as resolveImmersiveMode } from '../../../hooks/useLightingSync';
-import { usePersistentState, usePersistentIdSet } from '../../../hooks/usePersistentState';
+import { usePersistentState } from '../../../hooks/usePersistentState';
 import { useTranslation } from '../../../lib/i18n';
 import { isPaletteKey } from '../../../types/lightingPalette';
 import {
-  pickCustomForDevices, pickLookForDevices, unlockedIds,
-  DEVICE_PICKS_STORAGE_KEY, SELECTED_DEVICES_STORAGE_KEY, PRIMARY_DEVICE_STORAGE_KEY,
-  type DevicePick, type DevicePicks,
-} from './staticPicks';
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pickerMarks, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, clearLegacyLightingKeys,
+} from './pins';
 import type { WidgetProps } from '../types';
 import styles from './LightingPage.module.scss';
 
@@ -70,8 +73,11 @@ const DEFAULT_PP: PostProcessState = { hue: 0, colorize: 0, saturation: 1, contr
  */
 export function LightingTouch({ widget, surface, immersiveGrid }: WidgetProps) {
   const fullsizeWidget = useMemo(() => ({ ...widget, size: '4x4' as const }), [widget]);
-  const { mode, animate } = useImmersiveAnimateState();
-  const post = useImmersivePostProcess(mode);
+  const { mode, animate, deviceSelect, scope, selectionPick } = useImmersiveAnimateState();
+  // The filters belong to the source the editor shows: the Animation and Static
+  // editors show a Mirror- or Media-pinned selection's shared source instead.
+  const shaderEditor = mode === 'animate' || mode === 'static';
+  const post = useImmersivePostProcess(shaderEditor && scope === 'mirror' ? 'screen' : shaderEditor && scope === 'media' ? 'gif' : mode);
   const panelUsage = usePanelBackgroundUsage();
 
   const cells: ReactNode[] = [
@@ -85,7 +91,7 @@ export function LightingTouch({ widget, surface, immersiveGrid }: WidgetProps) {
   // Always keep a second (fill) cell below the fixed 4x4 preview so the preview
   // stays a 4x4 even when there's no editor (off mode). The spacer just holds
   // the leftover height; otherwise the lone preview becomes the fill cell.
-  const editor = renderImmersiveEditor(mode, animate, post, panelUsage);
+  const editor = renderImmersiveEditor(mode, animate, post, panelUsage, deviceSelect, scope, selectionPick);
   cells.push(editor ?? <div key="imm-fill" />);
 
   return (
@@ -103,7 +109,7 @@ function ImmersivePickerCanvas({ animate }: { animate: ImmersiveAnimateControlle
     <StaticPickerCanvas
       fill
       devices={animate.pickerDevices}
-      hasSelection={animate.selectedIds.size > 0}
+      implied={animate.selectedIds.size === 0}
       hex={animate.selectedHex}
       segmented={animate.segmented}
       patternEffect={animate.staticPattern?.key ?? null}
@@ -158,65 +164,47 @@ function ImmersivePicker({ animate }: { animate: ImmersiveAnimateController }) {
   );
 }
 
-/**
- * The lighting page's static lockout, reusing its classes: with no devices
- * selected a pick has no target, so the browser shows through but is inert.
- */
-function StaticBrowser({ locked, children }: { locked: boolean; children: ReactNode }) {
-  const { t } = useTranslation();
-  if (!locked) return <>{children}</>;
-  return (
-    <>
-      <p className={styles.browserHint}>{t('lighting.pane.pickDevices')}</p>
-      <div className={styles.browserLocked} inert>{children}</div>
-    </>
-  );
-}
-
 function renderImmersiveEditor(
   mode: LightingMode,
   animate: ImmersiveAnimateController | null,
   post: ImmersivePostProcess,
   panelUsage: PanelBackgroundUsage,
+  deviceSelect: React.ComponentProps<typeof StaticDeviceSelect>,
+  scope: EditorScope,
+  selectionPick: (() => void) | undefined,
 ): ReactNode | null {
+  const mirrorPostProcess = (
+    <PostProcessControls value={post.value} onChange={post.onChange} onCommit={post.onCommit} onReset={post.onReset} />
+  );
   if (mode === 'animate' || mode === 'static') {
     if (!animate) return null;
     const isStatic = mode === 'static';
-    // Static picks land on the selection, so with none there is nothing to
-    // pick for - the same lockout the lighting page shows.
-    const needsSelection = isStatic && animate.selectedIds.size === 0;
     return (
       <EffectEditor
-        devices={isStatic ? (
-          <StaticDeviceSelect
-            devices={animate.devices}
-            selectedIds={animate.selectedIds}
-            onSetSelection={animate.onSetSelection}
-            ledPickFor={animate.ledPickFor}
+        devices={<StaticDeviceSelect {...animate.deviceSelect} />}
+        // A mixed selection or a palette color has no single set of controls.
+        effectDisabled={scope === 'mixed' || scope === 'palette'}
+        // A selection pinned to the shared Mirror or Media edits that source here,
+        // without switching the global mode to it.
+        options={scope === 'mirror' ? <ScreenControls screenPP={post.value} onScreenPPChange={post.onScreenPPChange} keepMode />
+          : scope === 'media' ? <MediaList keepMode /> : (
+          <AnimateGrid
+            // The highlight belongs to what the SELECTION wears, not to what was
+            // last browsed: a pattern tile left lit after a color pick reads as
+            // a second selection beside the picker tile.
+            effect={isStatic ? (animate.staticPattern?.key ?? '') : animate.effect}
+            onSelect={animate.onSelectEffect}
+            effects={isStatic ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
+            frozen={isStatic}
+            slotFor={animate.slotFor}
+            versionFor={animate.versionFor}
+            rgbActiveEffect={isStatic ? null : animate.runningEffect}
+            panelEffects={panelUsage.effects}
+            pinnedDevices={animate.pinnedDevices}
+            leading={isStatic ? <ImmersivePicker animate={animate} /> : undefined}
           />
-        ) : undefined}
-        effectDisabled={needsSelection}
-        options={(
-          <StaticBrowser locked={needsSelection}>
-            <AnimateGrid
-              // Static's highlight belongs to what the SELECTION wears, not to
-              // what was last browsed: a pattern tile left lit after a colour
-              // pick reads as a second selection beside the picker tile. A
-              // selection with no pick of its own lights nothing here (the
-              // lighting page falls back to the browsed effect instead).
-              effect={isStatic ? (animate.staticPattern?.key ?? '') : animate.effect}
-              onSelect={animate.onSelectEffect}
-              effects={isStatic ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
-              frozen={isStatic}
-              slotFor={animate.slotFor}
-              versionFor={animate.versionFor}
-              rgbActiveEffect={isStatic ? null : animate.effect}
-              panelEffects={panelUsage.effects}
-              leading={isStatic ? <ImmersivePicker animate={animate} /> : undefined}
-            />
-          </StaticBrowser>
         )}
-        effect={(
+        effect={scope === 'mirror' || scope === 'media' ? mirrorPostProcess : (
           <EffectControls
             effect={animate.effect}
             state={animate.state}
@@ -234,23 +222,22 @@ function renderImmersiveEditor(
       />
     );
   }
+  // A Media or Mirror pick with cards selected gives just them the shared source.
   if (mode === 'gif') {
     return (
       <EffectEditor
-        options={<MediaList />}
-        effect={(
-          <PostProcessControls value={post.value} onChange={post.onChange} onCommit={post.onCommit} onReset={post.onReset} />
-        )}
+        devices={<StaticDeviceSelect {...deviceSelect} />}
+        options={<MediaList onSelectionPick={selectionPick} />}
+        effect={mirrorPostProcess}
       />
     );
   }
   if (mode === 'screen') {
     return (
       <EffectEditor
-        options={<ScreenControls screenPP={post.value} onScreenPPChange={post.onScreenPPChange} />}
-        effect={(
-          <PostProcessControls value={post.value} onChange={post.onChange} onCommit={post.onCommit} onReset={post.onReset} />
-        )}
+        devices={<StaticDeviceSelect {...deviceSelect} />}
+        options={<ScreenControls screenPP={post.value} onScreenPPChange={post.onScreenPPChange} onSelectionPick={selectionPick} />}
+        effect={mirrorPostProcess}
       />
     );
   }
@@ -258,9 +245,14 @@ function renderImmersiveEditor(
 }
 
 interface ImmersiveAnimateController {
+  /** The effect the editor shows: the pinned target when the selection wears one, else the running one. */
   effect: string;
-  /** Static only: the devices a pick lands on, shared with the lighting page. */
-  devices: LightingDevice[];
+  /** The effect the global source is running. */
+  runningEffect: string;
+  /** Props for the devices tab: the rail's cards with pin buttons. */
+  deviceSelect: React.ComponentProps<typeof StaticDeviceSelect>;
+  /** Device names per pinned effect, for the grid badges. */
+  pinnedDevices: ReadonlyMap<string, readonly string[]>;
   selectedIds: Set<string>;
   onSetSelection: (ids: Set<string>, primary: string | null) => void;
   customColor: string;
@@ -274,9 +266,6 @@ interface ImmersiveAnimateController {
   segmented: boolean;
   onSetSegmented: (on: boolean) => void;
   pickerDevices: { id: string; name: string; hex: string }[];
-  /** A device's own Static assignment for its card readout; the shared effect
-   *  canvas is not what a per-device mode is showing. */
-  ledPickFor: (id: string) => LedPick | undefined;
   state: EffectState;
   bundle: EffectTemplateBundle;
   canReset: boolean;
@@ -298,8 +287,13 @@ interface ImmersiveAnimateController {
  */
 function useImmersiveDevices(enabled: boolean) {
   const [devices, setDevices] = useState<LightingDevice[]>([]);
-  const [selectedIds, setSelectedIds] = usePersistentIdSet(SELECTED_DEVICES_STORAGE_KEY);
-  const [, setPrimaryId] = usePersistentState<string | null>(PRIMARY_DEVICE_STORAGE_KEY, null);
+  // Not persisted: a restored selection would silently turn the next pick into a
+  // pin, so every visit starts at "All devices".
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    clearLegacyLightingKeys();
+    return new Set();
+  });
+  const [, setPrimaryId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const list = await fetchLightingDevices();
@@ -319,38 +313,66 @@ function useImmersiveDevices(enabled: boolean) {
   return { devices, selectedIds, onSetSelection };
 }
 
-function useImmersiveAnimateState(): { mode: LightingMode; animate: ImmersiveAnimateController | null } {
+/** What the selection wears, for the editor: nothing, mixed pins, a palette color, Mirror, or a shader or static look. */
+type EditorScope = 'none' | 'mixed' | 'palette' | 'mirror' | 'media' | 'pin';
+
+function useImmersiveAnimateState(): {
+  mode: LightingMode;
+  animate: ImmersiveAnimateController | null;
+  deviceSelect: React.ComponentProps<typeof StaticDeviceSelect>;
+  scope: EditorScope;
+  selectionPick: (() => void) | undefined;
+} {
+  const { t } = useTranslation();
   const [active, setActive] = useState<string>('rainbow');
   const [templates, setTemplates] = useState<Record<string, EffectTemplateBundle>>({});
   const [mode, setMode] = useState<LightingMode>('none');
-  const stagedRef = useRef<EffectState | null>(null);
+  // The edit in progress, tagged with the target it belongs to: after the
+  // selection or a pinned pick moves the editor to another effect or preset it
+  // is simply not that target's staged state any more.
+  const stagedRef = useRef<{ target: string; state: EffectState } | null>(null);
   const [, force] = useState(0);
-  const { devices, selectedIds, onSetSelection } = useImmersiveDevices(mode === 'static');
-  // A drag's per-move picks stay out of the persisted record, which writes
-  // localStorage on every change.
-  const [previewPicks, setPreviewPicks] = useState<DevicePicks | null>(null);
-  const [devicePicks, setDevicePicks] = usePersistentState<DevicePicks>(DEVICE_PICKS_STORAGE_KEY, {});
-  const livePicks = useMemo(
-    () => (previewPicks ? { ...devicePicks, ...previewPicks } : devicePicks),
-    [devicePicks, previewPicks],
-  );
+  const { devices, selectedIds, onSetSelection } = useImmersiveDevices(mode === 'static' || mode === 'animate' || mode === 'screen' || mode === 'gif');
+  const { pins, refresh: refreshPins, applyPins, recordPins } = usePins();
+  useEffect(() => { void refreshPins(); }, [refreshPins]);
+  useTopicCallback('lighting', true, () => { void refreshPins(); });
   const [segmented, setSegmented] = usePersistentState('nexus.lighting.pickerSegmented', true);
-  const queueCustomWrite = useColorWriteQueue();
+  const queueColorWrite = useColorWriteQueue(useCallback((ids: string[], pin: Pin) => applyPins(ids, pin, false), [applyPins]));
   const [customStaticColor, setCustomStaticColor] = usePersistentState('nexus.lighting.customColor', '');
+  // The exact flat color the global Static look is, from the service; '' when it is an effect.
+  const [globalColor, setGlobalColor, readGlobalColor] = useGlobalColor();
+
+  const selectionIds = useMemo(() => [...selectedIds], [selectedIds]);
+  const selection = useMemo(() => selectionPin(pins, selectionIds), [pins, selectionIds]);
+  const scope: EditorScope = selection.kind === 'none' ? 'none'
+    : selection.kind === 'mixed' ? 'mixed'
+      : selection.pin.kind === 'mirror' ? 'mirror'
+        : selection.pin.kind === 'media' ? 'media'
+          : isPaletteKey(pinGridKey(selection.pin)) ? 'palette' : 'pin';
+  // A selection wearing one shader or static pin shows that target in the
+  // editor; the running effect is untouched.
+  const pinnedKey = selection.kind === 'pin' && selection.pin.kind !== 'mirror' && selection.pin.kind !== 'media' && !isPaletteKey(pinGridKey(selection.pin))
+    ? pinGridKey(selection.pin)
+    : null;
+  const pinnedSlot = selection.kind === 'pin' && selection.pin.kind === 'static' ? (selection.pin.slot ?? 0) : null;
+  const shown = pinnedKey ?? active;
 
   // The colour the selection shares, which is where the picker marks it.
   const selectedHex = useMemo(() => {
+    if (selectedIds.size === 0) return globalColor;
     let hex = '';
     for (const id of selectedIds) {
-      const pick = livePicks[id];
-      if (!pick?.hex) return '';
-      if (hex && hex.toLowerCase() !== pick.hex.toLowerCase()) return '';
-      hex = pick.hex;
+      const pin = pins[id];
+      if (!pin || pin.kind !== 'static') return '';
+      const h = pinHex(pin);
+      if (hex && hex.toLowerCase() !== h.toLowerCase()) return '';
+      hex = h;
     }
     return hex;
-  }, [livePicks, selectedIds]);
+  }, [globalColor, pins, selectedIds]);
 
   const hydrate = useCallback(async () => {
+    const land = readGlobalColor();
     const [sync, settings, staticSettings, defaults] = await Promise.all([
       fetchCurrentSync(),
       fetchAnimateSettings(),
@@ -362,13 +384,13 @@ function useImmersiveAnimateState(): { mode: LightingMode; animate: ImmersiveAni
       next[e.key] = mergeTemplates(e.key, settings?.templates?.[e.key], defaults);
     }
     setTemplates(next);
+    land(staticSettings?.color ?? '');
     const rawSync = sync?.sync || 'none';
     const nextMode = resolveImmersiveMode(rawSync);
     setMode(nextMode);
     if (nextMode === 'static') {
-      // Static picks are per device, so nothing here writes Lighting.Static.Effect
-      // any more - re-seeding on every broadcast (there are dozens, most unrelated
-      // to lighting picks) would yank the browsed effect back. Seed on entry only.
+      // Seed on entry only: re-seeding on every broadcast (there are dozens,
+      // most unrelated to lighting) would yank the browsed effect back.
       setActive(prev => isStaticEffect(prev)
         ? prev
         : (isStaticEffect(staticSettings?.effect ?? '') ? staticSettings!.effect : DEFAULT_STATIC_EFFECT));
@@ -377,7 +399,7 @@ function useImmersiveAnimateState(): { mode: LightingMode; animate: ImmersiveAni
     } else if (settings?.effect) {
       setActive(settings.effect);
     }
-  }, []);
+  }, [readGlobalColor]);
 
   useEffect(() => { hydrate(); }, [hydrate]);
   useTopicCallback('lighting', true, hydrate);
@@ -395,21 +417,25 @@ function useImmersiveAnimateState(): { mode: LightingMode; animate: ImmersiveAni
     }
   }), []);
 
-  const bundle = templates[active];
-  const baseState = bundle?.slots[bundle.selected] ?? defaultStateFor(active);
+  const bundle = templates[shown];
+  const slotShown = pinnedSlot ?? bundle?.selected ?? 0;
+  const baseState = bundle?.slots[slotShown] ?? defaultStateFor(shown);
 
-  // Static and animate share this editor; only the target differs. A static
-  // pick belongs to the selected devices, exactly as on the lighting page -
-  // starting the shared effect instead would repaint every device that carries
-  // an assignment of its own.
+  // An edit: a static pin re-pins its devices, a shader pin only changes that
+  // shader's settings (the running effect is not touched unless it is the
+  // same shader), and with nothing pinned the global source is edited.
   const applyLook = useCallback((key: string, s: EffectState, slot: number) => {
+    if (selection.kind === 'pin' && selection.pin.kind === 'static' && pinnedKey) {
+      void applyPins(selectionIds, staticLookPin(key, slot, s));
+      return;
+    }
+    if (pinnedKey && pinnedKey !== active) return;
     if (mode === 'static') {
-      if (selectedIds.size === 0) return;
-      setDevicePicks(prev => pickLookForDevices(prev, key, slot, s, [...selectedIds], true));
+      setGlobalColor('', startStatic(key, s.intensity, s.hue, s.colorize, s.saturation, s.contrast, s.params, true));
       return;
     }
     void startAnimate(key, s.speed, s.intensity, s.hue, s.colorize, s.saturation, s.contrast, s.params, true);
-  }, [mode, selectedIds, setDevicePicks]);
+  }, [active, applyPins, mode, pinnedKey, selection, selectionIds, setGlobalColor]);
 
   const versionForSlot = useCallback((key: string, slot: number) => {
     const b = templates[key];
@@ -418,114 +444,159 @@ function useImmersiveAnimateState(): { mode: LightingMode; animate: ImmersiveAni
   }, [templates]);
 
   const ledPickFor = useCallback((id: string): LedPick | undefined => {
-    const pick = livePicks[id];
+    const pin = pins[id];
+    const pick = pin ? pinStripPick(pin) : null;
     return pick ? { ...pick, version: versionForSlot(pick.key, pick.slot) } : undefined;
-  }, [livePicks, versionForSlot]);
+  }, [pins, versionForSlot]);
 
-  // The selection wears a pattern when every device agrees on one look and that
-  // look is an effect rather than a flat colour.
-  const staticPattern = useMemo(() => {
-    if (selectedIds.size === 0) return null;
-    let first: DevicePick | undefined;
-    for (const id of selectedIds) {
-      const pick = livePicks[id];
-      if (!pick) return null;
-      if (!first) first = pick;
-      else if (first.key !== pick.key || first.slot !== pick.slot) return null;
-    }
-    return first && !isPaletteKey(first.key) ? { key: first.key, slot: first.slot } : null;
-  }, [livePicks, selectedIds]);
+  // The selection wears a pattern when every device agrees on one static pin
+  // and that pin is an effect rather than a flat color.
+  const staticPattern = useMemo(
+    () => selection.kind === 'pin' && selection.pin.kind === 'static' && pinnedKey
+      ? { key: pinnedKey, slot: selection.pin.slot ?? 0 }
+      : null,
+    [pinnedKey, selection],
+  );
 
   const pickerDevices = useMemo(
-    () => devices
-      .filter(d => selectedIds.has(d.id))
-      .map(d => ({ id: d.id, name: d.name, hex: livePicks[d.id]?.hex ?? '' })),
-    [devices, livePicks, selectedIds],
+    () => pickerMarks(visibleCards(devices), pins, selectedIds, globalColor),
+    [devices, globalColor, pins, selectedIds],
   );
+
+  // Static and animate share this editor; only the target differs. A pick with
+  // devices selected pins them to it and leaves the running effect alone; with
+  // none selected it is the global source.
+  const onSelectEffect = useCallback((key: string) => {
+    const b = templates[key];
+    const s = b?.slots[b.selected] ?? defaultStateFor(key);
+    const slot = b?.selected ?? 0;
+    if (selectionIds.length > 0) {
+      void applyPins(selectionIds, mode === 'static' ? staticLookPin(key, slot, s) : animatePin(key));
+      return;
+    }
+    setActive(key);
+    stagedRef.current = null;
+    force(n => n + 1);
+    applyLook(key, s, slot);
+  }, [applyLook, applyPins, mode, selectionIds, templates]);
 
   const onSelectCustom = useCallback((hex: string) => {
     setCustomStaticColor(hex);
-    if (selectedIds.size === 0) return;
-    // A locked device in the selection keeps its look; the write skips it.
-    const ids = unlockedIds(devicePicks, [...selectedIds]);
-    if (ids.length === 0) return;
+    // Nothing selected: the color is the exact global flat color.
+    if (selectionIds.length === 0) {
+      setGlobalColor(hex, startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, hex));
+      return;
+    }
     // Record without pushing and queue the write, so a commit cannot race a
     // preview still in flight and leave the hardware on the older colour.
-    setPreviewPicks(null);
-    setDevicePicks(prev => pickCustomForDevices(prev, hex, ids, false));
-    queueCustomWrite(hex, ids);
-  }, [devicePicks, queueCustomWrite, selectedIds, setCustomStaticColor, setDevicePicks]);
+    const pin = colorPin(hex);
+    recordPins(selectionIds, pin);
+    queueColorWrite(pin, selectionIds);
+  }, [queueColorWrite, recordPins, selectionIds, setCustomStaticColor, setGlobalColor]);
 
   const onPreviewCustom = useCallback((hex: string) => {
-    if (selectedIds.size === 0) return;
-    const ids = unlockedIds(devicePicks, [...selectedIds]);
-    if (ids.length === 0) return;
-    setPreviewPicks(pickCustomForDevices({}, hex, ids, false));
-    queueCustomWrite(hex, ids);
-  }, [devicePicks, queueCustomWrite, selectedIds]);
+    if (selectionIds.length === 0) return;
+    const pin = colorPin(hex);
+    recordPins(selectionIds, pin);
+    queueColorWrite(pin, selectionIds);
+  }, [queueColorWrite, recordPins, selectionIds]);
   // Ref-backed staged state bypasses the render cycle on slider drag; `force`
   // a render after mutation.
-  const liveState = stagedRef.current ?? baseState;
+  const targetKey = `${shown}#${slotShown}`;
+  const stagedFor = useCallback((target: string) => (stagedRef.current?.target === target ? stagedRef.current.state : null), []);
+  const liveState = stagedFor(targetKey) ?? baseState;
 
   const onChange = useCallback((patch: Partial<EffectState>, commit?: boolean) => {
-    const next = { ...(stagedRef.current ?? baseState), ...patch };
-    stagedRef.current = next;
+    const next = { ...(stagedFor(targetKey) ?? baseState), ...patch };
+    stagedRef.current = { target: targetKey, state: next };
     force(n => n + 1);
     if (commit) {
-      applyLook(active, next, bundle?.selected ?? 0);
+      applyLook(shown, next, slotShown);
     }
-  }, [active, applyLook, baseState, bundle]);
+  }, [applyLook, baseState, shown, slotShown, stagedFor, targetKey]);
 
   const onCommit = useCallback(() => {
-    const s = stagedRef.current;
+    const s = stagedFor(targetKey);
     if (!s) return;
-    applyLook(active, s, bundle?.selected ?? 0);
+    applyLook(shown, s, slotShown);
     if (bundle) {
       const slots = bundle.slots.slice();
-      slots[bundle.selected] = s;
+      slots[slotShown] = s;
       const nextBundle: EffectTemplateBundle = { ...bundle, slots };
-      const nextTemplates = { ...templates, [active]: nextBundle };
+      const nextTemplates = { ...templates, [shown]: nextBundle };
       setTemplates(nextTemplates);
       saveAnimateTemplates(nextTemplates).catch(() => { /* best-effort */ });
     }
-  }, [active, applyLook, bundle, templates]);
+  }, [applyLook, bundle, shown, slotShown, stagedFor, targetKey, templates]);
 
   const onTemplateSelect = useCallback((idx: number) => {
     if (!bundle) return;
     const clamped = Math.min(Math.max(idx, 0), bundle.slots.length - 1);
-    const nextBundle: EffectTemplateBundle = { ...bundle, selected: clamped };
-    const nextTemplates = { ...templates, [active]: nextBundle };
+    // A static pin repoints only its devices; the effect's shared pointer stays.
+    const nextBundle: EffectTemplateBundle = pinnedSlot === null ? { ...bundle, selected: clamped } : bundle;
+    const nextTemplates = { ...templates, [shown]: nextBundle };
     setTemplates(nextTemplates);
     stagedRef.current = null;
     const next = nextBundle.slots[clamped];
-    saveAnimateTemplates(nextTemplates).catch(() => { /* best-effort */ });
+    if (pinnedSlot === null) saveAnimateTemplates(nextTemplates).catch(() => { /* best-effort */ });
     if (next) {
-      applyLook(active, next, clamped);
+      applyLook(shown, next, clamped);
     }
-  }, [active, applyLook, bundle, templates]);
+  }, [applyLook, bundle, pinnedSlot, shown, templates]);
 
   const onReset = useCallback(() => {
     stagedRef.current = null;
     force(n => n + 1);
     if (bundle) {
-      const slot = bundle.slots[bundle.selected] ?? defaultStateFor(active);
-      applyLook(active, slot, bundle.selected);
+      const slot = bundle.slots[slotShown] ?? defaultStateFor(shown);
+      applyLook(shown, slot, slotShown);
     }
-  }, [active, applyLook, bundle]);
+  }, [applyLook, bundle, shown, slotShown]);
 
-  const onSelectEffect = useCallback((key: string) => {
-    setActive(key);
-    stagedRef.current = null;
-    force(n => n + 1);
-    const b = templates[key];
-    const s = b?.slots[b.selected] ?? defaultStateFor(key);
-    applyLook(key, s, b?.selected ?? 0);
-  }, [applyLook, templates]);
+  // What a press on a following card's pin pins it to: the current global source.
+  const sourceLabel = useCallback((key: string) => {
+    const def = EFFECTS.find(e => e.key === key);
+    return def ? t(def.labelKey) : key;
+  }, [t]);
+  const globalPin: { pin: Pin; name: string } | null = useMemo(() => {
+    if (mode === 'static') {
+      // A no-selection pick sets the global color and leaves the pattern alone.
+      if (globalColor) {
+        const pin = colorPin(globalColor);
+        return { pin, name: pinTargetLabel(pin, t) };
+      }
+      const b = templates[active];
+      const slot = b?.selected ?? 0;
+      return { pin: staticLookPin(active, slot, b?.slots[slot] ?? defaultStateFor(active)), name: sourceLabel(active) };
+    }
+    if (mode === 'animate') return { pin: animatePin(active), name: sourceLabel(active) };
+    if (mode === 'screen') return { pin: MIRROR_PIN, name: t('lighting.mode.screen') };
+    if (mode === 'gif') return { pin: MEDIA_PIN, name: t('lighting.mode.gif') };
+    return null;
+  }, [active, globalColor, mode, sourceLabel, t, templates]);
+  const deviceSelect: React.ComponentProps<typeof StaticDeviceSelect> = {
+    devices,
+    selectedIds,
+    onSetSelection,
+    ledPickFor,
+    pins,
+    pinSource: globalPin?.name ?? null,
+    pinDisabledReason: globalPin ? undefined : t('lighting.pin.disabledUnavailable'),
+    pinTargetName: (pin: Pin) => pinModeTargetLabel(pin, t),
+    onSetPin: (ids, pinned) => { if (!pinned) void applyPins(ids, null); else if (globalPin) void applyPins(ids, globalPin.pin); },
+  };
+
+  const pinnedDevices = useMemo(() => {
+    const names = new Map(devices.map(d => [d.id, d.name]));
+    return pinnedNamesByEffect(pins, mode === 'static' ? 'static' : 'animate', id => names.get(id));
+  }, [devices, mode, pins]);
 
   const animate: ImmersiveAnimateController | null = ((mode === 'animate' || mode === 'static') && bundle)
     ? {
-      effect: active,
-      devices,
+      effect: shown,
+      runningEffect: active,
+      deviceSelect,
+      pinnedDevices,
       selectedIds,
       onSetSelection,
       customColor: selectedHex || customStaticColor,
@@ -536,10 +607,9 @@ function useImmersiveAnimateState(): { mode: LightingMode; animate: ImmersiveAni
       segmented,
       onSetSegmented: setSegmented,
       pickerDevices,
-      ledPickFor,
       state: liveState,
-      bundle,
-      canReset: stagedRef.current !== null,
+      bundle: pinnedSlot === null ? bundle : { ...bundle, selected: slotShown },
+      canReset: stagedFor(targetKey) !== null,
       slotFor: (e: string) => templates[e]?.selected ?? 0,
       versionFor: (e: string) => versionForSlot(e, templates[e]?.selected ?? 0),
       versionForSlot,
@@ -551,7 +621,10 @@ function useImmersiveAnimateState(): { mode: LightingMode; animate: ImmersiveAni
     }
     : null;
 
-  return { mode, animate };
+  const selectionPick = selectionIds.length > 0 && (mode === 'screen' || mode === 'gif')
+    ? () => { void applyPins(selectionIds, mode === 'screen' ? MIRROR_PIN : MEDIA_PIN); }
+    : undefined;
+  return { mode, animate, deviceSelect, scope, selectionPick };
 }
 
 interface ImmersivePostProcess {
@@ -587,12 +660,12 @@ function useImmersivePostProcess(mode: LightingMode): ImmersivePostProcess {
 
   // Commit-only writes (mirror the immersive animate controls): drag updates
   // local state for the live slider, the service write fires on release.
+  // Writes the ref first: a typed slider edit commits in the same tick.
   const onChange = useCallback((patch: Partial<PostProcessState>, commit?: boolean) => {
-    setPp(prev => {
-      const next = { ...prev, ...patch };
-      if (commit) apply(next, true);
-      return next;
-    });
+    const next = { ...ppRef.current, ...patch };
+    ppRef.current = next;
+    setPp(next);
+    if (commit) apply(next, true);
   }, [apply]);
 
   const onCommit = useCallback(() => { apply(ppRef.current, true); }, [apply]);

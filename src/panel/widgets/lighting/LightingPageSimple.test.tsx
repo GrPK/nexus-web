@@ -72,7 +72,8 @@ vi.mock('../../../api/lighting', async importOriginal => {
     startStatic: vi.fn(() => Promise.resolve(null)),
     stopLighting: vi.fn(() => Promise.resolve(null)),
     setMusicReactive: vi.fn(() => Promise.resolve(null)),
-    setLightingDeviceColor: vi.fn(() => Promise.resolve(null)),
+    setPins: vi.fn(() => Promise.resolve(true)),
+    fetchPins: vi.fn(() => Promise.resolve({})),
     setLightingDeviceControlled: vi.fn(() => Promise.resolve(null)),
   };
 });
@@ -90,6 +91,7 @@ function renderPage() {
 describe('LightingPage simple mode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(lightingApi.fetchStaticSettings).mockResolvedValue({ effect: 'gradientlinear', states: {} });
     // Fresh install: no stored settings, both page modes default to 'simple'.
     localStorage.clear();
     syncState.mode = 'none';
@@ -158,7 +160,7 @@ describe('LightingPage simple mode', () => {
     expect(vi.mocked(lightingApi.setLightingDeviceControlled).mock.calls.some(c => c[0] === 'dev-1')).toBe(false);
   });
 
-  it('paints every device with a picked colour, entering static first', async () => {
+  it('runs a picked color as the exact global color, entering static first', async () => {
     const { container } = renderPage();
     // Wait for the device fetch: a colour has nowhere to land until it lands.
     await waitFor(() => {
@@ -168,8 +170,19 @@ describe('LightingPage simple mode', () => {
     fireEvent.click(swatch);
     await waitFor(() => {
       expect(vi.mocked(lightingApi.startStatic)).toHaveBeenCalled();
-      expect(vi.mocked(lightingApi.setLightingDeviceColor).mock.calls.some(c => c[0] === 'dev-1')).toBe(true);
+      expect(vi.mocked(lightingApi.startStatic).mock.calls.some(c => c[8] === PALETTE.find(p => p.id === 'red-3')!.hex)).toBe(true);
     });
+    expect(vi.mocked(lightingApi.setPins)).not.toHaveBeenCalled();
+  });
+
+  it('marks the swatch the exact global color matches', async () => {
+    syncState.mode = 'static';
+    vi.mocked(lightingApi.fetchStaticSettings).mockResolvedValue({ effect: 'gradientlinear', states: {}, color: PALETTE.find(p => p.id === 'blue-3')!.hex });
+    const { container } = renderPage();
+    await waitFor(() => {
+      expect(container.querySelector('[data-palette-id="blue-3"]')?.getAttribute('aria-pressed')).toBe('true');
+    });
+    expect(container.querySelector('[data-palette-id="red-3"]')?.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('the mode menu stops lighting when a mode is running', async () => {
@@ -223,8 +236,8 @@ describe('LightingPage simple mode', () => {
       expect(vi.mocked(lightingApi.startAnimate)).toHaveBeenCalledWith('sweepbars', 50, 1, 0, 0, 1, 1, {});
     });
     expect(vi.mocked(lightingApi.setLightingDeviceControlled)).toHaveBeenCalledWith('dev-2', true);
-    // A sweep is one shared canvas: no per-device colour is written for it.
-    expect(vi.mocked(lightingApi.setLightingDeviceColor)).not.toHaveBeenCalled();
+    // A sweep is one shared canvas: nothing is pinned for it.
+    expect(vi.mocked(lightingApi.setPins)).not.toHaveBeenCalled();
   });
 
   it('turns the running sweep around from the direction switch', async () => {

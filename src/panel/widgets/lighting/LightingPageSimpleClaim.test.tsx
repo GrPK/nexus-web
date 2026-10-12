@@ -40,7 +40,8 @@ vi.mock('../../../api/lighting', async importOriginal => {
     fetchLayoutPresets: vi.fn(() => Promise.resolve(null)),
     setLightingDeviceControlled: vi.fn(() => Promise.resolve(null)),
     setLightingDevicePower: vi.fn(() => Promise.resolve(null)),
-    setLightingDeviceColor: vi.fn(() => Promise.resolve(null)),
+    setPins: vi.fn(() => Promise.resolve(true)),
+    fetchPins: vi.fn(() => Promise.resolve({})),
     stopLighting: vi.fn(() => Promise.resolve(null)),
     startStatic: vi.fn(() => Promise.resolve(null)),
     startAnimate: vi.fn(() => Promise.resolve(null)),
@@ -81,18 +82,18 @@ describe('LightingPage simple mode device claiming', () => {
     expect(lightingApi.setLightingDevicePower).toHaveBeenCalledWith('openrgb-0', true);
   });
 
-  it('paints the device it just claimed, on the first press', async () => {
+  it('claims the device and sets the global color, on the first press', async () => {
     const { container } = renderSimple();
     await waitFor(() => expect(lightingApi.fetchLightingDevices).toHaveBeenCalled());
 
     const swatch = container.querySelector('[data-palette-id="red-3"]') as HTMLButtonElement;
     fireEvent.click(swatch);
 
-    // The claim and the paint have to agree about which devices are driven;
-    // reading the ids captured before the claim skips everything it claimed.
-    await waitFor(() => expect(lightingApi.setLightingDeviceColor).toHaveBeenCalled());
-    const painted = vi.mocked(lightingApi.setLightingDeviceColor).mock.calls.map(c => c[0]);
-    expect(painted).toContain('openrgb-0');
+    // The color is global, so it reaches the claimed device without a write for it.
+    await waitFor(() => expect(lightingApi.startStatic).toHaveBeenCalled());
+    expect(vi.mocked(lightingApi.startStatic).mock.calls.at(-1)?.[8]).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(lightingApi.setLightingDeviceControlled).toHaveBeenCalledWith('openrgb-0', true);
+    expect(lightingApi.setPins).not.toHaveBeenCalled();
   });
 
   it('claims nothing when Off is picked while already off', async () => {

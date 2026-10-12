@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, Pin } from 'lucide-react';
 import { useTranslation } from '../../../../lib/i18n';
 import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import {
@@ -13,6 +13,8 @@ export interface PickerDevice {
   name: string;
   /** The colour this device currently wears. */
   hex: string;
+  /** Pinned: a press with nothing selected does not move it. */
+  pinned?: boolean;
 }
 
 // The staticNoticeFade keyframes own the fade; this drives their duration.
@@ -49,12 +51,13 @@ interface Marker extends PickerDevice {
  * whole canvas, drops the marks, and answers a press with a notice instead.
  */
 export function StaticPickerCanvas({
-  devices, hasSelection, hex, segmented, fill, patternEffect, patternSlot, patternVersion, gpuAvailable,
-  onPreview, onCommit, notice: externalNotice,
+  devices, implied, hex, segmented, fill, patternEffect, patternSlot, patternVersion, gpuAvailable,
+  onPreview, onCommit,
 }: {
-  /** Selected devices, in rail order. */
+  /** Devices whose color gets a mark, in rail order. */
   devices: PickerDevice[];
-  hasSelection: boolean;
+  /** Nothing is selected, so the marks read dotted. */
+  implied?: boolean;
   /** The colour the selection shares; '' when they disagree. */
   hex: string;
   /** Sample the field on the coarse grid instead of continuously. */
@@ -69,9 +72,6 @@ export function StaticPickerCanvas({
   /** Fires per pointer-move; the caller paces its own writes. */
   onPreview: (hex: string) => void;
   onCommit: (hex: string) => void;
-  /** A notice the page wants shown over the field, the same box the field's
-   *  own refusals use. Each new `seq` shows it again. */
-  notice?: { title: string; body: string; seq: number } | null;
 }) {
   const { t } = useTranslation();
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -114,15 +114,6 @@ export function StaticPickerCanvas({
     noticeTimer.current = setTimeout(() => setNotice(null), NOTICE_MS);
   }, []);
 
-  // Keyed on the seq alone: the page re-renders the object per render, and
-  // only a new burst should show the box again.
-  const externalSeq = externalNotice?.seq ?? 0;
-  useEffect(() => {
-    if (!externalNotice || externalSeq === 0) return;
-    showNotice(externalNotice.title, externalNotice.body);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalSeq, showNotice]);
-
   // One mark per spot: devices sharing a colour (or a cell) collapse into it and
   // the label's count is what says how many.
   const markers = useMemo<Marker[]>(() => {
@@ -139,6 +130,7 @@ export function StaticPickerCanvas({
       const seen = at.get(key);
       if (seen !== undefined) {
         out[seen].extra += 1;
+        out[seen].pinned = !!out[seen].pinned && !!d.pinned;
         continue;
       }
       at.set(key, out.length);
@@ -177,10 +169,6 @@ export function StaticPickerCanvas({
   const blocked = () => {
     if (patternEffect) {
       showNotice(t('lighting.static.patternNoticeTitle'), t('lighting.static.patternNoticeBody'));
-      return true;
-    }
-    if (!hasSelection) {
-      showNotice(t('lighting.static.selectNoticeTitle'), t('lighting.static.selectNoticeBody'));
       return true;
     }
     return false;
@@ -232,6 +220,7 @@ export function StaticPickerCanvas({
     <div className={`${styles.staticPicker} ${fill ? styles.staticPickerFill : ''}`} style={{ '--picker-notice-hold': `${NOTICE_MS}ms` } as React.CSSProperties}>
       <div
         ref={fieldRef}
+        data-pick
         className={`${styles.staticField} ${fill ? styles.staticFieldFill : ''} ${patternEffect ? styles.staticFieldPattern : ''} ${!patternEffect && segmented ? styles.staticFieldSegmented : ''}`}
         style={patternEffect && blastUrl ? { backgroundImage: `url(${blastUrl})` } : undefined}
         // The field owns its drag; without this a vertical pick on a panel
@@ -260,12 +249,12 @@ export function StaticPickerCanvas({
           <div key={m.id} className={styles.staticPin} style={{ left: `${m.left}px`, top: `${m.top}px` }}>
             {m.cell ? (
               <span
-                className={`${styles.staticCell} ${m.inexact ? styles.staticCellInexact : ''}`}
+                className={`${styles.staticCell} ${m.inexact ? styles.staticCellInexact : ''} ${implied ? styles.staticCellImplied : ''}`}
                 style={{ width: `${m.cell.w}px`, height: `${m.cell.h}px` }}
               />
             ) : (
               <span
-                className={`${styles.staticPinDot} ${m.inexact ? styles.staticPinDotOff : ''}`}
+                className={`${styles.staticPinDot} ${m.inexact ? styles.staticPinDotOff : ''} ${implied ? styles.staticPinDotImplied : ''}`}
                 style={{ backgroundColor: m.hex }}
               />
             )}
@@ -277,12 +266,13 @@ export function StaticPickerCanvas({
                 m.labelAbove ? styles.staticPinLabelAbove : '',
               ].join(' ')}
             >
-              {m.name}
+              {m.pinned && <Pin className={styles.staticPinLabelPin} aria-hidden />}
+              <span className={styles.staticPinName}>{m.name}</span>
               {m.extra > 0 && <span className={styles.staticPinCount}>{`+${m.extra}`}</span>}
             </span>
           </div>
         ))}
-        {!patternEffect && hasSelection && (
+        {!patternEffect && (
           // Its own pointer target: a press here aims at the input, not the field.
           <div className={styles.staticHex} onPointerDown={e => e.stopPropagation()}>
             <span className={styles.staticHexSwatch} style={hex ? { backgroundColor: hex } : undefined} />

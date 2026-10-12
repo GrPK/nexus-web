@@ -357,7 +357,7 @@ export function LightingWidget({ widget, immersive, immersiveCanvas, onSectionNa
     // writer. Read the flag for the label; author nothing.
     const current = await fetchScreenEffect();
     setReactive(current?.reactive ?? false);
-    await startScreenMirror(current?.saturation, current?.contrast, '', current?.hue, current?.colorize);
+    await startScreenMirror(current?.saturation, current?.contrast, undefined, current?.hue, current?.colorize);
     publishLighting('screen', 'screen');
   }, [publishLighting]);
 

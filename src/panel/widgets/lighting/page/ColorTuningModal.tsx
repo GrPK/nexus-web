@@ -24,7 +24,8 @@ interface ColorTuningModalProps {
    *  whole selection when it was opened from a multi-card menu. Fixed for the
    *  life of the modal - the scope is chosen on the device rail, not in here. */
   deviceIds: string[];
-  onClose: () => void;
+  /** Gets the last write, settled or not, so a reader can wait for it. */
+  onClose: (lastWrite: Promise<void>) => void;
 }
 
 /** One control's value across the scoped devices: `mixed` when they disagree,
@@ -111,14 +112,21 @@ export function ColorTuningModal({ devices, deviceIds, onClose }: ColorTuningMod
   // up a typed edit (which fires onChange(commit) and onCommit back to back).
   const pendingRef = useRef<{ ids: string[]; patch: LightingColorAdjustPatch } | null>(null);
   const lastSentRef = useRef('');
+  const lastWriteRef = useRef<Promise<void>>(Promise.resolve());
   const flush = useCallback(() => {
     const p = pendingRef.current;
     if (!p || p.ids.length === 0) return;
     const key = JSON.stringify(p);
     if (key === lastSentRef.current) return;
     lastSentRef.current = key;
-    setLightingColorAdjust(p.ids, p.patch).catch(() => { /* best-effort */ });
+    lastWriteRef.current = setLightingColorAdjust(p.ids, p.patch).then(() => {}, () => { /* best-effort */ });
   }, []);
+  // A drag still waiting on the throttle goes out now, so the write handed
+  // over is the last one; the trailing call then drops it as identical.
+  const close = useCallback(() => {
+    flush();
+    onClose(lastWriteRef.current);
+  }, [flush, onClose]);
 
   // Only the moved control goes over the wire. The service leaves every field
   // the body omits alone, so nudging Red cannot flatten a saturation the two
@@ -173,7 +181,7 @@ export function ColorTuningModal({ devices, deviceIds, onClose }: ColorTuningMod
   const showCap = globalBrightness != null && bright.value > master;
 
   return (
-    <DeviceModal open onClose={onClose} title={t('lighting.colorTuning.title')} medium>
+    <DeviceModal open onClose={close} title={t('lighting.colorTuning.title')} medium>
       <div className={styles.body}>
         {/* Read-only: the scope is whatever the device rail had selected when
             the menu was opened, so this states what is about to change rather
@@ -322,7 +330,7 @@ export function ColorTuningModal({ devices, deviceIds, onClose }: ColorTuningMod
           <Button tone="ghost" size="sm" disabled={empty} onClick={handleReset}>
             {t('lighting.colorTuning.reset')}
           </Button>
-          <Button tone="accent" size="sm" onClick={onClose}>
+          <Button tone="accent" size="sm" onClick={close}>
             {t('lighting.colorTuning.done')}
           </Button>
         </div>

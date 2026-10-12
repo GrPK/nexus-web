@@ -5,7 +5,8 @@ import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import { isStaticFill } from '../../../../types/lighting';
 import { isPaletteKey } from '../../../../types/lightingPalette';
 import { cardEnabledLedCount } from './zoneUtils';
-import { sliceStackSlot, type StackSlot } from '../../../../lib/stackSlots';
+import { type StackSlot } from '../../../../lib/stackSlots';
+import { ledSample, sampleBox, sampleSpot } from '../../../../lib/ledSampling';
 import { getScenePoints } from '../../../../lib/scene/scenePointsStore';
 import type { LightingDevice } from '../../../../api/lighting';
 import styles from '../LightingPage.module.scss';
@@ -63,8 +64,45 @@ function paint(
   pickOnly: boolean,
   locks: readonly LockedCell[],
 ): void {
-  paintLook(canvas, device, slot, frame, pick, pattern, fullscreen, pickOnly);
+  // The device's own bytes are what the hardware gets, so they are the strip
+  // whenever the frame carries them; identify still outranks them.
+  if (!(identifyPhase(device.id) === null && paintDeviceBytes(canvas, device, frame))) {
+    paintLook(canvas, device, slot, frame, pick, pattern, fullscreen, pickOnly);
+  }
   if (locks.length > 0 && identifyPhase(device.id) === null) paintLockedCells(canvas, device, locks);
+}
+
+/**
+ * The device's own LED bytes from the output frame, before brightness. One
+ * cell per strip cell, sampled along the LED order (a matrix device reads in
+ * wiring order, which is the order the service and the hardware use). False
+ * when the frame carries no bytes for it (no frame index, relay connection,
+ * lighting off), so the caller falls back to sampling the canvas.
+ */
+function paintDeviceBytes(canvas: HTMLCanvasElement, device: LightingDevice, frame: LedFrame): boolean {
+  if (device.frameIndex === undefined) return false;
+  const bytes = frame.devices?.get(device.frameIndex);
+  const leds = bytes ? Math.floor(bytes.length / 3) : 0;
+  if (!bytes || leds === 0) return false;
+  const cells = stripCells(device);
+  if (canvas.width !== cells) canvas.width = cells;
+  if (canvas.height !== 1) canvas.height = 1;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return false;
+  // Same dimming the canvas path mirrors from the service.
+  const scale = Math.min(1, Math.max(0, (device.brightness ?? 100) / 100));
+  const img = ctx.createImageData(cells, 1);
+  const d = img.data;
+  for (let i = 0; i < cells; i++) {
+    const led = cells === 1 ? 0 : Math.round((i * (leds - 1)) / (cells - 1));
+    const o = i * 4;
+    d[o] = bytes[led * 3] * scale;
+    d[o + 1] = bytes[led * 3 + 1] * scale;
+    d[o + 2] = bytes[led * 3 + 2] * scale;
+    d[o + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return true;
 }
 
 /** LED-map colours outrank every look, as on the hardware. */
@@ -159,40 +197,30 @@ function paintLook(
       const o = i * 4;
       d[o + 3] = 255;
       if (Number.isNaN(cx)) continue;
-      // Floor, as the engine truncates its sample position.
-      const ux = Math.min(w - 1, Math.max(0, Math.floor((cx / CW) * w)));
-      const vy = Math.min(h - 1, Math.max(0, Math.floor((cy / CH) * h)));
-      const s = (vy * w + ux) * 3;
-      d[o] = pixels[s] * scale;
-      d[o + 1] = pixels[s + 1] * scale;
-      d[o + 2] = pixels[s + 2] * scale;
+      // The same spot mean the engine reads at an LED.
+      const [r, g, b] = sampleSpot({ pixels, w, h }, { sx: (cx / CW) * w, sy: (cy / CH) * h, halfW: Infinity, halfH: Infinity });
+      d[o] = r * scale;
+      d[o + 1] = g * scale;
+      d[o + 2] = b * scale;
     }
     ctx.putImageData(img, 0, 0);
     return;
   }
   // Static evaluates every device as if its frame filled the canvas, so a
-  // pattern reads end to end on each device instead of the slice its rect
-  // happens to cover. Other modes sample the centreline of the device's part
-  // of its frame (its stack slot, else the whole frame), first LED at its own
-  // left, turned about the frame centre by the frame's rotation - the line
-  // the engine's strip sampler walks.
-  const rad = fullscreen ? 0 : (((device.canvasRotation ?? 0) % 360) + 360) % 360 * Math.PI / 180;
-  const cos = Math.cos(rad), sin = Math.sin(rad);
-  const fcx = fullscreen ? CW / 2 : device.canvasX + device.canvasW / 2;
-  const fcy = fullscreen ? CH / 2 : device.canvasY + device.canvasH / 2;
-  const whole = fullscreen ? { x: 0, y: 0, w: CW, h: CH } : { x: device.canvasX, y: device.canvasY, w: device.canvasW, h: device.canvasH };
-  const part = slot && !fullscreen ? sliceStackSlot(whole, slot) : whole;
-  const midY = part.y + part.h / 2 - fcy;
+  // pattern reads end to end on each device (a box mean over its slice of it).
+  // Other modes read the spot at each LED along the centerline of the device's
+  // part of its frame (its stack slot, else the whole frame), turned about the
+  // frame center - the positions and the read the engine uses.
+  const leds = Math.max(1, device.ledCount);
+  const frameView = { pixels, w, h };
   for (let i = 0; i < cells; i++) {
-    const t = cells === 1 ? 0 : i / (cells - 1) - 0.5;
-    const lx = part.x + part.w / 2 + t * part.w - fcx;
-    const ux = Math.min(w - 1, Math.max(0, Math.round(((fcx + lx * cos - midY * sin) / CW) * w)));
-    const vy = Math.min(h - 1, Math.max(0, Math.round(((fcy + lx * sin + midY * cos) / CH) * h)));
-    const s = (vy * w + ux) * 3;
+    const led = cells === 1 ? 0 : Math.round((i * (leds - 1)) / (cells - 1));
+    const at = ledSample(device, led, leds, w, h, { fullFrame: fullscreen, slot });
+    const [r, g, b] = fullscreen ? sampleBox(frameView, at) : sampleSpot(frameView, at);
     const o = i * 4;
-    d[o] = pixels[s] * scale;
-    d[o + 1] = pixels[s + 1] * scale;
-    d[o + 2] = pixels[s + 2] * scale;
+    d[o] = r * scale;
+    d[o + 1] = g * scale;
+    d[o + 2] = b * scale;
     d[o + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
