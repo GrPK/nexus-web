@@ -16,7 +16,7 @@ import {
 } from '../../../api/lighting';
 import { DEFAULT_STATIC_EFFECT } from '../../../types/lighting';
 import { paletteColor, paletteKey } from '../../../types/lightingPalette';
-import { pushPalettePick } from '../../../panel/widgets/lighting/staticPicks';
+import { paletteColorPin, pushPins } from '../../../panel/widgets/lighting/pins';
 import { SIMPLE_ANIMATION_KEYS, simpleAnimationState } from '../../../panel/widgets/lighting/simpleAnimations';
 import { ZoneCard, zoneCardUnavailable } from '../../../panel/widgets/lighting/page/ZoneCard';
 import { visibleCards } from '../../../panel/widgets/lighting/page/zoneUtils';
@@ -190,14 +190,13 @@ export function LightingOnboardingScreen({ open, onComplete, onBack, onSkipOnboa
   }, [applyPick]);
 
   // The simple page's palette path: Static owns the output first, then every
-  // device takes the colour as its own pick (after, or the shared effect
-  // repaints them).
+  // device is pinned to the colour.
   const runColor = useCallback((id: string) => {
     const color = paletteColor(id);
     if (!color) return;
     applyPick(id, async () => {
       await startStatic(DEFAULT_STATIC_EFFECT);
-      await pushPalettePick(color, drivenIds());
+      await pushPins(drivenIds(), paletteColorPin(color));
     });
   }, [applyPick, drivenIds]);
 
@@ -257,7 +256,7 @@ export function LightingOnboardingScreen({ open, onComplete, onBack, onSkipOnboa
       // A device detected after the colour was picked has no pick of its own
       // and would wear the shared Static effect instead.
       await pickChainRef.current;
-      if (pickColor) await pushPalettePick(pickColor, drivenIds());
+      if (pickColor) await pushPins(drivenIds(), paletteColorPin(pickColor));
       updateUiSettings({ lightingDashboardMode: mode });
       const result = await completeLightingOnboarding();
       if (result?.lightingCompleted) {

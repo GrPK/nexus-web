@@ -40,7 +40,8 @@ vi.mock('../../../api/lighting', async importOriginal => {
     fetchLayoutPresets: vi.fn(() => Promise.resolve(null)),
     setLightingDeviceControlled: vi.fn(() => Promise.resolve(null)),
     setLightingDevicePower: vi.fn(() => Promise.resolve(null)),
-    setLightingDeviceColor: vi.fn(() => Promise.resolve(null)),
+    setPins: vi.fn(() => Promise.resolve(true)),
+    fetchPins: vi.fn(() => Promise.resolve({})),
     stopLighting: vi.fn(() => Promise.resolve(null)),
     startStatic: vi.fn(() => Promise.resolve(null)),
     startAnimate: vi.fn(() => Promise.resolve(null)),
@@ -81,18 +82,18 @@ describe('LightingPage simple mode device claiming', () => {
     expect(lightingApi.setLightingDevicePower).toHaveBeenCalledWith('openrgb-0', true);
   });
 
-  it('paints the device it just claimed, on the first press', async () => {
+  it('pins the device it just claimed, on the first press', async () => {
     const { container } = renderSimple();
     await waitFor(() => expect(lightingApi.fetchLightingDevices).toHaveBeenCalled());
 
     const swatch = container.querySelector('[data-palette-id="red-3"]') as HTMLButtonElement;
     fireEvent.click(swatch);
 
-    // The claim and the paint have to agree about which devices are driven;
+    // The claim and the pin have to agree about which devices are driven;
     // reading the ids captured before the claim skips everything it claimed.
-    await waitFor(() => expect(lightingApi.setLightingDeviceColor).toHaveBeenCalled());
-    const painted = vi.mocked(lightingApi.setLightingDeviceColor).mock.calls.map(c => c[0]);
-    expect(painted).toContain('openrgb-0');
+    await waitFor(() => expect(lightingApi.setPins).toHaveBeenCalled());
+    const pinned = vi.mocked(lightingApi.setPins).mock.calls.flatMap(c => c[0]);
+    expect(pinned).toContain('openrgb-0');
   });
 
   it('claims nothing when Off is picked while already off', async () => {

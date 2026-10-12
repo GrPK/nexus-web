@@ -1,17 +1,18 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchAnimateDeviceLocks, saveAnimateTemplates, setAnimateDeviceLock, startAnimate } from '../../../api/lighting';
+import { fetchPins, saveAnimateTemplates, setPins, startAnimate, startStatic, type Pin } from '../../../api/lighting';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { LightingPage } from './LightingPage';
 
 const topicHandlers = vi.hoisted(() => ({ lighting: [] as (() => void)[] }));
+const syncState = vi.hoisted(() => ({ mode: 'animate', rawSync: 'fire' }));
 
 vi.mock('../../../hooks/useLightingSync', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../hooks/useLightingSync')>()),
   useLightingSync: () => ({
-    mode: 'animate',
+    mode: syncState.mode,
     setMode: vi.fn(),
-    rawSync: 'fire',
+    rawSync: syncState.rawSync,
     setRawSync: vi.fn(),
     synced: true,
     paused: false,
@@ -37,46 +38,59 @@ vi.mock('../../../lib/controlSync', () => ({
   subscribeControlSync: vi.fn(() => () => {}),
 }));
 
-// The selection the page hands the grid is the thing that regressed, so the
-// stub renders it instead of the real cells.
+// The selection the page hands the grid is the thing under test, so the stub
+// renders it instead of the real cells.
 vi.mock('./page/AnimateGrid', () => ({
-  AnimateGrid: ({ effect, onSelect, lockedDevices }: {
+  AnimateGrid: ({ effect, onSelect, pinnedDevices }: {
     effect: string;
     onSelect?: (key: string) => void;
-    lockedDevices?: ReadonlyMap<string, readonly string[]>;
+    pinnedDevices?: ReadonlyMap<string, readonly string[]>;
   }) => (
     <div>
       <div data-testid="grid-effect" onClick={() => onSelect?.('stripes')}>{effect}</div>
-      <div data-testid="grid-locks">{[...(lockedDevices ?? [])].map(([k, v]) => `${k}=${v.join('+')}`).join(';')}</div>
+      <div data-testid="grid-pins">{[...(pinnedDevices ?? [])].map(([k, v]) => `${k}=${v.join('+')}`).join(';')}</div>
     </div>
   ),
 }));
 vi.mock('./page/FullscreenShader', () => ({
-  FullscreenShader: ({ effect, onPrev, children }: { effect: string; onPrev: () => void; children?: React.ReactNode }) => (
+  FullscreenShader: ({ effect, onPrev }: { effect: string; onPrev: () => void }) => (
     <div data-testid="fullscreen" data-effect={effect}>
       <button type="button" onClick={onPrev}>fs-prev</button>
-      {children}
     </div>
   ),
 }));
-vi.mock('./page/ModeControls', () => ({ ModeControls: () => null }));
-// The stub exposes exactly what the lock rides on: the pick the rail is handed
-// (locked or not) and the toggle callback.
+vi.mock('./page/ModeControls', () => ({
+  ModeControls: ({ mode }: { mode: string }) => <div data-testid="mode-controls" data-mode={mode} />,
+}));
+vi.mock('./page/StaticPickerCanvas', () => ({
+  StaticPickerCanvas: ({ onCommit, onPreview }: { onCommit: (hex: string) => void; onPreview: (hex: string) => void }) => (
+    <div>
+      <button type="button" onClick={() => onCommit('#00ff00')}>pick-green</button>
+      <button type="button" onClick={() => onPreview('#0000ff')}>preview-blue</button>
+    </div>
+  ),
+}));
+// The stub exposes what the pins ride on: the pins the rail is handed, the
+// source a press pins to, the disabled reason, and the callbacks.
 vi.mock('./page/DevicePanel', () => ({
-  DevicePanel: ({ animateLocks, animateLockable, onSetAnimateLock, lockFlash, onSetSelection }: {
-    animateLocks?: Record<string, string>;
-    animateLockable?: boolean;
-    onSetAnimateLock?: (ids: string[], locked: boolean) => void;
-    lockFlash?: { ids: ReadonlySet<string>; seq: number };
+  DevicePanel: ({ pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onUnpinAll, onSetSelection }: {
+    pins?: Record<string, Pin>;
+    pinSource?: string | null;
+    pinDisabledReason?: string;
+    pinTargetName?: (pin: Pin) => string;
+    onSetPin?: (ids: string[], pinned: boolean) => void;
+    onUnpinAll?: () => void;
     onSetSelection: (ids: Set<string>, primary: string | null) => void;
   }) => (
     <div
       data-testid="rail"
-      data-lockable={String(!!animateLockable)}
-      data-lock={animateLocks?.a ?? ''}
-      data-flash={`${lockFlash?.seq ?? 0}:${[...(lockFlash?.ids ?? [])].join(',')}`}
+      data-pin={pins?.a ? JSON.stringify(pins.a) : ''}
+      data-pin-name={pins?.a && pinTargetName ? pinTargetName(pins.a) : ''}
+      data-source={pinSource ?? ''}
+      data-disabled={pinDisabledReason ?? ''}
     >
-      <button type="button" onClick={() => onSetAnimateLock?.(['a'], !animateLocks?.a)}>toggle</button>
+      <button type="button" onClick={() => onSetPin?.(['a'], !pins?.a)}>toggle</button>
+      <button type="button" onClick={() => onUnpinAll?.()}>unpin-all</button>
       <button type="button" onClick={() => onSetSelection(new Set(['a']), 'a')}>select-a</button>
       <button type="button" onClick={() => onSetSelection(new Set(), null)}>clear-selection</button>
     </div>
@@ -86,7 +100,8 @@ vi.mock('./page/LedMapEditor', () => ({ LedMapEditor: () => null }));
 vi.mock('./page/RightPaneTabs', () => ({ RightPaneTabs: () => null }));
 // A typed slider edit is onChange(v, true) followed synchronously by onCommit.
 vi.mock('./page/EffectTab', () => ({
-  EffectTab: ({ effect, state, onAnimateChange, onAnimateCommit }: {
+  EffectTab: ({ mode, effect, state, onAnimateChange, onAnimateCommit }: {
+    mode: string;
     effect: string;
     state: { intensity: number } | null;
     onAnimateChange: (patch: { intensity: number }, commit?: boolean) => void;
@@ -95,6 +110,7 @@ vi.mock('./page/EffectTab', () => ({
     <button
       type="button"
       data-testid="type-intensity"
+      data-mode={mode}
       data-effect={effect}
       data-intensity={state?.intensity}
       onClick={() => { onAnimateChange({ intensity: 0.3 }, true); onAnimateCommit(); }}
@@ -113,8 +129,7 @@ vi.mock('../../../api/lighting', async importOriginal => {
   const actual = await importOriginal<typeof import('../../../api/lighting')>();
   return {
     ...actual,
-    fetchCurrentSync: vi.fn(() => Promise.resolve({ sync: 'fire' })),
-    // The animate side remembers a different effect; it must not win in static.
+    fetchCurrentSync: vi.fn(() => Promise.resolve({ sync: syncState.rawSync })),
     fetchAnimateSettings: vi.fn(() => Promise.resolve({ effect: 'fire', states: {}, templates: {} })),
     fetchStaticSettings: vi.fn(() => Promise.resolve({ effect: 'checker', states: {} })),
     fetchAnimateDefaults: vi.fn(() => Promise.resolve(null)),
@@ -129,11 +144,11 @@ vi.mock('../../../api/lighting', async importOriginal => {
     saveAnimateTemplates: vi.fn(() => Promise.resolve(null)),
     startAnimate: vi.fn(() => Promise.resolve(null)),
     startStatic: vi.fn(() => Promise.resolve(null)),
+    startScreenMirror: vi.fn(() => Promise.resolve(null)),
     stopLighting: vi.fn(() => Promise.resolve(null)),
     setMusicReactive: vi.fn(() => Promise.resolve(null)),
-    setAnimateDeviceLock: vi.fn(() => Promise.resolve(true)),
-    fetchAnimateDeviceLocks: vi.fn(() => Promise.resolve({})),
-    fetchStaticDeviceLooks: vi.fn(() => Promise.reject(new Error('offline'))),
+    setPins: vi.fn(() => Promise.resolve(true)),
+    fetchPins: vi.fn(() => Promise.resolve({})),
   };
 });
 
@@ -145,125 +160,345 @@ const renderPage = () => render(
   </UiSettingsProvider>,
 );
 
-describe('LightingPage animation lock', () => {
+const pinOf = () => {
+  const raw = screen.getByTestId('rail').dataset.pin;
+  return raw ? JSON.parse(raw) as Pin : null;
+};
+const lastPinsCall = () => vi.mocked(setPins).mock.calls.at(-1) as unknown as [string[], Pin | null];
+
+describe('LightingPage pins', () => {
   beforeEach(() => {
     localStorage.clear();
     localStorage.setItem('nexus_settings', JSON.stringify({ general: { lightingDashboardMode: 'advanced', coolingDashboardMode: 'advanced' } }));
-    vi.mocked(setAnimateDeviceLock).mockClear();
-    vi.mocked(setAnimateDeviceLock).mockImplementation(() => Promise.resolve(true));
-    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({}));
+    syncState.mode = 'animate';
+    syncState.rawSync = 'fire';
+    vi.mocked(setPins).mockClear();
+    vi.mocked(setPins).mockImplementation(() => Promise.resolve(true));
+    vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({}));
     vi.mocked(startAnimate).mockClear();
+    vi.mocked(startStatic).mockClear();
+    vi.mocked(saveAnimateTemplates).mockClear();
     topicHandlers.lighting.length = 0;
   });
 
-  it('offers locking in Animate and locks onto the running effect, optimistically', async () => {
+  describe('the pin button', () => {
+    it('pins a following card to the running shader in Animate, optimistically, and a second press unpins', async () => {
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail').dataset.source).not.toBe(''));
+      expect(screen.getByTestId('rail').dataset.disabled).toBe('');
+
+      fireEvent.click(screen.getByText('toggle'));
+      expect(pinOf()).toEqual({ kind: 'animate', effect: 'fire' });
+      expect(setPins).toHaveBeenCalledWith(['a'], { kind: 'animate', effect: 'fire' });
+
+      fireEvent.click(screen.getByText('toggle'));
+      expect(pinOf()).toBeNull();
+      expect(lastPinsCall()).toEqual([['a'], null]);
+    });
+
+    it('pins to the global static look in Static', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail').dataset.source).not.toBe(''));
+      fireEvent.click(screen.getByText('toggle'));
+      expect(lastPinsCall()[0]).toEqual(['a']);
+      expect(lastPinsCall()[1]).toMatchObject({ kind: 'static', effect: 'checker' });
+    });
+
+    it('pins to the one universal Mirror in Mirror', async () => {
+      syncState.mode = 'screen';
+      syncState.rawSync = 'screen';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail').dataset.source).not.toBe(''));
+      fireEvent.click(screen.getByText('toggle'));
+      expect(lastPinsCall()).toEqual([['a'], { kind: 'mirror' }]);
+    });
+
+    it.each([
+      ['gif', 'lighting.pin.disabledMedia'],
+      ['none', 'lighting.pin.disabledOff'],
+    ])('is disabled in %s, naming why', async (mode, reason) => {
+      syncState.mode = mode;
+      syncState.rawSync = mode;
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail').dataset.disabled).toBe(reason));
+      expect(screen.getByTestId('rail').dataset.source).toBe('');
+    });
+
+    it('names a pin by its target', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail').dataset.pinName).toBe('lighting.mode.screen'));
+    });
+
+    it('puts the pin back when the service refuses', async () => {
+      vi.mocked(setPins).mockImplementation(() => Promise.resolve(false));
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail').dataset.source).not.toBe(''));
+      fireEvent.click(screen.getByText('toggle'));
+      expect(pinOf()).not.toBeNull();
+      await waitFor(() => expect(pinOf()).toBeNull());
+    });
+
+    it('unpins everything from Unpin all', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' }, b: { kind: 'mirror' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()).not.toBeNull());
+      fireEvent.click(screen.getByText('unpin-all'));
+      expect(lastPinsCall()).toEqual([['a', 'b'], null]);
+      expect(pinOf()).toBeNull();
+    });
+  });
+
+  describe('syncing with the service', () => {
+    it('reads the pins on mount and again on the lighting broadcast', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
+
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({}));
+      topicHandlers.lighting.forEach(cb => cb());
+      await waitFor(() => expect(pinOf()).toBeNull());
+    });
+
+    it('keeps what it has when the pins are unreadable', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
+      vi.mocked(fetchPins).mockClear();
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve(null));
+      topicHandlers.lighting.forEach(cb => cb());
+      await waitFor(() => expect(fetchPins).toHaveBeenCalled());
+      expect(pinOf()?.effect).toBe('aurora');
+    });
+
+    it('keeps a pin request in flight against a lighting frame that predates it', async () => {
+      let resolve: (ok: boolean) => void = () => {};
+      vi.mocked(setPins).mockImplementation(() => new Promise<boolean>(r => { resolve = r; }));
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail').dataset.source).not.toBe(''));
+      fireEvent.click(screen.getByText('toggle'));
+      expect(pinOf()?.effect).toBe('fire');
+
+      vi.mocked(fetchPins).mockClear();
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({}));
+      topicHandlers.lighting.forEach(cb => cb());
+      await waitFor(() => expect(fetchPins).toHaveBeenCalled());
+      await new Promise(r => setTimeout(r, 0));
+      expect(pinOf()?.effect).toBe('fire');
+
+      resolve(true);
+      await new Promise(r => setTimeout(r, 0));
+      expect(pinOf()?.effect).toBe('fire');
+    });
+  });
+
+  describe('picks', () => {
+    it('with nothing selected a Static pick is global, never a pin, and needs no selection', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('checker'));
+      vi.mocked(startStatic).mockClear();
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      await waitFor(() => expect(startStatic).toHaveBeenCalled());
+      expect(vi.mocked(startStatic).mock.calls.at(-1)?.[0]).toBe('stripes');
+      expect(setPins).not.toHaveBeenCalled();
+    });
+
+    it('with nothing selected a picked colour runs the nearest fill globally', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('checker'));
+      vi.mocked(startStatic).mockClear();
+      fireEvent.click(screen.getByText('pick-green'));
+      await waitFor(() => expect(startStatic).toHaveBeenCalled());
+      expect(vi.mocked(startStatic).mock.calls.at(-1)?.[0]).toBe('simplegreen');
+      expect(setPins).not.toHaveBeenCalled();
+    });
+
+    it('with nothing selected an Animate pick is global', async () => {
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('fire'));
+      vi.mocked(startAnimate).mockClear();
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      await waitFor(() => expect(vi.mocked(startAnimate).mock.calls.some(c => c[0] === 'stripes')).toBe(true));
+      expect(setPins).not.toHaveBeenCalled();
+    });
+
+    it('with devices selected an Animate pick pins them and leaves the running effect alone', async () => {
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('fire'));
+      fireEvent.click(screen.getByText('select-a'));
+      vi.mocked(startAnimate).mockClear();
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      expect(lastPinsCall()).toEqual([['a'], { kind: 'animate', effect: 'stripes' }]);
+      expect(startAnimate).not.toHaveBeenCalled();
+    });
+
+    it('with devices selected a Static pick pins the whole look', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('checker'));
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      expect(lastPinsCall()[0]).toEqual(['a']);
+      expect(lastPinsCall()[1]).toMatchObject({ kind: 'static', effect: 'stripes', slot: 0 });
+      expect(lastPinsCall()[1]?.params).toBeDefined();
+    });
+
+    it('with devices selected a picked colour pins them to it', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('checker'));
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(screen.getByText('pick-green'));
+      await waitFor(() => expect(setPins).toHaveBeenCalled());
+      expect(lastPinsCall()[0]).toEqual(['a']);
+      expect(lastPinsCall()[1]).toMatchObject({ kind: 'static', effect: 'flat', color: '#00ff00' });
+    });
+
+    it('re-pins a selected pinned device instead of blocking, with no refusal notice', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      expect(lastPinsCall()).toEqual([['a'], { kind: 'animate', effect: 'stripes' }]);
+      await waitFor(() => expect(pinOf()?.effect).toBe('stripes'));
+      expect(screen.queryByText(/lockedNotice/)).toBeNull();
+    });
+
+    it('never touches unselected pinned devices', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ b: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(fetchPins).toHaveBeenCalled());
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      expect(lastPinsCall()[0]).toEqual(['a']);
+    });
+  });
+
+  it('starts with no selection, so the grid and preview show the running effect', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('rail').dataset.lockable).toBe('true'));
     await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('fire'));
-
-    fireEvent.click(screen.getByText('toggle'));
-    expect(screen.getByTestId('rail').dataset.lock).toBe('fire');
-    expect(setAnimateDeviceLock).toHaveBeenCalledWith('a', 'fire');
-    expect(screen.getByTestId('grid-locks').textContent).toBe('fire=Fan A');
-
-    fireEvent.click(screen.getByText('toggle'));
-    expect(screen.getByTestId('rail').dataset.lock).toBe('');
-    expect(setAnimateDeviceLock).toHaveBeenLastCalledWith('a', null);
+    expect(screen.getByTestId('preview').dataset.effect).toBe('fire');
   });
 
-  it('puts the lock back when the service refuses', async () => {
-    vi.mocked(setAnimateDeviceLock).mockImplementation(() => Promise.resolve(false));
-    renderPage();
-    await waitFor(() => expect(screen.getByTestId('rail').dataset.lockable).toBe('true'));
-    fireEvent.click(screen.getByText('toggle'));
-    expect(screen.getByTestId('rail').dataset.lock).toBe('fire');
-    await waitFor(() => expect(screen.getByTestId('rail').dataset.lock).toBe(''));
+  describe('a selection wearing one pin', () => {
+    it('scopes the grid, preview and fullscreen to a pinned shader, and clearing leaves the scope', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
+      expect(screen.getByTestId('grid-effect').textContent).toBe('fire');
+
+      vi.mocked(startAnimate).mockClear();
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('aurora'));
+      expect(screen.getByTestId('preview').dataset.effect).toBe('aurora');
+      expect(startAnimate).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'lighting.fullscreen' }));
+      expect(screen.getByTestId('fullscreen').dataset.effect).toBe('aurora');
+
+      fireEvent.click(screen.getByText('clear-selection'));
+      await waitFor(() => expect(screen.getByTestId('preview').dataset.effect).toBe('fire'));
+      expect(screen.getByTestId('grid-effect').textContent).toBe('fire');
+    });
+
+    it('edits a pinned shader\'s global settings without restarting the running effect', async () => {
+      localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByTestId('type-intensity').dataset.effect).toBe('aurora'));
+      await waitFor(() => expect(startAnimate).toHaveBeenCalled());
+      vi.mocked(startAnimate).mockClear();
+      vi.mocked(saveAnimateTemplates).mockClear();
+
+      fireEvent.click(screen.getByTestId('type-intensity'));
+      await waitFor(() => expect(saveAnimateTemplates).toHaveBeenCalled());
+      const saved = vi.mocked(saveAnimateTemplates).mock.calls.at(-1)?.[0] as Record<string, { selected: number; slots: { intensity: number }[] }>;
+      expect(saved.aurora.slots[saved.aurora.selected].intensity).toBe(0.3);
+      expect(startAnimate).not.toHaveBeenCalled();
+      expect(setPins).not.toHaveBeenCalled();
+    });
+
+    it('edits a static pin by re-pinning its devices with the new look', async () => {
+      localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'static', effect: 'stripes', slot: 0, intensity: 1 } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('stripes'));
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('stripes'));
+      await waitFor(() => expect(screen.getByTestId('type-intensity').dataset.effect).toBe('stripes'));
+      vi.mocked(startStatic).mockClear();
+
+      fireEvent.click(screen.getByTestId('type-intensity'));
+      await waitFor(() => expect(setPins).toHaveBeenCalled());
+      expect(lastPinsCall()[0]).toEqual(['a']);
+      expect(lastPinsCall()[1]).toMatchObject({ kind: 'static', effect: 'stripes', intensity: 0.3 });
+      expect(startStatic).not.toHaveBeenCalled();
+    });
+
+    it('shows the global Mirror controls for a mirror pin, from any tab', async () => {
+      localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.kind).toBe('mirror'));
+      expect(screen.queryByTestId('mode-controls')).toBeNull();
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByTestId('mode-controls').dataset.mode).toBe('screen'));
+      expect(screen.getByTestId('type-intensity').dataset.mode).toBe('screen');
+      expect(screen.queryByTestId('grid-effect')).toBeNull();
+    });
+
+    it('a fullscreen arrow re-pins the selection instead of doing nothing', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('aurora'));
+      fireEvent.click(screen.getByRole('button', { name: 'lighting.fullscreen' }));
+      fireEvent.click(screen.getByText('fs-prev'));
+      expect(lastPinsCall()[0]).toEqual(['a']);
+      expect(lastPinsCall()[1]).toMatchObject({ kind: 'animate' });
+    });
   });
 
-  it('reads the locks on mount and again on the lighting broadcast', async () => {
-    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({ a: 'aurora' }));
-    renderPage();
-    await waitFor(() => expect(screen.getByTestId('rail').dataset.lock).toBe('aurora'));
+  describe('Mirror tab', () => {
+    beforeEach(() => {
+      syncState.mode = 'screen';
+      syncState.rawSync = 'screen';
+    });
 
-    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({}));
-    topicHandlers.lighting.forEach(cb => cb());
-    await waitFor(() => expect(screen.getByTestId('rail').dataset.lock).toBe(''));
+    it('offers Pin selected to Mirror only with devices selected, and pins them', async () => {
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('mode-controls')).toBeTruthy());
+      expect(screen.queryByText('lighting.pin.pinSelectedToMirror')).toBeNull();
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(await screen.findByText('lighting.pin.pinSelectedToMirror'));
+      expect(lastPinsCall()).toEqual([['a'], { kind: 'mirror' }]);
+    });
+
+    it('switching tabs never pins', async () => {
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('mode-controls')).toBeTruthy());
+      expect(setPins).not.toHaveBeenCalled();
+    });
   });
 
-  it('keeps what it has when the locks are unreadable', async () => {
-    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({ a: 'aurora' }));
+  it('badges the grid cells with the names of the devices pinned to them', async () => {
+    vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('rail').dataset.lock).toBe('aurora'));
-    vi.mocked(fetchAnimateDeviceLocks).mockClear();
-    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve(null));
-    topicHandlers.lighting.forEach(cb => cb());
-    await waitFor(() => expect(fetchAnimateDeviceLocks).toHaveBeenCalled());
-    expect(screen.getByTestId('rail').dataset.lock).toBe('aurora');
-  });
-
-  it('lights the locked animation on the grid for a selected locked device, and ignores a different pick', async () => {
-    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({ a: 'aurora' }));
-    renderPage();
-    await waitFor(() => expect(screen.getByTestId('rail').dataset.lock).toBe('aurora'));
-    // The page seeds its selection with the only device, so the grid follows the lock.
-    await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('aurora'));
-
-    // Mount hydration restarts the running effect; only what follows the click counts.
-    vi.mocked(startAnimate).mockClear();
-    fireEvent.click(screen.getByText('select-a'));
-    await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('aurora'));
-    expect(startAnimate).not.toHaveBeenCalled();
-
-    expect(screen.getByTestId('rail').dataset.flash).toBe('0:');
-    fireEvent.click(screen.getByTestId('grid-effect'));
-    await waitFor(() => expect(screen.getByTestId('rail').dataset.flash).toBe('1:a'));
-    await waitFor(() => expect(screen.getByText('lighting.animate.lockedNoticeTitle')).toBeTruthy());
-    expect(startAnimate).not.toHaveBeenCalled();
-    expect(screen.getByTestId('grid-effect').textContent).toBe('aurora');
-  });
-
-  it('keeps a lock request in flight against a lighting frame that predates it', async () => {
-    let resolve: (ok: boolean) => void = () => {};
-    vi.mocked(setAnimateDeviceLock).mockImplementation(() => new Promise<boolean>(r => { resolve = r; }));
-    renderPage();
-    await waitFor(() => expect(screen.getByTestId('rail').dataset.lockable).toBe('true'));
-    fireEvent.click(screen.getByText('toggle'));
-    expect(screen.getByTestId('rail').dataset.lock).toBe('fire');
-
-    vi.mocked(fetchAnimateDeviceLocks).mockClear();
-    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({}));
-    topicHandlers.lighting.forEach(cb => cb());
-    await waitFor(() => expect(fetchAnimateDeviceLocks).toHaveBeenCalled());
-    await new Promise(r => setTimeout(r, 0));
-    expect(screen.getByTestId('rail').dataset.lock).toBe('fire');
-
-    resolve(true);
-    await new Promise(r => setTimeout(r, 0));
-    expect(screen.getByTestId('rail').dataset.lock).toBe('fire');
-  });
-
-  it('shows and edits the dock effect in fullscreen, and explains the arrows under a lock', async () => {
-    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({ a: 'aurora' }));
-    renderPage();
-    await waitFor(() => expect(screen.getByTestId('grid-effect').textContent).toBe('aurora'));
-    fireEvent.click(screen.getByRole('button', { name: 'lighting.fullscreen' }));
-    const fs = screen.getByTestId('fullscreen');
-    expect(fs.dataset.effect).toBe('aurora');
-
-    fireEvent.click(screen.getByText('fs-prev'));
-    await waitFor(() => expect(within(fs).getByText('lighting.animate.lockedNoticeTitle')).toBeTruthy());
-    expect(fs.dataset.effect).toBe('aurora');
-  });
-
-  it('previews the locked animation while scoped to it, and the running effect otherwise', async () => {
-    vi.mocked(fetchAnimateDeviceLocks).mockImplementation(() => Promise.resolve({ a: 'aurora' }));
-    renderPage();
-    await waitFor(() => expect(screen.getByTestId('preview').dataset.effect).toBe('aurora'));
-    expect(screen.getByTestId('grid-effect').textContent).toBe('aurora');
-
-    // Clearing the selection leaves the scope.
-    fireEvent.click(screen.getByText('clear-selection'));
-    await waitFor(() => expect(screen.getByTestId('preview').dataset.effect).toBe('fire'));
+    await waitFor(() => expect(screen.getByTestId('grid-pins').textContent).toBe('aurora=Fan A'));
   });
 
   it('a typed value reaches the service and is not overwritten by its own commit', async () => {
@@ -282,3 +517,5 @@ describe('LightingPage animation lock', () => {
     expect(saved.fire.slots[saved.fire.selected].intensity).toBe(0.3);
   });
 });
+
+void within;

@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { Power, PowerOff, Ban, Blend, Eye, Keyboard, Lightbulb, Users, Cpu, Check, Link2Off, Link2, Layers, Lock, MousePointerClick, Paintbrush, Pencil, RotateCcw, Unlock } from 'lucide-react';
+import { Power, PowerOff, Ban, Blend, Eye, Keyboard, Lightbulb, Users, Cpu, Check, Link2Off, Link2, Layers, MousePointerClick, Paintbrush, Pencil, Pin, PinOff, RotateCcw } from 'lucide-react';
 import {
   identifyLightingDevice,
   type LightingDevice,
@@ -67,41 +67,29 @@ export interface BulkSelection {
   stack?: () => void;
   /** Takes the selection apart; present when it is exactly one stack. */
   unstack?: () => void;
-  /** Members a Lock row can hold: unlocked, with a pick of their own. Zero
-   *  outside the Static tab, where nothing can be locked. */
-  lockCount?: number;
-  /** Members currently locked, which an Unlock row releases. */
-  unlockCount?: number;
-  setLocked?: (locked: boolean) => void;
-  /** Members a Lock animation row can hold: no lock of either kind yet.
-   *  Zero outside Animate mode on a shader effect. */
-  animateLockCount?: number;
-  /** Members currently locked onto an animation, which an Unlock animation row releases. */
-  animateUnlockCount?: number;
-  setAnimateLocked?: (locked: boolean) => void;
+  /** Members a Pin row can pin: following the global mode. Zero where
+   *  nothing can be pinned (Media, Game Sync, Off). */
+  pinCount?: number;
+  /** Members currently pinned, which an Unpin row releases. */
+  unpinCount?: number;
+  setPinned?: (pinned: boolean) => void;
 }
 
 /**
- * The card's colour lock. A locked card shows the lock beside its LED strip
- * in every mode, and that badge is also the quick unlock. The menu carries
- * both rows: Unlock wherever the card is locked, Lock only on the Static tab
- * (`lockable`) and only when the card has a pick of its own to hold.
+ * The card's pin. A card either follows the global mode or is pinned to a
+ * target; the pin button sits beside its LED strip in every mode. A press on a
+ * pinned card unpins it; a press on a following card pins it to the current
+ * global source. The menu carries the same two rows.
  */
-export interface DeviceLock {
-  locked: boolean;
-  lockable: boolean;
-  hasPick: boolean;
-  setLocked: (locked: boolean) => void;
-  /** Locked onto an Animate effect instead. A card holds one kind of lock, so
-   *  this and `locked` are never both true. The same badge shows, and a press
-   *  releases it. */
-  animateLocked?: boolean;
-  /** An animation lock can be set here: Animate mode on a shader effect. */
-  animateLockable?: boolean;
-  setAnimateLocked?: (locked: boolean) => void;
-  /** Bumped when a pick was aimed at this locked card; the badge flashes so
-   *  the user sees why nothing changed. 0 (or unchanged) flashes nothing. */
-  flashSeq?: number;
+export interface DevicePin {
+  pinned: boolean;
+  /** Display name of what the card is pinned to (tooltip). */
+  targetName?: string;
+  /** Display name of the global source a press would pin to (tooltip). */
+  sourceName?: string;
+  /** Why this card cannot be pinned right now (Media, Game Sync, Off). */
+  disabledReason?: string;
+  setPinned: (pinned: boolean) => void;
 }
 
 /** Where a card sits under a {@link ZoneCardStack} header: every member seams
@@ -305,7 +293,7 @@ export function ZoneCard({
   bulk,
   stacked,
   stackSlot,
-  lock,
+  pin,
 }: {
   device: LightingDevice;
   /** Deep-link anchor the card answers to; see CollapsibleSection's searchAnchor. */
@@ -384,8 +372,8 @@ export function ZoneCard({
   stacked?: StackPosition;
   /** The part of the shared frame this card's device samples when its stack is laid out; the readout reads the same slot. */
   stackSlot?: StackSlot | null;
-  /** Colour lock beside the LED strip. Absent on surfaces without one. */
-  lock?: DeviceLock;
+  /** Pin beside the LED strip. Absent on surfaces without one. */
+  pin?: DevicePin;
 }) {
   const { t, language } = useTranslation();
   const isZone = device.parentDeviceId != null && device.zoneIndex != null;
@@ -443,14 +431,6 @@ export function ZoneCard({
   const clickable = !unavailable && !firmwareControlled
     && (!selectOnly || zoneCardSelectable(device));
   const nameRef = useRef<EditableTextHandle>(null);
-
-  // The badge is keyed on the flash seq, so a bump remounts it and the CSS
-  // animation runs once from the start; no timer to keep in step with it.
-  // The seq the card mounted with is not a pick against THIS mount (the page
-  // keeps the last burst), so it flashes nothing - only a later bump does.
-  const flashSeq = lock?.flashSeq ?? 0;
-  const mountFlashSeq = useRef(flashSeq);
-  const flashing = flashSeq > 0 && flashSeq !== mountFlashSeq.current;
 
   const menuItems = (): DeviceMenuItem[] => {
     const items: DeviceMenuItem[] = [];
@@ -514,38 +494,22 @@ export function ZoneCard({
         ? { key: 'controlled', icon: <Link2Off size={14} />, onSelect: setControlled, label: label('lighting.devices.menuControlOff', 'lighting.devices.menuControlOffCount') }
         : { key: 'controlled', icon: <Link2 size={14} />, onSelect: setControlled, label: label('lighting.devices.menuControlOn', 'lighting.devices.menuControlOnCount'), highlighted: true });
     }
-    // The colour lock. Unlock is offered wherever something is locked; Lock
-    // only where a lock can be set (the Static tab) and there is a pick to
-    // hold. In a selection each row counts the members it will reach.
-    if (lock && !unavailable) {
-      const lockCount = bulk ? (bulk.lockCount ?? 0) : (lock.lockable && lock.hasPick && !lock.locked && !lock.animateLocked ? 1 : 0);
-      const unlockCount = bulk ? (bulk.unlockCount ?? 0) : (lock.locked ? 1 : 0);
-      const animateLockCount = bulk ? (bulk.animateLockCount ?? 0) : (lock.animateLockable && !lock.locked && !lock.animateLocked ? 1 : 0);
-      const animateUnlockCount = bulk ? (bulk.animateUnlockCount ?? 0) : (lock.animateLocked ? 1 : 0);
-      const setAnimateLocked = (locked: boolean) => bulk ? bulk.setAnimateLocked?.(locked) : lock.setAnimateLocked?.(locked);
-      const setLocked = (locked: boolean) => bulk ? bulk.setLocked?.(locked) : lock.setLocked(locked);
-      if (lockCount > 0) {
+    // The pin. Unpin is offered wherever something is pinned; Pin only where a
+    // pin can be set. In a selection each row counts the members it will reach.
+    if (pin && !unavailable) {
+      const pinCount = bulk ? (bulk.pinCount ?? 0) : (!pin.pinned && !pin.disabledReason ? 1 : 0);
+      const unpinCount = bulk ? (bulk.unpinCount ?? 0) : (pin.pinned ? 1 : 0);
+      const setPinned = (pinned: boolean) => bulk ? bulk.setPinned?.(pinned) : pin.setPinned(pinned);
+      if (pinCount > 0) {
         toggles.push({
-          key: 'lock', icon: <Lock size={14} />, onSelect: () => setLocked(true),
-          label: bulkMenuLabel(t, language, bulk && { count: lockCount }, 'lighting.devices.lockLook', 'lighting.devices.lockLookCount'),
+          key: 'pin', icon: <Pin size={14} />, onSelect: () => setPinned(true),
+          label: bulkMenuLabel(t, language, bulk && { count: pinCount }, 'lighting.devices.pin', 'lighting.devices.pinCount'),
         });
       }
-      if (unlockCount > 0) {
+      if (unpinCount > 0) {
         toggles.push({
-          key: 'unlock', icon: <Unlock size={14} />, onSelect: () => setLocked(false),
-          label: bulkMenuLabel(t, language, bulk && { count: unlockCount }, 'lighting.devices.unlockLook', 'lighting.devices.unlockLookCount'),
-        });
-      }
-      if (animateLockCount > 0) {
-        toggles.push({
-          key: 'lockAnimation', icon: <Lock size={14} />, onSelect: () => setAnimateLocked(true),
-          label: bulkMenuLabel(t, language, bulk && { count: animateLockCount }, 'lighting.devices.lockAnimation', 'lighting.devices.lockAnimationCount'),
-        });
-      }
-      if (animateUnlockCount > 0) {
-        toggles.push({
-          key: 'unlockAnimation', icon: <Unlock size={14} />, onSelect: () => setAnimateLocked(false),
-          label: bulkMenuLabel(t, language, bulk && { count: animateUnlockCount }, 'lighting.devices.unlockAnimation', 'lighting.devices.unlockAnimationCount'),
+          key: 'unpin', icon: <PinOff size={14} />, onSelect: () => setPinned(false),
+          label: bulkMenuLabel(t, language, bulk && { count: unpinCount }, 'lighting.devices.unpin', 'lighting.devices.unpinCount'),
         });
       }
     }
@@ -721,20 +685,31 @@ export function ZoneCard({
         {!unavailable && !firmwareControlled && controlled && device.ledsOn && (
           <DeviceLedStrip device={device} slot={stackSlot} pick={ledPick} fullscreen={ledFullscreen} pickOnly={ledPickOnly} />
         )}
-        {/* Only a locked card carries the badge: it sits between the strip
-            and the menu, so the strip gives up its width to it, and a press
-            unlocks in any mode. Locking lives in the menu. */}
-        {(lock?.locked || lock?.animateLocked) && !toggleMode && !unavailable && !firmwareControlled && (
-          <HoverTooltip body={t(lock.animateLocked ? 'lighting.devices.unlockAnimation' : 'lighting.devices.unlockLook')} side="top">
+        {/* The pin button: always there, so the card's two states (following
+            the global mode, or pinned) are readable at a glance. */}
+        {pin && !toggleMode && !unavailable && !firmwareControlled && (
+          <HoverTooltip
+            body={pin.pinned
+              ? t('lighting.pin.pinnedTo', { name: pin.targetName ?? '' })
+              : (pin.disabledReason ?? t('lighting.pin.pinTo', { name: pin.sourceName ?? '' }))}
+            side="top"
+          >
             <button
-              key={flashSeq}
               type="button"
-              className={`${styles.deviceSettingsBtn} ${styles.deviceLockBtn} ${flashing ? styles.deviceLockBtnFlash : ''}`}
-              aria-label={t(lock.animateLocked ? 'lighting.devices.unlockAnimation' : 'lighting.devices.unlockLook')}
+              className={`${styles.deviceSettingsBtn} ${styles.deviceBadgeBtn} ${styles.devicePinBtn} ${pin.pinned ? styles.devicePinBtnOn : ''} ${!pin.pinned && pin.disabledReason ? styles.devicePinBtnDisabled : ''}`}
+              aria-label={pin.pinned
+                ? t('lighting.pin.pinnedTo', { name: pin.targetName ?? '' })
+                : (pin.disabledReason ?? t('lighting.pin.pinTo', { name: pin.sourceName ?? '' }))}
+              aria-pressed={pin.pinned}
+              aria-disabled={!pin.pinned && !!pin.disabledReason ? true : undefined}
               data-no-dnd
-              onClick={e => { e.stopPropagation(); if (lock.animateLocked) lock.setAnimateLocked?.(false); else lock.setLocked(false); }}
+              onClick={e => {
+                e.stopPropagation();
+                if (pin.pinned) pin.setPinned(false);
+                else if (!pin.disabledReason) pin.setPinned(true);
+              }}
             >
-              <Lock />
+              <Pin />
             </button>
           </HoverTooltip>
         )}
@@ -744,7 +719,7 @@ export function ZoneCard({
           <HoverTooltip body={t('lighting.devices.ledColorsBadge')} side="top">
             <button
               type="button"
-              className={`${styles.deviceSettingsBtn} ${styles.deviceLockBtn}`}
+              className={`${styles.deviceSettingsBtn} ${styles.deviceBadgeBtn}`}
               aria-label={t('lighting.devices.ledColorsBadge')}
               data-no-dnd
               onClick={e => { e.stopPropagation(); onOpenSettings(); }}
@@ -757,7 +732,7 @@ export function ZoneCard({
           <HoverTooltip body={t('lighting.keyReactions.badge')} side="top">
             <button
               type="button"
-              className={`${styles.deviceSettingsBtn} ${styles.deviceLockBtn}`}
+              className={`${styles.deviceSettingsBtn} ${styles.deviceBadgeBtn}`}
               aria-label={t('lighting.keyReactions.badge')}
               data-no-dnd
               onClick={e => { e.stopPropagation(); onOpenKeyReactions(); }}

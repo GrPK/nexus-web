@@ -72,7 +72,8 @@ vi.mock('../../../api/lighting', async importOriginal => {
     startStatic: vi.fn(() => Promise.resolve(null)),
     stopLighting: vi.fn(() => Promise.resolve(null)),
     setMusicReactive: vi.fn(() => Promise.resolve(null)),
-    setLightingDeviceColor: vi.fn(() => Promise.resolve(null)),
+    setPins: vi.fn(() => Promise.resolve(true)),
+    fetchPins: vi.fn(() => Promise.resolve({})),
     setLightingDeviceControlled: vi.fn(() => Promise.resolve(null)),
   };
 });
@@ -158,7 +159,7 @@ describe('LightingPage simple mode', () => {
     expect(vi.mocked(lightingApi.setLightingDeviceControlled).mock.calls.some(c => c[0] === 'dev-1')).toBe(false);
   });
 
-  it('paints every device with a picked colour, entering static first', async () => {
+  it('pins every device to a picked colour, entering static first', async () => {
     const { container } = renderPage();
     // Wait for the device fetch: a colour has nowhere to land until it lands.
     await waitFor(() => {
@@ -168,7 +169,7 @@ describe('LightingPage simple mode', () => {
     fireEvent.click(swatch);
     await waitFor(() => {
       expect(vi.mocked(lightingApi.startStatic)).toHaveBeenCalled();
-      expect(vi.mocked(lightingApi.setLightingDeviceColor).mock.calls.some(c => c[0] === 'dev-1')).toBe(true);
+      expect(vi.mocked(lightingApi.setPins).mock.calls.some(c => c[0].includes('dev-1'))).toBe(true);
     });
   });
 
@@ -223,8 +224,8 @@ describe('LightingPage simple mode', () => {
       expect(vi.mocked(lightingApi.startAnimate)).toHaveBeenCalledWith('sweepbars', 50, 1, 0, 0, 1, 1, {});
     });
     expect(vi.mocked(lightingApi.setLightingDeviceControlled)).toHaveBeenCalledWith('dev-2', true);
-    // A sweep is one shared canvas: no per-device colour is written for it.
-    expect(vi.mocked(lightingApi.setLightingDeviceColor)).not.toHaveBeenCalled();
+    // A sweep is one shared canvas: nothing is pinned for it.
+    expect(vi.mocked(lightingApi.setPins)).not.toHaveBeenCalled();
   });
 
   it('turns the running sweep around from the direction switch', async () => {

@@ -49,12 +49,11 @@ interface Marker extends PickerDevice {
  * whole canvas, drops the marks, and answers a press with a notice instead.
  */
 export function StaticPickerCanvas({
-  devices, hasSelection, hex, segmented, fill, patternEffect, patternSlot, patternVersion, gpuAvailable,
+  devices, hex, segmented, fill, patternEffect, patternSlot, patternVersion, gpuAvailable,
   onPreview, onCommit, notice: externalNotice,
 }: {
-  /** Selected devices, in rail order. */
+  /** Devices whose colour gets a mark, in rail order. */
   devices: PickerDevice[];
-  hasSelection: boolean;
   /** The colour the selection shares; '' when they disagree. */
   hex: string;
   /** Sample the field on the coarse grid instead of continuously. */
@@ -179,10 +178,6 @@ export function StaticPickerCanvas({
       showNotice(t('lighting.static.patternNoticeTitle'), t('lighting.static.patternNoticeBody'));
       return true;
     }
-    if (!hasSelection) {
-      showNotice(t('lighting.static.selectNoticeTitle'), t('lighting.static.selectNoticeBody'));
-      return true;
-    }
     return false;
   };
 
@@ -282,7 +277,7 @@ export function StaticPickerCanvas({
             </span>
           </div>
         ))}
-        {!patternEffect && hasSelection && (
+        {!patternEffect && (
           // Its own pointer target: a press here aims at the input, not the field.
           <div className={styles.staticHex} onPointerDown={e => e.stopPropagation()}>
             <span className={styles.staticHexSwatch} style={hex ? { backgroundColor: hex } : undefined} />

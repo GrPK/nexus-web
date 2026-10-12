@@ -521,27 +521,13 @@
   color: var(--text-dim);
 }
 
-// Effect browser shell. Static with nothing selected has nowhere to put a
-// colour, so it dims and stops taking input rather than silently doing nothing.
+// Effect browser shell.
 .browserWrap {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   transition: opacity var(--ease-fast) ease;
-}
-
-.browserLocked {
-  opacity: var(--alpha-medium);
-}
-
-.browserHint {
-  flex-shrink: 0;
-  margin: 0.6rem 0 0;
-  padding: 0 0.3rem;
-  font-size: var(--type-small);
-  color: var(--text-dim);
-  text-align: center;
 }
 
 // Rail tail card: why the list may be short, plus the subprocess dot the
@@ -596,26 +582,26 @@
   }
 }
 
-// One tooltip target inside the cell badges: the usage icons, or the lock with its count.
+// One tooltip target inside the cell badges: the usage icons, or the pin with its count.
 .cellBadgeGroup {
   display: flex;
   align-items: center;
 
   // Chromium 83 (the Q60 panel floor) has no flex `gap`.
   svg + svg,
-  svg + .cellLockCount {
+  svg + .cellPinCount {
     margin-left: 3px;
   }
 }
 
-.cellLockCount {
+.cellPinCount {
   color: #fff;
   font-size: var(--type-mini);
   line-height: 1;
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.85);
 }
 
-.cellLockName {
+.cellPinName {
   display: block;
 }
 
@@ -1309,25 +1295,37 @@
   svg { width: 13px; height: 13px; }
 }
 
-// Colour lock after the LED strip, only on a locked card.
-// Always visible: a lock the user has to hover to find is a lock they will
+// Badge buttons after the LED strip (pin, LED colours, key reactions).
+// Always visible: a state the user has to hover to find is a state they will
 // not know is set. Same dim ink as the stack badge, so it reads as card
 // chrome rather than a state light.
-.deviceLockBtn {
+.deviceBadgeBtn {
   opacity: 1;
   flex-shrink: 0;
 }
 
-// A pick aimed at the locked card: off, on, off, on - hard steps, no fade.
-// Runs once per mount; ZoneCard remounts the badge per flash.
-.deviceLockBtnFlash {
-  // Two off/on cycles of 1.5x the slow ease each: ~225 ms per phase.
-  animation: lockBadgeFlash calc(var(--ease-slow) * 1.5) step-end 2;
+// The pin button follows the card's mode: muted outline while the card follows
+// the global mode, filled and accented while it is pinned.
+.devicePinBtn {
+  opacity: 0.55;
+
+  &:hover, &:focus-visible { opacity: 1; }
 }
 
-@keyframes lockBadgeFlash {
-  0% { opacity: 0; }
-  50%, 100% { opacity: 1; }
+.devicePinBtnOn {
+  opacity: 1;
+  color: var(--accent);
+
+  svg { fill: currentColor; }
+}
+
+// Modes that cannot be pinned to (Media, Game Sync, Off): the button stays so
+// the card does not shift, and its tooltip says why.
+.devicePinBtnDisabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+
+  &:hover { color: var(--text-dim); background: transparent; opacity: 0.3; }
 }
 
 // Stays visible (overrides .deviceSettingsBtn's opacity:0) when the
@@ -2074,4 +2072,24 @@
 .staticFieldFill {
   height: 100%;
   width: 100%;
+}
+
+// "Unpin all" above the device list: only present while a pin exists.
+.unpinAll {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  margin: 0 0 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--type-small);
+  cursor: pointer;
+
+  &:hover { color: var(--accent); background: var(--accent-soft); }
+
+  // Chromium 83 (the Q60 panel floor) has no flex `gap`.
+  svg + span { margin-left: 0.4rem; }
 }

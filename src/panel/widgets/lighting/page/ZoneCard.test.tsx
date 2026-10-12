@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ZoneCard, zoneCardSelectable, type BulkSelection } from './ZoneCard';
 import type { LightingDevice } from '../../../../api/lighting';
@@ -772,209 +772,107 @@ describe('ZoneCard stacked', () => {
   });
 });
 
-describe('ZoneCard color lock', () => {
-  const badge = () => screen.queryByRole('button', { name: 'lighting.devices.unlockLook' }) as HTMLButtonElement | null;
+describe('ZoneCard pin', () => {
+  const button = (name: string) => screen.queryByRole('button', { name }) as HTMLButtonElement | null;
   const menuRow = (re: RegExp) => screen.queryAllByRole('button').find(b => re.test(b.textContent ?? '')) ?? null;
   const openMenu = () => fireEvent.click(screen.getByRole('button', { name: 'lighting.devices.moreActions' }));
-  const renderLock = (lock: { locked: boolean; lockable: boolean; hasPick: boolean; setLocked?: (locked: boolean) => void }, extra: Partial<Parameters<typeof ZoneCard>[0]> = {}) => render(
+  const renderPin = (pin: Partial<NonNullable<Parameters<typeof ZoneCard>[0]['pin']>>, extra: Partial<Parameters<typeof ZoneCard>[0]> = {}) => render(
     <ZoneCard
       device={baseDevice} selected={false} indent={false} onSelect={() => {}}
       onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
-      lock={{ setLocked: () => {}, ...lock }}
+      pin={{ pinned: false, sourceName: 'Plasma', setPinned: () => {}, ...pin }}
       {...extra}
     />,
   );
 
-  it('renders no badge and no rows without a lock prop', () => {
+  it('renders no pin button and no rows without a pin prop', () => {
     renderCard(baseDevice);
-    expect(badge()).toBeNull();
+    expect(button('lighting.pin.pinTo:{"name":""}')).toBeNull();
     openMenu();
-    expect(menuRow(/lighting\.devices\.(un)?lockLook/)).toBeNull();
+    expect(menuRow(/lighting\.devices\.(un)?pin$/)).toBeNull();
   });
 
-  it('shows no badge on an unlocked card, even on the Static tab', () => {
-    renderLock({ locked: false, lockable: true, hasPick: true });
-    expect(badge()).toBeNull();
+  it('shows a muted pin on a following card that pins it to the global source', () => {
+    const setPinned = vi.fn();
+    renderPin({ setPinned });
+    const btn = button('lighting.pin.pinTo:{"name":"Plasma"}')!;
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    expect(btn.className).not.toContain(styles.devicePinBtnOn);
+    fireEvent.click(btn);
+    expect(setPinned).toHaveBeenCalledWith(true);
   });
 
-  it('badges a locked card after the strip, in any mode, and the badge unlocks', () => {
-    const setLocked = vi.fn();
-    renderLock({ locked: true, lockable: false, hasPick: true, setLocked });
-    const btn = badge()!;
+  it('shows a filled pin on a pinned card, named for its target, and a press unpins', () => {
+    const setPinned = vi.fn();
+    renderPin({ pinned: true, targetName: 'Aurora', setPinned });
+    const btn = button('lighting.pin.pinnedTo:{"name":"Aurora"}')!;
+    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    expect(btn.className).toContain(styles.devicePinBtnOn);
+    fireEvent.click(btn);
+    expect(setPinned).toHaveBeenCalledWith(false);
+  });
+
+  it('keeps the button after the strip and does not select the card when pressed', () => {
+    const onSelect = vi.fn();
+    renderPin({ pinned: true, targetName: 'Aurora' }, { onSelect });
     const row = document.querySelector(`.${styles.deviceMetaRow}`)!;
     const order = [...row.children].map(el =>
       el.classList.contains(styles.ledStrip) ? 'strip'
-        : el.querySelector(`.${styles.deviceLockBtn}`) || el.classList.contains(styles.deviceLockBtn) ? 'lock' : null,
+        : el.classList.contains(styles.devicePinBtn) ? 'pin' : null,
     ).filter(Boolean);
-    expect(order).toEqual(['strip', 'lock']);
-    fireEvent.click(btn);
-    expect(setLocked).toHaveBeenCalledWith(false);
-  });
-
-  it('does not select the card when the badge is pressed', () => {
-    const onSelect = vi.fn();
-    renderLock({ locked: true, lockable: false, hasPick: true }, { onSelect });
-    fireEvent.click(badge()!);
+    expect(order).toEqual(['strip', 'pin']);
+    fireEvent.click(button('lighting.pin.pinnedTo:{"name":"Aurora"}')!);
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('offers Lock in the menu on the Static tab when the card has a pick', () => {
-    const setLocked = vi.fn();
-    renderLock({ locked: false, lockable: true, hasPick: true, setLocked });
+  it('disables the pin where nothing can be pinned, naming why, and presses do nothing', () => {
+    const setPinned = vi.fn();
+    renderPin({ sourceName: undefined, disabledReason: 'lighting.pin.disabledMedia', setPinned });
+    const btn = button('lighting.pin.disabledMedia')!;
+    expect(btn.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(btn);
+    expect(setPinned).not.toHaveBeenCalled();
     openMenu();
-    const row = menuRow(/^lighting\.devices\.lockLook$/)!;
-    expect(row).not.toBeNull();
-    expect(menuRow(/unlockLook/)).toBeNull();
-    fireEvent.click(row);
-    expect(setLocked).toHaveBeenCalledWith(true);
+    expect(menuRow(/^lighting\.devices\.pin$/)).toBeNull();
   });
 
-  it('offers no Lock row without a pick, or outside the Static tab', () => {
-    renderLock({ locked: false, lockable: true, hasPick: false });
+  it('offers Pin in the menu on a following card and Unpin on a pinned one', () => {
+    const setPinned = vi.fn();
+    renderPin({ setPinned });
     openMenu();
-    expect(menuRow(/lockLook/)).toBeNull();
-    cleanup();
-    renderLock({ locked: false, lockable: false, hasPick: true });
-    openMenu();
-    expect(menuRow(/lockLook/)).toBeNull();
+    fireEvent.click(menuRow(/^lighting\.devices\.pin$/)!);
+    expect(setPinned).toHaveBeenCalledWith(true);
+    expect(menuRow(/^lighting\.devices\.unpin$/)).toBeNull();
   });
 
-  it('offers Unlock in the menu on a locked card in any mode', () => {
-    const setLocked = vi.fn();
-    renderLock({ locked: true, lockable: false, hasPick: true, setLocked });
+  it('offers Unpin, and no Pin, on a pinned card', () => {
+    const setPinned = vi.fn();
+    renderPin({ pinned: true, targetName: 'x', setPinned });
     openMenu();
-    const row = menuRow(/^lighting\.devices\.unlockLook$/)!;
-    expect(row).not.toBeNull();
-    expect(menuRow(/^lighting\.devices\.lockLook$/)).toBeNull();
-    fireEvent.click(row);
-    expect(setLocked).toHaveBeenCalledWith(false);
-  });
-
-  it('flashes on a seq bump, restarts on the next, and never on the seq it mounted with', () => {
-    const withSeq = (seq: number) => (
-      <ZoneCard
-        device={baseDevice} selected={false} indent={false} onSelect={() => {}}
-        onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
-        lock={{ locked: true, lockable: true, hasPick: true, setLocked: () => {}, flashSeq: seq }}
-      />
-    );
-    // A card mounted while the page still holds an old burst does not flash:
-    // a collapsed group re-expanding is not a pick.
-    const { rerender } = render(withSeq(3));
-    expect(badge()!.className).not.toContain(styles.deviceLockBtnFlash);
-    // A bump flashes, and remounts the badge so the animation starts over.
-    rerender(withSeq(4));
-    const first = badge()!;
-    expect(first.className).toContain(styles.deviceLockBtnFlash);
-    rerender(withSeq(5));
-    const second = badge()!;
-    expect(second).not.toBe(first);
-    expect(second.className).toContain(styles.deviceLockBtnFlash);
-    // The same seq again keeps the same element: no re-run on a plain re-render.
-    rerender(withSeq(5));
-    expect(badge()).toBe(second);
+    expect(menuRow(/^lighting\.devices\.pin$/)).toBeNull();
+    fireEvent.click(menuRow(/^lighting\.devices\.unpin$/)!);
+    expect(setPinned).toHaveBeenCalledWith(false);
   });
 
   it('counts the members each row reaches in a selection', () => {
-    const setLocked = vi.fn();
+    const setPinned = vi.fn();
     render(
       <ZoneCard
         device={baseDevice} selected indent={false} onSelect={() => {}}
         onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
-        lock={{ locked: false, lockable: true, hasPick: true, setLocked: () => {} }}
+        pin={{ pinned: false, sourceName: 'Plasma', setPinned: () => {} }}
         bulk={{
           count: 3, identifyCount: 3, tunableCount: 3, controlled: true, ledsOn: true,
           setControlled: () => {}, setPower: () => {}, identify: () => {},
-          lockCount: 2, unlockCount: 1, setLocked,
+          pinCount: 2, unpinCount: 1, setPinned,
         }}
       />,
     );
     openMenu();
-    const lockRow = menuRow(/lockLookCount\.other:\{"count":2\}/)!;
-    const unlockRow = menuRow(/unlockLookCount\.one:\{"count":1\}/)!;
-    expect(lockRow).not.toBeNull();
-    expect(unlockRow).not.toBeNull();
-    fireEvent.click(lockRow);
-    expect(setLocked).toHaveBeenCalledWith(true);
-    fireEvent.click(unlockRow);
-    expect(setLocked).toHaveBeenCalledWith(false);
-  });
-});
-
-describe('ZoneCard animation lock', () => {
-  const badge = () => screen.queryByRole('button', { name: 'lighting.devices.unlockAnimation' }) as HTMLButtonElement | null;
-  const menuRow = (re: RegExp) => screen.queryAllByRole('button').find(b => re.test(b.textContent ?? '')) ?? null;
-  const openMenu = () => fireEvent.click(screen.getByRole('button', { name: 'lighting.devices.moreActions' }));
-  const renderLock = (lock: Partial<NonNullable<Parameters<typeof ZoneCard>[0]['lock']>>) => render(
-    <ZoneCard
-      device={baseDevice} selected={false} indent={false} onSelect={() => {}}
-      onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
-      lock={{ locked: false, lockable: false, hasPick: false, setLocked: () => {}, ...lock }}
-    />,
-  );
-
-  it('badges an animation-locked card with the animation tooltip, and the badge unlocks', () => {
-    const setAnimateLocked = vi.fn();
-    const setLocked = vi.fn();
-    renderLock({ animateLocked: true, setAnimateLocked, setLocked });
-    expect(screen.queryByRole('button', { name: 'lighting.devices.unlockLook' })).toBeNull();
-    fireEvent.click(badge()!);
-    expect(setAnimateLocked).toHaveBeenCalledWith(false);
-    expect(setLocked).not.toHaveBeenCalled();
-  });
-
-  it('shows no badge on an unlocked card', () => {
-    renderLock({ animateLockable: true });
-    expect(badge()).toBeNull();
-  });
-
-  it('offers Lock animation when animation locks are available and the card has no lock', () => {
-    const setAnimateLocked = vi.fn();
-    renderLock({ animateLockable: true, setAnimateLocked });
-    openMenu();
-    fireEvent.click(menuRow(/^lighting\.devices\.lockAnimation$/)!);
-    expect(setAnimateLocked).toHaveBeenCalledWith(true);
-  });
-
-  it('offers no Lock animation outside Animate, or on a card holding a static lock', () => {
-    renderLock({ animateLockable: false });
-    openMenu();
-    expect(menuRow(/lockAnimation/)).toBeNull();
-    cleanup();
-    renderLock({ animateLockable: true, locked: true });
-    openMenu();
-    expect(menuRow(/^lighting\.devices\.lockAnimation$/)).toBeNull();
-  });
-
-  it('offers Unlock animation on a locked card, and no Lock static color beside it', () => {
-    const setAnimateLocked = vi.fn();
-    renderLock({ animateLocked: true, lockable: true, hasPick: true, setAnimateLocked });
-    openMenu();
-    expect(menuRow(/^lighting\.devices\.lockLook$/)).toBeNull();
-    expect(menuRow(/^lighting\.devices\.lockAnimation$/)).toBeNull();
-    fireEvent.click(menuRow(/^lighting\.devices\.unlockAnimation$/)!);
-    expect(setAnimateLocked).toHaveBeenCalledWith(false);
-  });
-
-  it('counts the members each animation row reaches in a selection', () => {
-    const setAnimateLocked = vi.fn();
-    render(
-      <ZoneCard
-        device={baseDevice} selected indent={false} onSelect={() => {}}
-        onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
-        lock={{ locked: false, lockable: false, hasPick: false, setLocked: () => {} }}
-        bulk={{
-          count: 3, identifyCount: 3, tunableCount: 3, controlled: true, ledsOn: true,
-          setControlled: () => {}, setPower: () => {}, identify: () => {},
-          animateLockCount: 2, animateUnlockCount: 1, setAnimateLocked,
-        }}
-      />,
-    );
-    openMenu();
-    fireEvent.click(menuRow(/lockAnimationCount\.other:\{"count":2\}/)!);
-    expect(setAnimateLocked).toHaveBeenCalledWith(true);
-    fireEvent.click(menuRow(/unlockAnimationCount\.one:\{"count":1\}/)!);
-    expect(setAnimateLocked).toHaveBeenCalledWith(false);
+    fireEvent.click(menuRow(/pinCount\.other:\{"count":2\}/)!);
+    expect(setPinned).toHaveBeenCalledWith(true);
+    fireEvent.click(menuRow(/unpinCount\.one:\{"count":1\}/)!);
+    expect(setPinned).toHaveBeenCalledWith(false);
   });
 });
 
@@ -993,17 +891,17 @@ describe('ZoneCard LED colours badge', () => {
     expect(badge()).toBeNull();
   });
 
-  it('badges beside the colour lock and opens the LED map without clearing anything', () => {
+  it('badges beside the pin and opens the LED map without clearing anything', () => {
     const onOpenSettings = vi.fn();
-    const setLocked = vi.fn();
+    const setPinned = vi.fn();
     renderWith(
       { ...baseDevice, ledColors: [{ index: 0, color: '#ff0000' }] },
-      { onOpenSettings, lock: { locked: true, lockable: false, hasPick: true, setLocked } },
+      { onOpenSettings, pin: { pinned: true, targetName: 'Aurora', setPinned } },
     );
-    expect(screen.getByRole('button', { name: 'lighting.devices.unlockLook' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'lighting.pin.pinnedTo:{"name":"Aurora"}' })).toBeTruthy();
     fireEvent.click(badge()!);
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
-    expect(setLocked).not.toHaveBeenCalled();
+    expect(setPinned).not.toHaveBeenCalled();
   });
 });
 

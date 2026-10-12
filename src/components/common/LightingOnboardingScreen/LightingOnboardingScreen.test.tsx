@@ -4,8 +4,8 @@ import { LightingOnboardingScreen } from './LightingOnboardingScreen';
 import {
   fetchLightingDevices,
   fetchLightingStatus,
-  setLightingDeviceColor,
   setLightingDeviceControlled,
+  setPins,
   startAnimate,
   startStatic,
   type LightingDevice,
@@ -22,7 +22,7 @@ vi.mock('../../../api/lighting', () => ({
   identifyLightingDevice: vi.fn(),
   startAnimate: vi.fn(),
   startStatic: vi.fn(),
-  setLightingDeviceColor: vi.fn(),
+  setPins: vi.fn(),
 }));
 
 // The strip paints on a canvas, which jsdom does not implement; echoing the
@@ -78,7 +78,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(useConflictApps).mockReturnValue({ conflicts: [], ready: true });
   vi.mocked(setLightingDeviceControlled).mockResolvedValue(null);
-  vi.mocked(setLightingDeviceColor).mockResolvedValue(null as never);
+  vi.mocked(setPins).mockResolvedValue(true);
 });
 
 describe('LightingOnboardingScreen - device grid', () => {
@@ -297,7 +297,7 @@ describe('LightingOnboardingScreen colour test strip', () => {
     expect(startStatic).not.toHaveBeenCalled();
   });
 
-  it('keeps a picked colour the way the simple palette does: Static, then a pick per device', async () => {
+  it('keeps a picked colour the way the simple palette does: Static, then a pin per device', async () => {
     seed([strip, hub]);
     renderScreen();
     await screen.findByRole('switch', { name: 'Test Strip' });
@@ -306,13 +306,14 @@ describe('LightingOnboardingScreen colour test strip', () => {
     fireEvent.click(red);
 
     const color = paletteColor('red-3')!;
-    await waitFor(() => expect(setLightingDeviceColor).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(setPins).toHaveBeenCalledTimes(1));
     // Saved, not previewed: no persist=false.
     expect(vi.mocked(startStatic).mock.calls[0]).toEqual(['gradientlinear']);
-    // Simple drives every device, including the one stored as ignored.
-    for (const id of ['openrgb-0', 'openrgb-1']) {
-      expect(setLightingDeviceColor).toHaveBeenCalledWith(id, color.h, color.s, expect.objectContaining({ effect: 'flat', color: color.hex }));
-    }
+    // Simple drives every device, including the one stored as ignored: one pin write for all of them.
+    expect(setPins).toHaveBeenCalledWith(
+      ['openrgb-0', 'openrgb-1'],
+      expect.objectContaining({ kind: 'static', effect: 'flat', color: color.hex }),
+    );
     expect(red).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -324,8 +325,8 @@ describe('LightingOnboardingScreen colour test strip', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.simplered' }));
 
-    await waitFor(() => expect(setLightingDeviceColor).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(setLightingDeviceColor).mock.calls[0][0]).toBe('openrgb-0');
+    await waitFor(() => expect(setPins).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(setPins).mock.calls[0][0]).toEqual(['openrgb-0']);
   });
 
   it('goes back to the simple rainbow when its dot is pressed again', async () => {
@@ -354,21 +355,21 @@ describe('LightingOnboardingScreen colour test strip', () => {
     await waitFor(() => expect(startAnimate).toHaveBeenCalledTimes(1));
     // The superseded colours never reach the lights, so none can land late.
     expect(startStatic).not.toHaveBeenCalled();
-    expect(setLightingDeviceColor).not.toHaveBeenCalled();
+    expect(setPins).not.toHaveBeenCalled();
   });
 
-  it('re-applies the colour on Finish, so a device found after the pick wears it too', async () => {
+  it('re-applies the colour on Finish, so a device found after the pick is pinned to it too', async () => {
     seed([strip]);
     vi.mocked(completeLightingOnboarding).mockResolvedValue({ completed: true, lightingCompleted: true });
     const onComplete = renderScreen();
     await screen.findByRole('switch', { name: 'Test Strip' });
 
     fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.simplered' }));
-    await waitFor(() => expect(setLightingDeviceColor).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(setPins).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.finish' }));
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
-    expect(setLightingDeviceColor).toHaveBeenCalledTimes(2);
+    expect(setPins).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the scanning note and the strip out of the device scroller', async () => {
