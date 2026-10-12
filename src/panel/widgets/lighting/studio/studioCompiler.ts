@@ -165,11 +165,6 @@ uniform float u_hue;        // hint_range(0.0, 1.0, 0.01) = 0.0
 uniform float u_colorize;   // hint_range(0.0, 1.0, 0.01) = 0.0
 uniform float u_saturation; // hint_range(0.0, 4.0, 0.01) = 1.0
 uniform float u_contrast;   // hint_range(0.0, 4.0, 0.01) = 1.0
-uniform float u_audioLevel;
-uniform float u_audioBass;
-uniform float u_audioMid;
-uniform float u_audioHigh;
-uniform float u_audioBeat;
 const float PI = 3.14159265;`;
 
 const FOOTER_HELPERS = `vec2 uvCentered() {
@@ -242,6 +237,8 @@ export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: b
   const blocks = orderedBlocks(recipe);
   const defs = blocks.map(b => studioBlock(b.type)!);
   const uniforms: string[] = [];
+  // Audio inputs are declared only when a mod reads them: the service starts audio capture for any shader that declares one.
+  const audioInputs = new Set<string>();
   const params: Record<string, number> = {};
   const body: string[] = [];
   let patternIndex = 0;
@@ -262,6 +259,7 @@ export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: b
         const amount = Math.min(1, Math.max(-1, mod.amount));
         uniforms.push(`uniform float ${modName}; // hint_range(-1.0, 1.0, 0.01) = ${fmt(bake ? amount : 0.5)}`);
         params[modName] = amount;
+        audioInputs.add(MOD_UNIFORM[mod.source]);
         const swept = `clamp(${name} + ${modName} * ${fmt(p.max - p.min)} * ${MOD_UNIFORM[mod.source]}, ${fmt(p.min)}, ${fmt(p.max)})`;
         // A count between integers seams at the atan wrap (kaleidoscope, spiral).
         exprs[p.key] = p.whole ? `floor(${swept} + 0.5)` : swept;
@@ -303,6 +301,7 @@ export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: b
     `const float S_HUE = ${fmt(base[1])};`,
     `const float S_SAT = ${fmt(base[2])};`,
     `const float S_CON = ${fmt(base[3])};`,
+    ...[...audioInputs].sort().map(u => `uniform float ${u};`),
     ...uniforms,
     ...collectHelpers(defs, needsBlend),
     FOOTER_HELPERS,

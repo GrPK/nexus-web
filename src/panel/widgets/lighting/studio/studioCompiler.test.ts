@@ -148,3 +148,14 @@ describe('staleParamsBetween', () => {
     expect(staleParamsBetween(r, structuredClone(r))).toEqual([]);
   });
 });
+
+describe('audio inputs', () => {
+  it('declares an audio uniform only when a modulation reads it', () => {
+    const r = recipeOf('plasma', 'palette');
+    expect(compileStudio(r).frag).not.toMatch(/u_audio/);
+    r.blocks[0].mods = { scale: { source: 'bass', amount: 0.5 } };
+    const frag = compileStudio(r).frag;
+    expect(frag).toContain('uniform float u_audioBass;');
+    expect(frag).not.toContain('u_audioBeat');
+  });
+});
