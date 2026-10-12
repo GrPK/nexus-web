@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchAnimateDeviceLocks, setAnimateDeviceLock, startAnimate } from '../../../api/lighting';
+import { fetchAnimateDeviceLocks, saveAnimateTemplates, setAnimateDeviceLock, startAnimate } from '../../../api/lighting';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { LightingPage } from './LightingPage';
 
@@ -84,7 +84,23 @@ vi.mock('./page/DevicePanel', () => ({
 }));
 vi.mock('./page/LedMapEditor', () => ({ LedMapEditor: () => null }));
 vi.mock('./page/RightPaneTabs', () => ({ RightPaneTabs: () => null }));
-vi.mock('./page/EffectTab', () => ({ EffectTab: () => null }));
+// A typed slider edit is onChange(v, true) followed synchronously by onCommit.
+vi.mock('./page/EffectTab', () => ({
+  EffectTab: ({ effect, state, onAnimateChange, onAnimateCommit }: {
+    effect: string;
+    state: { intensity: number } | null;
+    onAnimateChange: (patch: { intensity: number }, commit?: boolean) => void;
+    onAnimateCommit: () => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="type-intensity"
+      data-effect={effect}
+      data-intensity={state?.intensity}
+      onClick={() => { onAnimateChange({ intensity: 0.3 }, true); onAnimateCommit(); }}
+    >type</button>
+  ),
+}));
 vi.mock('../../../components/common/ViewHeader/ViewHeader', () => ({ ViewHeader: () => null }));
 vi.mock('../../../components/views/ServiceRequired', () => ({ ServiceRequired: () => null }));
 vi.mock('../../../components/common/DeviceCanvas/DeviceCanvas', () => ({
@@ -248,5 +264,21 @@ describe('LightingPage animation lock', () => {
     // Clearing the selection leaves the scope.
     fireEvent.click(screen.getByText('clear-selection'));
     await waitFor(() => expect(screen.getByTestId('preview').dataset.effect).toBe('fire'));
+  });
+
+  it('a typed value reaches the service and is not overwritten by its own commit', async () => {
+    localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('type-intensity').dataset.effect).toBe('fire'));
+    // Mount hydration restarts the running effect; let it land before typing.
+    await waitFor(() => expect(startAnimate).toHaveBeenCalled());
+    vi.mocked(startAnimate).mockClear();
+    vi.mocked(saveAnimateTemplates).mockClear();
+    fireEvent.click(screen.getByTestId('type-intensity'));
+    await waitFor(() => expect(screen.getByTestId('type-intensity').dataset.intensity).toBe('0.3'));
+    await waitFor(() => expect(startAnimate).toHaveBeenCalled());
+    expect(vi.mocked(startAnimate).mock.calls.at(-1)?.[2]).toBe(0.3);
+    const saved = vi.mocked(saveAnimateTemplates).mock.calls.at(-1)?.[0] as Record<string, { selected: number; slots: { intensity: number }[] }>;
+    expect(saved.fire.slots[saved.fire.selected].intensity).toBe(0.3);
   });
 });

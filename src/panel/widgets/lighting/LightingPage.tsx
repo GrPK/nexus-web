@@ -908,6 +908,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     runningEffect: string | null,
     persist: boolean,
   ) => {
+    // A typed slider edit commits in the same tick, before a re-render.
+    effectTemplatesRef.current = next;
     setEffectTemplates(next);
     if (runningEffect) {
       const bundle = next[runningEffect];
@@ -1351,19 +1353,18 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
   }, [mode, throttlePostProcess]);
 
+  // Writes the ref first: a typed slider edit commits in the same tick.
   const handlePostProcessChange = useCallback((patch: Partial<PostProcessState>, commit: boolean) => {
     if (mode === 'screen') {
-      setScreenPP(prev => {
-        const next = { ...prev, ...patch };
-        applyPostProcess(next, commit);
-        return next;
-      });
+      const next = { ...postProcessRef.current.screen, ...patch };
+      postProcessRef.current = { ...postProcessRef.current, screen: next };
+      setScreenPP(next);
+      applyPostProcess(next, commit);
     } else if (mode === 'gif') {
-      setMediaPP(prev => {
-        const next = { ...prev, ...patch };
-        applyPostProcess(next, commit);
-        return next;
-      });
+      const next = { ...postProcessRef.current.media, ...patch };
+      postProcessRef.current = { ...postProcessRef.current, media: next };
+      setMediaPP(next);
+      applyPostProcess(next, commit);
     }
   }, [mode, applyPostProcess]);
 

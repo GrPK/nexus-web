@@ -587,12 +587,12 @@ function useImmersivePostProcess(mode: LightingMode): ImmersivePostProcess {
 
   // Commit-only writes (mirror the immersive animate controls): drag updates
   // local state for the live slider, the service write fires on release.
+  // Writes the ref first: a typed slider edit commits in the same tick.
   const onChange = useCallback((patch: Partial<PostProcessState>, commit?: boolean) => {
-    setPp(prev => {
-      const next = { ...prev, ...patch };
-      if (commit) apply(next, true);
-      return next;
-    });
+    const next = { ...ppRef.current, ...patch };
+    ppRef.current = next;
+    setPp(next);
+    if (commit) apply(next, true);
   }, [apply]);
 
   const onCommit = useCallback(() => { apply(ppRef.current, true); }, [apply]);
