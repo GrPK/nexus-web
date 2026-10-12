@@ -2652,7 +2652,6 @@
   "lighting.devices.stateLightsOff": "Podświetlenie wyłączone",
   "lighting.devices.stateNotControlled": "Brak Nexus Control",
   "lighting.devices.unpin": "Odepnij",
-  "lighting.devices.unpinAll": "Odepnij wszystko",
   "lighting.devices.unpinCount.few": "Odepnij ({count} urządzenia)",
   "lighting.devices.unpinCount.one": "Odepnij ({count} urządzenie)",
   "lighting.devices.unpinCount.other": "Odepnij ({count} urządzeń)",

@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "Éclairage éteint",
   "lighting.devices.stateNotControlled": "Pas de Nexus Control",
   "lighting.devices.unpin": "Désépingler",
-  "lighting.devices.unpinAll": "Tout désépingler",
   "lighting.devices.unpinCount.one": "Désépingler ({count} appareil)",
   "lighting.devices.unpinCount.other": "Désépingler ({count} appareils)",
   "lighting.devices.unstack": "Désempiler",

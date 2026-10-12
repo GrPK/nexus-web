@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "Luzes desligadas",
   "lighting.devices.stateNotControlled": "Sem Nexus Control",
   "lighting.devices.unpin": "Desafixar",
-  "lighting.devices.unpinAll": "Desafixar tudo",
   "lighting.devices.unpinCount.one": "Desafixar ({count} dispositivo)",
   "lighting.devices.unpinCount.other": "Desafixar ({count} dispositivos)",
   "lighting.devices.unstack": "Desempilhar",

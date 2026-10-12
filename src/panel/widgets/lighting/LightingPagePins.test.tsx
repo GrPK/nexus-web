@@ -83,13 +83,12 @@ vi.mock('./page/StaticPickerCanvas', () => ({
 // The stub exposes what the pins ride on: the pins the rail is handed, the
 // source a press pins to, the disabled reason, and the callbacks.
 vi.mock('./page/DevicePanel', () => ({
-  DevicePanel: ({ pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onUnpinAll, onSetSelection }: {
+  DevicePanel: ({ pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onSetSelection }: {
     pins?: Record<string, Pin>;
     pinSource?: string | null;
     pinDisabledReason?: string;
     pinTargetName?: (pin: Pin) => string;
     onSetPin?: (ids: string[], pinned: boolean) => void;
-    onUnpinAll?: () => void;
     onSetSelection: (ids: Set<string>, primary: string | null) => void;
   }) => (
     <div
@@ -100,7 +99,6 @@ vi.mock('./page/DevicePanel', () => ({
       data-disabled={pinDisabledReason ?? ''}
     >
       <button type="button" onClick={() => onSetPin?.(['a'], !pins?.a)}>toggle</button>
-      <button type="button" onClick={() => onUnpinAll?.()}>unpin-all</button>
       <button type="button" onClick={() => onSetSelection(new Set(['a']), 'a')}>select-a</button>
       <button type="button" onClick={() => onSetSelection(new Set(['a', 'b']), 'a')}>select-ab</button>
       <button type="button" onClick={() => onSetSelection(new Set(), null)}>clear-selection</button>
@@ -266,15 +264,6 @@ describe('LightingPage pins', () => {
       fireEvent.click(screen.getByText('toggle'));
       expect(pinOf()).not.toBeNull();
       await waitFor(() => expect(pinOf()).toBeNull());
-    });
-
-    it('unpins everything from Unpin all', async () => {
-      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' }, b: { kind: 'mirror' } }));
-      renderPage();
-      await waitFor(() => expect(pinOf()).not.toBeNull());
-      fireEvent.click(screen.getByText('unpin-all'));
-      expect(lastPinsCall()).toEqual([['a', 'b'], null]);
-      expect(pinOf()).toBeNull();
     });
   });
 
@@ -554,10 +543,10 @@ describe('LightingPage pins', () => {
       expect(screen.queryByText('lighting.pin.mirrorHint')).toBeNull();
     });
 
-    it.each(['screen', 'gif'])('says where the editor is for a shader pin on the %s tab, and opens it', async mode => {
+    it('says where the editor is for a shader pin on the Media tab, and opens it', async () => {
       localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
-      syncState.mode = mode;
-      syncState.rawSync = mode;
+      syncState.mode = 'gif';
+      syncState.rawSync = 'gif';
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
       renderPage();
       await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
@@ -631,6 +620,28 @@ describe('LightingPage pins', () => {
       fireEvent.click(screen.getByText('select-a'));
       fireEvent.click(await screen.findByText('lighting.pin.pinSelectedToMirror'));
       expect(lastPinsCall()).toEqual([['a'], { kind: 'mirror' }]);
+    });
+
+    it('re-pins a selection pinned to a shader straight to Mirror, with no notice', async () => {
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(await screen.findByText('lighting.pin.pinSelectedToMirror'));
+      expect(lastPinsCall()).toEqual([['a'], { kind: 'mirror' }]);
+      expect(screen.queryByText('lighting.pin.pinnedNotice')).toBeNull();
+      expect(screen.getByTestId('mode-controls')).toBeTruthy();
+    });
+
+    it('keeps the Mirror dock editable for a mixed selection', async () => {
+      localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
+      withDevices('a', 'b');
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
+      fireEvent.click(screen.getByText('select-ab'));
+      await waitFor(() => expect(screen.getByTestId('type-intensity').dataset.mode).toBe('screen'));
+      expect(screen.getByTestId('type-intensity').closest('[inert]')).toBeNull();
     });
 
     it('switching tabs never pins', async () => {

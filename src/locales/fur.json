@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "Lûs distudadis",
   "lighting.devices.stateNotControlled": "Nissun Nexus Control",
   "lighting.devices.unpin": "Sfisse",
-  "lighting.devices.unpinAll": "Sfisse dut",
   "lighting.devices.unpinCount.one": "Sfisse ({count} dispositîf)",
   "lighting.devices.unpinCount.other": "Sfisse ({count} dispositîfs)",
   "lighting.devices.unstack": "Disfâ la tasse",

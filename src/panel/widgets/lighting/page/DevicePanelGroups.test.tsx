@@ -717,7 +717,6 @@ describe('DevicePanel pins', () => {
   };
   function renderPinPanel(over: Partial<React.ComponentProps<typeof DevicePanel>> = {}) {
     const onSetPin = vi.fn();
-    const onUnpinAll = vi.fn();
     render(
       <DevicePanel
         devices={devices}
@@ -733,11 +732,10 @@ describe('DevicePanel pins', () => {
         pinSource="Aurora"
         pinTargetName={pin => pin.effect ?? ''}
         onSetPin={onSetPin}
-        onUnpinAll={onUnpinAll}
         {...over}
       />,
     );
-    return { onSetPin, onUnpinAll };
+    return { onSetPin };
   }
   const menuOf = (name: string) => {
     const card = screen.getByText(name).closest(`.${styles.deviceCard}`)!;
@@ -792,17 +790,6 @@ describe('DevicePanel pins', () => {
     menuOf('Strip one');
     expect(row(/^lighting\.devices\.pinCount/)).toBeNull();
     expect(row(/unpinCount\.one/)).not.toBeNull();
-  });
-
-  it('offers Unpin all only while a pin exists', () => {
-    const { onUnpinAll } = renderPinPanel();
-    fireEvent.click(screen.getByRole('button', { name: 'lighting.devices.unpinAll' }));
-    expect(onUnpinAll).toHaveBeenCalledTimes(1);
-  });
-
-  it('hides Unpin all when nothing is pinned', () => {
-    renderPinPanel({ pins: {} });
-    expect(screen.queryByRole('button', { name: 'lighting.devices.unpinAll' })).toBeNull();
   });
 });
 

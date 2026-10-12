@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "조명 꺼짐",
   "lighting.devices.stateNotControlled": "Nexus Control 없음",
   "lighting.devices.unpin": "고정 해제",
-  "lighting.devices.unpinAll": "모두 고정 해제",
   "lighting.devices.unpinCount.one": "고정 해제 ({count}개 장치)",
   "lighting.devices.unpinCount.other": "고정 해제 ({count}개 장치)",
   "lighting.devices.unstack": "스택 해제",

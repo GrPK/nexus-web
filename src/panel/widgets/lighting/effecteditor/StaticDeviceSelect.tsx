@@ -1,4 +1,4 @@
-import { Ban, CheckCheck, Lightbulb, Pin as PinIcon, PinOff } from 'lucide-react';
+import { Ban, CheckCheck, Lightbulb, Pin as PinIcon } from 'lucide-react';
 import { Button } from '../../../../components/common/Button/Button';
 import { EmptyState } from '../../../../components/common/EmptyState/EmptyState';
 import { usePersistentState } from '../../../../hooks/usePersistentState';
@@ -21,7 +21,7 @@ import styles from './StaticDeviceSelect.module.scss';
  * vice versa. Group headers collapse only; power and Nexus Control belong to
  * the page, not to a picker.
  */
-export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPickFor, pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onUnpinAll, onPinSelectedToMirror }: {
+export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPickFor, pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onPinSelectedToMirror }: {
   devices: LightingDevice[];
   selectedIds: Set<string>;
   /** Receives the whole next selection, matching DevicePanel's onSetSelection. */
@@ -35,7 +35,6 @@ export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPi
   pinDisabledReason?: string;
   pinTargetName?: (pin: Pin) => string;
   onSetPin?: (ids: string[], pinned: boolean) => void;
-  onUnpinAll?: () => void;
   /** Mirror tab only: pins the selection to the one global mirror. */
   onPinSelectedToMirror?: () => void;
 }) {
@@ -151,11 +150,6 @@ export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPi
             onClick={onPinSelectedToMirror}
           >
             {t('lighting.pin.pinSelectedToMirror')}
-          </Button>
-        )}
-        {onUnpinAll && pins && Object.keys(pins).length > 0 && (
-          <Button tone="ghost" size="sm" icon={<PinOff />} onClick={onUnpinAll}>
-            {t('lighting.devices.unpinAll')}
           </Button>
         )}
       </div>

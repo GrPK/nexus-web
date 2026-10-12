@@ -232,19 +232,12 @@ describe('LightingTouch pins', () => {
     vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ 'dev-b': { kind: 'mirror' } }));
     render(<LightingTouch widget={widget} />);
     await waitFor(() => expect(selectProps.current?.pinSource).toBeTruthy());
-    const props = selectProps.current as {
-      onSetPin: (ids: string[], pinned: boolean) => void;
-      onUnpinAll: () => void;
-    };
+    const props = selectProps.current as { onSetPin: (ids: string[], pinned: boolean) => void };
     props.onSetPin(['dev-a'], true);
     expect(lastPins()[0]).toEqual(['dev-a']);
     expect(lastPins()[1]).toMatchObject({ kind: 'static' });
     props.onSetPin(['dev-a'], false);
     expect(lastPins()).toEqual([['dev-a'], null]);
-    await waitFor(() => expect(Object.keys((selectProps.current as { pins: object }).pins)).toContain('dev-b'));
-    props.onUnpinAll();
-    expect(lastPins()[1]).toBeNull();
-    expect(lastPins()[0]).toContain('dev-b');
   });
 
   it('offers Pin selected to Mirror in the Mirror tab only', async () => {
@@ -361,11 +354,11 @@ describe('LightingTouch editor scope', () => {
     expect(screen.queryByTestId('screen-controls')).toBeNull();
   });
 
-  it('says where the editor is for a shader pin on the Mirror tab', async () => {
+  it('keeps the Mirror controls for a shader pin on the Mirror tab, with no notice', async () => {
     vi.mocked(fetchCurrentSync).mockImplementation(() => Promise.resolve({ sync: 'screen' }));
     render(<LightingTouch widget={widget} />);
     await select(['a']);
-    await waitFor(() => expect(screen.getByText('lighting.pin.pinnedNotice')).toBeTruthy());
-    expect(screen.queryByTestId('screen-controls')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('screen-controls')).toBeTruthy());
+    expect(screen.queryByText('lighting.pin.pinnedNotice')).toBeNull();
   });
 });

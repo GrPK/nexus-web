@@ -219,23 +219,22 @@ function renderImmersiveEditor(
       />
     );
   }
-  // A selection pinned to a shader or static look has no editor on these tabs.
-  if (mode === 'gif' || mode === 'screen') {
+  // Media cannot be pinned to, so a selection pinned to a shader or static look has no editor there.
+  if (mode === 'gif') {
     const pinnedElsewhere = scope === 'pin' || scope === 'palette';
-    const notice = <PinNotice>{t('lighting.pin.pinnedNotice', { name: scopeLabel })}</PinNotice>;
-    if (mode === 'gif') {
-      return (
-        <EffectEditor
-          options={pinnedElsewhere ? notice : <MediaList />}
-          effect={pinnedElsewhere ? undefined : mirrorPostProcess}
-        />
-      );
-    }
+    return (
+      <EffectEditor
+        options={pinnedElsewhere ? <PinNotice>{t('lighting.pin.pinnedNotice', { name: scopeLabel })}</PinNotice> : <MediaList />}
+        effect={pinnedElsewhere ? undefined : mirrorPostProcess}
+      />
+    );
+  }
+  if (mode === 'screen') {
     return (
       <EffectEditor
         devices={<StaticDeviceSelect {...deviceSelect} />}
-        options={pinnedElsewhere ? notice : <ScreenControls screenPP={post.value} onScreenPPChange={post.onScreenPPChange} />}
-        effect={pinnedElsewhere ? undefined : mirrorPostProcess}
+        options={<ScreenControls screenPP={post.value} onScreenPPChange={post.onScreenPPChange} />}
+        effect={mirrorPostProcess}
       />
     );
   }
@@ -577,7 +576,6 @@ function useImmersiveAnimateState(): {
     pinDisabledReason: globalPin ? undefined : t('lighting.pin.disabledUnavailable'),
     pinTargetName: (pin: Pin) => pinTargetLabel(pin, t),
     onSetPin: (ids, pinned) => { if (!pinned) void applyPins(ids, null); else if (globalPin) void applyPins(ids, globalPin.pin); },
-    onUnpinAll: () => { void applyPins(Object.keys(pins), null); },
     onPinSelectedToMirror: mode === 'screen' ? () => { void applyPins(selectionIds, MIRROR_PIN); } : undefined,
   };
 

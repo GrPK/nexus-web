@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "Verlichting uit",
   "lighting.devices.stateNotControlled": "Geen Nexus Control",
   "lighting.devices.unpin": "Losmaken",
-  "lighting.devices.unpinAll": "Alles losmaken",
   "lighting.devices.unpinCount.one": "Losmaken ({count} apparaat)",
   "lighting.devices.unpinCount.other": "Losmaken ({count} apparaten)",
   "lighting.devices.unstack": "Stapel opheffen",

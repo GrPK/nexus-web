@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "ライトオフ",
   "lighting.devices.stateNotControlled": "Nexus Control なし",
   "lighting.devices.unpin": "ピン留めを解除",
-  "lighting.devices.unpinAll": "すべてのピン留めを解除",
   "lighting.devices.unpinCount.one": "ピン留めを解除（{count} 台）",
   "lighting.devices.unpinCount.other": "ピン留めを解除（{count} 台）",
   "lighting.devices.unstack": "スタック解除",

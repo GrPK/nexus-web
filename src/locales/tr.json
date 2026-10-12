@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "Işıklar kapalı",
   "lighting.devices.stateNotControlled": "Nexus Control yok",
   "lighting.devices.unpin": "Sabitlemeyi kaldır",
-  "lighting.devices.unpinAll": "Tüm sabitlemeleri kaldır",
   "lighting.devices.unpinCount.one": "Sabitlemeyi kaldır ({count} cihaz)",
   "lighting.devices.unpinCount.other": "Sabitlemeyi kaldır ({count} cihaz)",
   "lighting.devices.unstack": "Yığını çöz",

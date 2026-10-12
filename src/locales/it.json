@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "Luci spente",
   "lighting.devices.stateNotControlled": "Nessun Nexus Control",
   "lighting.devices.unpin": "Stacca",
-  "lighting.devices.unpinAll": "Stacca tutto",
   "lighting.devices.unpinCount.one": "Stacca ({count} dispositivo)",
   "lighting.devices.unpinCount.other": "Stacca ({count} dispositivi)",
   "lighting.devices.unstack": "Separa pila",

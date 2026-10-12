@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "Licht aus",
   "lighting.devices.stateNotControlled": "Keine Nexus-Steuerung",
   "lighting.devices.unpin": "Lösen",
-  "lighting.devices.unpinAll": "Alle lösen",
   "lighting.devices.unpinCount.one": "Lösen ({count} Gerät)",
   "lighting.devices.unpinCount.other": "Lösen ({count} Geräte)",
   "lighting.devices.unstack": "Stapel auflösen",

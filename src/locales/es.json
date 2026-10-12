@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "Luces apagadas",
   "lighting.devices.stateNotControlled": "Sin Nexus Control",
   "lighting.devices.unpin": "Desfijar",
-  "lighting.devices.unpinAll": "Desfijar todo",
   "lighting.devices.unpinCount.one": "Desfijar ({count} dispositivo)",
   "lighting.devices.unpinCount.other": "Desfijar ({count} dispositivos)",
   "lighting.devices.unstack": "Desapilar",

@@ -2622,7 +2622,6 @@
   "lighting.devices.stateLightsOff": "灯光已关闭",
   "lighting.devices.stateNotControlled": "无 Nexus Control",
   "lighting.devices.unpin": "取消固定",
-  "lighting.devices.unpinAll": "全部取消固定",
   "lighting.devices.unpinCount.one": "取消固定（{count} 台设备）",
   "lighting.devices.unpinCount.other": "取消固定（{count} 台设备）",
   "lighting.devices.unstack": "取消堆叠",

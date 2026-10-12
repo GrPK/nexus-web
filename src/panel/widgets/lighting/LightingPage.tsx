@@ -999,7 +999,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   useEffect(() => { if (scoped.kind === 'mixed') setFullscreenOpen(false); }, [scoped.kind]);
   // A mirror pin has nothing of its own: the controls are the global Mirror ones.
   const mirrorScoped = scoped.kind === 'pin' && scoped.pin.kind === 'mirror';
-  const pinTarget = scoped.kind === 'pin' && !mirrorScoped ? scoped : null;
+  // The Mirror tab edits only the global Mirror, so a selection's shader or static pin has no say there.
+  const pinTarget = scoped.kind === 'pin' && !mirrorScoped && effectiveMode !== 'screen' ? scoped : null;
   // The post-process controls follow the mode, except that a selection pinned
   // to Mirror edits the global Mirror ones from any tab.
   const ppMode = mirrorScoped ? 'screen' : mode;
@@ -2039,8 +2040,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The colour the selection wears, which is where its dots sit on the field.
   const scopedHex = scoped.kind === 'pin' ? scoped.hex : (scoped.kind === 'none' ? globalColor : '');
   // Selected devices wearing different pins have no single value for the
-  // controls to edit, so the dock locks until the selection agrees.
-  const mixedSelection = scoped.kind === 'mixed';
+  // controls to edit, so the dock locks until the selection agrees. Mirror's
+  // controls are global, so its dock never locks.
+  const mixedSelection = scoped.kind === 'mixed' && effectiveMode !== 'screen';
   const allSelected = selectAllIds.length > 0 && selectAllIds.every(id => selectedDeviceIds.has(id));
   // The canvas previews the shared effect canvas, which Static does not sample
   // and Off has nothing to show on. Game Sync substitutes its own activity block.
@@ -2114,16 +2116,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           : 'lighting.pin.disabledUnavailable',
   );
   const pinTargetName = useCallback((pin: Pin): string => pinTargetLabel(pin, t), [t]);
-  // A selection pinned to a shader or a static look while the tab is Mirror or
-  // Media: that tab has no editor for it, so it says where the editor is.
-  const offTabPin = pinTarget && (effectiveMode === 'screen' || effectiveMode === 'gif') ? pinTarget : null;
+  // A selection pinned to a shader or a static look while the tab is Media:
+  // Media cannot be pinned to, so it says where the editor is.
+  const offTabPin = pinTarget && effectiveMode === 'gif' ? pinTarget : null;
   const handleSetPin = useCallback((ids: string[], pinned: boolean) => {
     if (!pinned) { void applyPins(ids, null); return; }
     if (globalPin) void applyPins(ids, globalPin.pin);
   }, [applyPins, globalPin]);
-  const handleUnpinAll = useCallback(() => {
-    void applyPins(Object.keys(pins), null);
-  }, [applyPins, pins]);
   // The Mirror tab's own action: the selection follows the one global mirror.
   const handlePinSelectedToMirror = useCallback(() => {
     void applyPins([...selectedDeviceIds], MIRROR_PIN);
@@ -2392,7 +2391,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             pinDisabledReason={pinDisabledReason}
             pinTargetName={pinTargetName}
             onSetPin={handleSetPin}
-            onUnpinAll={handleUnpinAll}
             selectedIds={selectedDeviceIds}
             onSetSelection={handleSetSelection}
             onTogglePower={handleTogglePower}

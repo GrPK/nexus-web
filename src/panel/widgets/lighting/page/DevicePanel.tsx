@@ -1,6 +1,5 @@
 import { type ReactNode } from 'react';
-import { FolderPlus, PinOff, Plus } from 'lucide-react';
-import { Button } from '../../../../components/common/Button/Button';
+import { FolderPlus, Plus } from 'lucide-react';
 import { identifyLightingDevice, type LightingDevice } from '../../../../api/lighting';
 import { useTranslation } from '../../../../lib/i18n';
 import { usePersistentState } from '../../../../hooks/usePersistentState';
@@ -36,7 +35,7 @@ import styles from '../LightingPage.module.scss';
  * using the same component/styling as a motherboard group: a chevron, the brand
  * name, a group power switch, and its lights as indented child cards.
  */
-export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, onUnpinAll, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
+export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
   devices: LightingDevice[];
   /** Optional control rendered at the top of the scrolling list (master brightness). */
   /** Every device before the Nexus-Control-off filter, so a group header can
@@ -67,8 +66,6 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   /** Pins these cards to the current global source, or unpins them. Absent
    *  leaves every card without a pin button. */
   onSetPin?: (ids: string[], pinned: boolean) => void;
-  /** Releases every pin. */
-  onUnpinAll?: () => void;
   /** Device ids currently selected (single-tap → 1-element set, canvas marquee → N-element set). */
   selectedIds: Set<string>;
   /** Bulk set: Cmd/Ctrl+click on a row toggles membership without clobbering the rest. */
@@ -605,11 +602,6 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
     <aside className={styles.devicePanel}>
       <div className={styles.deviceList}>
         {header}
-        {onUnpinAll && pins && Object.keys(pins).length > 0 && (
-          <Button tone="ghost" size="sm" icon={<PinOff />} onClick={onUnpinAll}>
-            {t('lighting.devices.unpinAll')}
-          </Button>
-        )}
         {devices.length === 0 && (
           <p className={styles.deviceEmpty}>{t(filtering ? 'lighting.devices.noMatches' : lightingOff ? 'lighting.devices.selectModeHint' : 'lighting.devices.empty')}</p>
         )}

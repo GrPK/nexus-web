@@ -2652,7 +2652,6 @@
   "lighting.devices.stateLightsOff": "Подсветка выключена",
   "lighting.devices.stateNotControlled": "Без Nexus Control",
   "lighting.devices.unpin": "Открепить",
-  "lighting.devices.unpinAll": "Открепить все",
   "lighting.devices.unpinCount.few": "Открепить ({count} устройства)",
   "lighting.devices.unpinCount.one": "Открепить ({count} устройство)",
   "lighting.devices.unpinCount.other": "Открепить ({count} устройств)",
