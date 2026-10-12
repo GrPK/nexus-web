@@ -1,4 +1,5 @@
 import { authFetchWithStatus } from '../api/service';
+import { isStaleChunkMessage, recoverFromStaleChunkNow } from '../lib/staleChunkRecovery';
 
 export type ErrorKind = 'window-error' | 'unhandled-rejection' | 'render';
 
@@ -143,6 +144,7 @@ export function reportError(error: unknown, kind: ErrorKind, context?: string): 
     const d = describe(error);
     const stack = stripUrlSecrets(d.stack);
     if (isNoise(d.message, stack)) return;
+    if (isStaleChunkMessage(d.message) && recoverFromStaleChunkNow()) return;
     const message = stripUrlSecrets(d.message);
     const fingerprint = cap(fingerprintOf(d.type, d.message), CAPS.fingerprint);
     const existing = records.get(fingerprint);
@@ -184,7 +186,30 @@ export function reportError(error: unknown, kind: ErrorKind, context?: string): 
   }
 }
 
+function stripUrlSuffix(url: string): string {
+  return url.replace(/[?#].*$/, '');
+}
+
+// Wallet extensions and in-app browsers inject scripts into the page. Their
+// frames never come from our hashed /assets/ bundle (or the dev server's
+// /src/ modules). The one exception is our own inline index.html polyfills,
+// which report the page URL as filename but always sit past line 1, whereas
+// an injected snippet evaluated against the page starts at line 1.
+export function isForeignScriptError(filename: string, lineno: number, pageHref: string): boolean {
+  if (!filename) return false;
+  if (filename.indexOf('/assets/') !== -1 || filename.indexOf('/src/') !== -1) return false;
+  if (stripUrlSuffix(filename) === stripUrlSuffix(pageHref)) return lineno <= 1;
+  return true;
+}
+
 function onWindowError(event: ErrorEvent): void {
+  let foreign = false;
+  try {
+    foreign = isForeignScriptError(event.filename, event.lineno, window.location.href);
+  } catch {
+    foreign = false;
+  }
+  if (foreign) return;
   reportError(event.error ?? event.message, 'window-error');
 }
 

@@ -5,9 +5,16 @@ vi.mock('../api/service', () => ({
   authFetchWithStatus: (...a: unknown[]) => postService(...a),
 }));
 
+const recoverNow = vi.fn(() => false);
+vi.mock('../lib/staleChunkRecovery', async (orig) => ({
+  ...(await orig<typeof import('../lib/staleChunkRecovery')>()),
+  recoverFromStaleChunkNow: () => recoverNow(),
+}));
+
 import {
   droppedErrorCount,
   fingerprintOf,
+  isForeignScriptError,
   installGlobalErrorReporting,
   reportError,
   resetErrorReportingForTests,
@@ -204,5 +211,57 @@ describe('reportError', () => {
     await vi.advanceTimersByTimeAsync(5000);
     const last = sent()[sent().length - 1].errors[0];
     expect(last.message).toBe('overflow-bbb');
+  });
+});
+
+describe('isForeignScriptError', () => {
+  const page = 'http://192.168.1.5:9400/panel/phone?token=abc';
+
+  it('keeps errors from our own bundle and the dev server', () => {
+    expect(isForeignScriptError('http://localhost:9400/assets/index-abc.js', 9, page)).toBe(false);
+    expect(isForeignScriptError('http://localhost:5173/src/App.tsx', 12, page)).toBe(false);
+  });
+
+  it('keeps errors with no filename', () => {
+    expect(isForeignScriptError('', 0, page)).toBe(false);
+  });
+
+  it('drops an injected snippet evaluated against the page at line 1', () => {
+    expect(isForeignScriptError('http://192.168.1.5:9400/panel/phone', 1, page)).toBe(true);
+  });
+
+  it('keeps our inline index.html scripts, which sit past line 1', () => {
+    expect(isForeignScriptError('http://192.168.1.5:9400/panel/phone', 32, page)).toBe(false);
+  });
+
+  it('drops scripts served from another origin or an extension', () => {
+    expect(isForeignScriptError('chrome-extension://abc/inpage.js', 3, page)).toBe(true);
+  });
+
+  it('does not report a foreign window error', async () => {
+    window.dispatchEvent(new ErrorEvent('error', {
+      error: new TypeError('undefined is not an object (evaluating window.ethereum.selectedAddress)'),
+      message: 'x', filename: 'http://localhost:3000/panel/phone', lineno: 1,
+    }));
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(postService).not.toHaveBeenCalled();
+  });
+});
+
+describe('stale chunk errors', () => {
+  const stale = () => new TypeError('Failed to fetch dynamically imported module: http://localhost:9400/assets/DevicesPage-Bc.js');
+
+  it('are swallowed when the reload guard allowed a reload', async () => {
+    recoverNow.mockReturnValueOnce(true);
+    reportError(stale(), 'unhandled-rejection');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(postService).not.toHaveBeenCalled();
+  });
+
+  it('are still reported when the guard blocked the reload', async () => {
+    recoverNow.mockReturnValueOnce(false);
+    reportError(stale(), 'unhandled-rejection');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(sent()).toHaveLength(1);
   });
 });
