@@ -26,3 +26,8 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+.trigger {
+  display: inline-flex;
+  flex-shrink: 0;
+}

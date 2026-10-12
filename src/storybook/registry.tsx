@@ -2,7 +2,7 @@
 // file per preview to satisfy the fast-refresh rule would be dozens of tiny
 // files. Storybook entries reload (not HMR) on edit.
 import { useEffect, useRef, useState, type CSSProperties, type FC } from 'react';
-import { Monitor, Palette, Sparkles, X, Plus, Settings, Download, AlertTriangle, HardDrive, Heart, Pause, Pointer, Power, Cpu, Gauge, MemoryStick } from 'lucide-react';
+import { Monitor, Palette, Sparkles, X, Plus, Settings, Download, AlertTriangle, HardDrive, HardDriveDownload, Heart, Link2Off, Pause, Pointer, Power, Cpu, Gauge, MemoryStick } from 'lucide-react';
 import { ViewHeader } from '../components/common/ViewHeader/ViewHeader';
 import { Sparkline } from '../components/common/Sparkline/Sparkline';
 import { SensorCard } from '../components/common/SensorCard/SensorCard';
@@ -31,6 +31,8 @@ import { DeviceWarningIcon } from '../components/common/DeviceWarningIcon/Device
 import { WarningIcon } from '../components/common/WarningIcon/WarningIcon';
 import { DeviceGroupIcon } from '../components/common/DeviceGroupIcon/DeviceGroupIcon';
 import { NexusControlOffIcon } from '../components/common/NexusControlOffIcon/NexusControlOffIcon';
+import { DeviceUpdateIcon } from '../components/common/DeviceUpdateIcon/DeviceUpdateIcon';
+import { RowGlyph } from '../components/common/RowGlyph/RowGlyph';
 import { NexusControlCard } from '../components/common/NexusControlCard/NexusControlCard';
 import { FeatureDisabled } from '../components/common/FeatureDisabled/FeatureDisabled';
 import { PageHero } from '../components/common/PageHero/PageHero';
@@ -360,6 +362,11 @@ function PreviewDeviceWarningIcon() {
         <span>Unknown code</span>
         <DeviceWarningIcon code="some-future-code" />
       </div>
+      <div className={styles.previewHoverCard}>
+        <span>Chip (Devices list)</span>
+        <DeviceWarningIcon code="usb-disconnected" chip />
+        <DeviceWarningIcon code="some-future-code" chip />
+      </div>
     </div>
   );
 }
@@ -403,6 +410,36 @@ function PreviewDeviceGroupIcon() {
           <span>{label}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function PreviewRowGlyph() {
+  return (
+    <div className={styles.previewStack}>
+      <div className={styles.previewHoverCard}>
+        <span>Dim (default)</span>
+        <RowGlyph icon={<Link2Off size={14} aria-hidden />} label="Nexus Control is off" />
+      </div>
+      <div className={styles.previewHoverCard}>
+        <span>Accent</span>
+        <RowGlyph icon={<HardDriveDownload size={14} aria-hidden />} label="Update available" tone="accent" />
+      </div>
+    </div>
+  );
+}
+
+function PreviewDeviceUpdateIcon() {
+  return (
+    <div className={styles.previewStack}>
+      <div className={styles.previewHoverCard}>
+        <span>HYTE Q60</span>
+        <DeviceUpdateIcon />
+      </div>
+      <div className={styles.previewHoverCard}>
+        <span>Chip (Devices list)</span>
+        <DeviceUpdateIcon chip />
+      </div>
     </div>
   );
 }
@@ -2604,7 +2641,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'DeviceWarningIcon', category: 'status',
     filePath: 'src/components/common/DeviceWarningIcon/DeviceWarningIcon.tsx',
-    description: 'Right-aligned warning glyph for a device row/card, shown whenever the service reports a device-level issue via DeviceListItem.warning. Code-driven - the warning code maps to a localized tooltip, so any handler can flag a problem without new UI per device family. Used by the sidebar DEVICES section and the Devices-page card grid.',
+    description: 'Device warning shown whenever the service reports a device-level issue via DeviceListItem.warning: a right-aligned glyph on sidebar rows, or with `chip` a short labelled Badge on the Devices-page cards whose tooltip carries the full message. Code-driven - the code maps to localized strings, so any handler can flag a problem without new UI per device family.',
     Preview: PreviewDeviceWarningIcon,
     notes: 'Renders the raw code as a fallback tooltip if it has no mapped i18n key, so an unmapped code fails visibly instead of silently.',
   },
@@ -2621,6 +2658,18 @@ export const REGISTRY: StorybookEntry[] = [
     description: 'The glyph before a hardware group\'s name on the lighting and cooling rails: curated device art for a known device-id prefix (NP50, SmartHub, Lian Li, Corsair, keeb, Q-series, Kraken, CNVS), a generic board / GPU / RAM / fan / bulb mark for an OpenRGB or smart-light iconType, else the generic device. User-made groups carry no icon.',
     Preview: PreviewDeviceGroupIcon,
     notes: 'Curated art is the same /assets/devices/*.svg the Devices page shows, drawn as a currentColor mask so it matches the lucide glyphs beside it. Sized to the compact CollapsibleSection chevron.',
+  },
+  {
+    name: 'DeviceUpdateIcon', category: 'status',
+    filePath: 'src/components/common/DeviceUpdateIcon/DeviceUpdateIcon.tsx',
+    description: 'Firmware or panel-app update indicator (useFirmwareUpdates): a RowGlyph on sidebar rows, or with `chip` a labelled Badge on the Devices-page cards.',
+    Preview: PreviewDeviceUpdateIcon,
+  },
+  {
+    name: 'RowGlyph', category: 'status',
+    filePath: 'src/components/common/RowGlyph/RowGlyph.tsx',
+    description: 'Right-aligned status glyph with a hover label on a device or nav row; bare (non-focusable) so it can sit inside a row button. tone="dim" (default) or "accent". NexusControlOffIcon and DeviceUpdateIcon wrap it.',
+    Preview: PreviewRowGlyph,
   },
   {
     name: 'NexusControlOffIcon', category: 'status',
@@ -3142,7 +3191,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'Badge', category: 'status',
     filePath: 'src/components/common/Badge/Badge.tsx',
-    description: 'Status pill with tone-tinted color and color-mixed background. Accepts an optional icon ReactNode. Host-renderer bridge for the SDK Badge element.',
+    description: 'Status pill with tone-tinted color and color-mixed background. Accepts an optional icon ReactNode, and an optional `tooltip` ({ title?, body }) that also becomes its accessible name. Host-renderer bridge for the SDK Badge element.',
     Preview: PreviewBadge,
   },
   {

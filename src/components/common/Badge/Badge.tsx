@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import classNames from 'classnames';
+import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 import styles from './Badge.module.scss';
 
 export interface BadgeProps {
@@ -22,17 +23,27 @@ export interface BadgeProps {
   uppercase?: boolean;
   /** 'small' sets the label one step up from the default caption size. */
   size?: 'caption' | 'small';
+  /** Hover explanation; also the badge's accessible name, since a tooltip is pointer-only. */
+  tooltip?: { title?: string; body: string };
+  className?: string;
 }
 
-export function Badge({ label, color = 'var(--text)', icon, iconPosition = 'start', minWidth, compact, uppercase, size = 'caption' }: BadgeProps) {
-  return (
+export function Badge({ label, color = 'var(--text)', icon, iconPosition = 'start', minWidth, compact, uppercase, size = 'caption', tooltip, className }: BadgeProps) {
+  const badge = (
     <span
-      className={classNames(styles.badge, compact && styles.compact, uppercase && styles.uppercase, size === 'small' && styles.small)}
+      className={classNames(styles.badge, compact && styles.compact, uppercase && styles.uppercase, size === 'small' && styles.small, !tooltip && className)}
       style={{ '--badge-color': color, ...(minWidth ? { '--badge-min-width': minWidth } : {}) } as CSSProperties}
     >
       {iconPosition === 'start' && icon}
       {label ?? ''}
       {iconPosition === 'end' && icon}
     </span>
+  );
+  if (!tooltip) return badge;
+  const name = tooltip.title ? `${tooltip.title}. ${tooltip.body}` : tooltip.body;
+  return (
+    <HoverTooltip title={tooltip.title} body={tooltip.body} side="top">
+      <span className={classNames(styles.trigger, className)} role="img" aria-label={name}>{badge}</span>
+    </HoverTooltip>
   );
 }
