@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EffectsMarket } from './EffectsMarket';
@@ -26,17 +27,29 @@ vi.mock('../../../api/effectMarket', () => ({
 }));
 
 const put = vi.fn();
-vi.mock('../../../api/customEffects', () => ({
-  STUDIO_UID_RE: /^[a-z0-9]{1,24}$/,
-  customEffectKey: (id: string) => `custom:${id}`,
-  getCustomEffects: () => [],
-  useCustomEffects: () => [],
+const remove = vi.fn();
+let installed: { id: string; name: string; recipe: string; updatedAt: number; audio: boolean; marketId?: string }[] = [];
+vi.mock('../../../api/customEffects', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../api/customEffects')>()),
+  getCustomEffects: () => installed,
+  useCustomEffects: () => installed,
   refreshCustomEffects: async () => {},
   putCustomEffect: (...a: unknown[]) => put(...a),
-  deleteCustomEffect: async () => true,
+  deleteCustomEffect: (...a: unknown[]) => remove(...a),
 }));
 
 vi.mock('../../../panel/widgets/lighting/studio/recipePreview', () => ({ attachRecipePreview: () => () => {} }));
+
+const fetchShaderSource = vi.fn();
+vi.mock('../../../api/lighting', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../api/lighting')>()),
+  fetchShaderSource: (...a: unknown[]) => fetchShaderSource(...a),
+}));
+
+let previewState: { current: { speed: number } | null } | null = null;
+vi.mock('../../../panel/widgets/lighting/studio/StudioPreview', () => ({
+  StudioPreview: (props: { stateRef: { current: { speed: number } | null } }) => { previewState = props.stateRef; return null; },
+}));
 
 const ID = '0b5c1a52-5f0e-4b8e-9d55-1a2b3c4d5e6f';
 const recipe = {
@@ -44,7 +57,7 @@ const recipe = {
   blocks: [{ uid: 'a1', type: 'rings', params: {} }, { uid: 'b2', type: 'palette', params: {} }],
 };
 const listing: EffectListing = {
-  id: ID, name: 'Fan spin', description: 'Spins', author: 'alice', recipe, audio: false,
+  id: ID, name: 'Fan spin', author: 'alice', recipe, audio: false,
   downloads: 3, createdAt: '2026-10-11T00:00:00Z', updatedAt: '2026-10-11T00:00:00Z',
 };
 
@@ -59,6 +72,10 @@ describe('EffectsMarket', () => {
     vi.clearAllMocks();
     getEffect.mockResolvedValue({ ok: true, value: listing });
     put.mockResolvedValue({ entry: {} });
+    remove.mockResolvedValue(true);
+    fetchShaderSource.mockResolvedValue(null);
+    installed = [];
+    previewState = null;
   });
 
   it('lists the most downloaded effects and opens one', async () => {
@@ -80,7 +97,7 @@ describe('EffectsMarket', () => {
   it('asks for a sign-in when the download is refused, then retries', async () => {
     downloadEffect.mockResolvedValueOnce({ ok: false, error: 'sign_in_required' });
     const onNeedsSignIn = detail(null);
-    fireEvent.click(await screen.findByRole('button', { name: 'store.effects.get' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'store.install' }));
     await waitFor(() => expect(onNeedsSignIn).toHaveBeenCalled());
     expect(put).not.toHaveBeenCalled();
 
@@ -90,16 +107,40 @@ describe('EffectsMarket', () => {
     expect(put.mock.calls[0][1]).toMatchObject({ name: 'Fan spin', marketId: ID, marketAuthor: 'alice' });
   });
 
-  it("offers the author Unpublish instead of Get", async () => {
+  it('uninstalls every local copy of the listing after a confirmation', async () => {
+    installed = [{ id: 'fx1', name: 'Fan spin', recipe: JSON.stringify(recipe), updatedAt: 1, audio: false, marketId: ID }];
+    detail();
+    fireEvent.click(await screen.findByRole('button', { name: 'store.effects.uninstall' }));
+    expect(remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('button', { name: 'store.effects.uninstall' }).at(-1)!);
+    await waitFor(() => expect(remove).toHaveBeenCalledWith('fx1'));
+  });
+
+  it("plays the effect with the Lighting page's controls, changing only the preview", async () => {
+    detail();
+    const speed = await screen.findByRole('slider', { name: /lighting\.controls\.speed/ });
+    fireEvent.change(speed, { target: { value: '80' } });
+    await waitFor(() => expect(previewState?.current?.speed).toBe(80));
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it('keeps the knobs under StrictMode, which re-runs unmount cleanups', async () => {
+    render(<StrictMode><EffectsMarket path={ID} username="bob" onNavigate={() => {}} onNeedsSignIn={() => {}} /></StrictMode>);
+    await screen.findByRole('slider', { name: /lighting\.controls\.speed/ });
+    // The service has no source for a listing's key: a remount that lost the primed one would fetch it.
+    expect(fetchShaderSource).not.toHaveBeenCalled();
+  });
+
+  it("offers the author Unpublish instead of Install", async () => {
     detail('Alice');
     expect(await screen.findByRole('button', { name: 'store.effects.unpublish' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'store.effects.get' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'store.install' })).not.toBeInTheDocument();
   });
 
   it('cannot get an effect this build cannot run', async () => {
     getEffect.mockResolvedValue({ ok: true, value: { ...listing, recipe: { ...recipe, blocks: [{ uid: 'x', type: 'hologram', params: {} }] } } });
     detail();
     expect(await screen.findByText('store.effects.unsupported')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'store.effects.get' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'store.install' })).toBeDisabled();
   });
 });

@@ -5,7 +5,7 @@ import { TextInput } from '../../../../components/common/TextInput/TextInput';
 import { AccountSignInModal } from '../../../../components/views/SettingsView/Account/AccountSignInModal';
 import { fetchCloudAccounts } from '../../../../api/cloud';
 import {
-  getEffect, publishEffect, updateEffect,
+  publishEffect, updateEffect,
   type EffectListing, type EffectMarketError, type EffectMarketResult,
 } from '../../../../api/effectMarket';
 import { useTranslation } from '../../../../lib/i18n';
@@ -15,12 +15,12 @@ import promptStyles from '../../../../components/common/PromptModal/PromptModal.
 import styles from './ShaderStudio.module.scss';
 
 const NAME_MAX = 40;
-const DESCRIPTION_MAX = 280;
 
 const ERROR_KEYS: Partial<Record<EffectMarketError, string>> = {
   unavailable: 'lighting.studio.publish.unavailable',
   listing_limit: 'lighting.studio.publish.limit',
   duplicate: 'lighting.studio.publish.duplicate',
+  name_not_allowed: 'lighting.studio.publish.nameNotAllowed',
 };
 
 async function activeUsername(): Promise<string | null> {
@@ -48,7 +48,6 @@ export function PublishEffectModal({ open, initialName, recipe, link, save, onVi
   // undefined while the account is being read.
   const [username, setUsername] = useState<string | null | undefined>(undefined);
   const [name, setName] = useState(initialName);
-  const [description, setDescription] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signIn, setSignIn] = useState(false);
@@ -65,22 +64,12 @@ export function PublishEffectModal({ open, initialName, recipe, link, save, onVi
     let alive = true;
     resumeRef.current = false;
     setName(initialNameRef.current);
-    setDescription('');
     setError(null);
     setPublished(null);
     setUsername(undefined);
     void activeUsername().then(u => { if (alive) setUsername(u); });
     return () => { alive = false; };
   }, [open]);
-
-  // Keyed on the id: the Studio passes a new link object on every render.
-  const linkId = link?.marketId;
-  useEffect(() => {
-    if (!open || !updating || !linkId) return;
-    let alive = true;
-    void getEffect(linkId).then(res => { if (alive && res.ok) setDescription(res.value.description ?? ''); });
-    return () => { alive = false; };
-  }, [open, updating, linkId]);
 
   const submit = async () => {
     const trimmed = name.trim();
@@ -90,7 +79,7 @@ export function PublishEffectModal({ open, initialName, recipe, link, save, onVi
     setError(null);
     const saveError = await save(trimmed);
     if (saveError) { setWorking(false); setError(saveError); return; }
-    const body = { name: trimmed, description: description.trim() || undefined, recipe };
+    const body = { name: trimmed, recipe };
     let res: EffectMarketResult<EffectListing> = updating && link ? await updateEffect(link.marketId, body) : await publishEffect(body);
     // The listing was unpublished from the Marketplace since: publish it anew.
     if (!res.ok && res.error === 'not_found' && updating) res = await publishEffect(body);
@@ -152,11 +141,6 @@ export function PublishEffectModal({ open, initialName, recipe, link, save, onVi
               <label className={promptStyles.fieldWrap}>
                 <span className={styles.caption}>{t('lighting.studio.publish.name')}</span>
                 <TextInput value={name} maxLength={NAME_MAX} onInput={setName} ariaLabel={t('lighting.studio.publish.name')} />
-              </label>
-              <label className={promptStyles.fieldWrap}>
-                <span className={styles.caption}>{t('lighting.studio.publish.description')}</span>
-                <TextInput value={description} maxLength={DESCRIPTION_MAX} onInput={setDescription}
-                  placeholder={t('lighting.studio.publish.descriptionPlaceholder')} ariaLabel={t('lighting.studio.publish.description')} />
               </label>
             </div>
             {error && <p className={promptStyles.error} role="alert">{error}</p>}

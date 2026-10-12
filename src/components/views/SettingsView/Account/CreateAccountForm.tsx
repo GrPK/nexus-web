@@ -20,8 +20,8 @@ export function CreateAccountForm({ backend, onSuccess }: CreateAccountFormProps
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  // Server-side rejection; cleared as soon as the username is edited.
-  const [usernameTaken, setUsernameTaken] = useState(false);
+  // Server-side rejection (the error key shown); cleared as soon as the username is edited.
+  const [usernameRejected, setUsernameRejected] = useState<string | null>(null);
 
   const emailInvalid = touched && email.length > 0 && !isValidEmail(email);
   const usernameInvalid = touched && username.length > 0 && !isValidUsername(username);
@@ -45,12 +45,16 @@ export function CreateAccountForm({ backend, onSuccess }: CreateAccountFormProps
       onSuccess(trimmedEmail, password);
       return;
     }
+    if (result.body?.msg === 'username_not_allowed') {
+      setUsernameRejected('account.error.usernameNotAllowed');
+      return;
+    }
     if (result.status !== 409) {
       setFormError(t('account.error.generic'));
       return;
     }
     if (result.body?.msg === 'username_taken') {
-      setUsernameTaken(true);
+      setUsernameRejected('account.error.usernameTaken');
       return;
     }
     setFormError(t('account.create.error.duplicate'));
@@ -74,17 +78,17 @@ export function CreateAccountForm({ backend, onSuccess }: CreateAccountFormProps
         <span className={styles.fieldLabel}>{t('account.create.username')}</span>
         <TextInput
           value={username}
-          onInput={value => { setUsername(value); setUsernameTaken(false); }}
+          onInput={value => { setUsername(value); setUsernameRejected(null); }}
           name="username"
           autoComplete="username"
           ariaLabel={t('account.create.username')}
           maxLength={15}
-          invalid={usernameInvalid || usernameTaken}
+          invalid={usernameInvalid || !!usernameRejected}
         />
         {usernameInvalid
           ? <p className={styles.error} role="alert">{t('account.create.error.username')}</p>
-          : usernameTaken
-            ? <p className={styles.error} role="alert">{t('account.error.usernameTaken')}</p>
+          : usernameRejected
+            ? <p className={styles.error} role="alert">{t(usernameRejected)}</p>
             : <p className={styles.hint}>{t('account.create.usernameHint')}</p>}
       </label>
       <label className={styles.field}>

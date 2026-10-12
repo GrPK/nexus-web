@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, Download, User } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
+import { Card } from '../../common/Card/Card';
 import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
 import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
 import { EffectCard } from '../../common/EffectCard/EffectCard';
@@ -12,9 +13,16 @@ import {
   downloadEffect, getEffect, listEffects, unpublishEffect,
   type EffectListing, type EffectMarketError, type EffectSort,
 } from '../../../api/effectMarket';
+import { forgetShaderSource, primeShaderSource } from '../../../api/lighting';
+import { customEffectDef } from '../../../api/customEffects';
+import { useAudioState } from '../../../hooks/useAudioState';
+import type { EffectState } from '../../../types/lighting';
+import { baselineTemplates, slotMatchesDefault } from '../../../types/lightingTemplates';
+import { EffectControls } from '../../../panel/widgets/lighting/page/EffectControls';
+import { StudioPreview } from '../../../panel/widgets/lighting/studio/StudioPreview';
 import { attachRecipePreview } from '../../../panel/widgets/lighting/studio/recipePreview';
-import { newEffectId, parseMarketRecipe, saveEffect, useSavedEffects } from '../../../panel/widgets/lighting/studio/studioLibrary';
-import type { StudioRecipe } from '../../../panel/widgets/lighting/studio/studioCompiler';
+import { deleteEffect, newEffectId, parseMarketRecipe, saveEffect, useSavedEffects } from '../../../panel/widgets/lighting/studio/studioLibrary';
+import { compileStudio, type StudioRecipe } from '../../../panel/widgets/lighting/studio/studioCompiler';
 import storeStyles from './StorePage.module.scss';
 import styles from './EffectsMarket.module.scss';
 
@@ -189,10 +197,67 @@ function CreatorEffects({ author, onOpen, onBack }: { author: string; onOpen: (i
   );
 }
 
+// Listing shaders stay primed for the last few detail pages instead of being
+// evicted on unmount: StrictMode re-runs cleanups while the preview and knobs
+// still read the key, and nothing on the service backs it.
+const PRIMED_MAX = 8;
+const primedKeys: string[] = [];
+function primeListingShader(key: string, frag: string): void {
+  primeShaderSource(key, frag);
+  const at = primedKeys.indexOf(key);
+  if (at >= 0) primedKeys.splice(at, 1);
+  primedKeys.push(key);
+  while (primedKeys.length > PRIMED_MAX) forgetShaderSource(primedKeys.shift()!);
+}
+
 const ERROR_KEYS: Partial<Record<EffectMarketError, string>> = {
   unavailable: 'store.effects.unavailable',
   not_found: 'store.effects.gone',
 };
+
+/**
+ * The listing running live with the Lighting page's effect controls. It is
+ * compiled the way an installed effect is (baked), so the neutral preset renders
+ * the recipe as published; edits only change this preview.
+ */
+function EffectPlayground({ listing, recipe, children }: { listing: EffectListing; recipe: StudioRecipe; children: ReactNode }) {
+  const { t } = useTranslation();
+  const compiled = useMemo(() => {
+    const c = compileStudio(recipe, { bake: true });
+    primeListingShader(c.key, c.frag);
+    return c;
+  }, [recipe]);
+  const def = useMemo(() => customEffectDef(
+    { id: listing.id, name: listing.name, recipe: JSON.stringify(recipe), updatedAt: 0, audio: listing.audio }, t,
+  ), [listing.id, listing.name, listing.audio, recipe, t]);
+  const neutral = useMemo(() => baselineTemplates(compiled.key), [compiled.key]);
+  const [state, setState] = useState<EffectState>(neutral.slots[0]);
+  const stateRef = useRef<EffectState | null>(state);
+  useLayoutEffect(() => { stateRef.current = state; }, [state]);
+  const audioRef = useAudioState(listing.audio);
+  return (
+    <div className={styles.playground}>
+      <div className={styles.main}>
+        <StudioPreview effectKey={compiled.key} stateRef={stateRef} audioRef={audioRef} className={styles.detailPreview} />
+        {children}
+      </div>
+      <Card compact className={styles.controls}>
+        <EffectControls
+          effect={compiled.key}
+          customDef={def}
+          state={state}
+          bundle={{ selected: 0, slots: [state] }}
+          canReset={!slotMatchesDefault(compiled.key, 0, state, { [compiled.key]: neutral })}
+          onTemplateSelect={() => {}}
+          onChange={patch => setState(s => ({ ...s, ...patch }))}
+          onCommit={() => {}}
+          onReset={() => setState(neutral.slots[0])}
+          noPresets
+        />
+      </Card>
+    </div>
+  );
+}
 
 function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
   id: string;
@@ -208,6 +273,7 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
   const [loadError, setLoadError] = useState<EffectMarketError | null>(null);
   const [state, setState] = useState<'idle' | 'working' | 'failed'>('idle');
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
+  const [confirmUninstall, setConfirmUninstall] = useState(false);
   const [unpublishFailed, setUnpublishFailed] = useState(false);
   const saved = useSavedEffects();
 
@@ -221,15 +287,15 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
   }, [id]);
 
   const recipe = useMemo(() => (listing ? recipeOf(listing) : null), [listing]);
-  const added = saved.some(s => s.marketId === id);
+  const installed = saved.filter(s => s.marketId === id);
   const mine = !!listing && !!username && listing.author.toLowerCase() === username.toLowerCase();
 
-  const get = async () => {
+  const install = async () => {
     setState('working');
     const res = await downloadEffect(id);
     if (!res.ok) {
       setState(res.error === 'sign_in_required' ? 'idle' : 'failed');
-      if (res.error === 'sign_in_required') onNeedsSignIn(() => { void get(); });
+      if (res.error === 'sign_in_required') onNeedsSignIn(() => { void install(); });
       return;
     }
     setListing(res.value);
@@ -238,6 +304,13 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
       ? await saveEffect(newEffectId(), res.value.name, parsed, { marketId: res.value.id, marketAuthor: res.value.author })
       : 'unsupported';
     setState(error ? 'failed' : 'idle');
+  };
+
+  const uninstall = async () => {
+    setConfirmUninstall(false);
+    setState('working');
+    const results = await Promise.all(installed.map(s => deleteEffect(s.id)));
+    setState(results.every(Boolean) ? 'idle' : 'failed');
   };
 
   const unpublish = async () => {
@@ -249,47 +322,58 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
   if (loadError) return <><BackBar onBack={onBack} /><div className={storeStyles.notice}>{t(ERROR_KEYS[loadError] ?? 'store.unavailable')}</div></>;
   if (!listing) return <div className={storeStyles.notice}>{t('store.loading')}</div>;
 
+  const header = (
+    <header className={storeStyles.heroMain}>
+      <h1 className={`${storeStyles.heroTitle} selectable`}>{listing.name}</h1>
+      <div className={styles.byline}>
+        <button type="button" className={styles.author} onClick={() => onCreator(listing.author)}>
+          <User size={14} aria-hidden={true} />
+          {t('store.effects.byAuthor', { author: listing.author })}
+        </button>
+        <span className={styles.count}>
+          <Download size={14} aria-hidden={true} />
+          {downloads(listing.downloads)}
+        </span>
+      </div>
+      <div className={storeStyles.heroActions}>
+        {mine ? (
+          <Button tone="danger" onClick={() => setConfirmUnpublish(true)}>{t('store.effects.unpublish')}</Button>
+        ) : installed.length > 0 ? (
+          <Button tone="neutral" loading={state === 'working'} disabled={state === 'working'} onClick={() => setConfirmUninstall(true)}>
+            {t('store.effects.uninstall')}
+          </Button>
+        ) : (
+          <Button tone="accent" loading={state === 'working'} disabled={!recipe || state === 'working'} onClick={() => { void install(); }}>
+            {state === 'failed' ? t('store.retry') : t('store.install')}
+          </Button>
+        )}
+      </div>
+      {(installed.length > 0 || mine) && <span className={storeStyles.installedVersion}>{t('store.effects.whereToFind')}</span>}
+      {state === 'failed' && <InlineError>{t(installed.length > 0 ? 'store.effects.uninstallFailed' : 'store.effects.getFailed')}</InlineError>}
+      {unpublishFailed && <InlineError>{t('store.effects.unpublishFailed')}</InlineError>}
+    </header>
+  );
+
   return (
     <>
       <BackBar onBack={onBack} />
-      <div className={styles.detailPreview}>
-        {recipe
-          ? <RecipeCanvas recipe={recipe} className={styles.detailCanvas} />
-          : <p className={styles.unsupported}>{t('store.effects.unsupported')}</p>}
-      </div>
-      <header className={storeStyles.heroMain}>
-        <h1 className={`${storeStyles.heroTitle} selectable`}>{listing.name}</h1>
-        <div className={styles.byline}>
-          <button type="button" className={styles.author} onClick={() => onCreator(listing.author)}>
-            <User size={14} aria-hidden={true} />
-            {t('store.effects.byAuthor', { author: listing.author })}
-          </button>
-          <span className={styles.count}>
-            <Download size={14} aria-hidden={true} />
-            {downloads(listing.downloads)}
-          </span>
+      {recipe ? (
+        <EffectPlayground key={listing.id} listing={listing} recipe={recipe}>{header}</EffectPlayground>
+      ) : (
+        <div className={styles.main}>
+          <div className={styles.detailPreview}><p className={styles.unsupported}>{t('store.effects.unsupported')}</p></div>
+          {header}
         </div>
-        <div className={storeStyles.heroActions}>
-          {mine ? (
-            <Button tone="danger" onClick={() => setConfirmUnpublish(true)}>{t('store.effects.unpublish')}</Button>
-          ) : added ? (
-            <Button tone="neutral" disabled>{t('store.effects.added')}</Button>
-          ) : (
-            <Button tone="accent" loading={state === 'working'} disabled={!recipe || state === 'working'} onClick={() => { void get(); }}>
-              {state === 'failed' ? t('store.retry') : t('store.effects.get')}
-            </Button>
-          )}
-        </div>
-        {(added || mine) && <span className={storeStyles.installedVersion}>{t('store.effects.whereToFind')}</span>}
-        {state === 'failed' && <InlineError>{t('store.effects.getFailed')}</InlineError>}
-        {unpublishFailed && <InlineError>{t('store.effects.unpublishFailed')}</InlineError>}
-      </header>
-      {listing.description && (
-        <section className={storeStyles.section}>
-          <h2 className={storeStyles.sectionTitle}>{t('store.section.description')}</h2>
-          <p className={`${styles.description} selectable`}>{listing.description}</p>
-        </section>
       )}
+      <ConfirmModal
+        open={confirmUninstall}
+        title={t('store.effects.uninstallTitle')}
+        message={t('store.effects.uninstallMessage', { name: listing.name })}
+        confirmLabel={t('store.effects.uninstall')}
+        destructive
+        onConfirm={() => { void uninstall(); }}
+        onCancel={() => setConfirmUninstall(false)}
+      />
       <ConfirmModal
         open={confirmUnpublish}
         title={t('store.effects.unpublishTitle')}

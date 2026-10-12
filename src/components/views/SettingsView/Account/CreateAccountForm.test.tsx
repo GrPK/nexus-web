@@ -32,6 +32,16 @@ describe('CreateAccountForm username taken', () => {
     expect(screen.queryByText('account.error.usernameTaken')).toBeNull();
   });
 
+  it('shows a refused username under the field', async () => {
+    const register = vi.fn().mockResolvedValue({ status: 400, body: { error: true, msg: 'username_not_allowed' } });
+    render(<CreateAccountForm backend={{ register } as never} onSuccess={vi.fn()} />);
+
+    fillAndSubmit();
+
+    await waitFor(() => expect(screen.getByText('account.error.usernameNotAllowed')).toBeTruthy());
+    expect(screen.getByLabelText('account.create.username').getAttribute('aria-invalid')).toBe('true');
+  });
+
   it('keeps a duplicate-email conflict as a form-level error', async () => {
     const register = vi.fn().mockResolvedValue({ status: 409, body: { error: true, msg: 'email_taken' } });
     render(<CreateAccountForm backend={{ register } as never} onSuccess={vi.fn()} />);

@@ -7,7 +7,6 @@ import { authFetchWithStatus } from './service';
 export interface EffectListing {
   id: string;
   name: string;
-  description: string | null;
   /** The publishing account's username. */
   author: string;
   /** A Shader Studio recipe; unchecked until parsed against this build's block catalog. */
@@ -37,7 +36,7 @@ export interface EffectQuery {
 }
 
 /** `sign_in_required` means no account is linked or its session was refused. */
-export type EffectMarketError = 'sign_in_required' | 'unavailable' | 'not_found' | 'listing_limit' | 'duplicate' | 'failed';
+export type EffectMarketError = 'sign_in_required' | 'unavailable' | 'not_found' | 'listing_limit' | 'duplicate' | 'name_not_allowed' | 'failed';
 
 export type EffectMarketResult<T> = { ok: true; value: T } | { ok: false; error: EffectMarketError };
 
@@ -47,6 +46,7 @@ function errorFor(status: number, body: { msg?: unknown; message?: unknown } | n
   const reason = typeof body?.msg === 'string' ? body.msg : typeof body?.message === 'string' ? body.message : '';
   if (reason === 'sign_in_required') return 'sign_in_required';
   if (reason === 'listing_limit') return 'listing_limit';
+  if (reason === 'name_not_allowed') return 'name_not_allowed';
   if (reason === 'duplicate' || status === 409) return 'duplicate';
   if (status === 404) return 'not_found';
   if (status === 0 || status === 503 || reason === 'market_unavailable') return 'unavailable';
@@ -80,7 +80,6 @@ export function downloadEffect(id: string): Promise<EffectMarketResult<EffectLis
 
 export interface EffectPublishBody {
   name: string;
-  description?: string;
   recipe: unknown;
 }
 

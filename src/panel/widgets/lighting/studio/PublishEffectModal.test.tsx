@@ -12,11 +12,9 @@ vi.mock('../../../../api/cloud', () => ({ fetchCloudAccounts: () => fetchCloudAc
 
 const publishEffect = vi.fn();
 const updateEffect = vi.fn();
-const getEffect = vi.fn();
 vi.mock('../../../../api/effectMarket', () => ({
   publishEffect: (...a: unknown[]) => publishEffect(...a),
   updateEffect: (...a: unknown[]) => updateEffect(...a),
-  getEffect: (...a: unknown[]) => getEffect(...a),
 }));
 
 vi.mock('../../../../components/views/SettingsView/Account/AccountSignInModal', () => ({
@@ -25,7 +23,7 @@ vi.mock('../../../../components/views/SettingsView/Account/AccountSignInModal', 
 }));
 
 const recipe: StudioRecipe = { v: 1, blocks: [makeBlock('rings'), makeBlock('palette')], speed: 50, hue: 0, saturation: 1, contrast: 1 };
-const listing = { id: 'L1', name: 'Spin', description: null, author: 'alice', recipe, audio: false, downloads: 0, createdAt: '', updatedAt: '' };
+const listing = { id: 'L1', name: 'Spin', author: 'alice', recipe, audio: false, downloads: 0, createdAt: '', updatedAt: '' };
 const signedIn = (username: string | null) => fetchCloudAccounts.mockResolvedValue(
   username ? { accounts: [{ accountId: 'a', username }], activeAccountId: 'a' } : { accounts: [], activeAccountId: null },
 );
@@ -39,7 +37,6 @@ function show(link: { marketId: string; marketAuthor: string } | null = null) {
 describe('PublishEffectModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getEffect.mockResolvedValue({ ok: false, error: 'not_found' });
   });
 
   it('saves, publishes, then stores the listing link', async () => {
@@ -48,7 +45,7 @@ describe('PublishEffectModal', () => {
     const save = show();
     fireEvent.click(await screen.findByRole('button', { name: 'lighting.studio.publish.confirm' }));
     expect(await screen.findByText('lighting.studio.publish.doneTitle')).toBeInTheDocument();
-    expect(publishEffect).toHaveBeenCalledWith({ name: 'Spin', description: undefined, recipe });
+    expect(publishEffect).toHaveBeenCalledWith({ name: 'Spin', recipe });
     expect(save.mock.calls).toEqual([['Spin'], ['Spin', { marketId: 'L1', marketAuthor: 'alice' }]]);
   });
 
@@ -90,9 +87,9 @@ describe('PublishEffectModal', () => {
     const save = vi.fn().mockResolvedValue(null);
     const { rerender } = render(<PublishEffectModal open initialName="" recipe={recipe} link={null} save={save} onClose={() => {}} />);
     await screen.findByRole('button', { name: 'lighting.studio.publish.confirm' });
-    fireEvent.input(screen.getByRole('textbox', { name: 'lighting.studio.publish.description' }), { target: { value: 'Spins' } });
+    fireEvent.input(screen.getByRole('textbox', { name: 'lighting.studio.publish.name' }), { target: { value: 'Spins' } });
     rerender(<PublishEffectModal open initialName="Spin" recipe={recipe} link={null} save={save} onClose={() => {}} />);
-    expect(screen.getByRole('textbox', { name: 'lighting.studio.publish.description' })).toHaveValue('Spins');
+    expect(screen.getByRole('textbox', { name: 'lighting.studio.publish.name' })).toHaveValue('Spins');
     expect(fetchCloudAccounts).toHaveBeenCalledTimes(1);
   });
 
@@ -112,17 +109,12 @@ describe('PublishEffectModal', () => {
     expect(publishEffect).not.toHaveBeenCalled();
   });
 
-  it("prefills the listing's description once, whatever the parent re-renders", async () => {
+  it('says when the cloud refuses the name', async () => {
     signedIn('alice');
-    getEffect.mockResolvedValue({ ok: true, value: { ...listing, description: 'From cloud' } });
-    const save = vi.fn().mockResolvedValue(null);
-    const props = { open: true, initialName: 'Spin', recipe, save, onClose: () => {} };
-    const { rerender } = render(<PublishEffectModal {...props} link={{ marketId: 'L0', marketAuthor: 'alice' }} />);
-    const field = await screen.findByRole('textbox', { name: 'lighting.studio.publish.description' });
-    await waitFor(() => expect(field).toHaveValue('From cloud'));
-    fireEvent.input(field, { target: { value: 'Edited' } });
-    rerender(<PublishEffectModal {...props} link={{ marketId: 'L0', marketAuthor: 'alice' }} />);
-    await waitFor(() => expect(getEffect).toHaveBeenCalledTimes(1));
-    expect(field).toHaveValue('Edited');
+    publishEffect.mockResolvedValue({ ok: false, error: 'name_not_allowed' });
+    const save = show();
+    fireEvent.click(await screen.findByRole('button', { name: 'lighting.studio.publish.confirm' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('lighting.studio.publish.nameNotAllowed');
+    expect(save).toHaveBeenCalledTimes(1);
   });
 });

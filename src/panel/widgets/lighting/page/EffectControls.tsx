@@ -27,7 +27,7 @@ export const EffectControls = memo(function EffectControls({
   effect, state, bundle,
   onTemplateSelect, canReset,
   onChange, onCommit, onReset,
-  rgbActiveSlot, panelSlots, staticMode, customDef,
+  rgbActiveSlot, panelSlots, staticMode, customDef, noPresets,
 }: {
   effect: string;
   /** Definition for a custom (Shader Studio) effect, which is not in EFFECTS. */
@@ -45,6 +45,8 @@ export const EffectControls = memo(function EffectControls({
   panelSlots?: Set<number> | null;
   /** Static mode: no speed control, and patterns gain a hex colour entry. */
   staticMode?: boolean;
+  /** Hides the preset row, for an effect with no saved presets (a Marketplace preview). */
+  noPresets?: boolean;
 }) {
   const { t } = useTranslation();
   const def = customDef ?? EFFECTS.find(e => e.key === effect);
@@ -75,7 +77,7 @@ export const EffectControls = memo(function EffectControls({
   );
   return (
     <div className={styles.effectControls}>
-      {!isSimple && (
+      {!isSimple && !noPresets && (
         <EffectTemplateSelector
           className={styles.drawerTemplates}
           effect={effect}
@@ -156,9 +158,11 @@ export const EffectControls = memo(function EffectControls({
       </div>
       <div className={styles.drawerFooter}>
         <HoverTooltip
-          body={canReset
-            ? `${t('lighting.controls.reset')} preset ${selected + 1}`
-            : `Preset ${selected + 1} is unchanged`}
+          body={noPresets
+            ? t(canReset ? 'lighting.controls.reset' : 'lighting.controls.resetAlready')
+            : canReset
+              ? `${t('lighting.controls.reset')} preset ${selected + 1}`
+              : `Preset ${selected + 1} is unchanged`}
           side="top"
         >
           <button
@@ -166,7 +170,7 @@ export const EffectControls = memo(function EffectControls({
             className={styles.drawerReset}
             onClick={onReset}
             disabled={!canReset}
-            aria-label={`${t('lighting.controls.reset')} preset ${selected + 1}`}
+            aria-label={noPresets ? t('lighting.controls.reset') : `${t('lighting.controls.reset')} preset ${selected + 1}`}
           >{t('lighting.controls.reset')}</button>
         </HoverTooltip>
       </div>
