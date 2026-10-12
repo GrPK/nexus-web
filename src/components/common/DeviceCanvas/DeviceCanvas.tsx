@@ -19,6 +19,8 @@ import styles from './DeviceCanvas.module.scss';
 
 interface DeviceCanvasProps {
   devices: LightingDevice[];
+  /** Draw only the preview: no frames, names or frame gestures. */
+  hideFrames?: boolean;
   /** Ids of the focused device frames. The canvas draws every device in
    *  `devices` whether focused or not, and this set can name one it is not
    *  drawing (a frame hidden by `hiddenFrameIds`, or one the caller dropped),
@@ -801,6 +803,16 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, select
   // metrics that no signature here would invalidate. Re-measure once the real
   // face is active.
   const [fontsTick, setFontsTick] = useState(0);
+  // The layer unmounts mid-gesture when the caller hides the frames, and only
+  // pointer-up reports a gesture over, so report it here or the parent stays
+  // paused on a drag that ended.
+  const gestureActiveRef = useRef(false);
+  gestureActiveRef.current = drag !== null || marquee !== null;
+  const onDragActiveChangeRef = useRef(onDragActiveChange);
+  onDragActiveChangeRef.current = onDragActiveChange;
+  useEffect(() => () => {
+    if (gestureActiveRef.current) onDragActiveChangeRef.current?.(false);
+  }, []);
   useEffect(() => {
     if (!document.fonts) return;
     let alive = true;
@@ -1055,7 +1067,7 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, select
   );
 });
 
-export function DeviceCanvas({ devices, selectedIds, primaryDeviceId, onSelectDevice, onSetSelection, shaderEffect, shaderState, shaderPaused, audioRef, hiddenFrameIds, selectedDeviceLeds, onOpenSettings, onOpenKeyReactions, keyReactiveIds, onDragActiveChange, onBeforeLayoutSave, onLayoutCommit, onSetDevicesPower, gpuAvailable, gpuState, onPickRenderGpu, stacks, stackActionsFor }: DeviceCanvasProps) {
+export function DeviceCanvas({ devices, hideFrames, selectedIds, primaryDeviceId, onSelectDevice, onSetSelection, shaderEffect, shaderState, shaderPaused, audioRef, hiddenFrameIds, selectedDeviceLeds, onOpenSettings, onOpenKeyReactions, keyReactiveIds, onDragActiveChange, onBeforeLayoutSave, onLayoutCommit, onSetDevicesPower, gpuAvailable, gpuState, onPickRenderGpu, stacks, stackActionsFor }: DeviceCanvasProps) {
   const notice = gpuNotice(gpuState, gpuAvailable);
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1072,7 +1084,7 @@ export function DeviceCanvas({ devices, selectedIds, primaryDeviceId, onSelectDe
     <div ref={containerRef} className={styles.canvas}>
       <CanvasBackground />
       <canvas ref={glCanvasRef} className={`${styles.glCanvas} ${ready ? styles.glCanvasReady : ''}`} />
-      <DeviceOverlays devices={devices} hiddenIds={hiddenIds} selectedIds={selectedIds} primaryDeviceId={primaryDeviceId} onSelectDevice={onSelectDevice} onSetSelection={onSetSelection} containerRef={containerRef} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={onOpenSettings} onOpenKeyReactions={onOpenKeyReactions} keyReactiveIds={keyReactiveIds} onDragActiveChange={onDragActiveChange} onBeforeLayoutSave={onBeforeLayoutSave} onLayoutCommit={onLayoutCommit} onSetDevicesPower={onSetDevicesPower} stacks={stacks} stackActionsFor={stackActionsFor} />
+      {!hideFrames && <DeviceOverlays devices={devices} hiddenIds={hiddenIds} selectedIds={selectedIds} primaryDeviceId={primaryDeviceId} onSelectDevice={onSelectDevice} onSetSelection={onSetSelection} containerRef={containerRef} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={onOpenSettings} onOpenKeyReactions={onOpenKeyReactions} keyReactiveIds={keyReactiveIds} onDragActiveChange={onDragActiveChange} onBeforeLayoutSave={onBeforeLayoutSave} onLayoutCommit={onLayoutCommit} onSetDevicesPower={onSetDevicesPower} stacks={stacks} stackActionsFor={stackActionsFor} />}
       <CanvasNoticeBar
         visible={notice != null && shaderEffect != null}
         message={notice ? t(notice.key) : ''}

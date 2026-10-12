@@ -11,6 +11,7 @@ const profileRef = vi.hoisted(() => ({ current: 'old' }));
 const devicesRef = vi.hoisted(() => ({ current: [] as unknown[] }));
 const canvasDeviceIds = vi.hoisted(() => ({ current: [] as string[] }));
 const canvasFocusIds = vi.hoisted(() => ({ current: [] as string[] }));
+const canvasHidesFrames = vi.hoisted(() => ({ current: false }));
 
 vi.mock('../../../hooks/useLightingSync', async (importOriginal) => ({
   // normalizeSync is the shared sync-string classifier; keep the real one so
@@ -103,14 +104,16 @@ vi.mock('../../../components/common/DeviceCanvas/DeviceCanvas', () => ({
   // Two stand-ins for the canvas gestures that move the focus: a tap on empty
   // space, and a marquee that lands on one frame. Neither may touch the
   // device-list selection.
-  DeviceCanvas: ({ devices, selectedIds, onSelectDevice, onSetSelection }: {
+  DeviceCanvas: ({ devices, selectedIds, hideFrames, onSelectDevice, onSetSelection }: {
     devices: { id: string }[];
     selectedIds: Set<string>;
+    hideFrames?: boolean;
     onSelectDevice: (id: string | null) => void;
     onSetSelection: (ids: Set<string>, primary: string | null) => void;
   }) => {
     canvasDeviceIds.current = devices.map(d => d.id);
     canvasFocusIds.current = [...selectedIds];
+    canvasHidesFrames.current = !!hideFrames;
     return (
       <>
         <button type="button" data-testid="device-canvas" onClick={() => onSelectDevice(null)} />
@@ -279,14 +282,15 @@ describe('LightingPage selection in a drive-everything mode', () => {
     </UiSettingsProvider>,
   );
 
-  it('starts with no selection, saying "All devices" and drawing every device', async () => {
+  it('starts with no selection, saying "All devices" and drawing every device with no frame', async () => {
     const { findByLabelText, findByText } = renderPage();
 
     // Nothing was seeded: select none has nothing to clear, select all has work to do.
     const selectAll = await findByLabelText('lighting.pane.selectAllControlled');
     const selectNone = await findByLabelText('lightingOnboarding.selectNone');
     await waitFor(() => expect(canvasDeviceIds.current).toEqual(['dev-a', 'dev-b']));
-    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+    expect(canvasFocusIds.current).toEqual([]);
+    expect(canvasHidesFrames.current).toBe(true);
     expect(selectAll).not.toBeDisabled();
     expect(selectNone).toBeDisabled();
     expect(await findByText('lighting.pane.allDevices')).toBeTruthy();
@@ -302,7 +306,8 @@ describe('LightingPage selection in a drive-everything mode', () => {
     const { findByLabelText } = renderPage();
 
     expect(await findByLabelText('lightingOnboarding.selectNone')).toBeDisabled();
-    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+    await waitFor(() => expect(canvasDeviceIds.current).toEqual(['dev-a', 'dev-b']));
+    expect(canvasFocusIds.current).toEqual([]);
     for (const key of ['nexus.lighting.selectedDevices', 'nexus.lighting.pinSelection', 'nexus.lighting.devicePicks', 'nexus.lighting.selectionSeeded']) {
       expect(localStorage.getItem(key)).toBeNull();
     }
@@ -361,8 +366,10 @@ describe('LightingPage selection in a drive-everything mode', () => {
     expect(canvasDeviceIds.current).toEqual(['dev-a', 'dev-b']);
 
     // A device-list change owns the focus again, rather than leaving it stuck
-    // on what the marquee swept.
+    // on what the marquee swept: nothing selected focuses nothing and hides the frames.
+    expect(canvasHidesFrames.current).toBe(false);
     fireEvent.click(await findByLabelText('lightingOnboarding.selectNone'));
-    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+    await waitFor(() => expect(canvasFocusIds.current).toEqual([]));
+    expect(canvasHidesFrames.current).toBe(true);
   });
 });

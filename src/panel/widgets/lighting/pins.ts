@@ -133,18 +133,23 @@ export const pinnedAmong = (pins: Pins, ids: readonly string[]): string[] => ids
 export const isPickTarget = (d: { id: string; ledsOn?: boolean; controlled?: boolean }, pins: Pins, selectedIds: ReadonlySet<string>): boolean =>
   selectedIds.size === 0 && !(d.id in pins) && d.ledsOn !== false && d.controlled !== false;
 
-/** The Static picker's marks: the selection, or with none, the devices a pick lands on. An unpinned device wears the global color. */
+/**
+ * The Static picker's marks, on the color each device wears (an unpinned one
+ * wears the global color): the selection, or with none, every lit and
+ * controlled device, the pinned ones flagged since a press leaves them be.
+ */
 export function pickerMarks(
   devices: readonly { id: string; name: string; ledsOn?: boolean; controlled?: boolean }[],
   pins: Pins,
   selectedIds: ReadonlySet<string>,
   globalColor: string,
-): { id: string; name: string; hex: string }[] {
+): { id: string; name: string; hex: string; pinned: boolean }[] {
+  const none = selectedIds.size === 0;
   return devices
-    .filter(d => (selectedIds.size === 0 ? isPickTarget(d, pins, selectedIds) : selectedIds.has(d.id)))
+    .filter(d => (none ? d.ledsOn !== false && d.controlled !== false : selectedIds.has(d.id)))
     .map(d => {
       const pin = pins[d.id];
-      return { id: d.id, name: d.name, hex: !pin ? globalColor : pin.kind === 'static' ? pinHex(pin) : '' };
+      return { id: d.id, name: d.name, hex: !pin ? globalColor : pin.kind === 'static' ? pinHex(pin) : '', pinned: none && !!pin };
     });
 }
 

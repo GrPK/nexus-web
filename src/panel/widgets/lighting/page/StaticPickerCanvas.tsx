@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, Pin } from 'lucide-react';
 import { useTranslation } from '../../../../lib/i18n';
 import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import {
@@ -13,6 +13,8 @@ export interface PickerDevice {
   name: string;
   /** The colour this device currently wears. */
   hex: string;
+  /** Pinned while nothing is selected: a press does not move it. */
+  pinned?: boolean;
 }
 
 // The staticNoticeFade keyframes own the fade; this drives their duration.
@@ -54,7 +56,7 @@ export function StaticPickerCanvas({
 }: {
   /** Devices whose colour gets a mark, in rail order. */
   devices: PickerDevice[];
-  /** The marks are the devices a press moves, not a selection, so they read dotted. */
+  /** Nothing is selected, so the marks read dotted; a pinned device's mark carries a pin. */
   implied?: boolean;
   /** The colour the selection shares; '' when they disagree. */
   hex: string;
@@ -140,6 +142,7 @@ export function StaticPickerCanvas({
       const seen = at.get(key);
       if (seen !== undefined) {
         out[seen].extra += 1;
+        out[seen].pinned = !!out[seen].pinned && !!d.pinned;
         continue;
       }
       at.set(key, out.length);
@@ -274,6 +277,7 @@ export function StaticPickerCanvas({
                 m.labelAbove ? styles.staticPinLabelAbove : '',
               ].join(' ')}
             >
+              {m.pinned && <Pin className={styles.staticPinLabelPin} aria-hidden />}
               {m.name}
               {m.extra > 0 && <span className={styles.staticPinCount}>{`+${m.extra}`}</span>}
             </span>

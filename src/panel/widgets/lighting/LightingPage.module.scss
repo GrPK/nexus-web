@@ -1312,9 +1312,7 @@
 
 .devicePinBtn {
   opacity: 1;
-  color: var(--accent);
-
-  svg { fill: currentColor; }
+  color: var(--text-dim);
 }
 
 // Stays visible (overrides .deviceSettingsBtn's opacity:0) when the
@@ -1391,10 +1389,11 @@
   margin-top: 0.15rem;
   margin-left: auto;
   color: var(--text-dim);
-  transition: color var(--ease-fast);
+  opacity: var(--alpha-medium);
+  transition: color var(--ease-fast), opacity var(--ease-fast);
 
   // Lit on a selected card, so the reason the whole stack lit up is in view.
-  .deviceCardSelected & { color: var(--text); }
+  .deviceCardSelected & { color: var(--text); opacity: 1; }
 }
 
 // The (i) notice icon at the end of a device label or group title. Bare icon
@@ -1948,6 +1947,14 @@
   left: auto;
   right: -10px;
   transform: none;
+}
+
+// A pinned device's mark, shown while nothing is selected.
+.staticPinLabelPin {
+  width: 0.8em;
+  height: 0.8em;
+  margin-right: 0.25rem;
+  vertical-align: -0.05em;
 }
 
 // Devices sharing the labelled dot's colour.

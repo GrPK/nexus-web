@@ -112,12 +112,18 @@ describe('pickerMarks', () => {
   const devices = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }, { id: 'd', name: 'D', ledsOn: false }, { id: 'e', name: 'E', controlled: false }];
   const pins = { a: colorPin('#ff0000'), b: animatePin('plasma') };
 
-  it('with nothing selected marks only the unpinned lit, controlled devices, on the global color', () => {
-    expect(pickerMarks(devices, pins, new Set(), '#336699')).toEqual([{ id: 'c', name: 'C', hex: '#336699' }]);
+  it('with nothing selected marks every lit, controlled device, flagging the pinned ones', () => {
+    expect(pickerMarks(devices, pins, new Set(), '#336699')).toEqual([
+      { id: 'a', name: 'A', hex: '#ff0000', pinned: true },
+      { id: 'b', name: 'B', hex: '', pinned: true },
+      { id: 'c', name: 'C', hex: '#336699', pinned: false },
+    ]);
   });
 
   it('marks a selection on what each wears, with no color for a non-static pin', () => {
-    expect(pickerMarks(devices, pins, new Set(['a', 'b', 'c']), '#336699').map(d => d.hex)).toEqual(['#ff0000', '', '#336699']);
+    const marks = pickerMarks(devices, pins, new Set(['a', 'b', 'c']), '#336699');
+    expect(marks.map(d => d.hex)).toEqual(['#ff0000', '', '#336699']);
+    expect(marks.some(d => d.pinned)).toBe(false);
   });
 });
 

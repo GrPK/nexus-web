@@ -69,12 +69,12 @@ vi.mock('./page/StaticPickerCanvas', () => ({
     onCommit: (hex: string) => void;
     onPreview: (hex: string) => void;
     hex: string;
-    devices: { id: string; hex: string }[];
+    devices: { id: string; hex: string; pinned?: boolean }[];
     implied?: boolean;
   }) => (
     <div>
       <span data-testid="picker-hex">{hex}</span>
-      <span data-testid="picker-marks" data-implied={implied ? '1' : ''}>{devices.map(d => `${d.id}@${d.hex}`).join(';')}</span>
+      <span data-testid="picker-marks" data-implied={implied ? '1' : ''}>{devices.map(d => `${d.id}@${d.hex}${d.pinned ? '(pinned)' : ''}`).join(';')}</span>
       <button type="button" onClick={() => onCommit('#00ff00')}>pick-green</button>
       <button type="button" onClick={() => onPreview('#0000ff')}>preview-blue</button>
     </div>
@@ -283,7 +283,7 @@ describe('LightingPage pins', () => {
       expect(await screen.findByText('lighting.pane.allPinned')).toBeTruthy();
     });
 
-    it('marks the unpinned devices dotted on the global color, and a selection solid on what each wears', async () => {
+    it('marks every device dotted with nothing selected, flagging the pinned, and a selection solid on what each wears', async () => {
       withDevices('a', 'b');
       syncState.mode = 'static';
       syncState.rawSync = 'static';
@@ -291,7 +291,7 @@ describe('LightingPage pins', () => {
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: colorPin('#ff0000') }));
       renderPage();
       const marks = () => screen.getByTestId('picker-marks');
-      await waitFor(() => expect(marks().textContent).toBe('b@#336699'));
+      await waitFor(() => expect(marks().textContent).toBe('a@#ff0000(pinned);b@#336699'));
       expect(marks().dataset.implied).toBe('1');
       fireEvent.click(screen.getByText('select-ab'));
       await waitFor(() => expect(marks().textContent).toBe('a@#ff0000;b@#336699'));
