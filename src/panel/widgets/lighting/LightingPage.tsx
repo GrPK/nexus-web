@@ -1802,10 +1802,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     reset: resetLayoutHistory,
   } = useUndoRedo<LayoutHistorySnapshot>({
     maxDepth: 50,
-    // Off while the LED map editor is open: it has its own undo/redo on the same
-    // Cmd/Ctrl+Z, and both listen on window, so an enabled layout history would
-    // also fire and undo the canvas underneath the modal.
-    enabled: editorTarget === null,
+    // Off while the LED map editor or Shader Studio is open: each has its own
+    // undo/redo on the same Cmd/Ctrl+Z, and all listen on window, so an enabled
+    // layout history would also fire and undo the canvas underneath the modal.
+    enabled: editorTarget === null && studioTarget === null,
     onUndo: handleUndoLayout,
     onRedo: handleRedoLayout,
     store: layoutHistoryStore,

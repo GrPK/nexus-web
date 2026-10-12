@@ -58,3 +58,33 @@ describe('ShaderStudio publishing', () => {
     clock.mockRestore();
   });
 });
+
+describe('ShaderStudio history keys', () => {
+  // Both modifiers, so the shortcut matches whichever platform the test UA reports.
+  const press = (shiftKey = false, target: EventTarget = window) =>
+    fireEvent.keyDown(target, { code: 'KeyZ', key: 'z', metaKey: true, ctrlKey: true, shiftKey });
+
+  it('undoes and redoes with Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z, from a slider but not a text field', () => {
+    render(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    const undo = screen.getByRole('button', { name: 'lighting.studio.undo' });
+    const redo = screen.getByRole('button', { name: 'lighting.studio.redo' });
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.surprise' }));
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.surprise' }));
+    expect(undo).toBeEnabled();
+
+    const field = document.body.appendChild(document.createElement('input'));
+    press(false, field);
+    expect(redo).toBeDisabled();
+    field.remove();
+
+    const slider = document.body.appendChild(Object.assign(document.createElement('input'), { type: 'range' }));
+    press(false, slider);
+    expect(redo).toBeEnabled();
+    slider.remove();
+    press();
+    expect(undo).toBeDisabled();
+    expect(redo).toBeEnabled();
+    press(true);
+    expect(undo).toBeEnabled();
+  });
+});

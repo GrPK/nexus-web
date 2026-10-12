@@ -232,7 +232,8 @@ function addRandom(r: StudioRecipe, stage: StudioStage): void {
   if (options.length) r.blocks.push(randomBlock(pick(options).type));
 }
 
-export function shuffleRecipe(): StudioRecipe {
+/** A new effect built from scratch: random blocks, params and colors. */
+export function randomRecipe(): StudioRecipe {
   const color = randomBlock(Math.random() < 0.8 ? 'palette' : 'colors');
   color.params.shade = snap(studioBlock(color.type)!.params.find(p => p.key === 'shade')!, 0.4 + Math.random() * 0.6);
   // The color block goes in first so the budget checks below count it.

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Dices, LayoutGrid, Redo2, Save, Trash2, Undo2, Upload, WandSparkles } from 'lucide-react';
 import { DeviceModal } from '../../../../components/common/DeviceModal/DeviceModal';
 import { Button } from '../../../../components/common/Button/Button';
@@ -12,6 +12,7 @@ import { SortableList, type SortableRowArgs } from '../../../../components/commo
 import { forgetShaderSource, primeShaderSource } from '../../../../api/lighting';
 import { useAudioState } from '../../../../hooks/useAudioState';
 import { useTranslation } from '../../../../lib/i18n';
+import { isApplePlatform } from '../../../../lib/platform';
 import type { EffectState } from '../../../../types/lighting';
 import {
   PATTERN_BLEND_PARAMS, STUDIO_COST_BUDGET, STUDIO_STAGES, STUDIO_STAGE_LIMIT, blocksForStage, studioBlock,
@@ -21,7 +22,7 @@ import {
   compileStudio, makeBlock, recipeCost, stageCount, staleParamsBetween,
   type CompiledStudio, type StudioBlock, type StudioRecipe,
 } from './studioCompiler';
-import { STUDIO_STARTERS, mutateRecipe, shuffleRecipe } from './studioRecipes';
+import { STUDIO_STARTERS, mutateRecipe, randomRecipe } from './studioRecipes';
 import { deleteEffect, getSavedEffects, newEffectId, saveEffect, useSavedEffects, type MarketLink } from './studioLibrary';
 import { PublishEffectModal } from './PublishEffectModal';
 import { StudioBlockCard } from './StudioBlockCard';
@@ -33,6 +34,7 @@ const STACKED = 'stacked' as const;
 const HISTORY_LIMIT = 50;
 const NEW_EFFECT_STARTER = 'neonKaleido';
 const VARIATION_COUNT = 6;
+const NON_TEXT_INPUTS = new Set(['range', 'checkbox', 'radio', 'button']);
 
 // Keys this editor primed; evicted on close so the module-level shader cache stays bounded.
 const primedKeys = new Set<string>();
@@ -154,6 +156,26 @@ export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }
     setRecipe(next);
   };
 
+  const historyKeysRef = useRef({ undo, redo, blocked: false });
+  historyKeysRef.current = { undo, redo, blocked: saving || publishing || !!pendingDiscard };
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyZ' || !(isApplePlatform() ? e.metaKey : e.ctrlKey)) return;
+      const h = historyKeysRef.current;
+      const target = e.target;
+      // Text fields keep their own undo (sliders are range inputs and have none); the stacked dialogs edit no recipe.
+      const typing = target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable)
+        || (target instanceof HTMLInputElement && !NON_TEXT_INPUTS.has(target.type));
+      if (h.blocked || typing) return;
+      e.preventDefault();
+      if (e.shiftKey) h.redo();
+      else h.undo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
   const cost = recipeCost(recipe);
   const fitsBudget = (delta: number) => cost + delta <= STUDIO_COST_BUDGET;
   const canAdd = (type: string) => {
@@ -256,8 +278,8 @@ export function ShaderStudio({ open, effectId, onSaved, onViewListing, onClose }
         }}
         height={32}
       />
-      <Button size="sm" icon={<Dices size={14} />} onClick={() => apply(shuffleRecipe(), true)}>
-        {t('lighting.studio.shuffle')}
+      <Button size="sm" icon={<Dices size={14} />} onClick={() => { setVariations(null); apply(randomRecipe(), true); }}>
+        {t('lighting.studio.surprise')}
       </Button>
       <Button size="sm" icon={<LayoutGrid size={14} />} onClick={() => (variations ? setVariations(null) : openVariations(recipe))}>
         {variations ? t('lighting.studio.done') : t('lighting.studio.variations')}

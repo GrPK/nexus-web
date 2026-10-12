@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseShaderParams } from '../../../../lib/shaderParams';
 import { STUDIO_BLOCKS, STUDIO_COST_BUDGET, STUDIO_STAGES, STUDIO_STAGE_LIMIT, studioBlock } from './studioBlocks';
 import { compileStudio, makeBlock, orderedBlocks, recipeCost, stageCount, staleParamsBetween, studioUniform, type StudioRecipe } from './studioCompiler';
-import { STUDIO_STARTERS, mutateRecipe, shuffleRecipe } from './studioRecipes';
+import { STUDIO_STARTERS, mutateRecipe, randomRecipe } from './studioRecipes';
 
 const recipeOf = (...types: string[]): StudioRecipe => ({
   v: 1, blocks: types.map(makeBlock), speed: 50, hue: 0, saturation: 1, contrast: 1,
@@ -118,9 +118,9 @@ describe('studio recipes', () => {
     for (const s of STUDIO_STARTERS) expectValid(s.build());
   });
 
-  it('shuffles and mutates into valid recipes', () => {
+  it('randomizes and mutates into valid recipes', () => {
     for (let i = 0; i < 300; i++) {
-      const r = shuffleRecipe();
+      const r = randomRecipe();
       expectValid(r);
       expectValid(mutateRecipe(r));
     }
