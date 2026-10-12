@@ -1874,6 +1874,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
     return orderedDevices.filter(d => !zoneCardUnavailable(d)).map(d => d.id);
   }, [devices, orderedDevices, handleSetControlled, handleSetPower]);
+  // Simple mode has no rail to show pins on, so a pick or Control all releases
+  // every pin, the same way it claims; arriving and Off leave pins alone.
+  const unpinAll = useCallback(() => {
+    const ids = Object.keys(pins);
+    if (ids.length > 0) void applyPins(ids, null);
+  }, [applyPins, pins]);
 
   // Counted over the devices the claim can actually reach. A zone with no LEDs
   // cannot be lit, so including it would leave the ratio permanently short of
@@ -1883,10 +1889,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     [orderedDevices],
   );
   // Matches zoneCardSelectable: a device Nexus drives AND that is lit. Counting
-  // only `controlled` would claim a dark device is being driven.
+  // only `controlled` would claim a dark device is being driven. A pinned device
+  // does not follow Simple mode's picks, so it is not counted either.
   const controlledCount = useMemo(
-    () => claimableDevices.filter(d => d.controlled !== false && d.ledsOn).length,
-    [claimableDevices],
+    () => claimableDevices.filter(d => d.controlled !== false && d.ledsOn && !pins[d.id]).length,
+    [claimableDevices, pins],
   );
 
   // The switch holds a browser-local preference, but the direction the hardware
@@ -1901,6 +1908,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // canvas while the hardware runs this one.
   const handleSimpleAnimationSelect = useCallback(async (key: string) => {
     claimAllDevices();
+    unpinAll();
     setActiveEffect('');
     // This IS the direction now, so the conform read below must not run for
     // this key: rawSync goes optimistic, and the stored sign is still the old
@@ -1917,7 +1925,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       await startAnimate(key, state.speed, state.intensity, state.hue, state.colorize, state.saturation, state.contrast, state.params);
       publishControlSync({ domain: 'lighting', mode: 'animate', rawSync: key, effect: key });
     } catch { /* the sync poll reconciles */ }
-  }, [claimAllDevices, paused, setMode, setPausedState, setRawSync, simpleReversed]);
+  }, [claimAllDevices, paused, setMode, setPausedState, setRawSync, simpleReversed, unpinAll]);
 
   // The running sweep, which is also what marks a tile.
   const simpleAnimation = synced && effectiveMode === 'animate' && isSimpleAnimation(rawSync)
@@ -2301,9 +2309,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               /* Off states what it did; every other mode carries both counts,
                  so a device the advanced page left un-driven is visible here
                  without a device list. Same line either way. The action runs
-                 the same claim the palette does - controlledCount also
-                 requires the lights to be on, so setting `controlled` alone
-                 would leave the count short and the button stuck on screen. */
+                 the same claim and unpin the palette does - controlledCount
+                 also requires the lights to be on and no pin, so setting
+                 `controlled` alone would leave the button stuck on screen. */
               tabsAdjacent={(
                 <DeviceCountSummary
                   detected={simpleOff
@@ -2313,7 +2321,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                       total: claimableDevices.length,
                     })}
                   action={!simpleOff && controlledCount < claimableDevices.length ? (
-                    <Button size="sm" pill onClick={() => { claimAllDevices(); }}>
+                    <Button size="sm" pill onClick={() => { claimAllDevices(); unpinAll(); }}>
                       {t('lighting.simple.controlAll')}
                     </Button>
                   ) : undefined}
@@ -2326,7 +2334,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             <SectionHeader className={styles.simpleSectionHeader}>{t('lighting.mode.static')}</SectionHeader>
             <StaticPalette
               selectedId={simplePaletteId}
-              onSelect={color => { claimAllDevices(); void handleSimplePaletteSelect(color); }}
+              onSelect={color => { claimAllDevices(); unpinAll(); void handleSimplePaletteSelect(color); }}
             />
           </div>
           <div className={styles.simpleSection}>
