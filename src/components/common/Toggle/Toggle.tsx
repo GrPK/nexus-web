@@ -16,7 +16,8 @@ export interface ToggleProps {
   ariaLabel?: string;
   ariaLabelledBy?: string;
   className?: string;
-  /** The controlled targets disagree: indeterminate knob, `aria-checked="mixed"`. A click sets all on. */
+  /** The controlled targets disagree: indeterminate knob. Renders as a checkbox with
+   *  `aria-checked="mixed"` (a switch cannot be mixed, so it would read as off). A click sets all on. */
   mixed?: boolean;
 }
 
@@ -26,7 +27,7 @@ export function Toggle({
   return (
     <button
       type="button"
-      role="switch"
+      role={mixed ? 'checkbox' : 'switch'}
       aria-checked={mixed ? 'mixed' : checked}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}

@@ -525,7 +525,7 @@ describe('LianLiWirelessScreenTab', () => {
       await renderTwo({ brightness: 40 }, { brightness: 80 });
       const slider = screen.getByRole('slider', { name: 'devices.lianli-wireless.brightness' });
       expect(slider).toHaveAttribute('data-mixed', 'true');
-      expect(slider).toHaveAttribute('aria-valuetext', 'devices.lianli-wireless.contentTypeMixed');
+      expect(slider).toHaveAttribute('aria-valuetext', 'common.mixed');
 
       await act(async () => { fireEvent.change(slider, { target: { value: '60' } }); });
       await act(async () => { fireEvent.pointerUp(slider); });
@@ -547,8 +547,9 @@ describe('LianLiWirelessScreenTab', () => {
 
     it('renders the sleep toggle and the panel switch mixed', async () => {
       await renderTwo({ sleepWhenLocked: true, nexusPanel: true }, { sleepWhenLocked: false, nexusPanel: false });
-      expect(screen.getByRole('switch', { name: 'devices.lcd.sleepWhenLocked' })).toHaveAttribute('aria-checked', 'mixed');
-      expect(panelSwitch()).toHaveAttribute('aria-checked', 'mixed');
+      // Mixed switches render as checkboxes so assistive tech announces "mixed", not "off".
+      expect(screen.getByRole('checkbox', { name: 'devices.lcd.sleepWhenLocked' })).toHaveAttribute('aria-checked', 'mixed');
+      expect(screen.getByRole('checkbox', { name: 'devices.lianli-wireless.nexusPanelUse' })).toHaveAttribute('aria-checked', 'mixed');
     });
 
     it('renders nothing mixed when the screens agree', async () => {
@@ -566,13 +567,39 @@ describe('LianLiWirelessScreenTab', () => {
       expect(screen.getByRole('button', { name: 'Poster' })).toHaveAttribute('aria-pressed', 'false');
     });
 
+    it('shows only the gallery when Media is picked over mixed content types', async () => {
+      await renderTwo({ contentType: 'sensor' }, { contentType: 'clock' });
+      fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-wireless.contentTypeAria' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('option', { name: 'devices.lianli-wireless.contentTypeMedia' }));
+      });
+
+      expect(screen.getByText('Loop')).toBeInTheDocument();
+      expect(screen.queryByText('devices.lianli-wireless.sensorSourceLabel')).not.toBeInTheDocument();
+      expect(screen.queryByText('devices.lianli-wireless.clockFaceLabel')).not.toBeInTheDocument();
+      expect(mockSetContent).not.toHaveBeenCalled();
+    });
+
+    it('shows no sensor controls while Media is pending on a sensor screen', async () => {
+      mockGetScreens.mockResolvedValue([panelScreen({ contentType: 'sensor' })]);
+      await renderTab();
+      expect(screen.getByText('devices.lianli-wireless.sensorSourceLabel')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-wireless.contentTypeAria' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('option', { name: 'devices.lianli-wireless.contentTypeMedia' }));
+      });
+
+      expect(screen.queryByText('devices.lianli-wireless.sensorSourceLabel')).not.toBeInTheDocument();
+      expect(screen.getByText('Loop')).toBeInTheDocument();
+    });
+
     it('shows a sensor source as mixed when the screens differ', async () => {
       await renderTwo(
         { contentType: 'sensor', sensorSource: 'cpuTemp' },
         { contentType: 'sensor', sensorSource: 'gpuLoad' },
       );
       expect(screen.getByRole('button', { name: 'devices.lianli-wireless.sensorSourceLabel' }))
-        .toHaveTextContent('devices.lianli-wireless.contentTypeMixed');
+        .toHaveTextContent('common.mixed');
     });
   });
 

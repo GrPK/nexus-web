@@ -18,12 +18,17 @@ export interface EditableNumberProps {
   ariaLabel?: string;
   /** Shows the value as plain text: no click or keyboard entry into edit mode. */
   disabled?: boolean;
+  /** No single committed value: the display reads `mixedLabel`, and the edit field opens
+   *  empty with it as the placeholder. Any typed value commits, even one equal to `value`. */
+  mixed?: boolean;
+  mixedLabel?: string;
 }
 
-export function EditableNumber({ value, min, max, step = 1, onCommit, format, className, ariaLabel, disabled }: EditableNumberProps) {
+export function EditableNumber({ value, min, max, step = 1, onCommit, format, className, ariaLabel, disabled, mixed = false, mixedLabel }: EditableNumberProps) {
   const fmt = format ?? ((v: number) => String(v));
   const editable = useEditable<number>({
-    value,
+    // NaN never equals a typed number, so a mixed edit always commits.
+    value: mixed ? Number.NaN : value,
     onCommit,
     parse: draft => {
       const parsed = Number(draft);
@@ -40,7 +45,7 @@ export function EditableNumber({ value, min, max, step = 1, onCommit, format, cl
       }
       return clamped;
     },
-    format: v => String(v),
+    format: v => (Number.isNaN(v) ? '' : String(v)),
   });
 
   // Going read-only mid-edit drops the draft, so no stale input returns on re-enable.
@@ -52,7 +57,7 @@ export function EditableNumber({ value, min, max, step = 1, onCommit, format, cl
   if (disabled) {
     return (
       <span className={`${styles.displayStatic} ${className ?? ''}`}>
-        {fmt(value)}
+        {mixed ? mixedLabel : fmt(value)}
         {ariaLabel && <span className={styles.visuallyHidden}>{ariaLabel}</span>}
       </span>
     );
@@ -67,6 +72,7 @@ export function EditableNumber({ value, min, max, step = 1, onCommit, format, cl
         max={max}
         step={step}
         aria-label={ariaLabel}
+        placeholder={mixed ? mixedLabel : undefined}
         {...editable.inputProps}
       />
     );
@@ -81,7 +87,7 @@ export function EditableNumber({ value, min, max, step = 1, onCommit, format, cl
       aria-label={ariaLabel}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editable.start(); } }}
     >
-      {fmt(value)}
+      {mixed ? mixedLabel : fmt(value)}
     </span>
   );
 }

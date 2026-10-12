@@ -67,7 +67,9 @@ export interface SliderProps {
   ariaLabel?: string;
   className?: string;
   /** The controlled targets hold different values. No value is shown or filled; the value
-      slot reads `mixedLabel` and the thumb is ghosted. A drag or edit sets one value for all. */
+      slot reads `mixedLabel` and the thumb is ghosted. A drag sets one value for all, and an
+      `editable` slider keeps its field: empty, with `mixedLabel` as placeholder, and a typed
+      value sets all. */
   mixed?: boolean;
   /** Visible text and spoken value while `mixed`. */
   mixedLabel?: string;
@@ -157,13 +159,13 @@ export function Slider({
   };
 
   const fmt = (v: number) => (formatValue ? formatValue(v) : String(v));
-  const valueNode = mixed ? (
-    <span className={`${styles.value} ${styles.mixedValue}`}>{mixedLabel}</span>
-  ) : editable ? (
+  const valueClass = mixed ? `${styles.value} ${styles.mixedValue}` : styles.value;
+  const valueNode = editable ? (
     <EditableNumber value={value} min={min} max={max} step={step}
-      onCommit={handleEditCommit} format={formatValue} className={styles.value} disabled={disabled} />
+      onCommit={handleEditCommit} format={formatValue} className={valueClass} disabled={disabled}
+      mixed={mixed} mixedLabel={mixedLabel} />
   ) : (
-    <span className={styles.value}>{fmt(value)}</span>
+    <span className={valueClass}>{mixed ? mixedLabel : fmt(value)}</span>
   );
 
   // Inline layout only: reserve the value column at the widest formatted
@@ -174,13 +176,12 @@ export function Slider({
   const reserveCh = Math.max(fmt(min).length, fmt(max).length) + 1;
   const inlineValueNode = (
     <span className={styles.inlineValue} style={{ minWidth: `${reserveCh}ch` }}>
-      {mixed ? (
-        <span className={`${styles.value} ${styles.mixedValue}`}>{mixedLabel}</span>
-      ) : editable ? (
+      {editable ? (
         <EditableNumber value={value} min={min} max={max} step={step}
-          onCommit={handleEditCommit} format={formatValue} ariaLabel={ariaLabel} className={styles.value} disabled={disabled} />
+          onCommit={handleEditCommit} format={formatValue} ariaLabel={ariaLabel} className={valueClass} disabled={disabled}
+          mixed={mixed} mixedLabel={mixedLabel} />
       ) : (
-        <span className={styles.value}>{fmt(value)}</span>
+        <span className={valueClass}>{mixed ? mixedLabel : fmt(value)}</span>
       )}
     </span>
   );

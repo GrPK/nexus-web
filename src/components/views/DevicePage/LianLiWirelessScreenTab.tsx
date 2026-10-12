@@ -85,7 +85,7 @@ const SELECTION_MODES: { key: 'single' | 'multiple'; labelKey: string }[] = [
 
 const MEDIA_ACCEPT = 'image/jpeg,image/png,image/gif,video/mp4';
 
-// The screen's media library is square, like the 400x400 glass.
+// The screen's media library is square, like the glass.
 const UPLOAD_ASPECT = 1;
 
 interface CropState {
@@ -265,7 +265,7 @@ export function LianLiWirelessScreenTab({
   const brightness = sharedValue(targetScreens, s => s.brightness);
   const rotation = sharedValue(targetScreens, s => s.rotation);
   const sleep = sharedValue(targetScreens, s => s.sleepWhenLocked ?? true);
-  const mixedLabel = t('devices.lianli-wireless.contentTypeMixed');
+  const mixedLabel = t('common.mixed');
   const nexusPanel = sharedValue(targetScreens, s => s.nexusPanel === true);
   // When several fans with different content types are selected the content
   // controls can't show one truth; force a fresh pick instead.
@@ -612,7 +612,7 @@ export function LianLiWirelessScreenTab({
           <Select
             className={styles.contentTypeSelect}
             value={contentMixed ? '' : (showMedia ? 'media' : (sharedChoice ?? 'off'))}
-            placeholder={t('devices.lianli-wireless.contentTypeMixed')}
+            placeholder={t('common.mixed')}
             options={contentTypeOptions}
             disabled={!representative || nexusPanel.value === true}
             onChange={v => handleContentTypeChange(v as ContentChoice)}
@@ -639,21 +639,21 @@ export function LianLiWirelessScreenTab({
                 onDeleteRequest={setPendingDeleteMedia}
               />
             )}
-            {representative.contentType === 'sensor' && (
+            {!showMedia && sharedChoice === 'sensor' && (
               <SensorPanel
                 screens={targetScreens}
                 onPreview={previewContentField}
                 onCommit={patch => commitContentField('sensor', patch)}
               />
             )}
-            {representative.contentType === 'clock' && (
+            {!showMedia && sharedChoice === 'clock' && (
               <ClockPanel
                 screens={targetScreens}
                 onPreview={previewContentField}
                 onCommit={patch => commitContentField('clock', patch)}
               />
             )}
-            {representative.contentType === 'animation' && (
+            {!showMedia && sharedChoice === 'animation' && (
               <AnimationPanel
                 screens={targetScreens}
                 onPreview={previewContentField}
@@ -795,7 +795,7 @@ function ColorPairRow({ screens, defaultA, defaultB, onPreview, onCommit }: {
   const { t } = useTranslation();
   const colorA = sharedValue(screens, s => (s.colorA ?? defaultA).toLowerCase());
   const colorB = sharedValue(screens, s => (s.colorB ?? defaultB).toLowerCase());
-  const mixedLabel = t('devices.lianli-wireless.contentTypeMixed');
+  const mixedLabel = t('common.mixed');
   return (
     <div className={styles.colorPairRow}>
       <div className={styles.colorEntry}>
@@ -824,7 +824,7 @@ function ColorPairRow({ screens, defaultA, defaultB, onPreview, onCommit }: {
 
 function SensorPanel({ screens, onPreview, onCommit }: ContentPanelProps) {
   const { t } = useTranslation();
-  const mixedLabel = t('devices.lianli-wireless.contentTypeMixed');
+  const mixedLabel = t('common.mixed');
   const source = sharedValue(screens, s => s.sensorSource ?? 'cpuTemp');
   const style = sharedValue(screens, s => s.sensorStyle ?? 'ring');
   const tempUnit = sharedValue(screens, s => s.tempUnit ?? 'c');
@@ -908,7 +908,7 @@ function ClockPanel({ screens, onPreview, onCommit }: ContentPanelProps) {
           ariaLabel={t('devices.lianli-wireless.clockFaceLabel')}
           activeKey={face.value ?? ''}
           partialKeys={face.mixed ? face.held : undefined}
-          partialLabel={t('devices.lianli-wireless.contentTypeMixed')}
+          partialLabel={t('common.mixed')}
           onChange={v => onCommit({ clockFace: v as LianLiWirelessScreen['clockFace'] })}
           options={faceOptions}
         />
@@ -941,7 +941,7 @@ function AnimationPanel({ screens, onPreview, onCommit }: ContentPanelProps) {
           ariaLabel={t('devices.lianli-wireless.animationLabel')}
           activeKey={animationId.value ?? ''}
           partialKeys={animationId.mixed ? animationId.held : undefined}
-          partialLabel={t('devices.lianli-wireless.contentTypeMixed')}
+          partialLabel={t('common.mixed')}
           onChange={v => onCommit({ animationId: v as LianLiWirelessScreen['animationId'] })}
           options={animationOptions}
         />

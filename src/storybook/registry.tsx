@@ -2539,7 +2539,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'Toggle (mixed)', category: 'inputs',
     filePath: 'src/components/common/Toggle/Toggle.tsx',
-    description: 'Indeterminate Toggle for a multi-target edit whose targets disagree: centred accent knob, aria-checked="mixed". A click sets every target on.', Preview: PreviewToggleMixed,
+    description: 'Indeterminate Toggle for a multi-target edit whose targets disagree: centered accent knob, a checkbox role with aria-checked="mixed". A click sets every target on.', Preview: PreviewToggleMixed,
   },
   {
     name: 'ChipGroup (partial)', category: 'inputs',
