@@ -130,7 +130,7 @@ export interface StackMenu {
  * The header row is the device: clicking it selects every zone, and its kebab
  * acts on them all.
  */
-export function ZoneCardStack({ name, anchorId, selected, drag, onSelect, menu, zoneCount = 0, children }: {
+export function ZoneCardStack({ name, anchorId, selected, dimmed = false, drag, onSelect, menu, zoneCount = 0, children }: {
   /** The device name, shown once above the zones. */
   name: string;
   /** Deep-link anchor the stack answers to; see CollapsibleSection's searchAnchor. */
@@ -139,6 +139,8 @@ export function ZoneCardStack({ name, anchorId, selected, drag, onSelect, menu, 
    *  selected fill (no border - that stays on the zone) so the device reads as
    *  one unit with something selected. */
   selected?: boolean;
+  /** A hovered press or pick leaves every zone out, so the header dims with them. */
+  dimmed?: boolean;
   /** Optional dnd-kit drag wiring for the whole stack. */
   drag?: SortableRowArgs;
   /** Header click, with whether the multi-select modifier was held, the way a
@@ -202,6 +204,7 @@ export function ZoneCardStack({ name, anchorId, selected, drag, onSelect, menu, 
             styles.deviceCardStackHeader,
             onSelect ? styles.deviceCardStackHeaderSelectable : '',
             selected ? styles.deviceCardStackHeaderSelected : '',
+            dimmed ? styles.deviceCardStackHeaderDimmed : '',
           ].filter(Boolean).join(' ')}
           data-menu-arrow-host={menu ? 'true' : undefined}
           onClick={onSelect ? e => onSelect(isMultiSelectModifier(e)) : undefined}
@@ -298,6 +301,7 @@ export function ZoneCard({
   stackSlot,
   pin,
   target = false,
+  dimmed = false,
 }: {
   device: LightingDevice;
   /** Deep-link anchor the card answers to; see CollapsibleSection's searchAnchor. */
@@ -380,6 +384,8 @@ export function ZoneCard({
   pin?: DevicePin;
   /** The next pick lands on this card. */
   target?: boolean;
+  /** A hovered press or pick previews its reach and leaves this card out. */
+  dimmed?: boolean;
 }) {
   const { t, language } = useTranslation();
   const isZone = device.parentDeviceId != null && device.zoneIndex != null;
@@ -598,6 +604,7 @@ export function ZoneCard({
         styles.deviceCard,
         (toggleMode ? toggleable && controlled : selected && !firmwareControlled) ? styles.deviceCardSelected : '',
         target && !toggleMode && !unavailable && !firmwareControlled ? styles.deviceCardTarget : '',
+        dimmed && !toggleMode ? styles.deviceCardDimmed : '',
         unavailable ? styles.deviceCardUnavailable : '',
         !unavailable && (!device.ledsOn || firmwareControlled || !controlled) ? styles.deviceCardPoweredOff : '',
         indent ? styles.deviceCardZone : '',

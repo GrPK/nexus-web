@@ -105,6 +105,12 @@
   justify-content: flex-start;
 }
 
+// Hover target around the scope Badge; flex keeps the Badge's own box.
+.scopeChip,
+.scopeChip > span {
+  display: flex;
+}
+
 .paneTitle {
   font-size: var(--type-body);
   font-weight: 600;
@@ -1153,7 +1159,7 @@
   border: var(--border-width) solid transparent;
   background: var(--surface);
   cursor: pointer;
-  transition: border-color var(--ease-fast), background var(--ease-fast);
+  transition: border-color var(--ease-fast), background var(--ease-fast), opacity var(--ease-fast);
 
   &:hover {
     border-color: var(--border-strong);
@@ -1163,6 +1169,10 @@
   // like the selected state, so hovering does not drop the accent.
   &.deviceCardTarget {
     border-color: var(--accent);
+  }
+
+  &.deviceCardDimmed {
+    opacity: var(--alpha-medium);
   }
 
   &.deviceCardSelected {
@@ -1211,10 +1221,15 @@
   font-weight: var(--weight-strong);
   color: var(--text);
   line-height: var(--leading-tight);
+  transition: opacity var(--ease-fast);
 }
 
 .deviceCardStackHeaderSelectable {
   cursor: pointer;
+}
+
+.deviceCardStackHeaderDimmed {
+  opacity: var(--alpha-medium);
 }
 
 // Any zone under the header selected: the fill only, so the selected zone's
@@ -1903,14 +1918,15 @@
   border-style: dotted;
 }
 
+// The name ellipsizes; the pin and the "+N" count never clip.
 .staticPinLabel {
   position: absolute;
   left: 50%;
   top: calc(100% + 5px);
   transform: translateX(-50%);
+  display: flex;
+  align-items: center;
   max-width: 11rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   padding: 1px 6px;
   border-radius: var(--radius-pill);
@@ -1965,16 +1981,23 @@
   transform: none;
 }
 
-// A pinned device's mark, shown while nothing is selected.
+// A pinned device's mark.
 .staticPinLabelPin {
+  flex-shrink: 0;
   width: 0.8em;
   height: 0.8em;
   margin-right: 0.25rem;
-  vertical-align: -0.05em;
+}
+
+.staticPinName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 // Devices sharing the labelled dot's colour.
 .staticPinCount {
+  flex-shrink: 0;
   margin-left: 0.3rem;
   opacity: var(--alpha-strong);
 }

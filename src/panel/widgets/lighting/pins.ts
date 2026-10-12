@@ -3,6 +3,7 @@ import { hexToHsv, hsvToHex } from '../../../lib/settings';
 import { nearestPaletteId, paletteColorForKey, paletteFamilyKey, paletteKey, type PaletteColor } from '../../../types/lightingPalette';
 import { EFFECTS, type EffectState, type LightingMode } from '../../../types/lighting';
 import { isSimpleAnimation, simpleAnimationLabelKey } from './simpleAnimations';
+import { canvasLabelName } from '../../../lib/canvasLabelName';
 
 /** Device id to the pin it wears. Absent means following the global mode. */
 export type Pins = Readonly<Record<string, Pin>>;
@@ -140,11 +141,11 @@ export const isPickTarget = (d: { id: string; ledsOn?: boolean; controlled?: boo
 
 /**
  * The Static picker's marks, on the color each device wears (an unpinned one
- * wears the global color): the selection, or with none, every lit and
- * controlled device, the pinned ones flagged since a press leaves them be.
+ * wears the global color), named as the canvas frames are: the selection, or
+ * with none, every lit and controlled device. Pinned ones are flagged.
  */
 export function pickerMarks(
-  devices: readonly { id: string; name: string; ledsOn?: boolean; controlled?: boolean }[],
+  devices: readonly { id: string; name: string; originalName?: string; ledsOn?: boolean; controlled?: boolean }[],
   pins: Pins,
   selectedIds: ReadonlySet<string>,
   globalColor: string,
@@ -154,7 +155,7 @@ export function pickerMarks(
     .filter(d => (none ? d.ledsOn !== false && d.controlled !== false : selectedIds.has(d.id)))
     .map(d => {
       const pin = pins[d.id];
-      return { id: d.id, name: d.name, hex: !pin ? globalColor : pin.kind === 'static' ? pinHex(pin) : '', pinned: none && !!pin };
+      return { id: d.id, name: canvasLabelName(d), hex: !pin ? globalColor : pin.kind === 'static' ? pinHex(pin) : '', pinned: !!pin };
     });
 }
 

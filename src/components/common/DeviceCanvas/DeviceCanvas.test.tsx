@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { DeviceCanvas, canvasLabelName } from './DeviceCanvas';
+import { DeviceCanvas } from './DeviceCanvas';
+import { canvasLabelName } from '../../../lib/canvasLabelName';
 import styles from './DeviceCanvas.module.scss';
 import type { LightingDevice } from '../../../api/lighting';
 

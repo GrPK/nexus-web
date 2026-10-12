@@ -120,10 +120,18 @@ describe('pickerMarks', () => {
     ]);
   });
 
-  it('marks a selection on what each wears, with no color for a non-static pin', () => {
+  it('marks a selection on what each wears, with no color for a non-static pin, still flagging pins', () => {
     const marks = pickerMarks(devices, pins, new Set(['a', 'b', 'c']), '#336699');
     expect(marks.map(d => d.hex)).toEqual(['#ff0000', '', '#336699']);
-    expect(marks.some(d => d.pinned)).toBe(false);
+    expect(marks.map(d => d.pinned)).toEqual([true, true, false]);
+  });
+
+  it('names a mark as the canvas names its frame', () => {
+    const zones = [
+      { id: 'z', name: 'B850I AORUS PRO - ARGB_V2_1' },
+      { id: 'r', name: 'Front - intake', originalName: 'B850I AORUS PRO - ARGB_V2_2' },
+    ];
+    expect(pickerMarks(zones, {}, new Set(), '#336699').map(d => d.name)).toEqual(['ARGB_V2_1', 'Front - intake']);
   });
 });
 

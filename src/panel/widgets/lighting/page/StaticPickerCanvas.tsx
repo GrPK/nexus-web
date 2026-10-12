@@ -13,7 +13,7 @@ export interface PickerDevice {
   name: string;
   /** The colour this device currently wears. */
   hex: string;
-  /** Pinned while nothing is selected: a press does not move it. */
+  /** Pinned: a press with nothing selected does not move it. */
   pinned?: boolean;
 }
 
@@ -56,7 +56,7 @@ export function StaticPickerCanvas({
 }: {
   /** Devices whose colour gets a mark, in rail order. */
   devices: PickerDevice[];
-  /** Nothing is selected, so the marks read dotted; a pinned device's mark carries a pin. */
+  /** Nothing is selected, so the marks read dotted. */
   implied?: boolean;
   /** The colour the selection shares; '' when they disagree. */
   hex: string;
@@ -278,7 +278,7 @@ export function StaticPickerCanvas({
               ].join(' ')}
             >
               {m.pinned && <Pin className={styles.staticPinLabelPin} aria-hidden />}
-              {m.name}
+              <span className={styles.staticPinName}>{m.name}</span>
               {m.extra > 0 && <span className={styles.staticPinCount}>{`+${m.extra}`}</span>}
             </span>
           </div>

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import type { ServiceState } from '../../../types/service';
@@ -38,8 +38,10 @@ describe('CoolingPage preset tab hover', () => {
       </UiSettingsProvider>,
     );
     await screen.findAllByText('Front Fan');
-    const outlined = () => ['Front Fan', 'Pump', 'Rear Fan']
-      .filter(n => screen.getAllByText(n).some(el => el.closest(`.${styles.fanCard}`)?.className.includes(styles.fanCardTarget)));
+    const withClass = (cls: string) => ['Front Fan', 'Pump', 'Rear Fan']
+      .filter(n => screen.getAllByText(n).some(el => el.closest(`.${styles.fanCard}`)?.className.includes(cls)));
+    const outlined = () => withClass(styles.fanCardTarget);
+    const dimmed = () => withClass(styles.fanCardDimmed);
     const tab = screen.getByRole('tab', { name: /cooling\.mode\.silent/ });
 
     expect(outlined()).toEqual([]);
@@ -47,7 +49,27 @@ describe('CoolingPage preset tab hover', () => {
     expect(outlined()).toEqual([]);
     fireEvent.pointerEnter(tab, { pointerType: 'mouse' });
     expect(outlined()).toEqual(['Front Fan']);
+    expect(dimmed()).toEqual(['Pump', 'Rear Fan']);
     fireEvent.pointerLeave(tab, { pointerType: 'mouse' });
     expect(outlined()).toEqual([]);
+    expect(dimmed()).toEqual([]);
+  });
+
+  it('previews nothing on the active preset, whose press retargets nothing', async () => {
+    localStorage.setItem('nexus_settings', JSON.stringify({ general: { coolingDashboardMode: 'advanced' } }));
+    render(
+      <UiSettingsProvider>
+        <CoolingPage serviceOnline serviceState={serviceState} />
+      </UiSettingsProvider>,
+    );
+    await screen.findAllByText('Front Fan');
+    const active = await waitFor(() => {
+      const tab = screen.getAllByRole('tab').find(el => el.getAttribute('aria-selected') === 'true' && /cooling\.mode\./.test(el.textContent ?? ''));
+      expect(tab).toBeTruthy();
+      return tab!;
+    });
+    fireEvent.pointerEnter(active, { pointerType: 'mouse' });
+    expect(document.querySelector(`.${styles.fanCardTarget}`)).toBeNull();
+    expect(document.querySelector(`.${styles.fanCardDimmed}`)).toBeNull();
   });
 });

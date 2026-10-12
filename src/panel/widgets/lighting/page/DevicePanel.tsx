@@ -66,7 +66,7 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   /** Pins these cards to the current global source, or unpins them. Absent
    *  leaves every card without a pin button. */
   onSetPin?: (ids: string[], pinned: boolean) => void;
-  /** Cards the next pick lands on, outlined; absent in modes with no picks. */
+  /** While a press or pick is hovered, the cards it reaches (outlined); the rest dim. */
   pickTargetIds?: ReadonlySet<string>;
   /** Device ids currently selected (single-tap → 1-element set, canvas marquee → N-element set). */
   selectedIds: Set<string>;
@@ -432,6 +432,7 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
       stackSlot={stackSlotOf(stacks, d.id)}
       pin={pinFor(d.id)}
       target={pickTargetIds?.has(d.id)}
+      dimmed={!!pickTargetIds && !pickTargetIds.has(d.id)}
       onUnstack={stackOf(stacks, d.id) ? () => onStacksChange?.(unstackDevices(stacks, [d.id])) : undefined}
     />
   );
@@ -458,6 +459,7 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
         anchorId={lightingGroupAnchor(block.groupKey)}
         name={block.label}
         selected={members.some(z => selectedIds.has(z.id))}
+        dimmed={!!pickTargetIds && members.every(z => !pickTargetIds.has(z.id))}
         zoneCount={members.length}
         drag={drag}
         onSelect={selectable.length > 0 ? additive => handleStackSelect(selectable, additive) : undefined}

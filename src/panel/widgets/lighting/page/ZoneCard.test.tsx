@@ -811,6 +811,11 @@ describe('ZoneCard pin', () => {
     expect(menuRow(/lighting\.devices\.(un)?pin$/)).toBeNull();
   });
 
+  it('dims a card a hovered press leaves out', () => {
+    renderPin({}, { dimmed: true });
+    expect(document.querySelector(`.${styles.deviceCardDimmed}`)).toBeTruthy();
+  });
+
   it('shows no pin on a following card', () => {
     renderPin({});
     expect(document.querySelector(`.${styles.devicePinBtn}`)).toBeNull();

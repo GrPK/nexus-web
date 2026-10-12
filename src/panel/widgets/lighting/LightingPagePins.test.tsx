@@ -5,6 +5,7 @@ import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { ANIMATE_EFFECTS } from '../../../types/lighting';
 import { LightingPage } from './LightingPage';
 import { colorPin } from './pins';
+import styles from './LightingPage.module.scss';
 
 const topicHandlers = vi.hoisted(() => ({ lighting: [] as (() => void)[] }));
 const syncState = vi.hoisted(() => ({ mode: 'animate', rawSync: 'fire' }));
@@ -308,13 +309,25 @@ describe('LightingPage pins', () => {
       expect(await screen.findByText('lighting.pane.allExceptPinned.one')).toBeTruthy();
     });
 
+    it('previews its reach on a hover of the scope chip', async () => {
+      withDevices('a', 'b', 'c');
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      const chip = (await screen.findByText('lighting.pane.allExceptPinned.one')).closest(`.${styles.scopeChip}`)!;
+      const targets = () => screen.getByTestId('rail').dataset.targets;
+      fireEvent.pointerEnter(chip, { pointerType: 'mouse' });
+      expect(targets()).toBe('b,c');
+      fireEvent.pointerLeave(chip, { pointerType: 'mouse' });
+      expect(targets()).toBe('none');
+    });
+
     it('says all pinned when every device wears a pin', async () => {
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
       expect(await screen.findByText('lighting.pane.allPinned')).toBeTruthy();
     });
 
-    it('marks every device dotted with nothing selected, flagging the pinned, and a selection solid on what each wears', async () => {
+    it('marks every device dotted with nothing selected and a selection solid on what each wears, flagging the pinned', async () => {
       withDevices('a', 'b');
       syncState.mode = 'static';
       syncState.rawSync = 'static';
@@ -325,7 +338,7 @@ describe('LightingPage pins', () => {
       await waitFor(() => expect(marks().textContent).toBe('a@#ff0000(pinned);b@#336699'));
       expect(marks().dataset.implied).toBe('1');
       fireEvent.click(screen.getByText('select-ab'));
-      await waitFor(() => expect(marks().textContent).toBe('a@#ff0000;b@#336699'));
+      await waitFor(() => expect(marks().textContent).toBe('a@#ff0000(pinned);b@#336699'));
       expect(marks().dataset.implied).toBe('');
     });
   });
@@ -334,18 +347,45 @@ describe('LightingPage pins', () => {
     const targets = () => screen.getByTestId('rail').dataset.targets;
     const tab = (key: string) => screen.getByText(`tab:${key}`);
 
-    it('outlines the unpinned cards with nothing selected, and none once something is', async () => {
-      withDevices('a', 'b');
+    it('previews the unpinned cards with nothing selected, and the selection once there is one', async () => {
+      withDevices('a', 'b', 'c');
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
       await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
       expect(targets()).toBe('none');
       fireEvent.mouseEnter(tab('gif'));
-      await waitFor(() => expect(targets()).toBe('b'));
+      await waitFor(() => expect(targets()).toBe('b,c'));
       fireEvent.click(screen.getByText('select-a'));
-      expect(targets()).toBe('');
+      expect(targets()).toBe('a');
       fireEvent.mouseLeave(tab('gif'));
       expect(targets()).toBe('none');
+    });
+
+    it('previews nothing on the tab already showing when its press changes nothing', async () => {
+      withDevices('a', 'b');
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
+      fireEvent.mouseEnter(tab('animate'));
+      expect(targets()).toBe('none');
+      fireEvent.mouseLeave(tab('animate'));
+      // The selection shows Mirror, and Mirror re-pins nothing; Animation would pin it.
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('screen'));
+      fireEvent.mouseEnter(tab('screen'));
+      expect(targets()).toBe('none');
+      fireEvent.mouseLeave(tab('screen'));
+      fireEvent.mouseEnter(tab('animate'));
+      expect(targets()).toBe('a');
+    });
+
+    it('previews an unpinned selection on the tab already showing, since its press pins it', async () => {
+      withDevices('a', 'b');
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.mouseEnter(tab('animate'));
+      expect(targets()).toBe('a');
     });
 
     it('outlines every lit card on Game Sync, pinned or selected', async () => {

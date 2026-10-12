@@ -15,6 +15,7 @@ import { gpuNotice, type GpuState } from '../CanvasNoticeBar/gpuNotice';
 import { DeviceContextMenu, menuSections, type DeviceMenuItem } from './DeviceContextMenu';
 import { stackMenuItems, type StackActions } from './groupMenuItems';
 import { sliceStackSlot, stackSlotOf, type DeviceStack } from '../../../lib/stackSlots';
+import { canvasLabelName } from '../../../lib/canvasLabelName';
 import styles from './DeviceCanvas.module.scss';
 
 interface DeviceCanvasProps {
@@ -220,19 +221,6 @@ type LabelPos = { cx: number; cy: number };
 
 /** Gap between a frame's bottom edge and its name, and between stacked name rows. */
 const LABEL_GAP = 5;
-
-/** The name a frame wears: the card's own part of a hardware name built as
- *  "{device} - {zone}" (or "{board} - {port} - {product}" on a chained port),
- *  which is the context the rail needs and the canvas cannot fit. A renamed
- *  card (originalName set) shows its name verbatim: a human typed it, dashes
- *  and all. */
-export function canvasLabelName(dev: Pick<LightingDevice, 'name' | 'originalName'>): string {
-  if (dev.originalName != null) return dev.name;
-  const last = dev.name.lastIndexOf(' - ');
-  if (last < 0) return dev.name;
-  const own = dev.name.slice(last + 3).trim();
-  return own || dev.name;
-}
 
 /** Resolves each label's center so no two labels overlap. A label sits just
  *  under its frame, centred on it, and steps down/up in alternating whole-row

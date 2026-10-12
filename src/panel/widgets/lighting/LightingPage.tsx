@@ -11,7 +11,7 @@ import {
   fetchCurrentSync, fetchAvailableMappings, fetchGameSyncState, fetchGameSyncGames,
   steamArtworkUrl, resolveActiveGame, setLightingPaused,
   resetDeviceLayouts, applyDeviceLayouts, setActiveLayoutPreset, updateLayoutPreset, identifyLightingDevice,
-  type LightingDevice, type LedMapEntry, type Pin, type PinKind, type PostProcessSettings, type GameSyncDevice,
+  type LightingDevice, type LedMapEntry, type Pin, type PostProcessSettings, type GameSyncDevice,
   type GameSyncGame, type DeviceLayoutDto, type PresetApp,
 } from '../../../api/lighting';
 import { groupNamesOf, type DeviceGroup } from '../../../lib/deviceGroups';
@@ -52,13 +52,14 @@ import { SectionHeader } from '../../../components/common/SectionHeader/SectionH
 import { useUiSettings } from '../../../hooks/useUiSettings';
 import { ServiceRequired } from '../../../components/views/ServiceRequired';
 import { DeviceCanvas } from '../../../components/common/DeviceCanvas/DeviceCanvas';
+import { canvasLabelName } from '../../../lib/canvasLabelName';
 import { SCENE_3D } from '../../../lib/scene/sceneFeature';
 import { useLightingScene } from './scene/useLightingScene';
 import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
 import { usePersistentState } from '../../../hooks/usePersistentState';
 import {
   staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex,
-  isPickTarget, pickerMarks, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
+  isPickTarget, pickerMarks, pinMode, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
@@ -163,9 +164,6 @@ function loadDeviceOrder(): string[] {
 const LightingScene3D = lazy(() => import('./scene/LightingScene3D'));
 const VIEW_2D = '2d';
 const VIEW_3D = '3d';
-// The tab a pin's devices show on.
-const PIN_MODES: Record<PinKind, LightingMode> = { static: 'static', animate: 'animate', mirror: 'screen', media: 'gif' };
-
 export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate }: LightingViewProps) {
   const { t, language } = useTranslation();
   const { mode, setMode, rawSync, setRawSync, synced, paused: syncedPaused } = useLightingSync(serviceOnline, activeProfileId);
@@ -926,7 +924,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // card pinned to Mirror opens on Mirror whatever the global mode is. Nothing
   // selected, a selection following the global mode, or one wearing different
   // pins shows the global mode.
-  const viewMode: LightingMode = scoped.kind === 'pin' ? PIN_MODES[scoped.pin.kind] : effectiveMode;
+  const viewMode: LightingMode = scoped.kind === 'pin' ? pinMode(scoped.pin.kind) : effectiveMode;
 
   // Pins the selection to a static look: the whole look travels, so the service
   // renders THIS effect for the device rather than approximating it with a
@@ -2029,15 +2027,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       default: return null;
     }
   };
-  // Hovering a mode tab outlines the cards its press reaches: Game Sync every lit
-  // device, any other mode the unpinned ones while nothing is selected. A press
-  // or the advanced header unmounting skips the tab's pointerleave, so both clear it.
+  // Hovering a mode tab or the scope chip previews the reach of a press or pick.
+  // A press or the advanced page unmounting skips the pointerleave, so both clear it.
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const [scopeHovered, setScopeHovered] = useState(false);
   const advancedHeader = serviceOnline && !simpleDashboard;
   const [hoverHeader, setHoverHeader] = useState(advancedHeader);
   if (hoverHeader !== advancedHeader) {
     setHoverHeader(advancedHeader);
     setHoveredTab(null);
+    setScopeHovered(false);
   }
   // A tab press either opens the mode menu or applies a mode: to the selected
   // cards when there are any, else to every unpinned one. A mode switch also
@@ -2063,17 +2062,50 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The preview stands for the selection; with nothing selected it is every
   // unpinned device, and the chip says how many pins a pick skips.
   const pinnedShown = visibleDevices.filter(d => d.id in pins).length;
+  // The cards a hovered press or pick reaches; the rest dim. A pick reaches the
+  // selection, or with none every unpinned lit, controlled card; Game Sync every
+  // lit, controlled card. The tab already showing previews nothing when its
+  // press leaves every card as it is. Off and Game Sync have no picks.
   const pickTargetIds = useMemo(() => {
+    const pickReach = () => (selectedDeviceIds.size > 0 ? new Set(selectedDeviceIds)
+      : new Set(visibleDevices.filter(d => isPickTarget(d, pins, selectedDeviceIds)).map(d => d.id)));
+    if (scopeHovered) return viewMode === 'none' || viewMode === 'gamesync' ? undefined : pickReach();
     if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
-    return new Set(visibleDevices.filter(d => hoveredTab === 'gamesync'
-      ? d.ledsOn !== false && d.controlled !== false
-      : isPickTarget(d, pins, selectedDeviceIds)).map(d => d.id));
-  }, [hoveredTab, pins, selectedDeviceIds, visibleDevices]);
+    if (hoveredTab === activeTabKey
+      && (selectedDeviceIds.size === 0 || hoveredTab === 'gamesync' || scoped.kind === 'pin')) return undefined;
+    if (hoveredTab === 'gamesync') {
+      return new Set(visibleDevices.filter(d => d.ledsOn !== false && d.controlled !== false).map(d => d.id));
+    }
+    return pickReach();
+  }, [scopeHovered, viewMode, hoveredTab, activeTabKey, scoped.kind, pins, selectedDeviceIds, visibleDevices]);
+  const pinnedNames = useMemo(() => visibleDevices.filter(d => d.id in pins).map(canvasLabelName), [visibleDevices, pins]);
   const previewBadgeLabel = selectedDeviceIds.size > 0
     ? t(pluralKey('lighting.pane.selectedCount', language, selectedDeviceIds.size), { count: selectedDeviceIds.size })
     : pinnedShown === 0 ? t('lighting.pane.allDevices')
       : pinnedShown === visibleDevices.length ? t('lighting.pane.allPinned')
         : t(pluralKey('lighting.pane.allExceptPinned', language, pinnedShown), { count: pinnedShown });
+  // The hover span stays mounted as the tooltip comes and goes, so its pointerleave always fires.
+  const scopeBadge = (
+    <Badge
+      label={previewBadgeLabel}
+      compact
+      uppercase
+      color={selectedDeviceIds.size > 0 ? 'var(--accent-glow)' : 'var(--text-dim)'}
+    />
+  );
+  const scopeChip = (
+    <span
+      className={styles.scopeChip}
+      onPointerEnter={e => { if (e.pointerType === 'mouse') setScopeHovered(true); }}
+      onPointerLeave={e => { if (e.pointerType === 'mouse') setScopeHovered(false); }}
+    >
+      {selectedDeviceIds.size === 0 && pinnedNames.length > 0 ? (
+        <HoverTooltip title={t('lighting.badge.pinnedDevices')} body={pinnedNames.join(', ')} side="bottom">
+          <span>{scopeBadge}</span>
+        </HoverTooltip>
+      ) : scopeBadge}
+    </span>
+  );
   const pinnedDevices = useMemo(() => {
     const names = new Map(devices.map(d => [d.id, d.name]));
     return pinnedNamesByEffect(pins, viewMode === 'static' ? 'static' : 'animate', id => names.get(id));
@@ -2362,9 +2394,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         </div>
         <div className={`${styles.paneHeader} ${styles.headerCenter}`}>
           <span className={styles.paneTitle}>{t('lighting.pane.effects')}</span>
-          {/* How many devices this preview stands for: every device in the
-              modes that drive them all, the selection in the per-device ones. */}
-          <Badge label={previewBadgeLabel} compact uppercase color="var(--text-dim)" />
+          {scopeChip}
           {SCENE_3D && showCanvas && (
             <ChipGroup
               className={styles.sceneViewSwitch}
