@@ -23,6 +23,22 @@ const mockGetAioScreen = vi.fn(() => Promise.resolve({
   showCpuTemp: true, showCpuLoad: true, showGpuTemp: true, showGpuLoad: true, showFanSpeed: false, nexusWidgets: true,
 }));
 
+const mockSearchKlipy = vi.fn();
+const mockStageKlipy = vi.fn();
+const mockFetchStaged = vi.fn();
+
+vi.mock('../../../api/klipy', () => ({
+  searchKlipy: (...args: any[]) => mockSearchKlipy(...args),
+  stageKlipy: (...args: any[]) => mockStageKlipy(...args),
+  klipyThumbUrl: (slug: string) => `thumb/${slug}`,
+}));
+
+vi.mock('../../../api/mediaLibrary', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../api/mediaLibrary')>()),
+  fetchStagedFile: (...args: any[]) => mockFetchStaged(...args),
+  cancelMediaStage: () => Promise.resolve(),
+}));
+
 vi.mock('../../../api/lianli-wireless', () => ({
   getLianLiWirelessScreens: (...args: any[]) => mockGetScreens(...args),
   getLianLiWirelessMedia: (...args: any[]) => mockGetMedia(...args),
@@ -58,6 +74,9 @@ beforeEach(() => {
   mockImportMedia.mockResolvedValue({ id: 'm4', name: 'test.png', kind: 'image' });
   mockDeleteMedia.mockResolvedValue(true);
   mockSetOrder.mockResolvedValue(true);
+  mockSearchKlipy.mockResolvedValue({ items: [{ slug: 'cat', title: 'Cat', width: 400, height: 400 }], hasNext: false });
+  mockStageKlipy.mockResolvedValue({ stageId: 'st1', mediaKind: 'gif', error: false, msg: '' });
+  mockFetchStaged.mockResolvedValue(new File(['x'], 'cat.gif', { type: 'image/gif' }));
 });
 
 afterEach(() => {
@@ -92,7 +111,7 @@ describe('LianLiWirelessScreenTab', () => {
 
     // Defaults to screen 1 (image content type).
     expect(screen.getByRole('button', { name: 'devices.lianli-wireless.contentTypeAria' }))
-      .toHaveTextContent('devices.lianli-wireless.contentTypePicture');
+      .toHaveTextContent('devices.lianli-wireless.contentTypeMedia');
   });
 
   it('moves the selected fan right, renumbers the tiles, and persists the serial order', async () => {
@@ -411,15 +430,15 @@ describe('LianLiWirelessScreenTab', () => {
     expect(mockSetSettings).toHaveBeenCalledWith('S1', { rotation: 2 });
   });
 
-  it('lists the media library filtered to the active content type and highlights the current pick', async () => {
+  it('lists the whole media library and highlights the current pick', async () => {
     await renderTab();
 
     const wallpaper = screen.getByRole('button', { name: 'Wallpaper' });
     const poster = screen.getByRole('button', { name: 'Poster' });
     expect(wallpaper).toHaveAttribute('aria-pressed', 'true');
     expect(poster).toHaveAttribute('aria-pressed', 'false');
-    // The gif-kind item is not shown while the picture content type is active.
-    expect(screen.queryByRole('button', { name: 'Loop' })).not.toBeInTheDocument();
+    // Pictures and GIFs share one gallery.
+    expect(screen.getByRole('button', { name: 'Loop' })).toBeInTheDocument();
 
     fireEvent.click(poster);
     expect(mockSetContent).toHaveBeenCalledWith('S1', 'image', 'm3');
@@ -440,9 +459,9 @@ describe('LianLiWirelessScreenTab', () => {
   it('uploads a new image through the crop dialog', async () => {
     await renderTab();
 
-    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-wireless.uploadImage' }));
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    expect(fileInput).toHaveAttribute('accept', 'image/jpeg,image/png');
+    expect(fileInput).toHaveAttribute('accept', 'image/jpeg,image/png,image/gif,video/mp4');
+    expect(screen.getByRole('button', { name: 'devices.lianli-wireless.uploadMedia' })).toBeInTheDocument();
 
     const file = new File(['data'], 'test.png', { type: 'image/png' });
     await act(async () => {
@@ -496,5 +515,72 @@ describe('LianLiWirelessScreenTab', () => {
     expect(screen.queryByText('devices.lianli-wireless.brightness')).not.toBeInTheDocument();
     expect(screen.queryByText('devices.lcd.sleepWhenLocked')).not.toBeInTheDocument();
     expect(screen.getByText('devices.lianli-wireless.rotationLabel')).toBeInTheDocument();
+  });
+
+  it('offers one Media entry instead of Picture, Dynamic and Video', async () => {
+    await renderTab();
+    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-wireless.contentTypeAria' }));
+    const names = screen.getAllByRole('option').map(o => o.textContent);
+
+    expect(names).toEqual([
+      'devices.lianli-wireless.contentTypeOff',
+      'devices.lianli-wireless.contentTypeMedia',
+      'devices.lianli-wireless.contentTypeSensor',
+      'devices.lianli-wireless.contentTypeClock',
+      'devices.lianli-wireless.contentTypeAnimation',
+      'devices.lianli-wireless.contentTypePanel',
+    ]);
+  });
+
+  it('shows a stored gif as Media with the shared gallery', async () => {
+    mockGetScreens.mockResolvedValue([
+      { serial: 'S1', position: 0, width: 400, height: 400, brightness: 80, rotation: 0, contentType: 'gif', mediaId: 'm2' },
+    ]);
+    await renderTab();
+
+    expect(screen.getByRole('button', { name: 'devices.lianli-wireless.contentTypeAria' }))
+      .toHaveTextContent('devices.lianli-wireless.contentTypeMedia');
+    expect(screen.getByText('Wallpaper')).toBeInTheDocument();
+    expect(screen.getByText('Loop')).toBeInTheDocument();
+  });
+
+  it('choosing Media posts nothing until an item is picked', async () => {
+    mockGetScreens.mockResolvedValue([
+      { serial: 'S1', position: 0, width: 400, height: 400, brightness: 80, rotation: 0, contentType: 'off' },
+    ]);
+    await renderTab();
+    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-wireless.contentTypeAria' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('option', { name: 'devices.lianli-wireless.contentTypeMedia' }));
+    });
+
+    expect(mockSetContent).not.toHaveBeenCalled();
+    expect(screen.getByText('Loop')).toBeInTheDocument();
+  });
+
+  it('posts the item kind when a video is picked', async () => {
+    mockGetMedia.mockResolvedValue([...mediaData, { id: 'm9', name: 'Clip', kind: 'video' }]);
+    await renderTab();
+    await act(async () => { fireEvent.click(screen.getByText('Clip')); });
+
+    expect(mockSetContent).toHaveBeenCalledWith('S1', 'video', 'm9');
+  });
+
+  it('sends a Klipy pick through the cropper into the library import', async () => {
+    await renderTab();
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.klipyBrowse' }));
+    await waitFor(() => expect(mockSearchKlipy).toHaveBeenCalled());
+    const pick = await screen.findByRole('button', { name: /Cat/ });
+    await act(async () => { fireEvent.click(pick); });
+
+    await waitFor(() => expect(mockStageKlipy).toHaveBeenCalledWith('cat'));
+    const dialog = await screen.findByRole('dialog', { name: 'cropper.title' });
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'cropper.confirm' }));
+    });
+
+    await waitFor(() => expect(mockImportMedia).toHaveBeenCalledTimes(1));
+    expect(mockFetchStaged).toHaveBeenCalled();
+    expect(mockImportMedia.mock.calls[0][0]).toBeInstanceOf(File);
   });
 });

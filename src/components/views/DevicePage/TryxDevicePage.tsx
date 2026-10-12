@@ -21,7 +21,7 @@ import { useFpsSensors } from '../../../hooks/useFpsSensors';
 import { buildNetworkSensors } from '../../../panel/widgets/monitoring/networkSensors';
 import { sensorsForCategory } from '../../../panel/widgets/monitoring/sensorCategories';
 import { stageKlipy, type KlipyGif } from '../../../api/klipy';
-import { cancelMediaStage, mediaStagePreviewUrl, mediaStageRawUrl, stagePreviewFor } from '../../../api/mediaLibrary';
+import { cancelMediaStage, fetchStagedFile, mediaStagePreviewUrl, mediaStageRawUrl, stagePreviewFor } from '../../../api/mediaLibrary';
 import {
   getTryxStatus,
   getTryxPresets,
@@ -94,18 +94,6 @@ const DEFAULT_OVERLAY_DOCKED = true;
 const STATUS_POLL_MS = 4000;
 const MEDIA_POLL_MS = 8000;
 const UPLOAD_ASPECT = TRYX_MEDIA_WIDTH / TRYX_MEDIA_HEIGHT;
-
-// Pulls a staged Klipy file back so it uploads through the same multipart path as a local pick.
-async function fetchStagedFile(rawUrl: string, name: string): Promise<File | null> {
-  try {
-    const res = await fetch(rawUrl);
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return new File([blob], name, { type: blob.type });
-  } catch {
-    return null;
-  }
-}
 
 // Fallback thumbnail for a device file we have no local frame for (a clip uploaded
 // via another tool): a muted play glyph so the card reads as a video, not a blank.

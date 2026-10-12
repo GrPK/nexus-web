@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Fan, Lightbulb, MonitorSmartphone, RadioReceiver, Unplug } from 'lucide-react';
+import { Fan, CircleEqual, Lightbulb, RadioReceiver, Unplug } from 'lucide-react';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { getLianLiWirelessState, type LianLiWirelessLinkStatus, type LianLiWirelessState } from '../../../api/lianli-wireless';
@@ -150,7 +150,7 @@ export function LianLiWirelessDevicePage({ onSectionNavigate }: LianLiWirelessDe
     { key: 'fans', label: t('devices.lianli-wireless.tab.devices'), icon: <RadioReceiver size={14} /> },
     ...(hasLighting ? [{ key: 'lighting', label: t('lighting.title'), icon: <Lightbulb size={14} /> }] : []),
     ...(hasFans ? [{ key: 'cooling', label: t('cooling.title'), icon: <Fan size={14} /> }] : []),
-    { key: 'screen', label: t('devices.lianli-wireless.tab.screen'), icon: <MonitorSmartphone size={14} /> },
+    { key: 'screen', label: t('devices.lianli-wireless.tab.screen'), icon: <CircleEqual size={14} /> },
   ];
   // A tab that disappears (its chain unbound or out of range) falls back to Devices.
   const tab: LianLiWirelessTab = tabs.some(x => x.key === activeTab) ? activeTab : 'fans';

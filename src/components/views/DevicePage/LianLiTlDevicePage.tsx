@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Fan, Lightbulb, MonitorSmartphone, Unplug } from 'lucide-react';
+import { CircleEqual, Fan, Lightbulb, Unplug } from 'lucide-react';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { Button } from '../../common/Button/Button';
@@ -143,7 +143,7 @@ export function LianLiTlDevicePage({ onSectionNavigate }: LianLiTlDevicePageProp
   const tabs = [
     { key: 'lighting', label: t('lighting.title'), icon: <Lightbulb size={14} /> },
     ...(hasCooling ? [{ key: 'cooling', label: t('cooling.title'), icon: <Fan size={14} /> }] : []),
-    ...(hasScreens ? [{ key: 'screens', label: t('devices.lianli-wireless.tab.screen'), icon: <MonitorSmartphone size={14} /> }] : []),
+    ...(hasScreens ? [{ key: 'screens', label: t('devices.lianli-wireless.tab.screen'), icon: <CircleEqual size={14} /> }] : []),
   ];
   // A tab that disappears (fans unplugged) falls back to Lighting.
   const tab = tabs.some(x => x.key === activeTab) ? activeTab : 'lighting';

@@ -12,6 +12,11 @@ import { EffectCard } from '../../common/EffectCard/EffectCard';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
 import { MediaCropper, type NormalizedCrop } from '../../common/MediaCropper/MediaCropper';
+import { KlipyPicker } from '../../common/KlipyPicker/KlipyPicker';
+import { stageKlipy, type KlipyGif } from '../../../api/klipy';
+import {
+  cancelMediaStage, fetchStagedFile, mediaStagePreviewUrl, mediaStageRawUrl, stagePreviewFor,
+} from '../../../api/mediaLibrary';
 import {
   getLianLiWirelessScreens,
   getLianLiWirelessMedia,
@@ -51,11 +56,20 @@ function orderKey(s: LianLiWirelessScreen): number {
   return s.order !== undefined && s.order >= 0 ? s.order : Number.MAX_SAFE_INTEGER;
 }
 
-const CONTENT_TYPES: { value: LianLiWirelessScreenContentType; labelKey: string }[] = [
+// Picture, dynamic and video content share one picker entry; the stored type is the item's kind.
+type ContentChoice = LianLiWirelessScreenContentType | 'media';
+
+function isMediaType(type: LianLiWirelessScreenContentType): boolean {
+  return type === 'image' || type === 'gif' || type === 'video';
+}
+
+function choiceOf(type: LianLiWirelessScreenContentType): ContentChoice {
+  return isMediaType(type) ? 'media' : type;
+}
+
+const CONTENT_TYPES: { value: ContentChoice; labelKey: string }[] = [
   { value: 'off', labelKey: 'devices.lianli-wireless.contentTypeOff' },
-  { value: 'image', labelKey: 'devices.lianli-wireless.contentTypePicture' },
-  { value: 'gif', labelKey: 'devices.lianli-wireless.contentTypeDynamic' },
-  { value: 'video', labelKey: 'devices.lianli-wireless.contentTypeVideo' },
+  { value: 'media', labelKey: 'devices.lianli-wireless.contentTypeMedia' },
   { value: 'sensor', labelKey: 'devices.lianli-wireless.contentTypeSensor' },
   { value: 'clock', labelKey: 'devices.lianli-wireless.contentTypeClock' },
   { value: 'animation', labelKey: 'devices.lianli-wireless.contentTypeAnimation' },
@@ -69,10 +83,26 @@ const SELECTION_MODES: { key: 'single' | 'multiple'; labelKey: string }[] = [
   { key: 'multiple', labelKey: 'devices.lianli-wireless.selectionModeMultiple' },
 ];
 
-function acceptForKind(kind: LianLiWirelessMediaKind): string {
-  if (kind === 'video') return 'video/mp4';
-  if (kind === 'gif') return 'image/gif';
-  return 'image/jpeg,image/png';
+const MEDIA_ACCEPT = 'image/jpeg,image/png,image/gif,video/mp4';
+
+// The screen's media library is square, like the 400x400 glass.
+const UPLOAD_ASPECT = 1;
+
+interface CropState {
+  src: string;
+  kind: 'video' | 'image';
+  fallbackSrc?: string;
+  name: string;
+  /** A local pick carries its File; a Klipy pick is staged in the service and fetched from rawUrl on confirm. */
+  file?: File;
+  stageId?: string;
+  rawUrl?: string;
+}
+
+function mediaKindIcon(kind: LianLiWirelessMediaKind) {
+  if (kind === 'video') return <Video size={14} aria-hidden />;
+  if (kind === 'gif') return <Film size={14} aria-hidden />;
+  return <ImageIcon size={14} aria-hidden />;
 }
 
 function contentTypeIcon(type: LianLiWirelessScreenContentType) {
@@ -120,9 +150,13 @@ export function LianLiWirelessScreenTab({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
   const [brightnessDraft, setBrightnessDraft] = useState(50);
-  const [uploadKind, setUploadKind] = useState<LianLiWirelessMediaKind>('image');
+  // "Media" chosen before any item: no content type is posted until an item is picked.
+  const [mediaPending, setMediaPending] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [cropState, setCropState] = useState<{ src: string; file: File } | null>(null);
+  const [cropState, setCropState] = useState<CropState | null>(null);
+  const [klipyOpen, setKlipyOpen] = useState(false);
+  const [klipyBusy, setKlipyBusy] = useState<string | null>(null);
+  const [klipyError, setKlipyError] = useState<string | null>(null);
   const [pendingDeleteMedia, setPendingDeleteMedia] = useState<LianLiWirelessMediaItem | null>(null);
 
   const aliveRef = useRef(true);
@@ -199,6 +233,7 @@ export function LianLiWirelessScreenTab({
   }, [screens, selected, orderedScreens, api]);
 
   const toggleScreen = useCallback((serial: string) => {
+    setMediaPending(false);
     setSelected(prev => {
       if (selectionMode === 'single') return new Set([serial]);
       const next = new Set(prev);
@@ -208,6 +243,7 @@ export function LianLiWirelessScreenTab({
   }, [selectionMode]);
 
   const handleModeChange = useCallback((mode: string) => {
+    setMediaPending(false);
     const next = mode === 'multiple' ? 'multiple' : 'single';
     setSelectionMode(next);
     if (next === 'single') {
@@ -226,11 +262,12 @@ export function LianLiWirelessScreenTab({
   const representative = targetScreens[0] ?? null;
   // When several fans with different content types are selected the content
   // controls can't show one truth; force a fresh pick instead.
-  const sharedContentType = targetScreens.length > 0
-    && targetScreens.every(s => s.contentType === targetScreens[0].contentType)
-    ? targetScreens[0].contentType
+  const sharedChoice = targetScreens.length > 0
+    && targetScreens.every(s => choiceOf(s.contentType) === choiceOf(targetScreens[0].contentType))
+    ? choiceOf(targetScreens[0].contentType)
     : null;
-  const contentMixed = targetScreens.length > 0 && sharedContentType === null;
+  const contentMixed = targetScreens.length > 0 && sharedChoice === null && !mediaPending;
+  const showMedia = mediaPending || sharedChoice === 'media';
 
   useEffect(() => {
     if (!brightnessInteractingRef.current && representative) {
@@ -281,7 +318,13 @@ export function LianLiWirelessScreenTab({
     );
   }, [applyToTargets, targetScreens, api]);
 
-  const handleContentTypeChange = useCallback((contentType: LianLiWirelessScreenContentType) => {
+  const handleContentTypeChange = useCallback((choice: ContentChoice) => {
+    if (choice === 'media') {
+      setMediaPending(true);
+      return;
+    }
+    setMediaPending(false);
+    const contentType = choice;
     applyToTargets(
       s => ({ ...s, contentType }),
       serial => { void api.setContent(serial, contentType); },
@@ -289,6 +332,7 @@ export function LianLiWirelessScreenTab({
   }, [applyToTargets, api]);
 
   const handleMediaSelect = useCallback((item: LianLiWirelessMediaItem) => {
+    setMediaPending(false);
     applyToTargets(
       s => ({ ...s, contentType: item.kind, mediaId: item.id }),
       serial => { void api.setContent(serial, item.kind, item.id); },
@@ -311,38 +355,37 @@ export function LianLiWirelessScreenTab({
     );
   }, [applyToTargets, api]);
 
-  const openUpload = useCallback((kind: LianLiWirelessMediaKind) => {
-    setUploadKind(kind);
-    // React batches the state update above, so the input's JSX-bound accept
-    // wouldn't reflect `kind` yet at the moment the OS file picker opens; set
-    // it imperatively here so the filter is right on the very first click.
-    const input = fileInputRef.current;
-    if (input) {
-      input.accept = acceptForKind(kind);
-      input.click();
-    }
-  }, []);
+  const openUpload = useCallback(() => { fileInputRef.current?.click(); }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    setCropState({ src: URL.createObjectURL(file), file });
+    setCropState({
+      src: URL.createObjectURL(file),
+      kind: file.type.startsWith('video/') ? 'video' : 'image',
+      name: file.name,
+      file,
+    });
   };
 
   const handleCropConfirm = useCallback(async (crop: NormalizedCrop) => {
     if (!cropState) return;
-    const { file, src } = cropState;
+    const { file, src, name, stageId, rawUrl } = cropState;
     // Keep the cropper mounted + busy through the encode (gif/video transcode
     // is slow); it disables its own buttons and shows a converting overlay.
     // Close only once the import fully resolves.
     setUploading(true);
     try {
-      const item = await importLianLiWirelessMedia(file, crop);
-      await refreshMedia();
-      if (item && aliveRef.current) handleMediaSelect(item);
+      const upload = file ?? (rawUrl ? await fetchStagedFile(rawUrl, name) : null);
+      if (upload) {
+        const item = await importLianLiWirelessMedia(upload, crop);
+        await refreshMedia();
+        if (item && aliveRef.current) handleMediaSelect(item);
+      }
     } finally {
-      URL.revokeObjectURL(src);
+      if (file) URL.revokeObjectURL(src);
+      if (stageId) cancelMediaStage(stageId).catch(() => {});
       if (aliveRef.current) {
         setUploading(false);
         setCropState(null);
@@ -351,9 +394,36 @@ export function LianLiWirelessScreenTab({
   }, [cropState, refreshMedia, handleMediaSelect]);
 
   const handleCropCancel = useCallback(() => {
-    if (cropState) URL.revokeObjectURL(cropState.src);
+    if (cropState?.file) URL.revokeObjectURL(cropState.src);
+    if (cropState?.stageId) cancelMediaStage(cropState.stageId).catch(() => {});
     setCropState(null);
   }, [cropState]);
+
+  // A pick is staged in the service like the other Klipy surfaces and lands in the same cropper as a file.
+  const handleKlipyPick = useCallback(async (gif: KlipyGif) => {
+    setKlipyBusy(gif.slug);
+    setKlipyError(null);
+    const staged = await stageKlipy(gif.slug);
+    if (!aliveRef.current) return;
+    setKlipyBusy(null);
+    if (!staged) {
+      setKlipyError(t('lighting.controls.importNetworkError'));
+      return;
+    }
+    // A refusal here is Klipy's (no file, no such clip, over the cap), not the service's.
+    if (staged.error || !staged.stageId) {
+      setKlipyError(t('lighting.controls.klipyPickFailed'));
+      return;
+    }
+    setKlipyOpen(false);
+    const rawUrl = mediaStageRawUrl(staged.stageId);
+    setCropState({
+      ...stagePreviewFor(staged.mediaKind, rawUrl, mediaStagePreviewUrl(staged.stageId)),
+      name: `${gif.slug}.${staged.mediaKind === 'gif' ? 'gif' : 'mp4'}`,
+      stageId: staged.stageId,
+      rawUrl,
+    });
+  }, [t]);
 
   const contentTypeOptions: SelectOption[] = CONTENT_TYPES.map(ct => ({
     value: ct.value,
@@ -495,11 +565,11 @@ export function LianLiWirelessScreenTab({
         <SettingRow label={t('devices.lianli-wireless.contentTypeLabel')} disabled={!representative}>
           <Select
             className={styles.contentTypeSelect}
-            value={contentMixed ? '' : (sharedContentType ?? 'off')}
+            value={contentMixed ? '' : (showMedia ? 'media' : (sharedChoice ?? 'off'))}
             placeholder={t('devices.lianli-wireless.contentTypeMixed')}
             options={contentTypeOptions}
             disabled={!representative}
-            onChange={v => handleContentTypeChange(v as LianLiWirelessScreenContentType)}
+            onChange={v => handleContentTypeChange(v as ContentChoice)}
             ariaLabel={t('devices.lianli-wireless.contentTypeAria')}
           />
         </SettingRow>
@@ -509,35 +579,13 @@ export function LianLiWirelessScreenTab({
 
         {representative && !contentMixed && (
           <div data-settings-aside="true">
-            {representative.contentType === 'image' && (
+            {showMedia && (
               <MediaPanel
-                kind="image"
                 media={media}
-                currentMediaId={representative.mediaId ?? null}
+                currentMediaId={sharedChoice === 'media' ? (representative.mediaId ?? null) : null}
                 uploading={uploading}
-                onUploadClick={() => openUpload('image')}
-                onSelect={handleMediaSelect}
-                onDeleteRequest={setPendingDeleteMedia}
-              />
-            )}
-            {representative.contentType === 'gif' && (
-              <MediaPanel
-                kind="gif"
-                media={media}
-                currentMediaId={representative.mediaId ?? null}
-                uploading={uploading}
-                onUploadClick={() => openUpload('gif')}
-                onSelect={handleMediaSelect}
-                onDeleteRequest={setPendingDeleteMedia}
-              />
-            )}
-            {representative.contentType === 'video' && (
-              <MediaPanel
-                kind="video"
-                media={media}
-                currentMediaId={representative.mediaId ?? null}
-                uploading={uploading}
-                onUploadClick={() => openUpload('video')}
+                onUploadClick={openUpload}
+                onKlipyClick={() => setKlipyOpen(true)}
                 onSelect={handleMediaSelect}
                 onDeleteRequest={setPendingDeleteMedia}
               />
@@ -576,7 +624,7 @@ export function LianLiWirelessScreenTab({
         <input
           ref={fileInputRef}
           type="file"
-          accept={acceptForKind(uploadKind)}
+          accept={MEDIA_ACCEPT}
           className={styles.hiddenInput}
           onChange={handleFileChange}
           data-settings-aside="true"
@@ -596,11 +644,21 @@ export function LianLiWirelessScreenTab({
         }}
       />
 
+      <KlipyPicker
+        open={klipyOpen}
+        busySlug={klipyBusy}
+        importError={klipyOpen ? klipyError : null}
+        thumbAspect={UPLOAD_ASPECT}
+        onPick={gif => { void handleKlipyPick(gif); }}
+        onClose={() => { setKlipyOpen(false); setKlipyError(null); }}
+      />
+
       {cropState && (
         <MediaCropper
           src={cropState.src}
-          kind={uploadKind === 'video' ? 'video' : 'image'}
-          aspect={1}
+          kind={cropState.kind}
+          fallbackSrc={cropState.fallbackSrc}
+          aspect={UPLOAD_ASPECT}
           busy={uploading}
           onConfirm={handleCropConfirm}
           onCancel={handleCropCancel}
@@ -639,30 +697,37 @@ function PanelModePanel({ panelDeviceId, single, onOpen }: {
 }
 
 function MediaPanel({
-  kind, media, currentMediaId, uploading, onUploadClick, onSelect, onDeleteRequest,
+  media, currentMediaId, uploading, onUploadClick, onKlipyClick, onSelect, onDeleteRequest,
 }: {
-  kind: LianLiWirelessMediaKind;
   media: LianLiWirelessMediaItem[];
   currentMediaId: string | null;
   uploading: boolean;
   onUploadClick: () => void;
+  onKlipyClick: () => void;
   onSelect: (item: LianLiWirelessMediaItem) => void;
   onDeleteRequest: (item: LianLiWirelessMediaItem) => void;
 }) {
   const { t } = useTranslation();
-  const items = media.filter(m => m.kind === kind);
-  const uploadKey = kind === 'video' ? 'uploadVideo' : kind === 'gif' ? 'uploadGif' : 'uploadImage';
-  const hintKey = kind === 'video' ? 'noMediaHintVideo' : kind === 'gif' ? 'noMediaHintGif' : 'noMediaHintImage';
-  const Icon = kind === 'video' ? Video : kind === 'gif' ? Film : ImageIcon;
 
   return (
     <div className={styles.typePanel}>
-      <Button size="sm" tone="neutral" disabled={uploading} onClick={onUploadClick}>
-        {uploading ? t('devices.lianli-wireless.uploading') : t(`devices.lianli-wireless.${uploadKey}`)}
-      </Button>
-      {items.length > 0 ? (
+      <div className={styles.orderButtons}>
+        <Button size="sm" tone="neutral" disabled={uploading} onClick={onUploadClick}>
+          {uploading ? t('devices.lianli-wireless.uploading') : t('devices.lianli-wireless.uploadMedia')}
+        </Button>
+        <Button
+          size="sm"
+          tone="neutral"
+          icon={<Sparkles size={16} aria-hidden />}
+          disabled={uploading}
+          onClick={onKlipyClick}
+        >
+          {t('lighting.controls.klipyBrowse')}
+        </Button>
+      </div>
+      {media.length > 0 ? (
         <div className={styles.mediaGrid}>
-          {items.map(item => (
+          {media.map(item => (
             <EffectCard
               key={item.id}
               asDiv
@@ -670,6 +735,7 @@ function MediaPanel({
               thumbUrl={item.thumb}
               thumbStatic
               thumbAspect={1}
+              cornerBadge={mediaKindIcon(item.kind)}
               active={item.id === currentMediaId}
               onClick={() => onSelect(item)}
               onDelete={() => onDeleteRequest(item)}
@@ -679,9 +745,9 @@ function MediaPanel({
         </div>
       ) : (
         <EmptyState
-          icon={<Icon size={28} />}
+          icon={<ImageIcon size={28} />}
           title={t('devices.lianli-wireless.noMediaTitle')}
-          hint={t(`devices.lianli-wireless.${hintKey}`)}
+          hint={t('devices.lianli-wireless.noMediaHint')}
           compact
         />
       )}
