@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { ShaderStudio } from './ShaderStudio';
 import type { MarketLink } from './studioLibrary';
 
@@ -19,8 +19,14 @@ vi.mock('../../../../api/lighting', () => ({
 
 vi.mock('../../../../hooks/useAudioState', () => ({ useAudioState: () => ({ current: null }) }));
 vi.mock('./StudioPreview', () => ({ StudioPreview: () => null }));
+let deleteNeighbor: string | null = null;
 vi.mock('./CustomEffectsGrid', () => ({
-  CustomEffectsGrid: ({ onCreate }: { onCreate: () => void }) => <button type="button" onClick={onCreate}>create-tile</button>,
+  CustomEffectsGrid: ({ effect, onCreate, onDeleted }: { effect: string | null; onCreate: () => void; onDeleted: (id: string, next: string | null) => void }) => (
+    <>
+      <button type="button" onClick={onCreate}>create-tile</button>
+      <button type="button" onClick={() => onDeleted((effect ?? '').slice('custom:'.length), deleteNeighbor)}>delete-open</button>
+    </>
+  ),
 }));
 
 const put = vi.fn();
@@ -209,6 +215,7 @@ describe('ShaderStudio opening', () => {
   afterEach(() => {
     savedEntries = [];
     entriesLoaded = true;
+    deleteNeighbor = null;
   });
   const recipe = (speed: number) => JSON.stringify({ v: 1, blocks: [{ uid: 'a1', type: 'rings', params: {} }, { uid: 'b2', type: 'palette', params: {} }], speed, hue: 0, saturation: 1, contrast: 1 });
 
@@ -264,6 +271,50 @@ describe('ShaderStudio opening', () => {
     fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
     expect(screen.getByPlaceholderText('lighting.studio.namePlaceholder')).toHaveValue('Mine');
     savedEntries = [];
+  });
+
+  it('opens the neighbor after the open effect is deleted, a new effect when none is left', () => {
+    savedEntries = [
+      { id: 'fx10', name: 'First', recipe: recipe(10), updatedAt: 1, audio: false },
+      { id: 'fx20', name: 'Second', recipe: recipe(20), updatedAt: 2, audio: false },
+    ];
+    const { unmount } = render(<ShaderStudio open effectId="fx10" onClose={() => {}} />);
+    savedEntries = [savedEntries[1]];
+    deleteNeighbor = 'fx20';
+    fireEvent.click(screen.getByRole('button', { name: 'delete-open' }));
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
+    expect(screen.getByPlaceholderText('lighting.studio.namePlaceholder')).toHaveValue('Second');
+    unmount();
+
+    savedEntries = [{ id: 'fx20', name: 'Second', recipe: recipe(20), updatedAt: 2, audio: false }];
+    render(<ShaderStudio open effectId="fx20" onClose={() => {}} />);
+    savedEntries = [];
+    deleteNeighbor = null;
+    fireEvent.click(screen.getByRole('button', { name: 'delete-open' }));
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
+    expect(screen.getByPlaceholderText('lighting.studio.namePlaceholder')).toHaveValue('');
+  });
+
+  it('copies the store link of an effect you published', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    onTestFinished(() => {
+      if (original) Object.defineProperty(navigator, 'clipboard', original);
+      else Reflect.deleteProperty(navigator, 'clipboard');
+    });
+    savedEntries = [{ id: 'fx10', name: 'Mine', recipe: recipe(10), updatedAt: 1, audio: false, marketId: 'L1', marketAuthor: 'me', downloaded: false }];
+    render(<ShaderStudio open effectId="fx10" username="me" onClose={() => {}} />);
+    expect(screen.getByText('lighting.studio.published')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.copyLink' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://my.hellonexus.com/store/effects/L1'));
+    expect(await screen.findByRole('button', { name: 'lighting.studio.linkCopied' })).toBeInTheDocument();
+  });
+
+  it('offers no store link for a download', () => {
+    savedEntries = [{ id: 'fx10', name: 'Theirs', recipe: recipe(10), updatedAt: 1, audio: false, marketId: 'L1', marketAuthor: 'bob', downloaded: true }];
+    render(<ShaderStudio open effectId="fx10" username="me" onClose={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'lighting.studio.copyLink' })).toBeNull();
   });
 
   it('starts a new effect when there is none', () => {

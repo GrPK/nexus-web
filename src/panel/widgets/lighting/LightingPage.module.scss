@@ -1449,9 +1449,9 @@
   transition: color var(--ease-fast), opacity var(--ease-fast);
 }
 
-// Lit on a selected card, so the reason the whole stack lit up is in view.
-// The tuning mark stays dim.
-.deviceStackBadge {
+// Both marks light on a selected card, so the reason the whole stack lit up is in view.
+.deviceStackBadge,
+.deviceTuneBadge {
   .deviceCardSelected & { color: var(--text); opacity: 1; }
 }
 

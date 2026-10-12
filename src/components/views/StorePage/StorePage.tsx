@@ -597,12 +597,14 @@ function AppDetail({ appId, onBack, installed, onNeedsSignIn, onInstalled }: {
  * version decides which releases it is offered - so the page renders what it is
  * given rather than filtering locally.
  */
-export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES }: {
+export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES, onOpenInLighting }: {
   /** Route segment: the open app's id, so a store page is linkable. */
   tab?: string | null;
   onTabChange?: (tab: string) => void;
   /** The app's shared account state: signing in from the store dialog signs the whole app in, so the top bar and account page have to hear about it. */
   accounts?: UseCloudAccountsResult;
+  /** Runs an installed lighting effect on the Lighting page. */
+  onOpenInLighting?: (effectKey: string) => void;
   /** The sidebar's device list: a fresh widget install offers every panel in it. */
   devices?: readonly UnifiedDevice[];
 }) {
@@ -683,7 +685,7 @@ export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES }: 
   return (
     <div className={styles.app} ref={rootRef}>
       <ViewHeader title={t('apps.tabs.store')} />
-      {EffectsMarket && !openId && !effectsPath && (
+      {EffectsMarket && !openId && (
         <Tabs
           className={styles.sectionTabs}
           ariaLabel={t('apps.tabs.store')}
@@ -703,6 +705,7 @@ export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES }: 
               username={accounts?.activeAccount?.username ?? null}
               onNavigate={sub => open(sub ? `${EFFECTS_ROUTE}/${sub}` : EFFECTS_ROUTE)}
               onNeedsSignIn={handleNeedsSignIn}
+              onOpenInLighting={onOpenInLighting}
             />
           </Suspense>
         </div>

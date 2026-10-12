@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Store } from 'lucide-react';
+import { HoverTooltip } from '../../../../components/common/HoverTooltip/HoverTooltip';
 import { EffectCard } from '../../../../components/common/EffectCard/EffectCard';
 import { CollapsibleSection } from '../../../../components/common/CollapsibleSection/CollapsibleSection';
 import { ConfirmModal } from '../../../../components/common/ConfirmModal/ConfirmModal';
@@ -44,9 +45,11 @@ function useRecipeStill(recipe: StudioRecipe | null): string | null {
   return recipe ? url : null;
 }
 
-function CustomEffectCell({ effect, active, draft, gpuAvailable, onSelect, onDelete }: {
+function CustomEffectCell({ effect, active, published, draft, gpuAvailable, onSelect, onDelete }: {
   effect: SavedEffect;
   active: boolean;
+  /** The user's own effect, listed in the Marketplace. */
+  published: boolean;
   /** The unsaved edit of this effect, rendered in place of its saved thumbnail. */
   draft: StudioRecipe | null;
   gpuAvailable: boolean;
@@ -69,6 +72,11 @@ function CustomEffectCell({ effect, active, draft, gpuAvailable, onSelect, onDel
       onClick={onSelect}
       onDelete={onDelete}
       deleteAriaLabel={t('lighting.studio.delete')}
+      cornerBadge={published ? (
+        <HoverTooltip body={t('lighting.studio.publishedBadge')} side="top">
+          <span className={styles.publishedBadge} data-testid="effect-published-badge"><Store aria-hidden={true} /></span>
+        </HoverTooltip>
+      ) : undefined}
     />
   );
 }
@@ -96,8 +104,8 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
   flat?: boolean;
   onSelect: (key: string) => void;
   onCreate?: () => void;
-  /** After an effect was deleted from this grid. */
-  onDeleted?: (id: string) => void;
+  /** After an effect was deleted from this grid, with the effect listed after it (before it when it was last). */
+  onDeleted?: (id: string, nextId: string | null) => void;
 }) {
   const { t } = useTranslation();
   const saved = useSavedEffects();
@@ -139,6 +147,7 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
           key={item.id}
           effect={item}
           active={effect === customEffectKey(item.id)}
+          published={!!item.marketId && !downloaded(item)}
           draft={draft?.id === item.id ? draft.recipe : null}
           gpuAvailable={gpuAvailable}
           onSelect={() => onSelect(customEffectKey(item.id))}
@@ -169,7 +178,12 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
         destructive
         onConfirm={() => {
           const target = pendingDelete;
-          if (target) void deleteEffect(target.id).then(ok => { if (ok) onDeleted?.(target.id); });
+          if (target) {
+            const order = sections.flatMap(s => s.items).map(s => s.id);
+            const at = order.indexOf(target.id);
+            const nextId = order[at + 1] ?? order[at - 1] ?? null;
+            void deleteEffect(target.id).then(ok => { if (ok) onDeleted?.(target.id, nextId); });
+          }
           setPendingDelete(null);
         }}
         onCancel={() => setPendingDelete(null)}

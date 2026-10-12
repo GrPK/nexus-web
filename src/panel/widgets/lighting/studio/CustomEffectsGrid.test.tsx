@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CustomEffectsGrid, SavedEffectSections } from './CustomEffectsGrid';
 import { makeBlock } from './studioCompiler';
@@ -11,7 +11,7 @@ vi.mock('./studioLibrary', () => ({
   isDownloaded: (s: { downloaded?: boolean | null; marketId?: string; marketAuthor?: string }, username?: string | null) =>
     s.downloaded ?? (!!s.marketId && s.marketAuthor?.toLowerCase() !== username?.toLowerCase()),
   migrateLegacyEffects: async () => {},
-  deleteEffect: async () => {},
+  deleteEffect: async () => true,
   useSavedEffects: () => [
     { id: 'fxa', name: 'Alpha', updatedAt: 1, recipe: { v: 1, blocks: [makeBlock('plasma'), makeBlock('palette')], speed: 50, hue: 0, saturation: 1, contrast: 1 } },
     { id: 'fxb', name: 'Beta', updatedAt: 1, recipe: { v: 1, blocks: [makeBlock('rings'), makeBlock('palette')], speed: 50, hue: 0, saturation: 1, contrast: 1 } },
@@ -71,6 +71,23 @@ describe('CustomEffectsGrid', () => {
     expect(screen.queryByText('lighting.category.custom')).not.toBeInTheDocument();
     expect(screen.queryByText('lighting.category.marketplace')).not.toBeInTheDocument();
     for (const name of ['Alpha', 'Gamma', 'Epsilon']) expect(screen.getByRole('button', { name })).toBeInTheDocument();
+  });
+
+  it('badges only the effects you published, not downloads', () => {
+    render(<CustomEffectsGrid effect={null} query="" username="me" onSelect={() => {}} onCreate={() => {}} />);
+    const badged = screen.getAllByTestId('effect-published-badge').map(b => b.closest('[data-effect-key]')?.getAttribute('data-effect-key'));
+    expect(badged.sort()).toEqual(['custom:fxo', 'custom:fxp']);
+  });
+
+  it('names the neighbor of a deleted effect, the one before it when it was last', async () => {
+    const onDeleted = vi.fn();
+    render(<CustomEffectsGrid effect={null} query="" username="me" onSelect={() => {}} onCreate={() => {}} onDeleted={onDeleted} />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'lighting.studio.delete' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'lighting.studio.delete' }).at(-1)!);
+    await waitFor(() => expect(onDeleted).toHaveBeenCalled());
+    const [deleted, next] = onDeleted.mock.calls[0];
+    expect(deleted).toBe('fxa');
+    expect(next).toBe('fxb');
   });
 
   it('shows a new draft at once and re-renders its tile as the recipe changes', async () => {

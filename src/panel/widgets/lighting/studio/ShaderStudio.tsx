@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Dices, Dna, Redo2, Save, Undo2, SprayCan, Upload } from 'lucide-react';
+import { Dices, Dna, Link2, Redo2, Save, Undo2, SprayCan, Upload } from 'lucide-react';
 import { DeviceModal } from '../../../../components/common/DeviceModal/DeviceModal';
 import { Button } from '../../../../components/common/Button/Button';
 import { Card } from '../../../../components/common/Card/Card';
@@ -28,7 +28,9 @@ import {
   type CompiledStudio, type StudioBlock, type StudioRecipe,
 } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, randomRecipe } from './studioRecipes';
-import { getSavedEffects, lastCreatedEffect, newEffectId, saveEffect, useSavedEffects, type MarketLink } from './studioLibrary';
+import { getSavedEffects, isDownloaded, lastCreatedEffect, newEffectId, saveEffect, useSavedEffects, type MarketLink, type SavedEffect } from './studioLibrary';
+import { marketEffectUrl } from '../../../../lib/marketLinks';
+import { copyText } from '../../../../lib/clipboard';
 import { PublishEffectModal } from './PublishEffectModal';
 import { StudioBlockCard } from './StudioBlockCard';
 import { StudioPreview } from './StudioPreview';
@@ -42,6 +44,7 @@ const STACKED = 'stacked' as const;
 const HISTORY_LIMIT = 50;
 const NEW_EFFECT_STARTER = 'breathing';
 const VARIATION_COUNT = 6;
+const COPIED_MS = 2000;
 // Live on devices: slider drags reach the LEDs at most this often. An idle
 // session is re-sent at a third of the lease the service last reported.
 const LIVE_SEND_MS = 100;
@@ -126,6 +129,19 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
   const current = saved.find(s => s.id === currentId);
   const currentName = current?.name;
   const currentLink = current?.marketId && current.marketAuthor ? { marketId: current.marketId, marketAuthor: current.marketAuthor } : null;
+  // The user's own listing, which the toolbar can share; a download is someone else's.
+  const sharedId = current?.marketId && !isDownloaded(current, username) ? current.marketId : null;
+  const [linkCopied, setLinkCopied] = useState(false);
+  const copiedTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+  const copyLink = (listingId: string) => {
+    void copyText(marketEffectUrl(listingId)).then(ok => {
+      if (!ok) return;
+      setLinkCopied(true);
+      window.clearTimeout(copiedTimer.current);
+      copiedTimer.current = window.setTimeout(() => setLinkCopied(false), COPIED_MS);
+    });
+  };
   const committedRef = useRef(recipe);
   const recipeRef = useRef(recipe);
 
@@ -365,30 +381,34 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
     setBaseline(JSON.stringify(pick.recipe));
   }, [saved, username, currentId]);
 
+  const openSaved = (s: SavedEffect) => {
+    apply(structuredClone(s.recipe), true);
+    setCurrentId(s.id);
+    setBaseline(JSON.stringify(s.recipe));
+  };
+  const startNew = () => {
+    const starter = (STUDIO_STARTERS.find(s => s.id === NEW_EFFECT_STARTER) ?? STUDIO_STARTERS[0]).build();
+    apply(starter, true);
+    setCurrentId(null);
+    setBaseline(JSON.stringify(starter));
+  };
   const loadSaved = (id: string) => unlessDirty(() => {
     const s = getSavedEffects().find(e => e.id === id);
-    if (!s) return;
-    apply(structuredClone(s.recipe), true);
-    setCurrentId(id);
-    setBaseline(JSON.stringify(s.recipe));
+    if (s) openSaved(s);
   });
 
   // Read at delete-resolve time: another effect may have been loaded while the delete was in flight.
   const currentIdRef = useRef(currentId);
   currentIdRef.current = currentId;
-  // The open effect was deleted from My effects: what is on screen is no longer saved.
-  const forgetDeleted = (id: string) => {
+  // The open effect was deleted from My effects: open its neighbor, or a new effect when none is left.
+  const forgetDeleted = (id: string, nextId: string | null) => {
     if (currentIdRef.current !== id) return;
-    setCurrentId(null);
-    setBaseline(null);
+    const next = nextId ? getSavedEffects().find(e => e.id === nextId) : undefined;
+    if (next) openSaved(next);
+    else startNew();
   };
 
-  const newEffect = () => unlessDirty(() => {
-    const starter = (STUDIO_STARTERS.find(s => s.id === NEW_EFFECT_STARTER) ?? STUDIO_STARTERS[0]).build();
-    apply(starter, true);
-    setCurrentId(null);
-    setBaseline(JSON.stringify(starter));
-  });
+  const newEffect = () => unlessDirty(startNew);
 
   const costLevel = cost <= 4 ? 'light' : cost <= 8 ? 'medium' : 'heavy';
 
@@ -436,6 +456,14 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
           <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} aria-label={t('lighting.studio.undo')} disabled={varying || !past.length} onClick={undo} />
           <Button size="sm" tone="ghost" icon={<Redo2 size={14} />} aria-label={t('lighting.studio.redo')} disabled={varying || !future.length} onClick={redo} />
         </div>
+      {sharedId && (
+        <>
+          <Badge label={t('lighting.studio.published')} color="var(--accent)" compact />
+          <Button size="sm" tone="ghost" icon={<Link2 size={14} />} disabled={varying} onClick={() => copyLink(sharedId)}>
+            {t(linkCopied ? 'lighting.studio.linkCopied' : 'lighting.studio.copyLink')}
+          </Button>
+        </>
+      )}
       <Button size="sm" icon={<Upload size={14} />} disabled={varying} onClick={() => { publishIdRef.current = null; setPublishing(true); }}>
         {t('lighting.studio.publish.button')}
       </Button>

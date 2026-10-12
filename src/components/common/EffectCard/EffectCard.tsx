@@ -50,6 +50,8 @@ interface EffectCardBaseProps {
   /** Overlay mode only: suppress the on-thumbnail caption (the aria-label still
    *  carries the name). Used by the simple colour swatches, which need no text. */
   hideLabel?: boolean;
+  /** Subtitle in the body font instead of monospace, for prose such as a creator's name. */
+  metaSans?: boolean;
 }
 
 // Interactive cards require onClick; nonInteractive cards (plain div, no
@@ -64,7 +66,7 @@ type EffectCardProps = EffectCardBaseProps & (
 export function EffectCard({
   label, thumbUrl, active, onClick,
   audio, meta, onDelete, deleteAriaLabel,
-  asDiv, thumbOverlay, thumbStatic, cornerBadge, ariaLabel, dataEffectKey, overlay, thumbAspect, hideLabel, nonInteractive,
+  asDiv, thumbOverlay, thumbStatic, cornerBadge, ariaLabel, dataEffectKey, overlay, thumbAspect, hideLabel, metaSans, nonInteractive,
 }: EffectCardProps) {
   const { t } = useTranslation();
   const className = `${styles.card} ${overlay ? styles.cardOverlay : ''} ${active ? styles.cardActive : ''} ${nonInteractive ? styles.cardStatic : ''}`;
@@ -101,7 +103,7 @@ export function EffectCard({
         {overlay && !hideLabel && <span className={styles.labelOverlay}>{label}</span>}
       </div>
       {!overlay && <span className={styles.label}>{label}</span>}
-      {!overlay && meta !== undefined && <span className={styles.meta}>{meta}</span>}
+      {!overlay && meta !== undefined && <span className={`${styles.meta} ${metaSans ? styles.metaSans : ''}`}>{meta}</span>}
     </>
   );
 

@@ -82,7 +82,7 @@ describe('EffectsMarket', () => {
     listEffects.mockResolvedValue({ ok: true, value: { items: [listing], page: 1, limit: 24, hasMore: false } });
     const onNavigate = vi.fn();
     render(<EffectsMarket path="" username={null} onNavigate={onNavigate} onNeedsSignIn={() => {}} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Fan spin' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Fan spin/ }));
     expect(listEffects.mock.calls[0][0]).toMatchObject({ sort: 'popular', page: 1 });
     expect(onNavigate).toHaveBeenCalledWith(ID);
   });
@@ -116,6 +116,22 @@ describe('EffectsMarket', () => {
     await waitFor(() => expect(remove).toHaveBeenCalledWith('fx1'));
   });
 
+  it('opens an installed copy on the Lighting page', async () => {
+    installed = [{ id: 'fx1', name: 'Fan spin', recipe: JSON.stringify(recipe), updatedAt: 1, audio: false, marketId: ID }];
+    const onOpenInLighting = vi.fn();
+    render(<EffectsMarket path={ID} username="bob" onNavigate={() => {}} onNeedsSignIn={() => {}} onOpenInLighting={onOpenInLighting} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'store.effects.openInLighting' }));
+    expect(onOpenInLighting).toHaveBeenCalledWith('custom:fx1');
+  });
+
+  it('shows the download count on a browse tile', async () => {
+    listEffects.mockResolvedValue({ ok: true, value: { items: [{ ...listing, downloads: 1234567 }], page: 1, limit: 24, hasMore: false } });
+    render(<EffectsMarket path="" username={null} onNavigate={() => {}} onNeedsSignIn={() => {}} />);
+    const tile = await screen.findByRole('button', { name: /^Fan spin/ });
+    expect(screen.getByText(/1.234.567/)).toBeInTheDocument();
+    expect(tile.getAttribute('aria-label')).toMatch(/store\.effects\.downloads/);
+  });
+
   it("plays the effect with the Lighting page's controls, changing only the preview", async () => {
     detail();
     const speed = await screen.findByRole('slider', { name: /lighting\.controls\.speed/ });
@@ -129,6 +145,20 @@ describe('EffectsMarket', () => {
     await screen.findByRole('slider', { name: /lighting\.controls\.speed/ });
     // The service has no source for a listing's key: a remount that lost the primed one would fetch it.
     expect(fetchShaderSource).not.toHaveBeenCalled();
+  });
+
+  it("unpublishing clears the author's own copy's link, not a downloaded one", async () => {
+    installed = [
+      { id: 'fx1', name: 'Fan spin', recipe: JSON.stringify(recipe), updatedAt: 1, audio: false, marketId: ID, marketAuthor: 'Alice', downloaded: false } as typeof installed[number],
+      { id: 'fx2', name: 'Fan spin', recipe: JSON.stringify(recipe), updatedAt: 2, audio: false, marketId: ID, marketAuthor: 'Alice', downloaded: true } as typeof installed[number],
+    ];
+    unpublishEffect.mockResolvedValue({ ok: true, value: undefined });
+    detail('Alice');
+    fireEvent.click(await screen.findByRole('button', { name: 'store.effects.unpublish' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'store.effects.unpublish' }).at(-1)!);
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+    expect(put.mock.calls[0][0]).toBe('fx1');
+    expect(put.mock.calls[0][1]).toMatchObject({ marketId: '' });
   });
 
   it("offers the author Unpublish instead of Install", async () => {

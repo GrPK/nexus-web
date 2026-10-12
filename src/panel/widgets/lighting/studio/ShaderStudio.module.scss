@@ -246,3 +246,20 @@
   flex-direction: column;
   gap: 0.75rem;
 }
+
+// Top left: the delete button holds the top right corner.
+.publishedBadge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  display: flex;
+  pointer-events: auto;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: #fff;
+    filter: drop-shadow(var(--shadow-sm));
+  }
+}

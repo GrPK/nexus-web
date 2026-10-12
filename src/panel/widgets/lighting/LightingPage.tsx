@@ -17,6 +17,7 @@ import {
 } from '../../../api/lighting';
 import { groupNamesOf, type DeviceGroup } from '../../../lib/deviceGroups';
 import { matchesAllWords } from '../../../search/match';
+import { takeLightingEffect } from '../../../lib/lightingIntent';
 import { RailSearchButton, RailSearchField, useRailSearch } from '../../../components/common/RailSearch/RailSearch';
 import { useUndoRedo } from '../../../hooks/useUndoRedo';
 import { useLayoutPresets, devicesToLayouts, devicesToPower } from './page/useLayoutPresets';
@@ -853,6 +854,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     return () => { cancelled = true; };
   }, [effectiveMode, serviceOnline]);
 
+  // The Marketplace's "Open in Lighting" effect, taken on mount so it never fires on a later visit.
+  // Kept when StrictMode's second mount finds nothing left to take.
+  const openIntentRef = useRef<string | null>(null);
+  useEffect(() => {
+    const key = takeLightingEffect();
+    if (key) openIntentRef.current = key;
+  }, []);
+
   const restartedProfileRef = useRef<string | null>(null);
   useEffect(() => {
     restartedProfileRef.current = null;
@@ -865,6 +874,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (restartedProfileRef.current === key) return;
     if (!sync || sync === 'none') { return; }
     restartedProfileRef.current = key;
+    // A requested effect starts instead; restoring the profile's would race it to the LEDs.
+    if (openIntentRef.current) return;
     (async () => {
       if (EFFECTS.some(e => e.key === sync) || isCustomEffectKey(sync)) {
         const state = stateFor(sync);
@@ -1887,7 +1898,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (presetId) { await updateLayoutPreset(presetId, { saveCurrent: true }); await loadPresets(); }
   }, [loadPresets]);
 
-  const handleModeChange = useCallback(async (m: LightingMode) => {
+  /** `effectKey` names the effect Animation starts with instead of the remembered one. */
+  const handleModeChange = useCallback(async (m: LightingMode, effectKey?: string) => {
     setMode(m);
     // Starting any mode is never paused - reset optimistically so a stale
     // "paused" trailing glyph can't flash on the newly active tab while the
@@ -1900,9 +1912,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       switch (m) {
         case 'animate': {
           const runnable = (k: string) => ANIMATE_EFFECTS.some(e => e.key === k) || isCustomEffectKey(k);
-          const key = runnable(activeEffect)
+          const key = effectKey ?? (runnable(activeEffect)
             ? activeEffect
-            : (runnable(rawSync) ? rawSync : animateEffectRef.current);
+            : (runnable(rawSync) ? rawSync : animateEffectRef.current));
           setActiveEffect(key);
           setRawSync(key);
           const state = stateFor(key);
@@ -1941,6 +1953,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       }
     } catch { /* best-effort; backend state becomes source of truth */ }
   }, [activeEffect, globalColor, rawSync, setMode, setRawSync, screenPP, stateFor, setPausedState]);
+
+  // Once the profile's lighting has loaded, the requested effect becomes the Animation effect.
+  useEffect(() => {
+    const key = openIntentRef.current;
+    if (!serviceOnline || !loadedProfileLighting || !key) return;
+    openIntentRef.current = null;
+    void handleModeChange('animate', key);
+  }, [serviceOnline, loadedProfileLighting, handleModeChange]);
 
   // Simple mode has no device rail, so a color is the exact global flat color.
   // Static has to own the output first.
@@ -2773,7 +2793,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   leading={viewMode === 'animate' ? (SavedEffectSections && (
                     <Suspense fallback={null}>
                       <SavedEffectSections
-                        effect={activeEffect}
+                        effect={gridEffect}
                         query={effectQuery}
                         username={accountUsername}
                         gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}

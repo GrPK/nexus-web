@@ -101,6 +101,7 @@ import { useMonitoringStoreBridge } from './monitoringBridge';
 import { isWindowsAppShell, isMacAppShell, postResizeStart, NEXUS_RESIZE_EDGES, type NexusResizeEdge } from './windowActions';
 import { useWindowMaximized } from './useWindowMaximized';
 import { DEV_TOOLS } from '../lib/devTools';
+import { requestLightingEffect } from '../lib/lightingIntent';
 import { OFFICIAL_BUILD } from '../lib/officialBuild';
 import styles from '../App.module.scss';
 
@@ -967,7 +968,7 @@ export function Dashboard() {
       );
       case 'diagnostics': return <FeatureGate feature="diagnostics"><DiagnosticsPage serviceOnline={online} connectionState={status.state} platform={status.ping?.platform ?? ''} tab={subtab} onTabChange={setSubtab} onOpenCooling={() => navigate('system', 'cooling')} /></FeatureGate>;
       case 'frames':      return <FramesPage tab={subtab} onTabChange={setSubtab} />;
-      case 'store':      return <StorePage tab={subtab} onTabChange={setSubtab} accounts={cloudAccounts} devices={unifiedDevices.unified} />;
+      case 'store':      return <StorePage tab={subtab} onTabChange={setSubtab} accounts={cloudAccounts} devices={unifiedDevices.unified} onOpenInLighting={key => { requestLightingEffect(key); navigate('system', 'lighting'); }} />;
       case 'build':      return <BuildPage path={subtab} onOpenBenchmark={() => { requestBenchmarkStart(); navigate('system', 'benchmark', 'run'); }} onOpenLighting={() => navigate('system', 'lighting')} />;
       case 'clock':      return <ClockPage />;
       case 'weather':    return <WeatherPage />;
@@ -975,7 +976,7 @@ export function Dashboard() {
       case 'gallery':    return <GalleryPage />;
       case 'settings':   return <SettingsView serviceOnline={online} connectionState={status.state} platform={status.ping?.platform ?? ''} tab={subtab} onTabChange={setSubtab} />;
       case 'profiles':   return <ProfilesView serviceOnline={online} connectionState={status.state} profiles={profilesHook} tab={subtab} onTabChange={setSubtab} />;
-      case 'account':    return OFFICIAL_BUILD ? <AccountView serviceOnline={online} connectionState={status.state} accounts={cloudAccounts} tab={subtab} onTabChange={setSubtab} onOpenStoreApp={appId => navigate('system', 'store', appId)} /> : <Placeholder title={activeView} />;
+      case 'account':    return OFFICIAL_BUILD ? <AccountView serviceOnline={online} connectionState={status.state} accounts={cloudAccounts} tab={subtab} onTabChange={setSubtab} onOpenStoreApp={appId => navigate('system', 'store', appId)} onOpenStoreEffect={id => navigate('system', 'store', `effects/${id}`)} /> : <Placeholder title={activeView} />;
       case 'tools':      return DEV_TOOLS ? <ToolsView serviceOnline={online} connectionState={status.state} /> : <Placeholder title={activeView} />;
       default: {
         // Page-capable marketplace (SDK) widget: render its bundle's page surface

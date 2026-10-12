@@ -126,6 +126,15 @@ export async function saveEffect(id: string, name: string, recipe: StudioRecipe,
   return null;
 }
 
+/** Drops an effect's Marketplace link (its listing was removed); its look is unchanged. An empty marketId clears the link. */
+export async function unlinkEffect(effect: SavedEffect): Promise<string | null> {
+  const frag = compileStudio(effect.recipe, { bake: true }).frag;
+  const result = await putCustomEffect(effect.id, { name: effect.name, recipe: JSON.stringify(effect.recipe), frag, marketId: '' });
+  if ('error' in result) return result.error;
+  invalidateShaderSource(customEffectKey(effect.id));
+  return null;
+}
+
 export async function deleteEffect(id: string): Promise<boolean> {
   const ok = await deleteCustomEffect(id);
   if (ok) invalidateShaderSource(customEffectKey(id));

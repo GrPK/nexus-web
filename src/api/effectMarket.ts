@@ -91,6 +91,23 @@ export function updateEffect(id: string, body: EffectPublishBody): Promise<Effec
   return call<EffectListing>(`${BASE}/${encodeURIComponent(id)}`, 'PUT', body);
 }
 
+/** One effect the signed-in account downloaded. */
+export interface EffectDownload {
+  /** The listing id. */
+  id: string;
+  name: string;
+  author: string;
+  downloadedAt: string;
+  /** Taken down by its author or a moderator; copies already installed stay. */
+  removed: boolean;
+  /** Null once removed. */
+  recipe: unknown;
+}
+
+export function listEffectDownloads(): Promise<EffectMarketResult<{ items: EffectDownload[] }>> {
+  return call<{ items: EffectDownload[] }>(`${BASE}/downloads`);
+}
+
 export function unpublishEffect(id: string): Promise<EffectMarketResult<void>> {
   return call<void>(`${BASE}/${encodeURIComponent(id)}`, 'DELETE');
 }

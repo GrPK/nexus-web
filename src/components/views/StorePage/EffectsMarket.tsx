@@ -14,14 +14,18 @@ import {
   type EffectListing, type EffectMarketError, type EffectSort,
 } from '../../../api/effectMarket';
 import { forgetShaderSource, primeShaderSource } from '../../../api/lighting';
-import { customEffectDef } from '../../../api/customEffects';
+import { customEffectDef, customEffectKey } from '../../../api/customEffects';
+import { LIGHTING_MODE_ICONS } from '../../../lib/lightingModeIcons';
 import { useAudioState } from '../../../hooks/useAudioState';
 import type { EffectState } from '../../../types/lighting';
 import { baselineTemplates, slotMatchesDefault } from '../../../types/lightingTemplates';
 import { EffectControls } from '../../../panel/widgets/lighting/page/EffectControls';
 import { StudioPreview } from '../../../panel/widgets/lighting/studio/StudioPreview';
 import { attachRecipePreview } from '../../../panel/widgets/lighting/studio/recipePreview';
-import { deleteEffect, newEffectId, parseMarketRecipe, saveEffect, useSavedEffects } from '../../../panel/widgets/lighting/studio/studioLibrary';
+import { HoverTooltip } from '../../common/HoverTooltip/HoverTooltip';
+import { useUnitPrefs } from '../../../hooks/useUiSettings';
+import { formatNumber } from '../../../lib/units';
+import { deleteEffect, isDownloaded, newEffectId, parseMarketRecipe, saveEffect, unlinkEffect, useSavedEffects } from '../../../panel/widgets/lighting/studio/studioLibrary';
 import { compileStudio, type StudioRecipe } from '../../../panel/widgets/lighting/studio/studioCompiler';
 import storeStyles from './StorePage.module.scss';
 import styles from './EffectsMarket.module.scss';
@@ -31,6 +35,7 @@ type NeedsSignIn = (retry: () => void) => void;
 const SEARCH_DEBOUNCE_MS = 300;
 const SORT_POPULAR: EffectSort = 'popular';
 const SORT_NEW: EffectSort = 'new';
+const AnimationIcon = LIGHTING_MODE_ICONS.animate;
 
 // Parsed once per listing object: the preview attaches per recipe identity.
 const parsedRecipes = new WeakMap<EffectListing, StudioRecipe | null>();
@@ -47,20 +52,32 @@ function RecipeCanvas({ recipe, className }: { recipe: StudioRecipe; className: 
 
 function useDownloadsLabel() {
   const { t, language } = useTranslation();
-  return (n: number) => t(pluralKey('store.effects.downloads', language, n), { count: n.toLocaleString(language) });
+  const { numberFormat } = useUnitPrefs();
+  return (n: number) => t(pluralKey('store.effects.downloads', language, n), { count: formatNumber(n, numberFormat) });
 }
 
 function EffectTile({ listing, onOpen }: { listing: EffectListing; onOpen: () => void }) {
   const { t } = useTranslation();
+  const { numberFormat } = useUnitPrefs();
   const downloads = useDownloadsLabel();
   const recipe = recipeOf(listing);
   return (
     <EffectCard
       label={listing.name}
-      meta={`${t('store.effects.byAuthor', { author: listing.author })} · ${downloads(listing.downloads)}`}
+      ariaLabel={`${listing.name}, ${downloads(listing.downloads)}`}
+      meta={t('store.effects.byAuthor', { author: listing.author })}
+      metaSans
       thumbUrl={null}
       thumbStatic
       thumbOverlay={recipe ? <RecipeCanvas recipe={recipe} className={styles.tileCanvas} /> : null}
+      cornerBadge={(
+        <HoverTooltip body={downloads(listing.downloads)} side="top">
+          <span className={styles.tileDownloads}>
+            <Download size={12} aria-hidden={true} />
+            {formatNumber(listing.downloads, numberFormat)}
+          </span>
+        </HoverTooltip>
+      )}
       audio={listing.audio}
       active={false}
       onClick={onOpen}
@@ -259,13 +276,15 @@ function EffectPlayground({ listing, recipe, children }: { listing: EffectListin
   );
 }
 
-function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
+function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn, onOpenInLighting }: {
   id: string;
   /** The signed-in account's username; null when signed out. */
   username: string | null;
   onBack: () => void;
   onCreator: (author: string) => void;
   onNeedsSignIn: NeedsSignIn;
+  /** Runs an installed copy on the Lighting page. */
+  onOpenInLighting?: (effectKey: string) => void;
 }) {
   const { t } = useTranslation();
   const downloads = useDownloadsLabel();
@@ -316,7 +335,14 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
   const unpublish = async () => {
     setConfirmUnpublish(false);
     const res = await unpublishEffect(id);
-    if (res.ok) onBack(); else setUnpublishFailed(true);
+    if (!res.ok) {
+      setUnpublishFailed(true);
+      return;
+    }
+    // The author's own copies stop showing as published; a later publish lists them anew.
+    const errors = await Promise.all(saved.filter(s => s.marketId === id && !isDownloaded(s, username)).map(s => unlinkEffect(s)));
+    if (errors.some(Boolean)) setUnpublishFailed(true);
+    else onBack();
   };
 
   if (loadError) return <><BackBar onBack={onBack} /><div className={storeStyles.notice}>{t(ERROR_KEYS[loadError] ?? 'store.unavailable')}</div></>;
@@ -348,7 +374,11 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
           </Button>
         )}
       </div>
-      {(installed.length > 0 || mine) && <span className={storeStyles.installedVersion}>{t(mine ? 'store.effects.whereToFind' : 'store.effects.whereToFindMarket')}</span>}
+      {installed.length > 0 && onOpenInLighting && (
+        <Button tone="neutral" size="sm" icon={<AnimationIcon size={14} />} onClick={() => onOpenInLighting(customEffectKey(installed[0].id))}>
+          {t('store.effects.openInLighting')}
+        </Button>
+      )}
       {state === 'failed' && <InlineError>{t(installed.length > 0 ? 'store.effects.uninstallFailed' : 'store.effects.getFailed')}</InlineError>}
       {unpublishFailed && <InlineError>{t('store.effects.unpublishFailed')}</InlineError>}
     </header>
@@ -392,12 +422,13 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn }: {
  * published. `path` is the route below `effects`: empty for the browse list,
  * `<id>` for an effect, `by/<username>` for one creator's effects.
  */
-export function EffectsMarket({ path, username, onNavigate, onNeedsSignIn }: {
+export function EffectsMarket({ path, username, onNavigate, onNeedsSignIn, onOpenInLighting }: {
   path: string;
   username: string | null;
   /** Sets the route below `effects`. */
   onNavigate: (path: string) => void;
   onNeedsSignIn: NeedsSignIn;
+  onOpenInLighting?: (effectKey: string) => void;
 }) {
   const [first, second] = path.split('/');
   const open = (id: string) => onNavigate(id);
@@ -407,7 +438,7 @@ export function EffectsMarket({ path, username, onNavigate, onNeedsSignIn }: {
       {first === 'by' && second ? (
         <CreatorEffects author={decodeURIComponent(second)} onOpen={open} onBack={() => onNavigate('')} />
       ) : first ? (
-        <EffectDetail id={first} username={username} onBack={() => onNavigate('')} onCreator={creator} onNeedsSignIn={onNeedsSignIn} />
+        <EffectDetail id={first} username={username} onBack={() => onNavigate('')} onCreator={creator} onNeedsSignIn={onNeedsSignIn} onOpenInLighting={onOpenInLighting} />
       ) : (
         <EffectsBrowse onOpen={open} />
       )}
