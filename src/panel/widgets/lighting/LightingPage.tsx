@@ -2029,10 +2029,21 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       default: return null;
     }
   };
+  // Hovering a mode tab outlines the cards its press reaches: Game Sync every lit
+  // device, any other mode the unpinned ones while nothing is selected. A press
+  // or the advanced header unmounting skips the tab's pointerleave, so both clear it.
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const advancedHeader = serviceOnline && !simpleDashboard;
+  const [hoverHeader, setHoverHeader] = useState(advancedHeader);
+  if (hoverHeader !== advancedHeader) {
+    setHoverHeader(advancedHeader);
+    setHoveredTab(null);
+  }
   // A tab press either opens the mode menu or applies a mode: to the selected
   // cards when there are any, else to every unpinned one. A mode switch also
   // drops the menu, which the tab row keeps "inside" its anchor.
   const handleTabChange = (key: string, origin?: HTMLButtonElement) => {
+    setHoveredTab(null);
     if (key === MODE_MENU_TAB_KEY) {
       setModeMenuOpen(open => !open);
       return;
@@ -2052,11 +2063,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The preview stands for the selection; with nothing selected it is every
   // unpinned device, and the chip says how many pins a pick skips.
   const pinnedShown = visibleDevices.filter(d => d.id in pins).length;
-  // The cards the next pick lands on; Off and Game Sync have no picks.
   const pickTargetIds = useMemo(() => {
-    if (viewMode === 'none' || viewMode === 'gamesync') return undefined;
-    return new Set(visibleDevices.filter(d => isPickTarget(d, pins, selectedDeviceIds)).map(d => d.id));
-  }, [viewMode, pins, selectedDeviceIds, visibleDevices]);
+    if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
+    return new Set(visibleDevices.filter(d => hoveredTab === 'gamesync'
+      ? d.ledsOn !== false && d.controlled !== false
+      : isPickTarget(d, pins, selectedDeviceIds)).map(d => d.id));
+  }, [hoveredTab, pins, selectedDeviceIds, visibleDevices]);
   const previewBadgeLabel = selectedDeviceIds.size > 0
     ? t(pluralKey('lighting.pane.selectedCount', language, selectedDeviceIds.size), { count: selectedDeviceIds.size })
     : pinnedShown === 0 ? t('lighting.pane.allDevices')
@@ -2270,6 +2282,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               tabs={modeTabs}
               activeTab={activeTabKey}
               onTabChange={handleTabChange}
+              onTabHover={setHoveredTab}
               tabActions={(
                 <PresetToolbar
                   rail

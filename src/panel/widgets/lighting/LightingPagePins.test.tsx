@@ -133,13 +133,22 @@ vi.mock('./page/EffectTab', () => ({
   ),
 }));
 vi.mock('../../../components/common/ViewHeader/ViewHeader', () => ({
-  ViewHeader: ({ tabs, activeTab, onTabChange }: {
+  ViewHeader: ({ tabs, activeTab, onTabChange, onTabHover }: {
     tabs?: { key: string }[];
     activeTab?: string;
     onTabChange?: (key: string) => void;
+    onTabHover?: (key: string | null) => void;
   }) => (
     <div data-testid="tabs" data-active={activeTab ?? ''}>
-      {tabs?.map(tab => <button key={tab.key} type="button" onClick={() => onTabChange?.(tab.key)}>{`tab:${tab.key}`}</button>)}
+      {tabs?.map(tab => (
+        <button
+          key={tab.key}
+          type="button"
+          onClick={() => onTabChange?.(tab.key)}
+          onMouseEnter={() => onTabHover?.(tab.key)}
+          onMouseLeave={() => onTabHover?.(null)}
+        >{`tab:${tab.key}`}</button>
+      ))}
     </div>
   ),
 }));
@@ -179,9 +188,9 @@ vi.mock('../../../api/lighting', async importOriginal => {
 
 const serviceState = { cooling: null, lighting: null, panel: null } as never;
 
-const renderPage = () => render(
+const renderPage = (platform = '') => render(
   <UiSettingsProvider>
-    <LightingPage serviceOnline serviceState={serviceState} activeProfileId="p1" />
+    <LightingPage serviceOnline serviceState={serviceState} activeProfileId="p1" platform={platform} />
   </UiSettingsProvider>,
 );
 
@@ -321,33 +330,49 @@ describe('LightingPage pins', () => {
     });
   });
 
-  describe('the cards a pick lands on', () => {
+  describe('hovering a mode tab', () => {
     const targets = () => screen.getByTestId('rail').dataset.targets;
+    const tab = (key: string) => screen.getByText(`tab:${key}`);
 
-    it('are the unpinned cards with nothing selected, and none once something is', async () => {
+    it('outlines the unpinned cards with nothing selected, and none once something is', async () => {
       withDevices('a', 'b');
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
+      expect(targets()).toBe('none');
+      fireEvent.mouseEnter(tab('gif'));
       await waitFor(() => expect(targets()).toBe('b'));
       fireEvent.click(screen.getByText('select-a'));
       expect(targets()).toBe('');
+      fireEvent.mouseLeave(tab('gif'));
+      expect(targets()).toBe('none');
     });
 
-    it('follow the selection on Media too', async () => {
+    it('outlines every lit card on Game Sync, pinned or selected', async () => {
       withDevices('a', 'b');
-      syncState.mode = 'gif';
-      syncState.rawSync = 'gif';
-      renderPage();
-      await waitFor(() => expect(targets()).toBe('a,b'));
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage('windows');
+      await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
       fireEvent.click(screen.getByText('select-a'));
-      expect(targets()).toBe('');
+      fireEvent.mouseEnter(tab('gamesync'));
+      expect(targets()).toBe('a,b');
     });
 
-    it('do not exist with lighting off', async () => {
-      syncState.mode = 'none';
-      syncState.rawSync = 'none';
+    it('clears on a press, which may remount the tab before its pointerleave', async () => {
+      withDevices('a', 'b');
       renderPage();
       await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
+      fireEvent.mouseEnter(tab('static'));
+      expect(targets()).toBe('a,b');
+      fireEvent.click(tab('static'));
+      expect(targets()).toBe('none');
+    });
+
+    it('outlines nothing on the mode menu', async () => {
+      withDevices('a', 'b');
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
+      fireEvent.mouseEnter(tab('modeMenu'));
       expect(targets()).toBe('none');
     });
   });
