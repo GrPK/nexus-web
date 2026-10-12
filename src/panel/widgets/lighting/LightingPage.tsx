@@ -59,7 +59,7 @@ import { usePersistentState } from '../../../hooks/usePersistentState';
 import { PinNotice } from './page/PinNotice';
 import {
   staticLookPin, colorPin, animatePin, MIRROR_PIN, selectionPin, pinGridKey, pinHex,
-  pickerMarks, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
+  isPickTarget, pickerMarks, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
@@ -164,6 +164,7 @@ function loadDeviceOrder(): string[] {
 const LightingScene3D = lazy(() => import('./scene/LightingScene3D'));
 const VIEW_2D = '2d';
 const VIEW_3D = '3d';
+const NO_SELECTION: ReadonlySet<string> = new Set();
 
 export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate }: LightingViewProps) {
   const { t, language } = useTranslation();
@@ -2025,6 +2026,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The preview stands for the selection; with nothing selected it is every
   // unpinned device, and the chip says how many pins a pick skips.
   const pinnedShown = visibleDevices.filter(d => d.id in pins).length;
+  // The cards the next pick lands on. Media's picks ignore the selection; Off
+  // and Game Sync have none.
+  const pickTargetIds = useMemo(() => {
+    if (effectiveMode === 'none' || effectiveMode === 'gamesync') return undefined;
+    const scope = effectiveMode === 'gif' ? NO_SELECTION : selectedDeviceIds;
+    return new Set(visibleDevices.filter(d => isPickTarget(d, pins, scope)).map(d => d.id));
+  }, [effectiveMode, pins, selectedDeviceIds, visibleDevices]);
   const previewBadgeLabel = selectedDeviceIds.size > 0
     ? t(pluralKey('lighting.pane.selectedCount', language, selectedDeviceIds.size), { count: selectedDeviceIds.size })
     : pinnedShown === 0 ? t('lighting.pane.allDevices')
@@ -2391,6 +2399,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             pinDisabledReason={pinDisabledReason}
             pinTargetName={pinTargetName}
             onSetPin={handleSetPin}
+            pickTargetIds={pickTargetIds}
             selectedIds={selectedDeviceIds}
             onSetSelection={handleSetSelection}
             onTogglePower={handleTogglePower}

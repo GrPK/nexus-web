@@ -2897,7 +2897,6 @@
   "lighting.pin.mirrorHint": "Bu cihazlar ekranınızı yansıtıyor. Ekranı Yansıtma sekmesinden seçin; filtreler herkes için geçerlidir.",
   "lighting.pin.openTab": "{tab} sekmesini aç",
   "lighting.pin.pinSelectedToMirror": "Seçilenleri Yansıtma'ya sabitle",
-  "lighting.pin.pinTo": "{name} öğesine sabitle",
   "lighting.pin.pinnedNotice": "Bu cihazlar {name} öğesine sabitlendi. Kendi sekmesinden düzenleyin.",
   "lighting.pin.pinnedTo": "{name} öğesine sabitlendi",
   "lighting.renderGpu.auto": "Otomatik",

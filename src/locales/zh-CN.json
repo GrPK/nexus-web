@@ -2897,7 +2897,6 @@
   "lighting.pin.mirrorHint": "这些设备正在镜像你的屏幕。请在“镜像”标签页中选择屏幕；滤镜对所有设备生效。",
   "lighting.pin.openTab": "打开{tab}",
   "lighting.pin.pinSelectedToMirror": "将所选项固定到镜像",
-  "lighting.pin.pinTo": "固定到 {name}",
   "lighting.pin.pinnedNotice": "这些设备已固定到 {name}。请在对应的标签页中编辑。",
   "lighting.pin.pinnedTo": "已固定到 {name}",
   "lighting.renderGpu.auto": "自动",

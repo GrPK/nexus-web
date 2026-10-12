@@ -83,16 +83,18 @@ vi.mock('./page/StaticPickerCanvas', () => ({
 // The stub exposes what the pins ride on: the pins the rail is handed, the
 // source a press pins to, the disabled reason, and the callbacks.
 vi.mock('./page/DevicePanel', () => ({
-  DevicePanel: ({ pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onSetSelection }: {
+  DevicePanel: ({ pins, pinSource, pinDisabledReason, pinTargetName, onSetPin, onSetSelection, pickTargetIds }: {
     pins?: Record<string, Pin>;
     pinSource?: string | null;
     pinDisabledReason?: string;
     pinTargetName?: (pin: Pin) => string;
     onSetPin?: (ids: string[], pinned: boolean) => void;
     onSetSelection: (ids: Set<string>, primary: string | null) => void;
+    pickTargetIds?: ReadonlySet<string>;
   }) => (
     <div
       data-testid="rail"
+      data-targets={pickTargetIds ? [...pickTargetIds].join(',') : 'none'}
       data-pin={pins?.a ? JSON.stringify(pins.a) : ''}
       data-pin-name={pins?.a && pinTargetName ? pinTargetName(pins.a) : ''}
       data-source={pinSource ?? ''}
@@ -294,6 +296,37 @@ describe('LightingPage pins', () => {
       fireEvent.click(screen.getByText('select-ab'));
       await waitFor(() => expect(marks().textContent).toBe('a@#ff0000;b@#336699'));
       expect(marks().dataset.implied).toBe('');
+    });
+  });
+
+  describe('the cards a pick lands on', () => {
+    const targets = () => screen.getByTestId('rail').dataset.targets;
+
+    it('are the unpinned cards with nothing selected, and none once something is', async () => {
+      withDevices('a', 'b');
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
+      renderPage();
+      await waitFor(() => expect(targets()).toBe('b'));
+      fireEvent.click(screen.getByText('select-a'));
+      expect(targets()).toBe('');
+    });
+
+    it('ignore the selection on Media, whose picks are always global', async () => {
+      withDevices('a', 'b');
+      syncState.mode = 'gif';
+      syncState.rawSync = 'gif';
+      renderPage();
+      await waitFor(() => expect(targets()).toBe('a,b'));
+      fireEvent.click(screen.getByText('select-a'));
+      expect(targets()).toBe('a,b');
+    });
+
+    it('do not exist with lighting off', async () => {
+      syncState.mode = 'none';
+      syncState.rawSync = 'none';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
+      expect(targets()).toBe('none');
     });
   });
 

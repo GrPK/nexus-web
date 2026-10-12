@@ -129,7 +129,11 @@ export function pinStripPick(pin: Pin): { key: string; slot: number; hex: string
 /** Ids of `ids` that wear a pin. */
 export const pinnedAmong = (pins: Pins, ids: readonly string[]): string[] => ids.filter(id => id in pins);
 
-/** The Static picker's marks: the selection, or with none, the unpinned lit and controlled devices a press moves. An unpinned device wears the global color. */
+/** With nothing selected, a pick lands on every unpinned lit and controlled device; a selection marks its own target. */
+export const isPickTarget = (d: { id: string; ledsOn?: boolean; controlled?: boolean }, pins: Pins, selectedIds: ReadonlySet<string>): boolean =>
+  selectedIds.size === 0 && !(d.id in pins) && d.ledsOn !== false && d.controlled !== false;
+
+/** The Static picker's marks: the selection, or with none, the devices a pick lands on. An unpinned device wears the global color. */
 export function pickerMarks(
   devices: readonly { id: string; name: string; ledsOn?: boolean; controlled?: boolean }[],
   pins: Pins,
@@ -137,9 +141,7 @@ export function pickerMarks(
   globalColor: string,
 ): { id: string; name: string; hex: string }[] {
   return devices
-    .filter(d => (selectedIds.size === 0
-      ? !(d.id in pins) && d.ledsOn !== false && d.controlled !== false
-      : selectedIds.has(d.id)))
+    .filter(d => (selectedIds.size === 0 ? isPickTarget(d, pins, selectedIds) : selectedIds.has(d.id)))
     .map(d => {
       const pin = pins[d.id];
       return { id: d.id, name: d.name, hex: !pin ? globalColor : pin.kind === 'static' ? pinHex(pin) : '' };

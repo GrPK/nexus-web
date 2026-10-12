@@ -77,16 +77,14 @@ export interface BulkSelection {
 
 /**
  * The card's pin. A card either follows the global mode or is pinned to a
- * target; the pin button sits beside its LED strip in every mode. A press on a
- * pinned card unpins it; a press on a following card pins it to the current
- * global source. The menu carries the same two rows.
+ * target. Only a pinned card shows the pin button, beside its LED strip, and a
+ * press unpins it; the menu offers Pin on a following card and Unpin on a
+ * pinned one.
  */
 export interface DevicePin {
   pinned: boolean;
   /** Display name of what the card is pinned to (tooltip). */
   targetName?: string;
-  /** Display name of the global source a press would pin to (tooltip). */
-  sourceName?: string;
   /** Why this card cannot be pinned right now (Media, Game Sync, Off). */
   disabledReason?: string;
   setPinned: (pinned: boolean) => void;
@@ -294,6 +292,7 @@ export function ZoneCard({
   stacked,
   stackSlot,
   pin,
+  target = false,
 }: {
   device: LightingDevice;
   /** Deep-link anchor the card answers to; see CollapsibleSection's searchAnchor. */
@@ -374,6 +373,8 @@ export function ZoneCard({
   stackSlot?: StackSlot | null;
   /** Pin beside the LED strip. Absent on surfaces without one. */
   pin?: DevicePin;
+  /** The next pick lands on this card. */
+  target?: boolean;
 }) {
   const { t, language } = useTranslation();
   const isZone = device.parentDeviceId != null && device.zoneIndex != null;
@@ -590,6 +591,7 @@ export function ZoneCard({
       className={[
         styles.deviceCard,
         (toggleMode ? toggleable && controlled : selected && !firmwareControlled) ? styles.deviceCardSelected : '',
+        target && !toggleMode && !unavailable && !firmwareControlled ? styles.deviceCardTarget : '',
         unavailable ? styles.deviceCardUnavailable : '',
         !unavailable && (!device.ledsOn || firmwareControlled || !controlled) ? styles.deviceCardPoweredOff : '',
         indent ? styles.deviceCardZone : '',
@@ -685,28 +687,18 @@ export function ZoneCard({
         {!unavailable && !firmwareControlled && controlled && device.ledsOn && (
           <DeviceLedStrip device={device} slot={stackSlot} pick={ledPick} fullscreen={ledFullscreen} pickOnly={ledPickOnly} />
         )}
-        {/* The pin button: always there, so the card's two states (following
-            the global mode, or pinned) are readable at a glance. */}
-        {pin && !toggleMode && !unavailable && !firmwareControlled && (
-          <HoverTooltip
-            body={pin.pinned
-              ? t('lighting.pin.pinnedTo', { name: pin.targetName ?? '' })
-              : (pin.disabledReason ?? t('lighting.pin.pinTo', { name: pin.sourceName ?? '' }))}
-            side="top"
-          >
+        {/* Only a pinned card carries the pin; a press unpins it. Pinning a
+            following card is the menu's Pin, or a pick with it selected. */}
+        {pin?.pinned && !toggleMode && !unavailable && !firmwareControlled && (
+          <HoverTooltip body={t('lighting.pin.pinnedTo', { name: pin.targetName ?? '' })} side="top">
             <button
               type="button"
-              className={`${styles.deviceSettingsBtn} ${styles.deviceBadgeBtn} ${styles.devicePinBtn} ${pin.pinned ? styles.devicePinBtnOn : ''} ${!pin.pinned && pin.disabledReason ? styles.devicePinBtnDisabled : ''}`}
-              aria-label={pin.pinned
-                ? t('lighting.pin.pinnedTo', { name: pin.targetName ?? '' })
-                : (pin.disabledReason ?? t('lighting.pin.pinTo', { name: pin.sourceName ?? '' }))}
-              aria-pressed={pin.pinned}
-              aria-disabled={!pin.pinned && !!pin.disabledReason ? true : undefined}
+              className={`${styles.deviceSettingsBtn} ${styles.deviceBadgeBtn} ${styles.devicePinBtn}`}
+              aria-label={t('lighting.pin.pinnedTo', { name: pin.targetName ?? '' })}
               data-no-dnd
               onClick={e => {
                 e.stopPropagation();
-                if (pin.pinned) pin.setPinned(false);
-                else if (!pin.disabledReason) pin.setPinned(true);
+                pin.setPinned(false);
               }}
             >
               <Pin />

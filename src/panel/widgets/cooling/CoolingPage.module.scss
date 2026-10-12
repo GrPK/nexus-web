@@ -470,6 +470,10 @@
   z-index: var(--z-dropdown);
 }
 
+.fanCardTarget {
+  border-color: var(--accent);
+}
+
 .fanCardSelected {
   border-color: var(--accent);
   background: var(--surface-selected, color-mix(in srgb, var(--accent) 12%, transparent));

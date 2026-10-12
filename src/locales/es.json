@@ -2897,7 +2897,6 @@
   "lighting.pin.mirrorHint": "Estos dispositivos reflejan tu pantalla. Elige la pantalla en la pestaña Espejo; los filtros se aplican a todos.",
   "lighting.pin.openTab": "Abrir {tab}",
   "lighting.pin.pinSelectedToMirror": "Fijar la selección al Espejo",
-  "lighting.pin.pinTo": "Fijar a {name}",
   "lighting.pin.pinnedNotice": "Estos dispositivos están fijados a {name}. Edítalo desde su propia pestaña.",
   "lighting.pin.pinnedTo": "Fijado a {name}",
   "lighting.renderGpu.auto": "Automático",

@@ -1159,6 +1159,12 @@
     border-color: var(--border-strong);
   }
 
+  // The selection's border without its fill: a pick lands here. After :hover,
+  // like the selected state, so hovering does not drop the accent.
+  &.deviceCardTarget {
+    border-color: var(--accent);
+  }
+
   &.deviceCardSelected {
     border-color: var(--accent);
     background: var(--accent-soft);
@@ -1304,28 +1310,11 @@
   flex-shrink: 0;
 }
 
-// The pin button follows the card's mode: muted outline while the card follows
-// the global mode, filled and accented while it is pinned.
 .devicePinBtn {
-  opacity: 0.55;
-
-  &:hover, &:focus-visible { opacity: 1; }
-}
-
-.devicePinBtnOn {
   opacity: 1;
   color: var(--accent);
 
   svg { fill: currentColor; }
-}
-
-// Modes that cannot be pinned to (Media, Game Sync, Off): the button stays so
-// the card does not shift, and its tooltip says why.
-.devicePinBtnDisabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-
-  &:hover { color: var(--text-dim); background: transparent; opacity: 0.3; }
 }
 
 // Stays visible (overrides .deviceSettingsBtn's opacity:0) when the

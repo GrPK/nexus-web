@@ -2897,7 +2897,6 @@
   "lighting.pin.mirrorHint": "이 장치는 화면을 미러링합니다. 화면은 미러 탭에서 선택하며, 필터는 모든 장치에 적용됩니다.",
   "lighting.pin.openTab": "{tab} 열기",
   "lighting.pin.pinSelectedToMirror": "선택 항목을 미러에 고정",
-  "lighting.pin.pinTo": "{name}에 고정",
   "lighting.pin.pinnedNotice": "이 장치는 {name}에 고정되어 있습니다. 해당 탭에서 편집하세요.",
   "lighting.pin.pinnedTo": "{name}에 고정됨",
   "lighting.renderGpu.auto": "자동",

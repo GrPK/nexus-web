@@ -2897,7 +2897,6 @@
   "lighting.pin.mirrorHint": "Deze apparaten spiegelen je scherm. Kies het scherm op het tabblad Spiegelen; de filters gelden voor iedereen.",
   "lighting.pin.openTab": "{tab} openen",
   "lighting.pin.pinSelectedToMirror": "Selectie vastzetten op Spiegelen",
-  "lighting.pin.pinTo": "Vastzetten op {name}",
   "lighting.pin.pinnedNotice": "Deze apparaten zijn vastgezet op {name}. Bewerk het op het eigen tabblad.",
   "lighting.pin.pinnedTo": "Vastgezet op {name}",
   "lighting.renderGpu.auto": "Automatisch",

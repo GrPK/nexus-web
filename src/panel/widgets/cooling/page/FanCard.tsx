@@ -59,7 +59,7 @@ export interface FanBulkSelection {
 
 export const FanCard = memo(function FanCard({
   channel, state, curves, calibrating, compact, canCreateCurve = true, highlighted,
-  selected = false, onSelect,
+  selected = false, onSelect, presetTarget = false,
   hubMode, hubSupportsFirmware,
   hubSupportsBios = true,
   nubRef, cardRef: cardRefProp, onWirePointerDown, onWireHover,
@@ -74,6 +74,8 @@ export const FanCard = memo(function FanCard({
   calibrating?: boolean;
   /** Multi-select membership; a mode change on any selected card applies to all. */
   selected?: boolean;
+  /** A hovered preset tab will retarget this fan. */
+  presetTarget?: boolean;
   /** Body click. Receives whether the multi-select modifier was held, so the
    *  caller owns additive vs replace without FanCard holding a Set. */
   onSelect?: (additive: boolean) => void;
@@ -419,7 +421,7 @@ export const FanCard = memo(function FanCard({
       {...(drag?.attributes ?? {})}
       {...(drag?.listeners ?? {})}
       data-menu-arrow-host={menuEnabled || undefined}
-      className={`${styles.fanCard} ${selected ? styles.fanCardSelected : ''} ${calibrating ? styles.fanCardCalibrating : ''} ${roleMenuOpen ? styles.fanCardMenuOpen : ''} ${dragClasses}`}
+      className={`${styles.fanCard} ${presetTarget ? styles.fanCardTarget : ''} ${selected ? styles.fanCardSelected : ''} ${calibrating ? styles.fanCardCalibrating : ''} ${roleMenuOpen ? styles.fanCardMenuOpen : ''} ${dragClasses}`}
       onClick={onSelect ? e => {
         // Controls inside the card own their own clicks; only bare card
         // surface toggles selection. Matched via the same [data-no-dnd] marker

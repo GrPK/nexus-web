@@ -2897,7 +2897,6 @@
   "lighting.pin.mirrorHint": "Questi dispositivi rispecchiano il tuo schermo. Scegli lo schermo nella scheda Specchio; i filtri valgono per tutti.",
   "lighting.pin.openTab": "Apri {tab}",
   "lighting.pin.pinSelectedToMirror": "Fissa la selezione allo Specchio",
-  "lighting.pin.pinTo": "Fissa su {name}",
   "lighting.pin.pinnedNotice": "Questi dispositivi sono fissati su {name}. Modificalo dalla sua scheda.",
   "lighting.pin.pinnedTo": "Fissato su {name}",
   "lighting.renderGpu.auto": "Automatico",

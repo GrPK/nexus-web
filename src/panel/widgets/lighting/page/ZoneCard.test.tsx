@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ZoneCard, zoneCardSelectable, type BulkSelection } from './ZoneCard';
 import type { LightingDevice } from '../../../../api/lighting';
@@ -772,6 +772,25 @@ describe('ZoneCard stacked', () => {
   });
 });
 
+describe('ZoneCard pick target', () => {
+  const cardOf = (target: boolean, selected = false) => {
+    render(
+      <ZoneCard
+        device={baseDevice} selected={selected} indent={false} onSelect={() => {}}
+        onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
+        target={target}
+      />,
+    );
+    return document.querySelector(`.${styles.deviceCard}`)!.className;
+  };
+
+  it('outlines a card a pick lands on, and only that card', () => {
+    expect(cardOf(true)).toContain(styles.deviceCardTarget);
+    cleanup();
+    expect(cardOf(false)).not.toContain(styles.deviceCardTarget);
+  });
+});
+
 describe('ZoneCard pin', () => {
   const button = (name: string) => screen.queryByRole('button', { name }) as HTMLButtonElement | null;
   const menuRow = (re: RegExp) => screen.queryAllByRole('button').find(b => re.test(b.textContent ?? '')) ?? null;
@@ -780,7 +799,7 @@ describe('ZoneCard pin', () => {
     <ZoneCard
       device={baseDevice} selected={false} indent={false} onSelect={() => {}}
       onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
-      pin={{ pinned: false, sourceName: 'Plasma', setPinned: () => {}, ...pin }}
+      pin={{ pinned: false, setPinned: () => {}, ...pin }}
       {...extra}
     />,
   );
@@ -792,22 +811,15 @@ describe('ZoneCard pin', () => {
     expect(menuRow(/lighting\.devices\.(un)?pin$/)).toBeNull();
   });
 
-  it('shows a muted pin on a following card that pins it to the global source', () => {
-    const setPinned = vi.fn();
-    renderPin({ setPinned });
-    const btn = button('lighting.pin.pinTo:{"name":"Plasma"}')!;
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
-    expect(btn.className).not.toContain(styles.devicePinBtnOn);
-    fireEvent.click(btn);
-    expect(setPinned).toHaveBeenCalledWith(true);
+  it('shows no pin on a following card', () => {
+    renderPin({});
+    expect(document.querySelector(`.${styles.devicePinBtn}`)).toBeNull();
   });
 
-  it('shows a filled pin on a pinned card, named for its target, and a press unpins', () => {
+  it('shows the pin on a pinned card, named for its target, and a press unpins', () => {
     const setPinned = vi.fn();
     renderPin({ pinned: true, targetName: 'Aurora', setPinned });
     const btn = button('lighting.pin.pinnedTo:{"name":"Aurora"}')!;
-    expect(btn.getAttribute('aria-pressed')).toBe('true');
-    expect(btn.className).toContain(styles.devicePinBtnOn);
     fireEvent.click(btn);
     expect(setPinned).toHaveBeenCalledWith(false);
   });
@@ -825,13 +837,9 @@ describe('ZoneCard pin', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('disables the pin where nothing can be pinned, naming why, and presses do nothing', () => {
-    const setPinned = vi.fn();
-    renderPin({ sourceName: undefined, disabledReason: 'lighting.pin.disabledMedia', setPinned });
-    const btn = button('lighting.pin.disabledMedia')!;
-    expect(btn.getAttribute('aria-disabled')).toBe('true');
-    fireEvent.click(btn);
-    expect(setPinned).not.toHaveBeenCalled();
+  it('offers no Pin where nothing can be pinned', () => {
+    renderPin({ disabledReason: 'lighting.pin.disabledMedia' });
+    expect(button('lighting.pin.disabledMedia')).toBeNull();
     openMenu();
     expect(menuRow(/^lighting\.devices\.pin$/)).toBeNull();
   });
@@ -860,7 +868,7 @@ describe('ZoneCard pin', () => {
       <ZoneCard
         device={baseDevice} selected indent={false} onSelect={() => {}}
         onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
-        pin={{ pinned: false, sourceName: 'Plasma', setPinned: () => {} }}
+        pin={{ pinned: false, setPinned: () => {} }}
         bulk={{
           count: 3, identifyCount: 3, tunableCount: 3, controlled: true, ledsOn: true,
           setControlled: () => {}, setPower: () => {}, identify: () => {},

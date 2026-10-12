@@ -8,6 +8,7 @@ import { ZoneCard, ZoneCardStack, zoneCardSelectable, type DevicePin, type Stack
 import { MotherboardGroup } from '../page/MotherboardGroup';
 import { buildDeviceBlocks, stripParentPrefix, type ZoneBlock } from '../page/deviceBlocks';
 import { visibleCards } from '../page/zoneUtils';
+import { isPickTarget } from '../pins';
 import type { LedPick } from '../page/DeviceLedStrip';
 import styles from './StaticDeviceSelect.module.scss';
 
@@ -74,7 +75,6 @@ export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPi
     return {
       pinned: !!pin,
       targetName: pin ? pinTargetName?.(pin) : undefined,
-      sourceName: pinSource ?? undefined,
       disabledReason: pinSource == null ? pinDisabledReason : undefined,
       setPinned: value => onSetPin([id], value),
     };
@@ -91,6 +91,7 @@ export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPi
       ledPickOnly
       ledPick={ledPickFor?.(d.id)}
       pin={pinFor(d.id)}
+      target={!!pins && isPickTarget(d, pins, selectedIds)}
       selected={selectedIds.has(d.id)}
       indent={indent}
       onSelect={() => toggle(d.id)}

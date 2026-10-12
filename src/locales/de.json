@@ -2897,7 +2897,6 @@
   "lighting.pin.mirrorHint": "Diese Geräte spiegeln deinen Bildschirm. Wähle den Bildschirm im Tab Spiegel; die Filter gelten für alle.",
   "lighting.pin.openTab": "{tab} öffnen",
   "lighting.pin.pinSelectedToMirror": "Auswahl an Spiegel anheften",
-  "lighting.pin.pinTo": "An {name} anheften",
   "lighting.pin.pinnedNotice": "Diese Geräte sind an {name} angeheftet. Bearbeite es im zugehörigen Tab.",
   "lighting.pin.pinnedTo": "Angeheftet an {name}",
   "lighting.renderGpu.auto": "Automatisch",

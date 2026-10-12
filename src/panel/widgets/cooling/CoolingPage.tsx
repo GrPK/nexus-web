@@ -1325,6 +1325,15 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
   // The strip marks the mode tab while cooling is off - it is the tab Off now
   // lives on. Every other mode still marks its own tab.
   const activeTabKey = activeMode === 'off' ? MODE_MENU_TAB_KEY : (activeMode ?? undefined);
+  // Hovering a preset tab outlines the fans it would retarget: presets skip
+  // pinned fans and fans with Nexus Control off. Only the advanced header
+  // reports hovers, so its absence must not leave a stale one behind.
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const hoverHeaderShown = serviceOnline && !simpleDashboard;
+  const presetTargets = useMemo(() => new Set(hoverHeaderShown && hoveredTab && isCoolingModeKey(hoveredTab)
+    ? channels.filter(ch => !ch.pinned && ch.controlled !== false && !ch.readOnly
+      && ch.classification !== 'Fixed' && !isFanDisconnected(ch)).map(ch => ch.id)
+    : []), [channels, hoverHeaderShown, hoveredTab]);
   // A tab press either opens the mode menu or switches mode; a mode switch
   // also drops the menu, which the tab row keeps "inside" its anchor.
   const handleTabChange = (key: string, origin?: HTMLButtonElement) => {
@@ -1459,6 +1468,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
               tabs={modeTabs}
               activeTab={activeTabKey}
               onTabChange={handleTabChange}
+              onTabHover={setHoveredTab}
               tabActions={(
                 <PresetToolbar
                   rail
@@ -1723,6 +1733,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
               const renderFanCard = (ch: FanChannel, drag: SortableRowArgs) => (
                 <FanCard key={ch.id} channel={ch} state={fanStates[ch.id]} curves={curves} hazard={hazardByFan[ch.id]}
                   compact
+                  presetTarget={presetTargets.has(ch.id)}
                   selected={selectedFanIds.has(ch.id)}
                   onSelect={additive => selectFan(ch.id, additive)}
                   calibrating={calibrating}

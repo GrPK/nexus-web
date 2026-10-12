@@ -2897,7 +2897,6 @@
   "lighting.pin.mirrorHint": "Ces appareils reflètent votre écran. Choisissez l'écran dans l'onglet Miroir ; les filtres s'appliquent à tous.",
   "lighting.pin.openTab": "Ouvrir {tab}",
   "lighting.pin.pinSelectedToMirror": "Épingler la sélection sur Miroir",
-  "lighting.pin.pinTo": "Épingler sur {name}",
   "lighting.pin.pinnedNotice": "Ces appareils sont épinglés sur {name}. Modifiez-le depuis son propre onglet.",
   "lighting.pin.pinnedTo": "Épinglé sur {name}",
   "lighting.renderGpu.auto": "Automatique",

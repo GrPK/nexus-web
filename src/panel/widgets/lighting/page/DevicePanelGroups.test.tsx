@@ -743,21 +743,18 @@ describe('DevicePanel pins', () => {
   };
   const row = (re: RegExp) => screen.queryAllByRole('button').find(b => re.test(b.textContent ?? '')) ?? null;
 
-  it('puts a pin button on every card, filled only on the pinned one', () => {
-    renderPinPanel();
-    expect(screen.getAllByRole('button', { name: /^lighting\.pin\.(pinTo|pinnedTo)/ })).toHaveLength(3);
-    const filled = screen.getAllByRole('button', { name: 'lighting.pin.pinnedTo:{"name":"plasma"}' });
-    expect(filled).toHaveLength(1);
-    expect(filled[0].className).toContain(styles.devicePinBtnOn);
-    expect(screen.getAllByRole('button', { name: 'lighting.pin.pinTo:{"name":"Aurora"}' })).toHaveLength(2);
-  });
-
-  it('a press unpins a pinned card and pins a following one to the global source', () => {
+  it('puts the pin only on the pinned card, and a press unpins it', () => {
     const { onSetPin } = renderPinPanel();
+    expect(screen.getAllByRole('button', { name: /^lighting\.pin\.(pinTo|pinnedTo)/ })).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'lighting.pin.pinnedTo:{"name":"plasma"}' }));
     expect(onSetPin).toHaveBeenLastCalledWith(['d1'], false);
-    fireEvent.click(screen.getAllByRole('button', { name: 'lighting.pin.pinTo:{"name":"Aurora"}' })[0]);
-    expect(onSetPin).toHaveBeenLastCalledWith(['d2'], true);
+  });
+
+  it('outlines exactly the cards the next pick lands on', () => {
+    renderPinPanel({ pickTargetIds: new Set(['d2', 'd3']) });
+    const outlined = ['Strip one', 'Strip two', 'Strip three']
+      .filter(n => screen.getByText(n).closest(`.${styles.deviceCard}`)!.className.includes(styles.deviceCardTarget));
+    expect(outlined).toEqual(['Strip two', 'Strip three']);
   });
 
   it('offers Pin on a following card and Unpin on a pinned one', () => {
@@ -776,16 +773,13 @@ describe('DevicePanel pins', () => {
     expect(onSetPin).toHaveBeenLastCalledWith(['d1'], false);
   });
 
-  it('disables pinning where nothing can be pinned, but still offers Unpin', () => {
+  it('offers only Unpin where nothing can be pinned', () => {
     const { onSetPin } = renderPinPanel({
       pinSource: null,
       pinDisabledReason: 'lighting.pin.disabledMedia',
       selectedIds: new Set(['d1', 'd2', 'd3']),
     });
-    const disabled = screen.getAllByRole('button', { name: 'lighting.pin.disabledMedia' });
-    expect(disabled).toHaveLength(2);
-    disabled.forEach(b => expect(b.getAttribute('aria-disabled')).toBe('true'));
-    fireEvent.click(disabled[0]);
+    expect(screen.queryByRole('button', { name: 'lighting.pin.disabledMedia' })).toBeNull();
     expect(onSetPin).not.toHaveBeenCalled();
     menuOf('Strip one');
     expect(row(/^lighting\.devices\.pinCount/)).toBeNull();
