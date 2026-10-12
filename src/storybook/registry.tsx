@@ -1328,6 +1328,39 @@ function PreviewToggleOff() {
   return <Toggle checked={on} onChange={setOn} ariaLabel="Sample toggle" />;
 }
 
+function PreviewToggleMixed() {
+  const [on, setOn] = useState(false);
+  return <Toggle checked={on} mixed onChange={setOn} ariaLabel="Sample mixed toggle" />;
+}
+
+function PreviewChipGroupPartial() {
+  const [active, setActive] = useState('');
+  return <ChipGroup
+    ariaLabel="Sample partial chip group"
+    options={[
+      { key: 'quiet', label: 'Quiet' },
+      { key: 'balanced', label: 'Balanced' },
+      { key: 'turbo', label: 'Turbo' },
+    ]}
+    activeKey={active}
+    partialKeys={new Set(['quiet', 'turbo'])}
+    partialLabel="Mixed"
+    onChange={setActive}
+  />;
+}
+
+function PreviewSliderMixed() {
+  const [value, setValue] = useState(50);
+  return <Slider label="Brightness" value={value} min={0} max={100} trackFill mixed mixedLabel="Mixed" ariaLabel="Sample mixed slider" onChange={setValue} />;
+}
+
+function PreviewHsvPickerMixed() {
+  const [color, setColor] = useState(DEFAULT_ACCENT);
+  return <div className={styles.previewHsv}>
+    <HsvPicker value={color} mixed mixedLabel="Mixed" onPreview={setColor} onCommit={setColor} />
+  </div>;
+}
+
 function PreviewEmptyState() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -2502,6 +2535,26 @@ export const REGISTRY: StorybookEntry[] = [
     name: 'Toggle (off)', category: 'inputs',
     filePath: 'src/components/common/Toggle/Toggle.tsx',
     description: 'Same Toggle primitive in the unchecked state.', Preview: PreviewToggleOff,
+  },
+  {
+    name: 'Toggle (mixed)', category: 'inputs',
+    filePath: 'src/components/common/Toggle/Toggle.tsx',
+    description: 'Indeterminate Toggle for a multi-target edit whose targets disagree: centred accent knob, aria-checked="mixed". A click sets every target on.', Preview: PreviewToggleMixed,
+  },
+  {
+    name: 'ChipGroup (partial)', category: 'inputs',
+    filePath: 'src/components/common/ChipGroup/ChipGroup.tsx',
+    description: 'Single-select ChipGroup for a multi-target edit whose targets disagree. No chip is active; chips named in partialKeys get a dashed accent outline and a spoken partialLabel suffix. A click applies that option to every target.', Preview: PreviewChipGroupPartial,
+  },
+  {
+    name: 'Slider (mixed)', category: 'inputs',
+    filePath: 'src/components/common/Slider/Slider.tsx',
+    description: 'Slider for a multi-target edit whose targets disagree: unfilled track, ghosted thumb, the value slot reads mixedLabel and aria-valuetext announces it. A drag sets one value on every target.', Preview: PreviewSliderMixed,
+  },
+  {
+    name: 'HsvPicker (mixed)', category: 'editable',
+    filePath: 'src/components/common/HsvPicker/HsvPicker.tsx',
+    description: 'HsvPicker for a multi-target edit whose targets hold different colors: striped square, no cursors, hex field reads mixedLabel. Picking a color sets it on every target.', Preview: PreviewHsvPickerMixed,
   },
   {
     name: 'ChipGroup', category: 'inputs',

@@ -175,7 +175,7 @@ export async function setLianLiAioScreen(mac: string, patch: LianLiAioScreenPatc
 }
 
 export type LianLiWirelessScreenContentType =
-  | 'off' | 'image' | 'gif' | 'video' | 'sensor' | 'clock' | 'animation' | 'panel';
+  | 'off' | 'image' | 'gif' | 'video' | 'sensor' | 'clock' | 'animation';
 
 export type LianLiWirelessSensorSource =
   'cpuLoad' | 'cpuTemp' | 'gpuLoad' | 'gpuTemp' | 'memoryUsage' | 'vramUsage' | 'fanRpm';
@@ -213,10 +213,12 @@ export interface LianLiWirelessScreen {
   /** Absent/null = on. */
   sleepWhenLocked?: boolean | null;
   /**
-   * Panel record id once the screen is in panel mode and its record exists, usually a few
-   * seconds after switching; null or absent otherwise.
+   * Panel record id while `nexusPanel` is on and its record exists, usually a few seconds
+   * after switching; null or absent otherwise.
    */
   panelDeviceId?: string | null;
+  /** The screen is a Nexus panel; `contentType` is what it shows while this is off. */
+  nexusPanel?: boolean;
   /** Uni Fan TL only: the screen's port and fan, e.g. "#1.2"; empty when unknown. */
   label?: string;
 }
@@ -238,7 +240,7 @@ export async function getLianLiWirelessScreens(): Promise<LianLiWirelessScreen[]
 
 export async function setLianLiWirelessScreenSettings(
   serial: string,
-  settings: { brightness?: number; rotation?: number; sleepWhenLocked?: boolean },
+  settings: LianLiScreenSettingsPatch,
 ): Promise<boolean> {
   return isOk(await postService<OkResponse>('/devices/lianli-wireless/screen/settings', { serial, ...settings }));
 }
@@ -266,6 +268,7 @@ export interface LianLiScreenSettingsPatch {
   brightness?: number;
   rotation?: number;
   sleepWhenLocked?: boolean;
+  nexusPanel?: boolean;
 }
 
 /** The screen endpoints of one Lian Li fan LCD family; the Screens tab is written against this. */

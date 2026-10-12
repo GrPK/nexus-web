@@ -254,3 +254,26 @@ describe('Slider', () => {
     });
   });
 });
+
+describe('Slider mixed', () => {
+  it('shows the mixed label, an unfilled track and a spoken value, and still takes a drag', () => {
+    const onChange = vi.fn();
+    render(<Slider value={40} min={0} max={100} ariaLabel="Level" mixed mixedLabel="Mixed" editable onChange={onChange} />);
+    const range = screen.getByRole('slider', { name: 'Level' });
+
+    expect(screen.getByText('Mixed')).toBeInTheDocument();
+    expect(range).toHaveAttribute('data-mixed', 'true');
+    expect(range).toHaveAttribute('aria-valuetext', 'Mixed');
+    expect(range.style.getPropertyValue('--slider-fill-end')).toBe('0%');
+
+    fireEvent.change(range, { target: { value: '60' } });
+    expect(onChange).toHaveBeenCalledWith(60, false);
+  });
+
+  it('renders normally when not mixed', () => {
+    render(<Slider value={40} min={0} max={100} ariaLabel="Level" trackFill onChange={() => {}} />);
+    const range = screen.getByRole('slider', { name: 'Level' });
+    expect(range).not.toHaveAttribute('data-mixed');
+    expect(range.style.getPropertyValue('--slider-fill-end')).toBe('40%');
+  });
+});

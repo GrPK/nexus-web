@@ -169,3 +169,9 @@
   display: flex;
   gap: 0.5rem;
 }
+
+/* Content controls while the Nexus panel owns the screen: visible, not usable. */
+.contentLocked {
+  opacity: 0.5;
+  pointer-events: none;
+}

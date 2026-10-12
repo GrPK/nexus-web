@@ -16,21 +16,23 @@ export interface ToggleProps {
   ariaLabel?: string;
   ariaLabelledBy?: string;
   className?: string;
+  /** The controlled targets disagree: indeterminate knob, `aria-checked="mixed"`. A click sets all on. */
+  mixed?: boolean;
 }
 
 export function Toggle({
-  checked, onChange, disabled, ariaLabel, ariaLabelledBy, className,
+  checked, onChange, disabled, ariaLabel, ariaLabelledBy, className, mixed = false,
 }: ToggleProps) {
   return (
     <button
       type="button"
       role="switch"
-      aria-checked={checked}
+      aria-checked={mixed ? 'mixed' : checked}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
-      data-on={checked ? 'true' : 'false'}
+      data-on={mixed ? 'mixed' : (checked ? 'true' : 'false')}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
+      onClick={() => onChange(mixed ? true : !checked)}
       className={`${styles.toggle} ${className ?? ''}`}
     >
       <span className={styles.thumb} aria-hidden="true" />

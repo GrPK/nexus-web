@@ -439,6 +439,13 @@ input[type="range"][data-fill] {
   }
 }
 
+// Mixed: the controlled targets disagree, so the thumb is ghosted and the
+// track stays unfilled (the Slider zeroes the fill vars).
+input[type="range"][data-mixed="true"] {
+  &::-webkit-slider-thumb { opacity: 0.4; }
+  &::-moz-range-thumb { opacity: 0.4; }
+}
+
 // Dual-knob mode. RangeSlider stacks two `<input type="range">` on top of a
 // painted track (gray underlay + colored band as separate divs) and tags each
 // input with `data-range-knob`. The inputs paint ONLY the thumb - the track is
@@ -502,6 +509,14 @@ input[type="range"][data-range-knob] {
     background: var(--accent);
     border-color: var(--control-border-accent);
     color: var(--accent-text);
+  }
+
+  // Partial: some, not all, of the controlled targets hold this option. A dashed
+  // accent outline over an idle fill, distinct from both active and idle.
+  &.chip-partial {
+    border-style: dashed;
+    border-color: var(--control-border-accent);
+    color: var(--text);
   }
 }
 

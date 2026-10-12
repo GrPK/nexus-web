@@ -46,6 +46,17 @@
   transition: transform var(--ease) ease, background var(--ease) ease;
 }
 
+/* Indeterminate: a half-filled track with the knob centred. */
+.toggle[data-on='mixed'] {
+  background: var(--accent-soft, var(--bg));
+  border-color: var(--control-border-accent);
+}
+
+.toggle[data-on='mixed'] .thumb {
+  transform: translateX(9px);
+  background: var(--accent);
+}
+
 .toggle[data-on='true'] .thumb {
   transform: translateX(18px);
   background: #fff;

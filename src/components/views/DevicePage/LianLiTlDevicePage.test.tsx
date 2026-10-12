@@ -80,7 +80,7 @@ describe('LianLiTlDevicePage screens tab', () => {
   const fans = [{ port: 1, fanIndex: 1, rpm: 900, duty: 40 }];
   const tlScreen = {
     serial: 'T1', position: 0, width: 400, height: 400, rotation: 0, label: '#1.2',
-    contentType: 'panel', panelDeviceId: 'rec-9',
+    contentType: 'off', nexusPanel: true, panelDeviceId: 'rec-9',
   };
 
   it('puts Screens last, after Lighting and Cooling', async () => {

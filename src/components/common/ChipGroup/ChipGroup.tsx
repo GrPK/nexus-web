@@ -36,6 +36,11 @@ export type ChipGroupProps = {
   /** Reflow onto further lines instead of growing the row, for a chip list
    *  whose length comes from data rather than a fixed option set. */
   wrap?: boolean;
+  /** Single-select only: the controlled targets disagree. Pass no `activeKey` match and the
+   *  values some target holds here; those chips read as partial, not active. */
+  partialKeys?: ReadonlySet<string>;
+  /** Spoken suffix on each partial chip, so the state is not conveyed by styling alone. */
+  partialLabel?: string;
 } & (ChipGroupSingleProps | ChipGroupMultiProps);
 
 /**
@@ -47,7 +52,7 @@ export type ChipGroupProps = {
  * toggle independently, so they stay `aria-pressed` toggle buttons in a group.
  */
 export function ChipGroup(props: ChipGroupProps) {
-  const { options, ariaLabel, className, fullWidth, wrap } = props;
+  const { options, ariaLabel, className, fullWidth, wrap, partialKeys, partialLabel } = props;
   const groupRef = useRef<HTMLDivElement>(null);
 
   // Radio semantics put the whole group on one tab stop and arrows move inside
@@ -96,6 +101,7 @@ export function ChipGroup(props: ChipGroupProps) {
         const active = props.multiSelect
           ? props.activeKeys.has(opt.key)
           : props.activeKey === opt.key;
+        const partial = !active && !props.multiSelect && partialKeys?.has(opt.key) === true;
         const handleClick = props.multiSelect
           ? () => props.onToggleKey(opt.key)
           : () => props.onChange(opt.key);
@@ -108,9 +114,12 @@ export function ChipGroup(props: ChipGroupProps) {
             aria-checked={singleSelect ? active : undefined}
             aria-pressed={singleSelect ? undefined : active}
             tabIndex={singleSelect ? (opt.key === tabStopKey ? 0 : -1) : undefined}
-            aria-label={opt.ariaLabel}
+            aria-label={partial && partialLabel && (opt.ariaLabel ?? typeof opt.label === 'string')
+              ? `${opt.ariaLabel ?? String(opt.label)} (${partialLabel})`
+              : opt.ariaLabel}
             disabled={opt.disabled}
-            className={`chip-action${active ? ' chip-active' : ''}`}
+            data-partial={partial ? 'true' : undefined}
+            className={`chip-action${active ? ' chip-active' : ''}${partial ? ' chip-partial' : ''}`}
             onClick={handleClick}
           >
             {opt.label}

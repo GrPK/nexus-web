@@ -476,21 +476,24 @@ describe('LianLiWirelessScreenTab', () => {
     await waitFor(() => expect(mockGetMedia).toHaveBeenCalledTimes(2));
   });
 
-  it('offers Nexus panel and posts it as the content type', async () => {
-    await renderTab();
-    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-wireless.contentTypeAria' }));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('option', { name: 'devices.lianli-wireless.contentTypePanel' }));
-    });
+  const panelScreen = (over: Record<string, unknown> = {}) => ({
+    serial: 'S1', position: 0, width: 400, height: 400, brightness: 80, rotation: 0, contentType: 'image', mediaId: 'm1', ...over,
+  });
+  const panelSwitch = () => screen.getByRole('switch', { name: 'devices.lianli-wireless.nexusPanelUse' });
 
-    expect(mockSetContent).toHaveBeenCalledWith('S1', 'panel');
+  it('turns the Nexus panel on through the settings endpoint and locks the content controls', async () => {
+    await renderTab();
+    expect(panelSwitch()).toHaveAttribute('aria-checked', 'false');
+    await act(async () => { fireEvent.click(panelSwitch()); });
+
+    expect(mockSetSettings).toHaveBeenCalledWith('S1', { nexusPanel: true });
+    expect(panelSwitch()).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: 'devices.lianli-wireless.contentTypeAria' })).toBeDisabled();
   });
 
-  it('shows Open panel for a panel-mode screen once its panel exists', async () => {
+  it('shows Open panel while the panel is on and its record exists', async () => {
     const onOpen = vi.fn();
-    mockGetScreens.mockResolvedValue([
-      { serial: 'S1', position: 0, width: 400, height: 400, brightness: 80, rotation: 0, contentType: 'panel', panelDeviceId: 'rec-1' },
-    ]);
+    mockGetScreens.mockResolvedValue([panelScreen({ nexusPanel: true, panelDeviceId: 'rec-1' })]);
     await act(async () => { render(<LianLiWirelessScreenTab onOpenScreenPanel={onOpen} />); });
 
     fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-wireless.openPanel' }));
@@ -498,13 +501,79 @@ describe('LianLiWirelessScreenTab', () => {
   });
 
   it('disables Open panel while the panel record is not published yet', async () => {
-    mockGetScreens.mockResolvedValue([
-      { serial: 'S1', position: 0, width: 400, height: 400, brightness: 80, rotation: 0, contentType: 'panel', panelDeviceId: null },
-    ]);
+    mockGetScreens.mockResolvedValue([panelScreen({ nexusPanel: true, panelDeviceId: null })]);
     await act(async () => { render(<LianLiWirelessScreenTab onOpenScreenPanel={vi.fn()} />); });
 
     expect(screen.getByRole('button', { name: 'devices.lianli-wireless.openPanel' })).toBeDisabled();
     expect(screen.getByText('devices.lianli-wireless.panelPending')).toBeInTheDocument();
+  });
+
+  it('shows no Open panel action while the panel is off', async () => {
+    await renderTab();
+    expect(screen.queryByRole('button', { name: 'devices.lianli-wireless.openPanel' })).not.toBeInTheDocument();
+  });
+
+  describe('mixed values across several selected screens', () => {
+    async function renderTwo(a: Record<string, unknown>, b: Record<string, unknown>) {
+      mockGetScreens.mockResolvedValue([panelScreen(a), panelScreen({ serial: 'S2', ...b })]);
+      await renderTab();
+      fireEvent.click(screen.getByRole('radio', { name: 'devices.lianli-wireless.selectionModeMultiple' }));
+      fireEvent.click(fanTile(2));
+    }
+
+    it('renders brightness mixed and one drag posts to both screens', async () => {
+      await renderTwo({ brightness: 40 }, { brightness: 80 });
+      const slider = screen.getByRole('slider', { name: 'devices.lianli-wireless.brightness' });
+      expect(slider).toHaveAttribute('data-mixed', 'true');
+      expect(slider).toHaveAttribute('aria-valuetext', 'devices.lianli-wireless.contentTypeMixed');
+
+      await act(async () => { fireEvent.change(slider, { target: { value: '60' } }); });
+      await act(async () => { fireEvent.pointerUp(slider); });
+      await waitFor(() => expect(mockSetSettings).toHaveBeenCalledTimes(2));
+      expect(mockSetSettings).toHaveBeenCalledWith('S1', { brightness: 60 });
+      expect(mockSetSettings).toHaveBeenCalledWith('S2', { brightness: 60 });
+    });
+
+    it('renders rotation chips 0 and 2 partial with none active', async () => {
+      await renderTwo({ rotation: 0 }, { rotation: 2 });
+      const group = screen.getByRole('radiogroup', { name: 'devices.lianli-wireless.rotationLabel' });
+      const chips = within(group).getAllByRole('radio');
+      expect(chips.filter(c => c.getAttribute('aria-checked') === 'true')).toHaveLength(0);
+      expect(chips.filter(c => c.getAttribute('data-partial') === 'true')).toHaveLength(2);
+      expect(chips[0]).toHaveAttribute('data-partial', 'true');
+      expect(chips[2]).toHaveAttribute('data-partial', 'true');
+      expect(chips[1]).not.toHaveAttribute('data-partial');
+    });
+
+    it('renders the sleep toggle and the panel switch mixed', async () => {
+      await renderTwo({ sleepWhenLocked: true, nexusPanel: true }, { sleepWhenLocked: false, nexusPanel: false });
+      expect(screen.getByRole('switch', { name: 'devices.lcd.sleepWhenLocked' })).toHaveAttribute('aria-checked', 'mixed');
+      expect(panelSwitch()).toHaveAttribute('aria-checked', 'mixed');
+    });
+
+    it('renders nothing mixed when the screens agree', async () => {
+      await renderTwo({ brightness: 70, rotation: 1 }, { brightness: 70, rotation: 1 });
+      expect(screen.getByRole('slider', { name: 'devices.lianli-wireless.brightness' })).not.toHaveAttribute('data-mixed');
+      const group = screen.getByRole('radiogroup', { name: 'devices.lianli-wireless.rotationLabel' });
+      expect(within(group).getAllByRole('radio').filter(c => c.getAttribute('aria-checked') === 'true')).toHaveLength(1);
+      expect(group.querySelector('[data-partial]')).toBeNull();
+      expect(screen.getByRole('switch', { name: 'devices.lcd.sleepWhenLocked' })).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('highlights no gallery tile when the screens show different items', async () => {
+      await renderTwo({ mediaId: 'm1' }, { mediaId: 'm3' });
+      expect(screen.getByRole('button', { name: 'Wallpaper' })).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByRole('button', { name: 'Poster' })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('shows a sensor source as mixed when the screens differ', async () => {
+      await renderTwo(
+        { contentType: 'sensor', sensorSource: 'cpuTemp' },
+        { contentType: 'sensor', sensorSource: 'gpuLoad' },
+      );
+      expect(screen.getByRole('button', { name: 'devices.lianli-wireless.sensorSourceLabel' }))
+        .toHaveTextContent('devices.lianli-wireless.contentTypeMixed');
+    });
   });
 
   it('hides brightness and sleep when the family has neither', async () => {
@@ -528,7 +597,6 @@ describe('LianLiWirelessScreenTab', () => {
       'devices.lianli-wireless.contentTypeSensor',
       'devices.lianli-wireless.contentTypeClock',
       'devices.lianli-wireless.contentTypeAnimation',
-      'devices.lianli-wireless.contentTypePanel',
     ]);
   });
 

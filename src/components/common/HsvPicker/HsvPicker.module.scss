@@ -44,6 +44,19 @@
   pointer-events: none;
 }
 
+.mixedStripes {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    rgb(0 0 0 / 0.45) 0,
+    rgb(0 0 0 / 0.45) 8px,
+    rgb(255 255 255 / 0.35) 8px,
+    rgb(255 255 255 / 0.35) 16px
+  );
+  pointer-events: none;
+}
+
 .hueSlider {
   position: relative;
   width: 100%;
