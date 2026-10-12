@@ -285,6 +285,22 @@ describe('Slider mixed', () => {
     expect(onCommit).toHaveBeenCalledWith(40);
   });
 
+  it('commits nothing when the empty mixed field is left or confirmed untouched', () => {
+    const onChange = vi.fn();
+    const onCommit = vi.fn();
+    render(<Slider value={40} min={0} max={100} ariaLabel="Level" mixed mixedLabel="Mixed" editable onChange={onChange} onCommit={onCommit} />);
+
+    fireEvent.click(screen.getByText('Mixed'));
+    fireEvent.blur(screen.getByRole('spinbutton'));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('Mixed'));
+    fireEvent.keyDown(screen.getByRole('spinbutton'), { key: 'Enter' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
   it('renders normally when not mixed', () => {
     render(<Slider value={40} min={0} max={100} ariaLabel="Level" trackFill onChange={() => {}} />);
     const range = screen.getByRole('slider', { name: 'Level' });

@@ -534,6 +534,25 @@ describe('LianLiWirelessScreenTab', () => {
       expect(mockSetSettings).toHaveBeenCalledWith('S2', { brightness: 60 });
     });
 
+    it('leaves mixed brightness alone on an empty edit, and a typed value sets every screen', async () => {
+      await renderTwo({ brightness: 40 }, { brightness: 80 });
+      const mixedValue = () => screen.getAllByText('common.mixed')
+        .find(el => el.getAttribute('role') === 'button') as HTMLElement;
+
+      await act(async () => { fireEvent.click(mixedValue()); });
+      await act(async () => { fireEvent.blur(screen.getByRole('spinbutton')); });
+      expect(mockSetSettings).not.toHaveBeenCalled();
+
+      await act(async () => { fireEvent.click(mixedValue()); });
+      const input = screen.getByRole('spinbutton');
+      await act(async () => {
+        fireEvent.change(input, { target: { value: '30' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+      });
+      expect(mockSetSettings).toHaveBeenCalledWith('S1', { brightness: 30 });
+      expect(mockSetSettings).toHaveBeenCalledWith('S2', { brightness: 30 });
+    });
+
     it('renders rotation chips 0 and 2 partial with none active', async () => {
       await renderTwo({ rotation: 0 }, { rotation: 2 });
       const group = screen.getByRole('radiogroup', { name: 'devices.lianli-wireless.rotationLabel' });

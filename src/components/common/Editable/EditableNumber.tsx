@@ -31,6 +31,8 @@ export function EditableNumber({ value, min, max, step = 1, onCommit, format, cl
     value: mixed ? Number.NaN : value,
     onCommit,
     parse: draft => {
+      // Number('') is 0, which would clamp to min: an empty draft is a cancel, never a value.
+      if (draft.trim() === '') return null;
       const parsed = Number(draft);
       if (!Number.isFinite(parsed)) return null;
       const clamped = Math.max(min, Math.min(max, parsed));
