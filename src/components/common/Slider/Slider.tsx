@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties, type PointerEventHandler, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type CSSProperties, type PointerEventHandler, type ReactNode } from 'react';
 import { EditableNumber } from '../Editable/EditableNumber';
 import { InfoTooltip } from '../InfoTooltip/InfoTooltip';
 import styles from './Slider.module.scss';
@@ -74,6 +74,7 @@ export function Slider({
   formatValue, onChange, onCommit, onPointerDown, onPointerCancel,
   disabled, trackFill, marker, markerLabel, fillCap, ariaLabel, className, labelAction,
 }: SliderProps) {
+  const rangeId = useId();
   const latestInputValueRef = useRef(value);
   const onCommitRef = useRef(onCommit);
   const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -218,6 +219,7 @@ export function Slider({
 
   const range = (
     <input type="range" min={min} max={max} step={step} value={value}
+      id={rangeId}
       disabled={disabled}
       aria-label={ariaLabel}
       data-fill=""
@@ -254,9 +256,11 @@ export function Slider({
 
   if (orientation === 'stacked') {
     return (
-      <label className={`${styles.root} ${styles.stacked} ${className ?? ''}`}>
+      // A div with a label on the name only: a wrapping label forwards a click on
+      // the value or name to its first labelable descendant, a labelAction button.
+      <div className={`${styles.root} ${styles.stacked} ${className ?? ''}`}>
         <div className={styles.head}>
-          <span className={styles.label}>{label}{info && <InfoTooltip message={info} side="top" />}{labelAction}</span>
+          <span className={styles.label}>{label && <label htmlFor={rangeId}>{label}</label>}{info && <InfoTooltip message={info} side="top" />}{labelAction}</span>
           {valueNode}
         </div>
         <div className={styles.track}>
@@ -270,7 +274,7 @@ export function Slider({
             <span>{formatValue ? formatValue(max) : max}</span>
           </div>
         )}
-      </label>
+      </div>
     );
   }
 
