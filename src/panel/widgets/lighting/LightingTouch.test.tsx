@@ -45,9 +45,17 @@ vi.mock('./page/StaticPickerCanvas', () => ({
     );
   },
 }));
-vi.mock('./effecteditor/MediaList', () => ({ MediaList: () => <div /> }));
+vi.mock('./effecteditor/MediaList', () => ({
+  MediaList: ({ onSelectionPick }: { onSelectionPick?: () => void }) => (
+    <div data-testid="media-list">{onSelectionPick && <button type="button" onClick={onSelectionPick}>media-pick</button>}</div>
+  ),
+}));
 vi.mock('./effecteditor/PostProcessControls', () => ({ PostProcessControls: () => <div data-testid="post-process" /> }));
-vi.mock('./page/ModeControls', () => ({ ScreenControls: () => <div data-testid="screen-controls" /> }));
+vi.mock('./page/ModeControls', () => ({
+  ScreenControls: ({ onSelectionPick }: { onSelectionPick?: () => void }) => (
+    <div data-testid="screen-controls">{onSelectionPick && <button type="button" onClick={onSelectionPick}>screen-pick</button>}</div>
+  ),
+}));
 const gridProps = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 vi.mock('./page/AnimateGrid', () => ({
   // `leading` carries the static palette; dropping it hides the subject.
@@ -240,20 +248,6 @@ describe('LightingTouch pins', () => {
     expect(lastPins()).toEqual([['dev-a'], null]);
   });
 
-  it('offers Pin selected to Mirror in the Mirror tab only', async () => {
-    vi.mocked(fetchCurrentSync).mockImplementation(() => Promise.resolve({ sync: 'screen' }));
-    render(<LightingTouch widget={widget} />);
-    await select(['dev-a']);
-    await waitFor(() => expect(selectProps.current?.onPinSelectedToMirror).toBeTypeOf('function'));
-    (selectProps.current!.onPinSelectedToMirror as () => void)();
-    expect(lastPins()).toEqual([['dev-a'], { kind: 'mirror' }]);
-  });
-
-  it('does not offer it in Static', async () => {
-    render(<LightingTouch widget={widget} />);
-    await waitFor(() => expect(selectProps.current).not.toBeNull());
-    expect(selectProps.current!.onPinSelectedToMirror).toBeUndefined();
-  });
 
   it('names pins as the page does: palette family and shade, simple sweeps by their label', async () => {
     render(<LightingTouch widget={widget} />);
@@ -345,13 +339,40 @@ describe('LightingTouch editor scope', () => {
     await waitFor(() => expect(editorDisabled()).toBe('false'));
   });
 
-  it('shows only the global Mirror filters for a mirror pin, and slider drags never touch the global effect', async () => {
+  it('shows the shared Mirror controls and filters for a mirror pin, and slider drags never touch the global effect', async () => {
     render(<LightingTouch widget={widget} />);
     await select(['m']);
     await waitFor(() => expect(screen.getByTestId('post-process')).toBeTruthy());
-    expect(screen.getByText('lighting.pin.mirrorHint')).toBeTruthy();
+    expect(screen.getByTestId('screen-controls')).toBeTruthy();
     expect(screen.queryByTestId('effect-controls')).toBeNull();
-    expect(screen.queryByTestId('screen-controls')).toBeNull();
+  });
+
+  it('shows the shared Media list and filters for a media pin while the global mode is Static', async () => {
+    vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ 'dev-a': { kind: 'media' } }));
+    render(<LightingTouch widget={widget} />);
+    await select(['dev-a']);
+    await waitFor(() => expect(screen.getByTestId('media-list')).toBeTruthy());
+    expect(screen.getByTestId('post-process')).toBeTruthy();
+    expect(screen.queryByTestId('effect-controls')).toBeNull();
+  });
+
+  it('a screen pick with cards selected gives only them Mirror', async () => {
+    vi.mocked(fetchCurrentSync).mockImplementation(() => Promise.resolve({ sync: 'screen' }));
+    render(<LightingTouch widget={widget} />);
+    await waitFor(() => expect(screen.getByTestId('screen-controls')).toBeTruthy());
+    expect(screen.queryByText('screen-pick')).toBeNull();
+    await select(['dev-a']);
+    fireEvent.click(await screen.findByText('screen-pick'));
+    expect(lastPins()).toEqual([['dev-a'], { kind: 'mirror' }]);
+  });
+
+  it('lists the devices on Media, and a media pick with cards selected gives only them Media', async () => {
+    vi.mocked(fetchCurrentSync).mockImplementation(() => Promise.resolve({ sync: 'gif' }));
+    render(<LightingTouch widget={widget} />);
+    await waitFor(() => expect(screen.getByTestId('media-list')).toBeTruthy());
+    await select(['dev-a']);
+    fireEvent.click(await screen.findByText('media-pick'));
+    expect(lastPins()).toEqual([['dev-a'], { kind: 'media' }]);
   });
 
   it('keeps the Mirror controls for a shader pin on the Mirror tab, with no notice', async () => {

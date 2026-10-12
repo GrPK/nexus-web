@@ -221,10 +221,13 @@ export const startStatic = (
  * left out, the service keeps the persisted one, while '' would select the
  * default screen and persist that.
  */
-export const startScreenMirror = (saturation = 1, contrast = 1, monitor?: string, hue = 0, colorize = 0) =>
+// keepMode applies to the one shared capture (and the devices pinned to it)
+// without switching the global mode to Mirror.
+export const startScreenMirror = (saturation = 1, contrast = 1, monitor?: string, hue = 0, colorize = 0, keepMode = false) =>
   postService('/lighting/screen/headless-start', {
     ...(monitor !== undefined ? { monitor } : {}),
     effect: 'average', saturation, contrast, blur: 0, hue, colorize,
+    ...(keepMode ? { keepMode } : {}),
   });
 
 // Post-process params persisted across sessions, shared by Mirror + Media:
@@ -567,7 +570,7 @@ export const setLightingDeviceColor = (id: string, hue: number, saturation: numb
   postService('/devices/lighting-devices/color', { id, hue, saturation });
 
 /** What a pinned device wears, whatever the global mode is. */
-export type PinKind = 'static' | 'animate' | 'mirror';
+export type PinKind = 'static' | 'animate' | 'mirror' | 'media';
 
 /**
  * One device's pin as the service holds it. A static pin carries the full

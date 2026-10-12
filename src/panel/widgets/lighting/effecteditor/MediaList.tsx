@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
 import { EmptyState } from '../../../../components/common/EmptyState/EmptyState';
 import { useTranslation } from '../../../../lib/i18n';
@@ -10,9 +11,18 @@ import styles from '../LightingPage.module.scss';
  * to play. No import / delete / folder chrome; that lives only on the desktop
  * MediaControls.
  */
-export function MediaList() {
+export function MediaList({ keepMode = false, onSelectionPick }: {
+  /** Change the shared media item without switching the global mode to Media. */
+  keepMode?: boolean;
+  /** Set while cards are selected: called after a pick so it applies to them. */
+  onSelectionPick?: () => void;
+}) {
   const { t } = useTranslation();
-  const { items, activeId, thumbs, play } = useMediaLibrary();
+  const { items, activeId, thumbs, play: playShared } = useMediaLibrary();
+  const play = useCallback(async (id: string) => {
+    await playShared(id, keepMode);
+    onSelectionPick?.();
+  }, [keepMode, onSelectionPick, playShared]);
   return (
     <div className={styles.mediaSection}>
       {items.length === 0 && (

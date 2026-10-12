@@ -75,6 +75,8 @@ export const paletteColorPin = (color: PaletteColor): Pin => ({
 export const animatePin = (effect: string): Pin => ({ kind: 'animate', effect });
 
 export const MIRROR_PIN: Pin = { kind: 'mirror' };
+/** The one shared Media source, as Mirror is the one shared capture. */
+export const MEDIA_PIN: Pin = { kind: 'media' };
 
 /** Stable identity of a pin's target, for "do these devices share one pin". */
 export function pinSignature(pin: Pin): string {
@@ -177,6 +179,7 @@ export function pinnedNamesByEffect(
 /** What a pin points at, for tooltips: the shader or simple sweep, the palette swatch or hex, or Mirror. */
 export function pinTargetLabel(pin: Pin, t: (key: string) => string): string {
   if (pin.kind === 'mirror') return t('lighting.mode.screen');
+  if (pin.kind === 'media') return t('lighting.mode.gif');
   if (pin.kind === 'static' && pin.effect === 'flat') {
     const palette = paletteColorForKey(pinGridKey(pin));
     return palette ? `${t(paletteFamilyKey(palette.family))} ${palette.shade}` : (pin.color ?? '').toUpperCase();

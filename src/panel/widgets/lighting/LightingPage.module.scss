@@ -2077,13 +2077,3 @@
   height: 100%;
   width: 100%;
 }
-
-// A selection pinned to something the current tab cannot edit.
-.pinNotice {
-  padding: 1rem;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: var(--type-small);
-
-  p { margin: 0 0 0.6rem; }
-}

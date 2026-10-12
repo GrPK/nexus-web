@@ -62,7 +62,11 @@ vi.mock('./page/FullscreenShader', () => ({
   ),
 }));
 vi.mock('./page/ModeControls', () => ({
-  ModeControls: ({ mode }: { mode: string }) => <div data-testid="mode-controls" data-mode={mode} />,
+  ModeControls: ({ mode, onSelectionPick }: { mode: string; onSelectionPick?: () => void }) => (
+    <div data-testid="mode-controls" data-mode={mode}>
+      {onSelectionPick && <button type="button" onClick={onSelectionPick}>selection-pick</button>}
+    </div>
+  ),
 }));
 vi.mock('./page/StaticPickerCanvas', () => ({
   StaticPickerCanvas: ({ onCommit, onPreview, hex, devices, implied }: {
@@ -128,7 +132,17 @@ vi.mock('./page/EffectTab', () => ({
     >type</button>
   ),
 }));
-vi.mock('../../../components/common/ViewHeader/ViewHeader', () => ({ ViewHeader: () => null }));
+vi.mock('../../../components/common/ViewHeader/ViewHeader', () => ({
+  ViewHeader: ({ tabs, activeTab, onTabChange }: {
+    tabs?: { key: string }[];
+    activeTab?: string;
+    onTabChange?: (key: string) => void;
+  }) => (
+    <div data-testid="tabs" data-active={activeTab ?? ''}>
+      {tabs?.map(tab => <button key={tab.key} type="button" onClick={() => onTabChange?.(tab.key)}>{`tab:${tab.key}`}</button>)}
+    </div>
+  ),
+}));
 vi.mock('../../../components/views/ServiceRequired', () => ({ ServiceRequired: () => null }));
 vi.mock('../../../components/common/DeviceCanvas/DeviceCanvas', () => ({
   DeviceCanvas: ({ shaderEffect }: { shaderEffect?: string | null }) => (
@@ -242,8 +256,16 @@ describe('LightingPage pins', () => {
       expect(lastPinsCall()).toEqual([['a'], { kind: 'animate', effect: 'sweeprainbow' }]);
     });
 
+    it('pins to the one shared Media in Media', async () => {
+      syncState.mode = 'gif';
+      syncState.rawSync = 'gif';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail').dataset.source).not.toBe(''));
+      fireEvent.click(screen.getByText('toggle'));
+      expect(lastPinsCall()).toEqual([['a'], { kind: 'media' }]);
+    });
+
     it.each([
-      ['gif', 'lighting.pin.disabledMedia'],
       ['none', 'lighting.pin.disabledOff'],
     ])('is disabled in %s, naming why', async (mode, reason) => {
       syncState.mode = mode;
@@ -311,14 +333,14 @@ describe('LightingPage pins', () => {
       expect(targets()).toBe('');
     });
 
-    it('ignore the selection on Media, whose picks are always global', async () => {
+    it('follow the selection on Media too', async () => {
       withDevices('a', 'b');
       syncState.mode = 'gif';
       syncState.rawSync = 'gif';
       renderPage();
       await waitFor(() => expect(targets()).toBe('a,b'));
       fireEvent.click(screen.getByText('select-a'));
-      expect(targets()).toBe('a,b');
+      expect(targets()).toBe('');
     });
 
     it('do not exist with lighting off', async () => {
@@ -550,7 +572,7 @@ describe('LightingPage pins', () => {
       expect(startStatic).not.toHaveBeenCalled();
     });
 
-    it.each(['animate', 'static', 'gif'])('shows only the global Mirror filters for a mirror pin on the %s tab, never the screen picker', async mode => {
+    it.each(['animate', 'static', 'gif'])('opens a mirror-pinned selection on Mirror while the global mode is %s', async mode => {
       localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
       syncState.mode = mode;
       syncState.rawSync = mode === 'animate' ? 'fire' : mode;
@@ -558,10 +580,9 @@ describe('LightingPage pins', () => {
       renderPage();
       await waitFor(() => expect(pinOf()?.kind).toBe('mirror'));
       fireEvent.click(screen.getByText('select-a'));
-      await waitFor(() => expect(screen.getByTestId('type-intensity').dataset.mode).toBe('screen'));
-      // The monitor picker and the reactive toggle start Mirror, which would switch the global mode.
-      expect(screen.queryByTestId('mode-controls')).toBeNull();
-      expect(screen.getByText('lighting.pin.mirrorHint')).toBeTruthy();
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('screen'));
+      expect(screen.getByTestId('mode-controls').dataset.mode).toBe('screen');
+      expect(screen.getByTestId('type-intensity').dataset.mode).toBe('screen');
       expect(screen.queryByTestId('grid-effect')).toBeNull();
     });
 
@@ -573,24 +594,18 @@ describe('LightingPage pins', () => {
       await waitFor(() => expect(pinOf()?.kind).toBe('mirror'));
       fireEvent.click(screen.getByText('select-a'));
       expect(screen.getByTestId('mode-controls').dataset.mode).toBe('screen');
-      expect(screen.queryByText('lighting.pin.mirrorHint')).toBeNull();
     });
 
-    it('says where the editor is for a shader pin on the Media tab, and opens it', async () => {
-      localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
+    it('opens a shader-pinned selection on Animation while the global mode is Media', async () => {
       syncState.mode = 'gif';
       syncState.rawSync = 'gif';
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
       renderPage();
       await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
       fireEvent.click(screen.getByText('select-a'));
-      await waitFor(() => expect(screen.getByText('lighting.pin.pinnedNotice')).toBeTruthy());
-      expect(screen.queryByTestId('mode-controls')).toBeNull();
-      expect(screen.queryByTestId('type-intensity')).toBeNull();
-
-      vi.mocked(startAnimate).mockClear();
-      fireEvent.click(screen.getByText('lighting.pin.openTab'));
-      await waitFor(() => expect(startAnimate).toHaveBeenCalled());
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
+      expect(screen.getByTestId('grid-effect').textContent).toBe('aurora');
+      expect(screen.queryByText('lighting.pin.pinnedNotice')).toBeNull();
     });
 
     it('a fullscreen arrow steps from the pinned target on screen and re-pins the selection', async () => {
@@ -646,24 +661,25 @@ describe('LightingPage pins', () => {
       syncState.rawSync = 'screen';
     });
 
-    it('offers Pin selected to Mirror only with devices selected, and pins them', async () => {
+    it('a screen pick with cards selected gives only them Mirror; with none it is global', async () => {
       renderPage();
       await waitFor(() => expect(screen.getByTestId('mode-controls')).toBeTruthy());
-      expect(screen.queryByText('lighting.pin.pinSelectedToMirror')).toBeNull();
+      expect(screen.queryByText('selection-pick')).toBeNull();
       fireEvent.click(screen.getByText('select-a'));
-      fireEvent.click(await screen.findByText('lighting.pin.pinSelectedToMirror'));
+      fireEvent.click(await screen.findByText('selection-pick'));
       expect(lastPinsCall()).toEqual([['a'], { kind: 'mirror' }]);
     });
 
-    it('re-pins a selection pinned to a shader straight to Mirror, with no notice', async () => {
+    it('the Mirror tab re-pins a shader-pinned selection without touching the global mode', async () => {
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'aurora' } }));
       renderPage();
       await waitFor(() => expect(pinOf()?.effect).toBe('aurora'));
       fireEvent.click(screen.getByText('select-a'));
-      fireEvent.click(await screen.findByText('lighting.pin.pinSelectedToMirror'));
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
+      vi.mocked(startAnimate).mockClear();
+      fireEvent.click(screen.getByText('tab:screen'));
       expect(lastPinsCall()).toEqual([['a'], { kind: 'mirror' }]);
-      expect(screen.queryByText('lighting.pin.pinnedNotice')).toBeNull();
-      expect(screen.getByTestId('mode-controls')).toBeTruthy();
+      expect(startAnimate).not.toHaveBeenCalled();
     });
 
     it('keeps the Mirror dock editable for a mixed selection', async () => {
@@ -677,10 +693,24 @@ describe('LightingPage pins', () => {
       expect(screen.getByTestId('type-intensity').closest('[inert]')).toBeNull();
     });
 
-    it('switching tabs never pins', async () => {
+    it('switching tabs with nothing selected changes the global mode and never pins', async () => {
       renderPage();
       await waitFor(() => expect(screen.getByTestId('mode-controls')).toBeTruthy());
+      fireEvent.click(screen.getByText('tab:static'));
+      await waitFor(() => expect(startStatic).toHaveBeenCalled());
       expect(setPins).not.toHaveBeenCalled();
+    });
+
+    it('a tab press with cards selected gives only them that mode', async () => {
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('mode-controls')).toBeTruthy());
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(screen.getByText('tab:static'));
+      expect(lastPinsCall()[0]).toEqual(['a']);
+      expect(lastPinsCall()[1]).toMatchObject({ kind: 'static', effect: 'checker' });
+      fireEvent.click(screen.getByText('tab:gif'));
+      expect(lastPinsCall()).toEqual([['a'], { kind: 'media' }]);
+      expect(startStatic).not.toHaveBeenCalled();
     });
   });
 

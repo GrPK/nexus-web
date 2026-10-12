@@ -11,7 +11,7 @@ import {
   fetchCurrentSync, fetchAvailableMappings, fetchGameSyncState, fetchGameSyncGames,
   steamArtworkUrl, resolveActiveGame, setLightingPaused,
   resetDeviceLayouts, applyDeviceLayouts, setActiveLayoutPreset, updateLayoutPreset, identifyLightingDevice,
-  type LightingDevice, type LedMapEntry, type Pin, type PostProcessSettings, type GameSyncDevice,
+  type LightingDevice, type LedMapEntry, type Pin, type PinKind, type PostProcessSettings, type GameSyncDevice,
   type GameSyncGame, type DeviceLayoutDto, type PresetApp,
 } from '../../../api/lighting';
 import { groupNamesOf, type DeviceGroup } from '../../../lib/deviceGroups';
@@ -56,9 +56,8 @@ import { SCENE_3D } from '../../../lib/scene/sceneFeature';
 import { useLightingScene } from './scene/useLightingScene';
 import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
 import { usePersistentState } from '../../../hooks/usePersistentState';
-import { PinNotice } from './page/PinNotice';
 import {
-  staticLookPin, colorPin, animatePin, MIRROR_PIN, selectionPin, pinGridKey, pinHex,
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex,
   isPickTarget, pickerMarks, pinnedNamesByEffect, pinTargetLabel, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
@@ -164,7 +163,8 @@ function loadDeviceOrder(): string[] {
 const LightingScene3D = lazy(() => import('./scene/LightingScene3D'));
 const VIEW_2D = '2d';
 const VIEW_3D = '3d';
-const NO_SELECTION: ReadonlySet<string> = new Set();
+// The tab a pin's devices show on.
+const PIN_MODES: Record<PinKind, LightingMode> = { static: 'static', animate: 'animate', mirror: 'screen', media: 'gif' };
 
 export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate }: LightingViewProps) {
   const { t, language } = useTranslation();
@@ -901,6 +901,33 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     return Promise.resolve();
   }, [applyAnimate]);
 
+  // What the effect grid, the dock and the preview are pointed at. Devices
+  // selected and all wearing one pin: that pin's target (identity includes the
+  // preset slot, so the same effect on two presets is a disagreement). Devices
+  // wearing different pins, or a mix of pinned and following, have no single
+  // value for the controls to edit, so the dock locks. Nothing selected, or
+  // every selected device following the global mode: the global source.
+  const selectionIds = useMemo(() => [...selectedDeviceIds], [selectedDeviceIds]);
+  const scoped: ScopedTarget = useMemo(() => {
+    const sel = selectionPin(pins, selectionIds);
+    if (sel.kind === 'none') return { kind: 'none' };
+    if (sel.kind === 'mixed') return { kind: 'mixed' };
+    const pin = sel.pin;
+    return {
+      kind: 'pin',
+      pin,
+      key: pin.kind === 'mirror' ? '' : pinGridKey(pin),
+      // An animate pin wears the shader's global settings, so its preset is the shader's own pointer.
+      slot: pin.kind === 'static' ? (pin.slot ?? 0) : slotOf(pin.effect ?? ''),
+      hex: pin.kind === 'static' ? pinHex(pin) : '',
+    };
+  }, [pins, selectionIds, slotOf]);
+  // The tabs and the views under them show what the selection wears, so a
+  // card pinned to Mirror opens on Mirror whatever the global mode is. Nothing
+  // selected, a selection following the global mode, or one wearing different
+  // pins shows the global mode.
+  const viewMode: LightingMode = scoped.kind === 'pin' ? PIN_MODES[scoped.pin.kind] : effectiveMode;
+
   // Pins the selection to a static look: the whole look travels, so the service
   // renders THIS effect for the device rather than approximating it with a
   // swatch colour. The pin records the slot it was made against, so a later
@@ -914,8 +941,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // wore; the running effect is untouched. Unselected pinned devices are
     // never reached.
     const ids = [...selectedDeviceIds];
-    if (ids.length > 0 && (effectiveMode === 'animate' || effectiveMode === 'static')) {
-      if (effectiveMode === 'static') {
+    if (ids.length > 0 && (viewMode === 'animate' || viewMode === 'static')) {
+      if (viewMode === 'static') {
         if (isStaticEffect(key)) pinStaticLook(key, slotOf(key), ids);
       } else {
         void applyPins(ids, animatePin(key));
@@ -939,7 +966,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       rawSync: selectMode === 'static' ? 'static' : key,
       effect: key,
     });
-  }, [activeEffect, applyAnimate, applyPins, effectiveMode, pinStaticLook, selectedDeviceIds, slotOf, stateFor]);
+  }, [activeEffect, applyAnimate, applyPins, viewMode, pinStaticLook, selectedDeviceIds, slotOf, stateFor]);
 
   // Paces the pin writes a colour drag produces; the local copy is recorded
   // per move, the write follows when the previous one lands.
@@ -974,36 +1001,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const effectPool = mode === 'static' ? STATIC_EFFECTS : ANIMATE_EFFECTS;
 
 
-  // What the effect grid, the dock and the preview are pointed at. Devices
-  // selected and all wearing one pin: that pin's target (identity includes the
-  // preset slot, so the same effect on two presets is a disagreement). Devices
-  // wearing different pins, or a mix of pinned and following, have no single
-  // value for the controls to edit, so the dock locks. Nothing selected, or
-  // every selected device following the global mode: the global source.
-  const selectionIds = useMemo(() => [...selectedDeviceIds], [selectedDeviceIds]);
-  const scoped: ScopedTarget = useMemo(() => {
-    const sel = selectionPin(pins, selectionIds);
-    if (sel.kind === 'none') return { kind: 'none' };
-    if (sel.kind === 'mixed') return { kind: 'mixed' };
-    const pin = sel.pin;
-    return {
-      kind: 'pin',
-      pin,
-      key: pin.kind === 'mirror' ? '' : pinGridKey(pin),
-      // An animate pin wears the shader's global settings, so its preset is the shader's own pointer.
-      slot: pin.kind === 'static' ? (pin.slot ?? 0) : slotOf(pin.effect ?? ''),
-      hex: pin.kind === 'static' ? pinHex(pin) : '',
-    };
-  }, [pins, selectionIds, slotOf]);
   // Fullscreen edits one value; a mixed selection has none, so it closes.
   useEffect(() => { if (scoped.kind === 'mixed') setFullscreenOpen(false); }, [scoped.kind]);
-  // A mirror pin has nothing of its own: the controls are the global Mirror ones.
-  const mirrorScoped = scoped.kind === 'pin' && scoped.pin.kind === 'mirror';
-  // The Mirror tab edits only the global Mirror, so a selection's shader or static pin has no say there.
-  const pinTarget = scoped.kind === 'pin' && !mirrorScoped && effectiveMode !== 'screen' ? scoped : null;
-  // The post-process controls follow the mode, except that a selection pinned
-  // to Mirror edits the global Mirror ones from any tab.
-  const ppMode = mirrorScoped ? 'screen' : mode;
+  // A shader or static-look pin is the selection's own target; Mirror and
+  // Media pins have nothing of their own, so their controls are the shared ones.
+  const pinTarget = scoped.kind === 'pin' && (scoped.pin.kind === 'static' || scoped.pin.kind === 'animate') ? scoped : null;
+  const ppMode = viewMode;
   const postProcess = ppMode === 'screen' ? screenPP : mediaPP;
 
   // The fullscreen arrows step through the effects. Under a pin scope they step
@@ -2008,9 +2011,27 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The strip marks the mode tab while lighting is off - it is the tab Off now
   // lives on. Every other mode still marks its own tab.
   const activeTabKey = !synced ? undefined
-    : (effectiveMode === 'none' ? MODE_MENU_TAB_KEY : effectiveMode);
-  // A tab press either opens the mode menu or switches mode; a mode switch
-  // also drops the menu, which the tab row keeps "inside" its anchor.
+    : (viewMode === 'none' ? MODE_MENU_TAB_KEY : viewMode);
+  // What a tab press gives the selected cards: that mode's global look, or the
+  // one shared Mirror or Media. Game Sync and Off cannot be pinned, so they
+  // always change everything.
+  const tabPinFor = (m: LightingMode): Pin | null => {
+    switch (m) {
+      case 'static': {
+        if (globalColor) return colorPin(globalColor);
+        const key = effectiveMode === 'static' && isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
+        return staticLookPin(key, slotOf(key), stateOf(key, slotOf(key)));
+      }
+      case 'animate':
+        return animatePin((effectiveMode === 'animate' ? (simpleAnimation ?? activeEffect) : '') || animateEffectRef.current);
+      case 'screen': return MIRROR_PIN;
+      case 'gif': return MEDIA_PIN;
+      default: return null;
+    }
+  };
+  // A tab press either opens the mode menu or applies a mode: to the selected
+  // cards when there are any, else to every unpinned one. A mode switch also
+  // drops the menu, which the tab row keeps "inside" its anchor.
   const handleTabChange = (key: string, origin?: HTMLButtonElement) => {
     if (key === MODE_MENU_TAB_KEY) {
       setModeMenuOpen(open => !open);
@@ -2018,20 +2039,24 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
     closeModeMenu();
     if (origin && key !== activeTabKey) emitRadialBloomFromElement(origin, false);
+    const pin = selectedDeviceIds.size > 0 ? tabPinFor(key as LightingMode) : null;
+    if (pin) {
+      // Cards already pinned to this mode keep their own look.
+      if (!(scoped.kind === 'pin' && key === viewMode)) void applyPins([...selectedDeviceIds], pin);
+      return;
+    }
     void handleModeChange(key as LightingMode);
   };
 
-  const shaderMode = effectiveMode === 'animate' || effectiveMode === 'static';
+  const shaderMode = viewMode === 'animate' || viewMode === 'static';
   // The preview stands for the selection; with nothing selected it is every
   // unpinned device, and the chip says how many pins a pick skips.
   const pinnedShown = visibleDevices.filter(d => d.id in pins).length;
-  // The cards the next pick lands on. Media's picks ignore the selection; Off
-  // and Game Sync have none.
+  // The cards the next pick lands on; Off and Game Sync have no picks.
   const pickTargetIds = useMemo(() => {
-    if (effectiveMode === 'none' || effectiveMode === 'gamesync') return undefined;
-    const scope = effectiveMode === 'gif' ? NO_SELECTION : selectedDeviceIds;
-    return new Set(visibleDevices.filter(d => isPickTarget(d, pins, scope)).map(d => d.id));
-  }, [effectiveMode, pins, selectedDeviceIds, visibleDevices]);
+    if (viewMode === 'none' || viewMode === 'gamesync') return undefined;
+    return new Set(visibleDevices.filter(d => isPickTarget(d, pins, selectedDeviceIds)).map(d => d.id));
+  }, [viewMode, pins, selectedDeviceIds, visibleDevices]);
   const previewBadgeLabel = selectedDeviceIds.size > 0
     ? t(pluralKey('lighting.pane.selectedCount', language, selectedDeviceIds.size), { count: selectedDeviceIds.size })
     : pinnedShown === 0 ? t('lighting.pane.allDevices')
@@ -2039,21 +2064,21 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         : t(pluralKey('lighting.pane.allExceptPinned', language, pinnedShown), { count: pinnedShown });
   const pinnedDevices = useMemo(() => {
     const names = new Map(devices.map(d => [d.id, d.name]));
-    return pinnedNamesByEffect(pins, effectiveMode === 'static' ? 'static' : 'animate', id => names.get(id));
-  }, [pins, devices, effectiveMode]);
+    return pinnedNamesByEffect(pins, viewMode === 'static' ? 'static' : 'animate', id => names.get(id));
+  }, [pins, devices, viewMode]);
   // A global flat colour is what Static is showing, so no effect tile reads as selected beside it.
   const gridEffect = scoped.kind === 'pin' ? scoped.key
-    : (scoped.kind === 'mixed' || (scoped.kind === 'none' && effectiveMode === 'static' && globalColor) ? '' : activeEffect);
+    : (scoped.kind === 'mixed' || (scoped.kind === 'none' && viewMode === 'static' && globalColor) ? '' : activeEffect);
   // The colour the selection wears, which is where its dots sit on the field.
   const scopedHex = scoped.kind === 'pin' ? scoped.hex : (scoped.kind === 'none' ? globalColor : '');
   // Selected devices wearing different pins have no single value for the
   // controls to edit, so the dock locks until the selection agrees. Mirror's
-  // controls are global, so its dock never locks.
-  const mixedSelection = scoped.kind === 'mixed' && effectiveMode !== 'screen';
+  // and Media's controls are shared, so their dock never locks.
+  const mixedSelection = scoped.kind === 'mixed' && viewMode !== 'screen' && viewMode !== 'gif';
   const allSelected = selectAllIds.length > 0 && selectAllIds.every(id => selectedDeviceIds.has(id));
   // The canvas previews the shared effect canvas, which Static does not sample
   // and Off has nothing to show on. Game Sync substitutes its own activity block.
-  const showCanvas = effectiveMode !== 'static' && effectiveMode !== 'none' && effectiveMode !== 'gamesync';
+  const showCanvas = viewMode !== 'static' && viewMode !== 'none' && viewMode !== 'gamesync';
   // The device list is the canvas filter: the canvas draws exactly what the
   // list has selected. Which of those frames is focused is the canvas's own
   // state (`canvasFocusIds`), so a canvas click never removes a frame.
@@ -2065,12 +2090,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
 
   // Static's canvas is the colour picker. A pattern pin replaces the field
   // with the effect's own render; a colour pin (or none yet) keeps the field.
-  const staticPattern = effectiveMode === 'static' && pinTarget?.pin.kind === 'static' && !isPaletteKey(pinTarget.key)
+  const staticPattern = viewMode === 'static' && pinTarget?.pin.kind === 'static' && !isPaletteKey(pinTarget.key)
     ? { key: pinTarget.key, slot: pinTarget.slot }
     : null;
   // The picker tiles stand for "this selection's colour was chosen by hand", so
   // only a colour pin, or the global flat colour, lights one.
-  const colorScoped = effectiveMode === 'static' && (pinTarget?.pin.kind === 'static'
+  const colorScoped = viewMode === 'static' && (pinTarget?.pin.kind === 'static'
     ? isPaletteKey(pinTarget.key)
     : scoped.kind === 'none' && globalColor !== '');
   const pickerDevices = useMemo(
@@ -2110,26 +2135,26 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       return key ? { pin: animatePin(key), name: simpleAnimation ? t(simpleAnimationLabelKey(simpleAnimation)) : effectLabel(key) } : null;
     }
     if (effectiveMode === 'screen') return { pin: MIRROR_PIN, name: t('lighting.mode.screen') };
+    if (effectiveMode === 'gif') return { pin: MEDIA_PIN, name: t('lighting.mode.gif') };
     return null;
   }, [activeEffect, effectLabel, effectiveMode, simpleAnimation, slotOf, stateOf, synced, t]);
   const pinDisabledReason = globalPin ? undefined : t(
-    effectiveMode === 'gif' ? 'lighting.pin.disabledMedia'
-      : effectiveMode === 'gamesync' ? 'lighting.pin.disabledGameSync'
+    effectiveMode === 'gamesync' ? 'lighting.pin.disabledGameSync'
         : effectiveMode === 'none' ? 'lighting.pin.disabledOff'
           : 'lighting.pin.disabledUnavailable',
   );
   const pinTargetName = useCallback((pin: Pin): string => pinTargetLabel(pin, t), [t]);
-  // A selection pinned to a shader or a static look while the tab is Media:
-  // Media cannot be pinned to, so it says where the editor is.
-  const offTabPin = pinTarget && effectiveMode === 'gif' ? pinTarget : null;
   const handleSetPin = useCallback((ids: string[], pinned: boolean) => {
     if (!pinned) { void applyPins(ids, null); return; }
     if (globalPin) void applyPins(ids, globalPin.pin);
   }, [applyPins, globalPin]);
-  // The Mirror tab's own action: the selection follows the one global mirror.
-  const handlePinSelectedToMirror = useCallback(() => {
-    void applyPins([...selectedDeviceIds], MIRROR_PIN);
-  }, [applyPins, selectedDeviceIds]);
+  // A Mirror or Media pick with cards selected gives just them the shared source.
+  const handleSelectionPick = useMemo(() => {
+    if (selectedDeviceIds.size === 0 || (viewMode !== 'screen' && viewMode !== 'gif')) return undefined;
+    const pin = viewMode === 'screen' ? MIRROR_PIN : MEDIA_PIN;
+    const ids = [...selectedDeviceIds];
+    return () => { void applyPins(ids, pin); };
+  }, [applyPins, selectedDeviceIds, viewMode]);
 
   const simpleOff = synced && effectiveMode === 'none';
   // The mode tab leads the strip in both dashboard modes; simple mode carries
@@ -2389,7 +2414,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             // device's own bytes, and falls back to the pin's render without them.
             pins={pins}
             versionForSlot={versionForSlot}
-            ledFullscreen={effectiveMode === 'static'}
+            ledFullscreen={viewMode === 'static'}
             pinSource={globalPin?.name ?? null}
             pinDisabledReason={pinDisabledReason}
             pinTargetName={pinTargetName}
@@ -2425,7 +2450,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           />
         </div>
         <div className={styles.main}>
-          {effectiveMode === 'gamesync' ? (
+          {viewMode === 'gamesync' ? (
             <>
               <div className={styles.canvasArea}>
                 <GameSyncActivityBlock
@@ -2441,7 +2466,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             </>
           ) : (
             <>
-              {effectiveMode === 'static' && (
+              {viewMode === 'static' && (
               <div className={styles.canvasArea}>
                 <StaticPickerCanvas
                   devices={pickerDevices}
@@ -2479,10 +2504,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 ) : (
                   <DeviceCanvas devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
                 )}
-                {effectiveMode === 'gif' && <MediaCanvasNotice />}
-                {shaderMode && activeEffect && currentState && !mixedSelection && (
+                {viewMode === 'gif' && <MediaCanvasNotice />}
+                {shaderMode && dockEffect && dockState && !mixedSelection && (
                   <>
-                    {EFFECTS.find(e => e.key === activeEffect)?.audio && (
+                    {EFFECTS.find(e => e.key === dockEffect)?.audio && (
                       <div className={styles.musicReactive}>
                         <HoverTooltip body={t('lighting.musicReactive')} side="left">
                           <button
@@ -2520,34 +2545,20 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               )}
               {/* Off renders no picker at all; Static and Animation each own an
                   effect pool; Screen and Media get their source controls. */}
-              {offTabPin ? (
-                <PinNotice
-                  action={(
-                    <Button size="sm" onClick={() => { void handleModeChange(offTabPin.pin.kind === 'animate' ? 'animate' : 'static'); }}>
-                      {t('lighting.pin.openTab', { tab: t(offTabPin.pin.kind === 'animate' ? 'lighting.mode.animate' : 'lighting.mode.static') })}
-                    </Button>
-                  )}
-                >
-                  {t('lighting.pin.pinnedNotice', { name: pinTargetName(offTabPin.pin) })}
-                </PinNotice>
-              ) : mirrorScoped && effectiveMode !== 'screen' && effectiveMode !== 'none' ? (
-                // The screen and the reactive toggle start Mirror, which would switch
-                // the global mode; the filters in the dock are the only controls here.
-                <PinNotice>{t('lighting.pin.mirrorHint')}</PinNotice>
-              ) : (effectiveMode === 'animate' || effectiveMode === 'static') ? (
+              {(viewMode === 'animate' || viewMode === 'static') ? (
                 <>
                 <div className={styles.browserWrap}>
                 <AnimateGrid
                   effect={gridEffect}
                   onSelect={handleEffectSelect}
-                  effects={effectiveMode === 'static' ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
-                  frozen={effectiveMode === 'static'}
+                  effects={viewMode === 'static' ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
+                  frozen={viewMode === 'static'}
                   slotFor={gridSlotFor}
                   versionFor={gridVersionFor}
                   panelEffects={panelUsage.effects}
                   pinnedDevices={pinnedDevices}
                   gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
-                  leading={effectiveMode === 'static' ? (
+                  leading={viewMode === 'static' ? (
                     <CollapsibleSection
                       compact
                       title={t('lighting.static.pickerGroup')}
@@ -2575,19 +2586,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 />
                 </div>
                 </>
-              ) : effectiveMode === 'none' ? (
+              ) : viewMode === 'none' ? (
                 <EmptyState icon={<Lightbulb />} title={t('lighting.pane.offHint')} />
               ) : (
-                <div className={`${styles.controls} ${effectiveMode === 'gif' ? styles.controlsFill : ''}`}>
-                  {effectiveMode === 'screen' && selectedDeviceIds.size > 0 && (
-                    <Button size="sm" pill onClick={handlePinSelectedToMirror}>
-                      {t('lighting.pin.pinSelectedToMirror')}
-                    </Button>
-                  )}
+                <div className={`${styles.controls} ${viewMode === 'gif' ? styles.controlsFill : ''}`}>
                   <ModeControls
-                    mode={effectiveMode}
+                    mode={viewMode}
                     screenPP={screenPP}
                     onScreenPPChange={setScreenPP}
+                    keepMode={selectedDeviceIds.size > 0 && viewMode !== effectiveMode}
+                    onSelectionPick={handleSelectionPick}
                   />
                 </div>
               )}
@@ -2604,7 +2612,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               inert={mixedSelection || undefined}
               aria-hidden={mixedSelection || undefined}
             >
-              {offTabPin ? null : dockPalette ? (
+              {dockPalette ? (
                 <div className={styles.paletteDetail}>
                   <div className={styles.paletteDetailSwatch} style={{ backgroundColor: dockPalette.hex }} />
                   <span className={styles.paletteDetailName}>
@@ -2614,7 +2622,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 </div>
               ) : (
               <EffectTab
-                mode={mirrorScoped ? 'screen' : effectiveMode}
+                mode={viewMode}
                 effect={dockEffect}
                 state={dockState}
                 bundle={dockBundle}
