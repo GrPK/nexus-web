@@ -46,15 +46,17 @@
   transition: transform var(--ease) ease, background var(--ease) ease;
 }
 
-/* Indeterminate: a half-filled track with the knob centered. */
+/* Indeterminate: the shared mixed look (see global.scss --mixed-fill and
+   --mixed-knob): muted-accent track, ghosted gray knob centered. */
 .toggle[data-on='mixed'] {
-  background: var(--accent-soft, var(--bg));
+  background: var(--mixed-fill);
   border-color: var(--control-border-accent);
 }
 
 .toggle[data-on='mixed'] .thumb {
   transform: translateX(9px);
-  background: var(--accent);
+  background: var(--mixed-knob);
+  opacity: var(--mixed-knob-opacity);
 }
 
 .toggle[data-on='true'] .thumb {

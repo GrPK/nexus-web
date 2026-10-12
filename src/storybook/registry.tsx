@@ -2539,17 +2539,17 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'Toggle (mixed)', category: 'inputs',
     filePath: 'src/components/common/Toggle/Toggle.tsx',
-    description: 'Indeterminate Toggle for a multi-target edit whose targets disagree: centered accent knob, a checkbox role with aria-checked="mixed". A click sets every target on.', Preview: PreviewToggleMixed,
+    description: 'Indeterminate Toggle for a multi-target edit whose targets disagree: muted-accent track, ghosted gray knob centered, a checkbox role with aria-checked="mixed". A click sets every target on.', Preview: PreviewToggleMixed,
   },
   {
     name: 'ChipGroup (partial)', category: 'inputs',
     filePath: 'src/components/common/ChipGroup/ChipGroup.tsx',
-    description: 'Single-select ChipGroup for a multi-target edit whose targets disagree. No chip is active; chips named in partialKeys get a dashed accent outline and a spoken partialLabel suffix. A click applies that option to every target.', Preview: PreviewChipGroupPartial,
+    description: 'Single-select ChipGroup for a multi-target edit whose targets disagree. No chip is active; chips named in partialKeys get the muted-accent mixed fill (between idle and active) and a spoken partialLabel suffix. A click applies that option to every target.', Preview: PreviewChipGroupPartial,
   },
   {
     name: 'Slider (mixed)', category: 'inputs',
     filePath: 'src/components/common/Slider/Slider.tsx',
-    description: 'Slider for a multi-target edit whose targets disagree: unfilled track, ghosted thumb, the value slot reads mixedLabel and aria-valuetext announces it. A drag sets one value on every target.', Preview: PreviewSliderMixed,
+    description: 'Slider for a multi-target edit whose targets disagree: muted-accent track, ghosted gray thumb, the value slot reads mixedLabel and aria-valuetext announces it. A drag sets one value on every target.', Preview: PreviewSliderMixed,
   },
   {
     name: 'HsvPicker (mixed)', category: 'editable',
