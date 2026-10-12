@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  MonitorOff, Image as ImageIcon, Film, Video, Gauge, Clock, Sparkles,
+  MonitorOff, Image as ImageIcon, Film, Video, Gauge, Clock, Sparkles, MonitorSmartphone,
 } from 'lucide-react';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { ChipGroup, type ChipOption } from '../../common/ChipGroup/ChipGroup';
@@ -20,17 +20,26 @@ import {
   importLianLiWirelessMedia,
   setLianLiWirelessScreenOrder,
   deleteLianLiWirelessMedia,
+  type LianLiScreenApi,
   type LianLiWirelessScreen,
   type LianLiWirelessScreenContentType,
   type LianLiWirelessScreenContentExtra,
   type LianLiWirelessMediaItem,
   type LianLiWirelessMediaKind,
 } from '../../../api/lianli-wireless';
+import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import { localizeNumbers } from '../../../lib/units';
 import { LianLiAioScreenSection } from './LianLiAioScreenSection';
 import styles from './LianLiWirelessDevicePage.module.scss';
+
+const WIRELESS_SCREEN_API: LianLiScreenApi = {
+  getScreens: () => getLianLiWirelessScreens(),
+  setSettings: (...args) => setLianLiWirelessScreenSettings(...args),
+  setOrder: (...args) => setLianLiWirelessScreenOrder(...args),
+  setContent: (...args) => setLianLiWirelessScreenContent(...args),
+};
 
 const SCREENS_POLL_MS = 2000;
 // One poll interval plus margin: long enough that the poll following an edit's
@@ -50,6 +59,7 @@ const CONTENT_TYPES: { value: LianLiWirelessScreenContentType; labelKey: string 
   { value: 'sensor', labelKey: 'devices.lianli-wireless.contentTypeSensor' },
   { value: 'clock', labelKey: 'devices.lianli-wireless.contentTypeClock' },
   { value: 'animation', labelKey: 'devices.lianli-wireless.contentTypeAnimation' },
+  { value: 'panel', labelKey: 'devices.lianli-wireless.contentTypePanel' },
 ];
 
 const ROTATIONS = [0, 1, 2, 3];
@@ -73,6 +83,7 @@ function contentTypeIcon(type: LianLiWirelessScreenContentType) {
     case 'sensor': return <Gauge size={20} aria-hidden />;
     case 'clock': return <Clock size={20} aria-hidden />;
     case 'animation': return <Sparkles size={20} aria-hidden />;
+    case 'panel': return <MonitorSmartphone size={20} aria-hidden />;
     default: return <MonitorOff size={20} aria-hidden />;
   }
 }
@@ -84,12 +95,23 @@ function contentTypeIcon(type: LianLiWirelessScreenContentType) {
  * Polls its own `/screens` list independently of the shell's fan-state poll.
  * Each bound HydroShift II adds its own screen section above the fan screens.
  */
-export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpener }: {
+export function LianLiWirelessScreenTab({
+  aioMacs = [], usbMacs = [], panelOpener, api = WIRELESS_SCREEN_API,
+  supportsBrightness = true, supportsSleepWhenLocked = true, onOpenScreenPanel,
+}: {
   aioMacs?: string[];
   /** AIOs whose USB cable is connected, by MAC. */
   usbMacs?: string[];
   /** Opens an AIO's own panel page by MAC; undefined when it has none. */
   panelOpener?: (mac: string) => (() => void) | undefined;
+  /** The screen endpoints of the device family; the wireless ones by default. */
+  api?: LianLiScreenApi;
+  /** False for a family whose screens have no backlight control. */
+  supportsBrightness?: boolean;
+  /** False for a family whose screens cannot sleep when the PC locks. */
+  supportsSleepWhenLocked?: boolean;
+  /** Opens the sidebar panel of a screen in panel mode, by its panel record id. */
+  onOpenScreenPanel?: (panelDeviceId: string) => void;
 }) {
   const { t } = useTranslation();
   const { numberFormat } = useUnitPrefs();
@@ -113,11 +135,11 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
   const lastEditRef = useRef(Number.NEGATIVE_INFINITY);
 
   const refreshScreens = useCallback(async () => {
-    const s = await getLianLiWirelessScreens();
+    const s = await api.getScreens();
     if (aliveRef.current && performance.now() - lastEditRef.current > EDIT_POLL_GRACE_MS) {
       setScreens(s);
     }
-  }, []);
+  }, [api]);
 
   const refreshMedia = useCallback(async () => {
     const m = await getLianLiWirelessMedia();
@@ -137,6 +159,9 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
       window.clearInterval(id);
     };
   }, [refreshScreens, refreshMedia]);
+
+  // The panel record appears a few seconds after a screen enters panel mode.
+  useTopicCallback('panel/device', true, () => { void refreshScreens(); });
 
   const loaded = screens !== null;
   // Saved order first, then the firmware position; equal keys keep the
@@ -170,8 +195,8 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
     [serials[from], serials[to]] = [serials[to], serials[from]];
     lastEditRef.current = performance.now();
     setScreens(prev => prev ? prev.map(s => ({ ...s, order: serials.indexOf(s.serial) })) : prev);
-    void setLianLiWirelessScreenOrder(serials);
-  }, [screens, selected, orderedScreens]);
+    void api.setOrder(serials);
+  }, [screens, selected, orderedScreens, api]);
 
   const toggleScreen = useCallback((serial: string) => {
     setSelected(prev => {
@@ -230,23 +255,23 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
     setBrightnessDraft(rounded);
     applyToTargets(
       s => ({ ...s, brightness: rounded }),
-      serial => { void setLianLiWirelessScreenSettings(serial, { brightness: rounded }); },
+      serial => { void api.setSettings(serial, { brightness: rounded }); },
     );
-  }, [applyToTargets]);
+  }, [applyToTargets, api]);
 
   const handleRotationChange = useCallback((rotation: number) => {
     applyToTargets(
       s => ({ ...s, rotation }),
-      serial => { void setLianLiWirelessScreenSettings(serial, { rotation }); },
+      serial => { void api.setSettings(serial, { rotation }); },
     );
-  }, [applyToTargets]);
+  }, [applyToTargets, api]);
 
   const handleSleepWhenLockedChange = useCallback((sleepWhenLocked: boolean) => {
     const previous = new Map(targetScreens.map(s => [s.serial, s.sleepWhenLocked]));
     applyToTargets(
       s => ({ ...s, sleepWhenLocked }),
       serial => {
-        void setLianLiWirelessScreenSettings(serial, { sleepWhenLocked }).then(ok => {
+        void api.setSettings(serial, { sleepWhenLocked }).then(ok => {
           if (ok) return;
           setScreens(prev => prev
             ? prev.map(s => (s.serial === serial ? { ...s, sleepWhenLocked: previous.get(serial) } : s))
@@ -254,21 +279,21 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
         });
       },
     );
-  }, [applyToTargets, targetScreens]);
+  }, [applyToTargets, targetScreens, api]);
 
   const handleContentTypeChange = useCallback((contentType: LianLiWirelessScreenContentType) => {
     applyToTargets(
       s => ({ ...s, contentType }),
-      serial => { void setLianLiWirelessScreenContent(serial, contentType); },
+      serial => { void api.setContent(serial, contentType); },
     );
-  }, [applyToTargets]);
+  }, [applyToTargets, api]);
 
   const handleMediaSelect = useCallback((item: LianLiWirelessMediaItem) => {
     applyToTargets(
       s => ({ ...s, contentType: item.kind, mediaId: item.id }),
-      serial => { void setLianLiWirelessScreenContent(serial, item.kind, item.id); },
+      serial => { void api.setContent(serial, item.kind, item.id); },
     );
-  }, [applyToTargets]);
+  }, [applyToTargets, api]);
 
   // Optimistic-only update for a color drag preview: mirrors the picker's
   // live value in the tile/target state without posting to the service.
@@ -282,9 +307,9 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
   ) => {
     applyToTargets(
       s => ({ ...s, contentType, ...patch }),
-      serial => { void setLianLiWirelessScreenContent(serial, contentType, undefined, patch); },
+      serial => { void api.setContent(serial, contentType, undefined, patch); },
     );
-  }, [applyToTargets]);
+  }, [applyToTargets, api]);
 
   const openUpload = useCallback((kind: LianLiWirelessMediaKind) => {
     setUploadKind(kind);
@@ -390,7 +415,7 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
                       {contentTypeIcon(s.contentType)}
                     </span>
                     <span className={styles.screenPreviewLabel}>
-                      {t('devices.lianli-wireless.fanN', { n: i + 1 })}
+                      {s.label || t('devices.lianli-wireless.fanN', { n: i + 1 })}
                     </span>
                   </button>
                 );
@@ -425,7 +450,7 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
         title={t('devices.lianli-wireless.displaySection')}
         boxClassName={styles.sectionBox}
       >
-        <SettingSlider
+        {supportsBrightness && <SettingSlider
           editable
           trackFill
           label={t('devices.lianli-wireless.brightness')}
@@ -443,7 +468,7 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
             setBrightnessDraft(rounded);
           }}
           onCommit={commitBrightness}
-        />
+        />}
         <SettingRow label={t('devices.lianli-wireless.rotationLabel')} disabled={!representative}>
           <ChipGroup
             ariaLabel={t('devices.lianli-wireless.rotationLabel')}
@@ -455,12 +480,12 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
             }))}
           />
         </SettingRow>
-        <SettingToggle
+        {supportsSleepWhenLocked && <SettingToggle
           label={t('devices.lcd.sleepWhenLocked')}
           checked={representative?.sleepWhenLocked ?? true}
           onChange={() => handleSleepWhenLockedChange(!(representative?.sleepWhenLocked ?? true))}
           disabled={!representative}
-        />
+        />}
       </SettingsSection>}
 
       {fanScreens && <SettingsSection
@@ -531,6 +556,13 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
                 onCommit={patch => commitContentField('clock', patch)}
               />
             )}
+            {representative.contentType === 'panel' && (
+              <PanelModePanel
+                panelDeviceId={targetScreens.length === 1 ? (representative.panelDeviceId ?? null) : null}
+                single={targetScreens.length === 1}
+                onOpen={onOpenScreenPanel}
+              />
+            )}
             {representative.contentType === 'animation' && (
               <AnimationPanel
                 screen={representative}
@@ -575,6 +607,34 @@ export function LianLiWirelessScreenTab({ aioMacs = [], usbMacs = [], panelOpene
         />
       )}
     </>
+  );
+}
+
+function PanelModePanel({ panelDeviceId, single, onOpen }: {
+  panelDeviceId: string | null;
+  /** One screen is targeted; with several there is no single panel to open. */
+  single: boolean;
+  onOpen?: (panelDeviceId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const ready = panelDeviceId !== null && onOpen !== undefined;
+  return (
+    <div className={styles.typePanel}>
+      <p className={styles.emptyNote}>
+        {t(single && panelDeviceId === null ? 'devices.lianli-wireless.panelPending' : 'devices.lianli-wireless.panelHint')}
+      </p>
+      {single && (
+        <Button
+          size="sm"
+          tone="neutral"
+          icon={<MonitorSmartphone size={14} />}
+          disabled={!ready}
+          onClick={() => { if (panelDeviceId !== null) onOpen?.(panelDeviceId); }}
+        >
+          {t('devices.lianli-wireless.openPanel')}
+        </Button>
+      )}
+    </div>
   );
 }
 

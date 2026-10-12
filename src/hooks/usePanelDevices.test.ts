@@ -228,33 +228,25 @@ describe('buildPanelDevices streamed panels', () => {
     });
   });
 
-  it('keeps each screen\'s own name when one device carries several', () => {
-    const screen = (id: string, displayName: string): PanelDeviceRecord => ({
+  it('brands the TL and SL screen families without claiming a device row', () => {
+    const screen = (id: string, family: string): PanelDeviceRecord => ({
       ...krakenRecord(),
       id,
-      displayName,
-      capabilities: { surface: 'lcd-round', family: 'lianli-tl-lcd', touch: false, cssWidth: 400, cssHeight: 400, dpr: 1 },
+      displayName: `Screen ${id}`,
+      capabilities: { surface: 'lcd-round', family, touch: false, cssWidth: 400, cssHeight: 400, dpr: 1 },
     });
     const devices = buildPanelDevices({
-      curatedDevices: [{
-        id: 'lianli-tl-lcd',
-        name: 'Lian Li Uni Fan TL LCD',
-        category: 'cooler',
-        connected: true,
-        firmwareVersion: '',
-        supportsNexusControl: true,
-        nexusControlEnabled: true,
-      }],
+      curatedDevices: [],
       phoneSessions: [],
-      records: [screen('rec-1', 'Lian Li Uni Fan TL LCD #1.1'), screen('rec-2', 'Lian Li Uni Fan TL LCD #1.2')],
+      records: [screen('rec-1', 'lianli-tl-lcd'), screen('rec-2', 'lianli-wireless-lcd')],
       status: null,
       simulatedPanels: [],
       labels: LABELS,
     });
 
-    expect(devices.map(d => [d.sourceId, d.name, d.iconSrc])).toEqual([
-      ['lianli-tl-lcd', 'Lian Li Uni Fan TL LCD #1.1', '/assets/devices/lianli.svg'],
-      ['lianli-tl-lcd', 'Lian Li Uni Fan TL LCD #1.2', '/assets/devices/lianli.svg'],
+    expect(devices.map(d => [d.sourceId, d.iconSrc])).toEqual([
+      [undefined, '/assets/devices/lianli.svg'],
+      [undefined, '/assets/devices/lianli.svg'],
     ]);
   });
 

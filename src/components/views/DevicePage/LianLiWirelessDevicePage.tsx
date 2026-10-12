@@ -185,7 +185,16 @@ export function LianLiWirelessDevicePage({ onSectionNavigate }: LianLiWirelessDe
           )}
           {tab === 'lighting' && <LianLiWirelessLightingTab onSectionNavigate={onSectionNavigate} />}
           {tab === 'cooling' && <LianLiWirelessCoolingTab state={state} />}
-          {tab === 'screen' && <LianLiWirelessScreenTab aioMacs={aioMacs} usbMacs={usbMacs} panelOpener={panelOpener} />}
+          {tab === 'screen' && (
+            <LianLiWirelessScreenTab
+              aioMacs={aioMacs}
+              usbMacs={usbMacs}
+              panelOpener={panelOpener}
+              onOpenScreenPanel={onSectionNavigate
+                ? id => onSectionNavigate('device', { deviceKey: panelDeviceKey(streamedPanelId(id)) })
+                : undefined}
+            />
+          )}
         </div>
       </div>
     </div>

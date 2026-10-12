@@ -175,7 +175,7 @@ export async function setLianLiAioScreen(mac: string, patch: LianLiAioScreenPatc
 }
 
 export type LianLiWirelessScreenContentType =
-  | 'off' | 'image' | 'gif' | 'video' | 'sensor' | 'clock' | 'animation';
+  | 'off' | 'image' | 'gif' | 'video' | 'sensor' | 'clock' | 'animation' | 'panel';
 
 export type LianLiWirelessSensorSource =
   'cpuLoad' | 'cpuTemp' | 'gpuLoad' | 'gpuTemp' | 'memoryUsage' | 'vramUsage' | 'fanRpm';
@@ -212,6 +212,13 @@ export interface LianLiWirelessScreen {
   tempUnit?: LianLiWirelessTempUnit;
   /** Absent/null = on. */
   sleepWhenLocked?: boolean | null;
+  /**
+   * Panel record id once the screen is in panel mode and its record exists, usually a few
+   * seconds after switching; null or absent otherwise.
+   */
+  panelDeviceId?: string | null;
+  /** Uni Fan TL only: the screen's port and fan, e.g. "#1.2"; empty when unknown. */
+  label?: string;
 }
 
 export interface LianLiWirelessScreenContentExtra {
@@ -253,6 +260,25 @@ export async function setLianLiWirelessScreenContent(
     ...(mediaId ? { mediaId } : {}),
     ...(extra ?? {}),
   }));
+}
+
+export interface LianLiScreenSettingsPatch {
+  brightness?: number;
+  rotation?: number;
+  sleepWhenLocked?: boolean;
+}
+
+/** The screen endpoints of one Lian Li fan LCD family; the Screens tab is written against this. */
+export interface LianLiScreenApi {
+  getScreens: () => Promise<LianLiWirelessScreen[] | null>;
+  setSettings: (serial: string, settings: LianLiScreenSettingsPatch) => Promise<boolean>;
+  setOrder: (serials: string[]) => Promise<boolean>;
+  setContent: (
+    serial: string,
+    contentType: LianLiWirelessScreenContentType,
+    mediaId?: string,
+    extra?: LianLiWirelessScreenContentExtra,
+  ) => Promise<boolean>;
 }
 
 export type LianLiWirelessMediaKind = 'image' | 'gif' | 'video';

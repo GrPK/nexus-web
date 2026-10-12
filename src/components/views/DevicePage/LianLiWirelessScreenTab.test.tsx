@@ -456,4 +456,45 @@ describe('LianLiWirelessScreenTab', () => {
     expect(mockImportMedia).toHaveBeenCalledWith(file, { x: 0, y: 0, w: 1, h: 1, rotate: 0, mirror: false });
     await waitFor(() => expect(mockGetMedia).toHaveBeenCalledTimes(2));
   });
+
+  it('offers Nexus panel and posts it as the content type', async () => {
+    await renderTab();
+    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-wireless.contentTypeAria' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('option', { name: 'devices.lianli-wireless.contentTypePanel' }));
+    });
+
+    expect(mockSetContent).toHaveBeenCalledWith('S1', 'panel');
+  });
+
+  it('shows Open panel for a panel-mode screen once its panel exists', async () => {
+    const onOpen = vi.fn();
+    mockGetScreens.mockResolvedValue([
+      { serial: 'S1', position: 0, width: 400, height: 400, brightness: 80, rotation: 0, contentType: 'panel', panelDeviceId: 'rec-1' },
+    ]);
+    await act(async () => { render(<LianLiWirelessScreenTab onOpenScreenPanel={onOpen} />); });
+
+    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-wireless.openPanel' }));
+    expect(onOpen).toHaveBeenCalledWith('rec-1');
+  });
+
+  it('disables Open panel while the panel record is not published yet', async () => {
+    mockGetScreens.mockResolvedValue([
+      { serial: 'S1', position: 0, width: 400, height: 400, brightness: 80, rotation: 0, contentType: 'panel', panelDeviceId: null },
+    ]);
+    await act(async () => { render(<LianLiWirelessScreenTab onOpenScreenPanel={vi.fn()} />); });
+
+    expect(screen.getByRole('button', { name: 'devices.lianli-wireless.openPanel' })).toBeDisabled();
+    expect(screen.getByText('devices.lianli-wireless.panelPending')).toBeInTheDocument();
+  });
+
+  it('hides brightness and sleep when the family has neither', async () => {
+    await act(async () => {
+      render(<LianLiWirelessScreenTab supportsBrightness={false} supportsSleepWhenLocked={false} />);
+    });
+
+    expect(screen.queryByText('devices.lianli-wireless.brightness')).not.toBeInTheDocument();
+    expect(screen.queryByText('devices.lcd.sleepWhenLocked')).not.toBeInTheDocument();
+    expect(screen.getByText('devices.lianli-wireless.rotationLabel')).toBeInTheDocument();
+  });
 });
