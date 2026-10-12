@@ -24,7 +24,7 @@ export const BACKGROUND_MEDIA_MAX_MB = BACKGROUND_MEDIA_MAX_BYTES / (1024 * 1024
 export const isBackgroundMediaTooLarge = (file: { size: number }): boolean => file.size > BACKGROUND_MEDIA_MAX_BYTES;
 
 /** True when the service refused the stage for size (HTTP 413). */
-export const isStageTooLargeRefusal = (r: { msg: string; status?: number }): boolean => r.status === 413;
+export const isStageTooLargeRefusal = (r: object & { status?: number }): boolean => r.status === 413;
 
 export interface BackgroundMediaStageResult { stageId: string; alpha: boolean; mediaKind?: StageMediaKind; error: boolean; msg: string }
 

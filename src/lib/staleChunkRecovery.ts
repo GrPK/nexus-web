@@ -9,6 +9,9 @@ import { checkOnce, liveDeps, loadedEntry, type CheckResult } from './buildReloa
 // stamp cannot be stored.
 const STAMP_KEY = 'nexus_stale_chunk_reload_at';
 export const STALE_CHUNK_RELOAD_LOCK_MS = 60_000;
+// A stalled service or tunnel never settles the check's fetches; give up so the
+// caller reports the error instead of dropping it.
+export const STALE_CHUNK_CHECK_TIMEOUT_MS = 10_000;
 
 const STALE_CHUNK_RE = /Failed to fetch dynamically imported module|Unable to preload CSS|error loading dynamically imported module|Importing a module script failed/i;
 
@@ -33,7 +36,17 @@ export async function recoverFromStaleChunk(deps: RecoverDeps): Promise<boolean>
   const last = deps.readStamp();
   if (last > 0 && deps.now >= last && deps.now - last < STALE_CHUNK_RELOAD_LOCK_MS) return false;
   let result: CheckResult;
-  try { result = await deps.check(); } catch { return false; }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    result = await Promise.race([
+      deps.check(),
+      new Promise<CheckResult>((resolve) => { timer = setTimeout(() => resolve('noop'), STALE_CHUNK_CHECK_TIMEOUT_MS); }),
+    ]);
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
   if (result !== 'reload') return false;
   if (!deps.writeStamp(deps.now)) return false;
   deps.reload();
@@ -55,6 +68,13 @@ export function liveRecoverDeps(): RecoverDeps {
   };
 }
 
+// One recovery at a time: a burst of chunk errors (several lazy pages, the
+// dashboard prefetches) shares a single index.html fetch and asset sweep.
+let inFlight: Promise<boolean> | null = null;
+
 export function recoverFromStaleChunkNow(): Promise<boolean> {
-  return recoverFromStaleChunk(liveRecoverDeps());
+  if (!inFlight) {
+    inFlight = recoverFromStaleChunk(liveRecoverDeps()).finally(() => { inFlight = null; });
+  }
+  return inFlight;
 }

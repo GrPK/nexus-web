@@ -31,6 +31,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   resetErrorReportingForTests();
   vi.useRealTimers();
 });
@@ -244,12 +245,19 @@ describe('isForeignScriptError', () => {
       message: 'x', filename: 'http://localhost:3000/panel/phone', lineno: 1,
     }));
     await vi.advanceTimersByTimeAsync(5000);
-    vi.unstubAllEnvs();
     expect(postService).not.toHaveBeenCalled();
   });
 });
 
 describe('stale chunk errors', () => {
+  it('never consults the recovery for an ordinary error', async () => {
+    recoverNow.mockClear();
+    reportError(new Error('Cannot read properties of undefined'), 'window-error');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(recoverNow).not.toHaveBeenCalled();
+    expect(sent()).toHaveLength(1);
+  });
+
   const stale = () => new TypeError('Failed to fetch dynamically imported module: http://localhost:9400/assets/DevicesPage-Bc.js');
 
   it('are swallowed when the reload guard allowed a reload', async () => {

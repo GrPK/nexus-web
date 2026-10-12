@@ -1,7 +1,25 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const watcher = vi.hoisted(() => ({
+  reload: vi.fn(),
+  passedReload: null as null | (() => void),
+  checkOnce: vi.fn(),
+}));
+vi.mock('./buildReloadWatcher', () => ({
+  loadedEntry: () => '/assets/index-abc.js',
+  liveDeps: () => ({ loaded: '/assets/index-abc.js', reload: watcher.reload }),
+  checkOnce: (deps: { reload: () => void }) => {
+    watcher.passedReload = deps.reload;
+    return watcher.checkOnce();
+  },
+}));
+
 import {
   isStaleChunkMessage,
+  liveRecoverDeps,
   recoverFromStaleChunk,
+  recoverFromStaleChunkNow,
+  STALE_CHUNK_CHECK_TIMEOUT_MS,
   STALE_CHUNK_RELOAD_LOCK_MS,
   type RecoverDeps,
 } from './staleChunkRecovery';
@@ -66,5 +84,43 @@ describe('recoverFromStaleChunk', () => {
   it('reloads again once the window has passed', async () => {
     const deps = makeDeps({ stamp: 1_000_000 - STALE_CHUNK_RELOAD_LOCK_MS });
     expect(await recoverFromStaleChunk(deps)).toBe(true);
+  });
+});
+
+describe('recoverFromStaleChunk timeout', () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('gives up on a check that never settles', async () => {
+    vi.useFakeTimers();
+    const deps = makeDeps({ check: vi.fn(() => new Promise<never>(() => {})) });
+    const pending = recoverFromStaleChunk(deps);
+    await vi.advanceTimersByTimeAsync(STALE_CHUNK_CHECK_TIMEOUT_MS);
+    expect(await pending).toBe(false);
+    expect(deps.reload).not.toHaveBeenCalled();
+  });
+});
+
+describe('liveRecoverDeps', () => {
+  it('runs the watcher check with its own reload disabled', async () => {
+    watcher.reload.mockClear();
+    watcher.checkOnce.mockResolvedValue('reload');
+    expect(await liveRecoverDeps().check()).toBe('reload');
+    watcher.passedReload?.();
+    expect(watcher.reload).not.toHaveBeenCalled();
+  });
+});
+
+describe('recoverFromStaleChunkNow', () => {
+  it('shares one check across a burst of callers', async () => {
+    let settle: (v: string) => void = () => {};
+    watcher.checkOnce.mockReset();
+    watcher.checkOnce.mockReturnValue(new Promise((resolve) => { settle = resolve; }));
+    const calls = [recoverFromStaleChunkNow(), recoverFromStaleChunkNow(), recoverFromStaleChunkNow()];
+    expect(watcher.checkOnce).toHaveBeenCalledTimes(1);
+    settle('noop');
+    expect(await Promise.all(calls)).toEqual([false, false, false]);
+    watcher.checkOnce.mockResolvedValue('noop');
+    await recoverFromStaleChunkNow();
+    expect(watcher.checkOnce).toHaveBeenCalledTimes(2);
   });
 });
