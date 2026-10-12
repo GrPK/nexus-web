@@ -212,6 +212,15 @@ export interface LianLiWirelessScreen {
   tempUnit?: LianLiWirelessTempUnit;
   /** Absent/null = on. */
   sleepWhenLocked?: boolean | null;
+  /**
+   * Panel record id while `nexusPanel` is on and its record exists, usually a few seconds
+   * after switching; null or absent otherwise.
+   */
+  panelDeviceId?: string | null;
+  /** The screen is a Nexus panel; `contentType` is what it shows while this is off. */
+  nexusPanel?: boolean;
+  /** Uni Fan TL only: the screen's port and fan, e.g. "#1.2"; empty when unknown. */
+  label?: string;
 }
 
 export interface LianLiWirelessScreenContentExtra {
@@ -231,7 +240,7 @@ export async function getLianLiWirelessScreens(): Promise<LianLiWirelessScreen[]
 
 export async function setLianLiWirelessScreenSettings(
   serial: string,
-  settings: { brightness?: number; rotation?: number; sleepWhenLocked?: boolean },
+  settings: LianLiScreenSettingsPatch,
 ): Promise<boolean> {
   return isOk(await postService<OkResponse>('/devices/lianli-wireless/screen/settings', { serial, ...settings }));
 }
@@ -253,6 +262,26 @@ export async function setLianLiWirelessScreenContent(
     ...(mediaId ? { mediaId } : {}),
     ...(extra ?? {}),
   }));
+}
+
+export interface LianLiScreenSettingsPatch {
+  brightness?: number;
+  rotation?: number;
+  sleepWhenLocked?: boolean;
+  nexusPanel?: boolean;
+}
+
+/** The screen endpoints of one Lian Li fan LCD family; the Screens tab is written against this. */
+export interface LianLiScreenApi {
+  getScreens: () => Promise<LianLiWirelessScreen[] | null>;
+  setSettings: (serial: string, settings: LianLiScreenSettingsPatch) => Promise<boolean>;
+  setOrder: (serials: string[]) => Promise<boolean>;
+  setContent: (
+    serial: string,
+    contentType: LianLiWirelessScreenContentType,
+    mediaId?: string,
+    extra?: LianLiWirelessScreenContentExtra,
+  ) => Promise<boolean>;
 }
 
 export type LianLiWirelessMediaKind = 'image' | 'gif' | 'video';

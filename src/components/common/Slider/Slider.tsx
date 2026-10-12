@@ -66,13 +66,20 @@ export interface SliderProps {
   fillCap?: number;
   ariaLabel?: string;
   className?: string;
+  /** The controlled targets hold different values. No value is shown or filled; the value
+      slot reads `mixedLabel` and the thumb is ghosted. A drag sets one value for all, and an
+      `editable` slider keeps its field: empty, with `mixedLabel` as placeholder, and a typed
+      value sets all. */
+  mixed?: boolean;
+  /** Visible text and spoken value while `mixed`. */
+  mixedLabel?: string;
 }
 
 export function Slider({
   label = '', info, value, min, max, step = 1,
   orientation = 'inline', editable = false, zeroMarker = false, showRange = false,
   formatValue, onChange, onCommit, onPointerDown, onPointerCancel,
-  disabled, trackFill, marker, markerLabel, fillCap, ariaLabel, className, labelAction,
+  disabled, trackFill, marker, markerLabel, fillCap, ariaLabel, className, labelAction, mixed = false, mixedLabel,
 }: SliderProps) {
   const rangeId = useId();
   const latestInputValueRef = useRef(value);
@@ -101,8 +108,8 @@ export function Slider({
   // Never past the fill end, or the gradient stops would decrease and mispaint.
   const capPct = fillCap != null ? Math.min(clamp(((fillCap - min) / (max - min)) * 100), fillEndPct) : null;
   const trackStyle = {
-    '--slider-fill-start': `${fillStartPct}%`,
-    '--slider-fill-end': `${fillEndPct}%`,
+    '--slider-fill-start': mixed ? '0%' : `${fillStartPct}%`,
+    '--slider-fill-end': mixed ? '0%' : `${fillEndPct}%`,
     ...(capPct != null ? { '--slider-fill-cap': `${capPct}%` } : {}),
   } as CSSProperties;
   const markerPct = marker != null ? clamp(((marker - min) / (max - min)) * 100) : null;
@@ -153,11 +160,13 @@ export function Slider({
   };
 
   const fmt = (v: number) => (formatValue ? formatValue(v) : String(v));
+  const valueClass = mixed ? `${styles.value} ${styles.mixedValue}` : styles.value;
   const valueNode = editable ? (
     <EditableNumber value={value} min={min} max={max} step={step}
-      onCommit={handleEditCommit} format={formatValue} className={styles.value} disabled={disabled} />
+      onCommit={handleEditCommit} format={formatValue} className={valueClass} disabled={disabled}
+      mixed={mixed} mixedLabel={mixedLabel} />
   ) : (
-    <span className={styles.value}>{fmt(value)}</span>
+    <span className={valueClass}>{mixed ? mixedLabel : fmt(value)}</span>
   );
 
   // Inline layout only: reserve the value column at the widest formatted
@@ -170,9 +179,10 @@ export function Slider({
     <span className={styles.inlineValue} style={{ minWidth: `${reserveCh}ch` }}>
       {editable ? (
         <EditableNumber value={value} min={min} max={max} step={step}
-          onCommit={handleEditCommit} format={formatValue} ariaLabel={ariaLabel} className={styles.value} disabled={disabled} />
+          onCommit={handleEditCommit} format={formatValue} ariaLabel={ariaLabel} className={valueClass} disabled={disabled}
+          mixed={mixed} mixedLabel={mixedLabel} />
       ) : (
-        <span className={styles.value}>{fmt(value)}</span>
+        <span className={valueClass}>{mixed ? mixedLabel : fmt(value)}</span>
       )}
     </span>
   );
@@ -223,6 +233,8 @@ export function Slider({
       disabled={disabled}
       aria-label={ariaLabel}
       data-fill=""
+      data-mixed={mixed ? 'true' : undefined}
+      aria-valuetext={mixed ? mixedLabel : undefined}
       style={trackStyle}
       onChange={e => handleChange(Number(e.target.value), false)}
       onPointerDown={e => {

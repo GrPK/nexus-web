@@ -228,6 +228,28 @@ describe('buildPanelDevices streamed panels', () => {
     });
   });
 
+  it('brands the TL and SL screen families without claiming a device row', () => {
+    const screen = (id: string, family: string): PanelDeviceRecord => ({
+      ...krakenRecord(),
+      id,
+      displayName: `Screen ${id}`,
+      capabilities: { surface: 'lcd-round', family, touch: false, cssWidth: 400, cssHeight: 400, dpr: 1 },
+    });
+    const devices = buildPanelDevices({
+      curatedDevices: [],
+      phoneSessions: [],
+      records: [screen('rec-1', 'lianli-tl-lcd'), screen('rec-2', 'lianli-wireless-lcd')],
+      status: null,
+      simulatedPanels: [],
+      labels: LABELS,
+    });
+
+    expect(devices.map(d => [d.sourceId, d.iconSrc])).toEqual([
+      [undefined, '/assets/devices/lianli.svg'],
+      [undefined, '/assets/devices/lianli.svg'],
+    ]);
+  });
+
   it('leaves a cooler LCD unclaimed when no curated device matches its family', () => {
     const device = firstDevice({
       ...krakenRecord(),

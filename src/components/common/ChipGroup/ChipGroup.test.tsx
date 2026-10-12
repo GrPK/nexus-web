@@ -136,3 +136,26 @@ describe('ChipGroup multi-select', () => {
     expect(onToggleKey).not.toHaveBeenCalled();
   });
 });
+
+describe('ChipGroup partial', () => {
+  it('marks held options partial, leaves none active, and announces the state', () => {
+    const onChange = vi.fn();
+    render(
+      <ChipGroup options={OPTIONS} activeKey="" partialKeys={new Set(['a', 'c'])} partialLabel="Mixed" onChange={onChange} />,
+    );
+
+    const radios = screen.getAllByRole('radio');
+    expect(radios.filter(r => r.getAttribute('aria-checked') === 'true')).toHaveLength(0);
+    expect(screen.getByRole('radio', { name: 'Alpha (Mixed)' })).toHaveAttribute('data-partial', 'true');
+    expect(screen.getByRole('radio', { name: 'Charlie (Mixed)' })).toHaveAttribute('data-partial', 'true');
+    expect(screen.getByRole('radio', { name: 'Bravo' })).not.toHaveAttribute('data-partial');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Alpha (Mixed)' }));
+    expect(onChange).toHaveBeenCalledWith('a');
+  });
+
+  it('never marks the active chip partial', () => {
+    render(<ChipGroup options={OPTIONS} activeKey="a" partialKeys={new Set(['a'])} partialLabel="Mixed" onChange={() => {}} />);
+    expect(screen.getByRole('radio', { name: 'Alpha' })).toHaveAttribute('aria-checked', 'true');
+  });
+});

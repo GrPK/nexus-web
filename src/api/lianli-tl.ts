@@ -1,4 +1,11 @@
-import { fetchService, putService } from './service';
+import { fetchService, postService, putService } from './service';
+import type {
+  LianLiScreenApi,
+  LianLiScreenSettingsPatch,
+  LianLiWirelessScreen,
+  LianLiWirelessScreenContentExtra,
+  LianLiWirelessScreenContentType,
+} from './lianli-wireless';
 
 export interface LianLiTlFan {
   port: number;
@@ -47,3 +54,53 @@ export function getLianLiTlLighting(): Promise<LianLiTlLighting | null> {
 export function setLianLiTlLighting(patch: LianLiTlLightingPatch): Promise<unknown | null> {
   return putService('/devices/lianli-tl/lighting', patch);
 }
+
+interface OkResponse {
+  error?: boolean;
+  msg?: string;
+}
+
+function isOk(r: OkResponse | null): boolean {
+  return !!r && r.error !== true;
+}
+
+async function getLianLiTlScreens(): Promise<LianLiWirelessScreen[] | null> {
+  const r = await fetchService<{ screens: LianLiWirelessScreen[] }>('/devices/lianli-tl/screens');
+  return r?.screens ?? null;
+}
+
+// TL screens have no brightness or sleep-when-locked; only rotation and the panel switch are sent.
+async function setLianLiTlScreenSettings(serial: string, settings: LianLiScreenSettingsPatch): Promise<boolean> {
+  const { rotation, nexusPanel } = settings;
+  if (rotation === undefined && nexusPanel === undefined) return true;
+  return isOk(await postService<OkResponse>('/devices/lianli-tl/screen/settings', {
+    serial,
+    ...(rotation !== undefined ? { rotation } : {}),
+    ...(nexusPanel !== undefined ? { nexusPanel } : {}),
+  }));
+}
+
+async function setLianLiTlScreenOrder(serials: string[]): Promise<boolean> {
+  return isOk(await postService<OkResponse>('/devices/lianli-tl/screens/order', { serials }));
+}
+
+async function setLianLiTlScreenContent(
+  serial: string,
+  contentType: LianLiWirelessScreenContentType,
+  mediaId?: string,
+  extra?: LianLiWirelessScreenContentExtra,
+): Promise<boolean> {
+  return isOk(await postService<OkResponse>('/devices/lianli-tl/screen/content', {
+    serial,
+    contentType,
+    ...(mediaId ? { mediaId } : {}),
+    ...(extra ?? {}),
+  }));
+}
+
+export const lianLiTlScreenApi: LianLiScreenApi = {
+  getScreens: getLianLiTlScreens,
+  setSettings: setLianLiTlScreenSettings,
+  setOrder: setLianLiTlScreenOrder,
+  setContent: setLianLiTlScreenContent,
+};

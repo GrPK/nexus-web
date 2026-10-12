@@ -99,6 +99,8 @@ const STREAMED_FAMILY_ICONS: Partial<Record<string, string>> = {
   'asus-ryujin-lcd': '/assets/devices/asus.svg',
   'lianli-galahad2-lcd': '/assets/devices/lianli.svg',
   'lianli-hydroshift-lcd': '/assets/devices/lianli.svg',
+  'lianli-tl-lcd': '/assets/devices/lianli.svg',
+  'lianli-wireless-lcd': '/assets/devices/lianli.svg',
   'lianli-hydroshift2': '/assets/devices/lianli.svg',
   'lianli-hydroshift2-curve': '/assets/devices/lianli.svg',
   'corsair-link-lcd': '/assets/devices/corsair.svg',

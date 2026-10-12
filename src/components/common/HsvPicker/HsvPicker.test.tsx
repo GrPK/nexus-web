@@ -159,3 +159,20 @@ describe('HsvPicker', () => {
     expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('#FF0000');
   });
 });
+
+describe('HsvPicker mixed', () => {
+  it('hides the cursor and shows a Mixed hex field', () => {
+    render(<HsvPicker value="#ff0000" mixed mixedLabel="Mixed" onPreview={() => {}} onCommit={() => {}} />);
+    const hex = screen.getByRole('textbox') as HTMLInputElement;
+    expect(hex.value).toBe('');
+    expect(hex).toHaveAttribute('placeholder', 'Mixed');
+    expect(hex.getAttribute('aria-label')).toContain('Mixed');
+  });
+
+  it('commits a typed color as usual', () => {
+    const onCommit = vi.fn();
+    render(<HsvPicker value="#ff0000" mixed mixedLabel="Mixed" onPreview={() => {}} onCommit={onCommit} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '#00ff00' } });
+    expect(onCommit).toHaveBeenCalledWith('#00ff00');
+  });
+});

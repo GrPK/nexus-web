@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Fan, Lightbulb, Unplug } from 'lucide-react';
+import { CircleEqual, Fan, Lightbulb, Unplug } from 'lucide-react';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { Button } from '../../common/Button/Button';
@@ -10,15 +10,20 @@ import { HsvPicker } from '../../common/HsvPicker/HsvPicker';
 import {
   getLianLiTlLighting,
   getLianLiTlState,
+  lianLiTlScreenApi,
   setLianLiTlLighting,
   type LianLiTlLighting,
   type LianLiTlLightingPatch,
   type LianLiTlScope,
   type LianLiTlState,
 } from '../../../api/lianli-tl';
+import { LianLiWirelessScreenTab } from './LianLiWirelessScreenTab';
+import { streamedPanelId } from '../../../hooks/usePanelDevices';
+import { panelDeviceKey } from '../../../hooks/useUnifiedDevices';
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import { formatNumber, localizeNumbers } from '../../../lib/units';
+import type { DashboardSectionNavigate } from '../../../panel/engine/panelLayoutHelpers';
 import styles from './LianLiDevicePage.module.scss';
 import { useReportDeviceWaiting } from './deviceDetecting';
 
@@ -33,16 +38,17 @@ const DEFAULT_COLOR = '#FFFFFF';
 const SCOPES: LianLiTlScope[] = ['all', 'top', 'bottom'];
 
 interface LianLiTlDevicePageProps {
-  onSectionNavigate?: (section: string) => void;
+  onSectionNavigate?: DashboardSectionNavigate;
 }
 
 export function LianLiTlDevicePage({ onSectionNavigate }: LianLiTlDevicePageProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'lighting' | 'cooling'>('lighting');
+  const [activeTab, setActiveTab] = useState<'lighting' | 'cooling' | 'screens'>('lighting');
   const { numberFormat } = useUnitPrefs();
   const [connection, setConnection] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
   useReportDeviceWaiting(connection !== 'connected');
   const [tlState, setTlState] = useState<LianLiTlState | null>(null);
+  const [screenCount, setScreenCount] = useState(0);
   const [lighting, setLighting] = useState<LianLiTlLighting | null>(null);
   const aliveRef = useRef(true);
   const connectedRef = useRef(false);
@@ -55,6 +61,11 @@ export function LianLiTlDevicePage({ onSectionNavigate }: LianLiTlDevicePageProp
 
   const commitLighting = useCallback(async (patch: LianLiTlLightingPatch) => {
     await setLianLiTlLighting(patch).catch(() => null);
+  }, []);
+
+  const refreshScreenCount = useCallback(async () => {
+    const screens = await lianLiTlScreenApi.getScreens().catch(() => null);
+    if (aliveRef.current && screens !== null) setScreenCount(screens.length);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -72,13 +83,14 @@ export function LianLiTlDevicePage({ onSectionNavigate }: LianLiTlDevicePageProp
     connectedRef.current = true;
     setConnection('connected');
     setTlState(s);
+    void refreshScreenCount();
     // Only when we hold no look: a refetch racing an in-flight edit reverts the control.
     if (lightingRef.current !== null) return;
     const l = await getLianLiTlLighting().catch(() => null);
     if (!aliveRef.current || l === null) return;
     lightingRef.current = l;
     setLighting(l);
-  }, []);
+  }, [refreshScreenCount]);
 
   const refreshRpm = useCallback(async () => {
     if (!connectedRef.current) { void refresh(); return; }
@@ -93,7 +105,8 @@ export function LianLiTlDevicePage({ onSectionNavigate }: LianLiTlDevicePageProp
       return;
     }
     setTlState(s);
-  }, [refresh]);
+    void refreshScreenCount();
+  }, [refresh, refreshScreenCount]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -126,25 +139,35 @@ export function LianLiTlDevicePage({ onSectionNavigate }: LianLiTlDevicePageProp
   const lightsOff = lighting?.mode === 'off';
 
   const hasCooling = stateLoaded && tlState.fans.length > 0;
-  const tab = hasCooling ? activeTab : 'lighting';
-  const tabs = hasCooling
-    ? [
-        { key: 'lighting', label: t('lighting.title'), icon: <Lightbulb size={14} /> },
-        { key: 'cooling', label: t('cooling.title'), icon: <Fan size={14} /> },
-      ]
-    : undefined;
+  const hasScreens = screenCount > 0;
+  const tabs = [
+    { key: 'lighting', label: t('lighting.title'), icon: <Lightbulb size={14} /> },
+    ...(hasCooling ? [{ key: 'cooling', label: t('cooling.title'), icon: <Fan size={14} /> }] : []),
+    ...(hasScreens ? [{ key: 'screens', label: t('devices.lianli-wireless.tab.screen'), icon: <CircleEqual size={14} /> }] : []),
+  ];
+  // A tab that disappears (fans unplugged) falls back to Lighting.
+  const tab = tabs.some(x => x.key === activeTab) ? activeTab : 'lighting';
 
   return (
     <div className={styles.page}>
       <ViewHeader
         // eslint-disable-next-line i18next/no-literal-string -- brand + model name
         title="Lian Li Uni Fan TL"
-        tabs={tabs}
+        tabs={tabs.length > 1 ? tabs : undefined}
         activeTab={tab}
-        onTabChange={key => setActiveTab(key as 'lighting' | 'cooling')}
+        onTabChange={key => setActiveTab(key as 'lighting' | 'cooling' | 'screens')}
       />
       <div className={`${styles.pageBody} pageBody`}>
-        {tab === 'cooling' ? (
+        {tab === 'screens' ? (
+          <LianLiWirelessScreenTab
+            api={lianLiTlScreenApi}
+            supportsBrightness={false}
+            supportsSleepWhenLocked={false}
+            onOpenScreenPanel={onSectionNavigate
+              ? id => onSectionNavigate('device', { deviceKey: panelDeviceKey(streamedPanelId(id)) })
+              : undefined}
+          />
+        ) : tab === 'cooling' ? (
           <SettingsSection
             title={t('devices.lianli-tl.fansSection')}
             boxClassName={styles.sectionBox}

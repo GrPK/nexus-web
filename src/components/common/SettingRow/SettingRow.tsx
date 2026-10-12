@@ -155,6 +155,7 @@ export function SettingToggle({
   anchorId,
   ariaLabel,
   stackOnNarrow,
+  mixed,
 }: {
   label: string;
   description?: ReactNode;
@@ -166,6 +167,8 @@ export function SettingToggle({
   anchorId?: string;
   ariaLabel?: string;
   stackOnNarrow?: boolean;
+  /** The controlled targets disagree; see Toggle. */
+  mixed?: boolean;
 }) {
   return (
     <SettingRow
@@ -177,7 +180,7 @@ export function SettingToggle({
       anchorId={anchorId}
       stackOnNarrow={stackOnNarrow}
     >
-      <Toggle checked={checked} onChange={onChange} disabled={disabled} ariaLabel={ariaLabel ?? label} />
+      <Toggle checked={checked} onChange={onChange} disabled={disabled} ariaLabel={ariaLabel ?? label} mixed={mixed} />
     </SettingRow>
   );
 }
@@ -193,9 +196,12 @@ export function SettingSelect({
   icon,
   iconLeading,
   anchorId,
+  placeholder,
 }: {
   label?: string;
   value: string;
+  /** Shown while `value` matches no option, e.g. "Mixed" for a multi-target edit. */
+  placeholder?: string;
   options: SelectOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -215,7 +221,7 @@ export function SettingSelect({
       anchorId={anchorId}
       disabled={disabled}
     >
-      <Select value={value} onChange={onChange} options={options} ariaLabel={label} disabled={disabled} />
+      <Select value={value} onChange={onChange} options={options} ariaLabel={label} disabled={disabled} placeholder={placeholder} />
     </SettingRow>
   );
 }
@@ -241,6 +247,8 @@ export function SettingSlider({
   anchorId,
   ariaLabel,
   controlWidth,
+  mixed,
+  mixedLabel,
 }: {
   label?: string;
   description?: ReactNode;
@@ -264,6 +272,9 @@ export function SettingSlider({
   ariaLabel?: string;
   // Overrides the default control width (min(12rem, 45vw)); pass a CSS length.
   controlWidth?: string;
+  // The controlled targets hold different values; see Slider.
+  mixed?: boolean;
+  mixedLabel?: string;
 }) {
   // Built outside the JSX: the variant id is not UI text, and the i18n literal
   // rule scans JSX only.
@@ -291,6 +302,8 @@ export function SettingSlider({
           trackFill={trackFill}
           disabled={disabled}
           ariaLabel={ariaLabel ?? label}
+          mixed={mixed}
+          mixedLabel={mixedLabel}
         />
       </div>
     </SettingRow>

@@ -144,3 +144,8 @@
   color: var(--text-dim);
   opacity: 0.85;
 }
+
+// Keeps the warning and update glyphs visibly apart from the Nexus Control one.
+.controlOff {
+  margin-left: var(--space-sm);
+}

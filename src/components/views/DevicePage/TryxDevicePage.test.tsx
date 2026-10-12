@@ -78,7 +78,8 @@ vi.mock('../../../api/klipy', () => ({
   stageKlipy: (...args: any[]) => mockStageKlipy(...args),
 }));
 
-vi.mock('../../../api/mediaLibrary', () => ({
+vi.mock('../../../api/mediaLibrary', async importOriginal => ({
+  fetchStagedFile: (await importOriginal<typeof import('../../../api/mediaLibrary')>()).fetchStagedFile,
   cancelMediaStage: (...args: any[]) => mockCancelMediaStage(...args),
   mediaStageRawUrl: (id: string) => `http://svc/media/stage/${id}/raw`,
   mediaStagePreviewUrl: (id: string) => `http://svc/media/stage/${id}/preview`,

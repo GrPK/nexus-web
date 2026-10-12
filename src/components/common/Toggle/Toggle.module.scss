@@ -33,7 +33,7 @@
 
 .thumb {
   position: absolute;
-  // Inset leaves the knob centred once the surface border is accounted for.
+  // Inset leaves the knob centered once the surface border is accounted for.
   top: 2px;
   left: 2px;
   width: 16px;
@@ -44,6 +44,18 @@
   // (sitting over the accent track).
   background: var(--text);
   transition: transform var(--ease) ease, background var(--ease) ease;
+}
+
+/* Indeterminate: the shared mixed look (see global.scss --mixed-fill and
+   --mixed-knob): muted-accent track, ghosted gray knob centered. */
+.toggle[data-on='mixed'] {
+  background: var(--mixed-fill);
+}
+
+.toggle[data-on='mixed'] .thumb {
+  transform: translateX(9px);
+  background: var(--mixed-knob);
+  opacity: var(--mixed-knob-opacity);
 }
 
 .toggle[data-on='true'] .thumb {

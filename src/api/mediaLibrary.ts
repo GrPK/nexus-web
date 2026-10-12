@@ -102,3 +102,15 @@ export async function commitMedia(stageId: string, crop: string, name: string): 
 export async function cancelMediaStage(stageId: string): Promise<void> {
   await deleteService<{ error?: boolean }>(`/media/stage/${encodeURIComponent(stageId)}`);
 }
+
+/** Pulls a staged file back so it uploads through the same multipart path as a local pick. */
+export async function fetchStagedFile(rawUrl: string, name: string): Promise<File | null> {
+  try {
+    const res = await fetch(rawUrl);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new File([blob], name, { type: blob.type });
+  } catch {
+    return null;
+  }
+}

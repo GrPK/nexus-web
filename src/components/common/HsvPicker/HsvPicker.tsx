@@ -23,11 +23,15 @@ export interface HsvPickerProps {
   value: string;
   onPreview: (hex: string) => void;
   onCommit: (hex: string) => void;
+  /** The controlled targets hold different colors: a striped square, no cursors, and the
+   *  hex field reads `mixedLabel`. Picking a color sets it on all. */
+  mixed?: boolean;
+  mixedLabel?: string;
 }
 
 interface Hsv { h: number; s: number; v: number }
 
-export function HsvPicker({ value, onPreview, onCommit }: HsvPickerProps) {
+export function HsvPicker({ value, onPreview, onCommit, mixed = false, mixedLabel }: HsvPickerProps) {
   const { t } = useTranslation();
   const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(value));
   // The field reads from `hsv` unless the user is typing in it; a host that does
@@ -129,7 +133,7 @@ export function HsvPicker({ value, onPreview, onCommit }: HsvPickerProps) {
   };
 
   return (
-    <div className={styles.hsvPicker}>
+    <div className={styles.hsvPicker} data-mixed={mixed ? 'true' : undefined}>
       <div
         ref={svRef}
         className={styles.svSquare}
@@ -138,25 +142,28 @@ export function HsvPicker({ value, onPreview, onCommit }: HsvPickerProps) {
       >
         <div className={styles.svWhiteGradient} />
         <div className={styles.svBlackGradient} />
-        <div className={styles.svCursor} style={{ left: `${s}%`, top: `${100 - v}%` }} />
+        {mixed
+          ? <div className={styles.mixedStripes} aria-hidden="true" />
+          : <div className={styles.svCursor} style={{ left: `${s}%`, top: `${100 - v}%` }} />}
       </div>
       <div
         ref={hueRef}
         className={styles.hueSlider}
         onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); handleDrag(e, readHue); }}
       >
-        <div className={styles.hueCursor} style={{ left: `${(h / 360) * 100}%` }} />
+        {!mixed && <div className={styles.hueCursor} style={{ left: `${(h / 360) * 100}%` }} />}
       </div>
       <input
         type="text"
         className={styles.hexInput}
-        value={hexDraft ?? hex.toUpperCase()}
+        value={hexDraft ?? (mixed ? '' : hex.toUpperCase())}
+        placeholder={mixed ? mixedLabel : undefined}
         onChange={e => handleHexChange(e.target.value)}
         onFocus={() => setHexDraft(hex.toUpperCase())}
         onBlur={() => setHexDraft(null)}
         spellCheck={false}
         maxLength={7}
-        aria-label={t('common.hexColor')}
+        aria-label={mixed && mixedLabel ? `${t('common.hexColor')} (${mixedLabel})` : t('common.hexColor')}
       />
     </div>
   );

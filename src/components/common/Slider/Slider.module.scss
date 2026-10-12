@@ -92,6 +92,11 @@
   &:disabled { cursor: not-allowed; opacity: 0.5; }
 }
 
+.mixedValue {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
 .zeroTick {
   position: absolute;
   top: 50%;

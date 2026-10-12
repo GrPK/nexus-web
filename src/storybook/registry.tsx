@@ -2,7 +2,7 @@
 // file per preview to satisfy the fast-refresh rule would be dozens of tiny
 // files. Storybook entries reload (not HMR) on edit.
 import { useEffect, useRef, useState, type CSSProperties, type FC } from 'react';
-import { Monitor, Palette, Sparkles, X, Plus, Settings, Download, AlertTriangle, HardDrive, Heart, Pause, Pointer, Power, Cpu, Gauge, MemoryStick } from 'lucide-react';
+import { Monitor, Palette, Sparkles, X, Plus, Settings, Download, AlertTriangle, HardDrive, HardDriveDownload, Heart, Link2Off, Pause, Pointer, Power, Cpu, Gauge, MemoryStick } from 'lucide-react';
 import { ViewHeader } from '../components/common/ViewHeader/ViewHeader';
 import { Sparkline } from '../components/common/Sparkline/Sparkline';
 import { SensorCard } from '../components/common/SensorCard/SensorCard';
@@ -31,6 +31,8 @@ import { DeviceWarningIcon } from '../components/common/DeviceWarningIcon/Device
 import { WarningIcon } from '../components/common/WarningIcon/WarningIcon';
 import { DeviceGroupIcon } from '../components/common/DeviceGroupIcon/DeviceGroupIcon';
 import { NexusControlOffIcon } from '../components/common/NexusControlOffIcon/NexusControlOffIcon';
+import { DeviceUpdateIcon } from '../components/common/DeviceUpdateIcon/DeviceUpdateIcon';
+import { RowGlyph } from '../components/common/RowGlyph/RowGlyph';
 import { NexusControlCard } from '../components/common/NexusControlCard/NexusControlCard';
 import { FeatureDisabled } from '../components/common/FeatureDisabled/FeatureDisabled';
 import { PageHero } from '../components/common/PageHero/PageHero';
@@ -360,6 +362,11 @@ function PreviewDeviceWarningIcon() {
         <span>Unknown code</span>
         <DeviceWarningIcon code="some-future-code" />
       </div>
+      <div className={styles.previewHoverCard}>
+        <span>Chip (Devices list)</span>
+        <DeviceWarningIcon code="usb-disconnected" chip />
+        <DeviceWarningIcon code="some-future-code" chip />
+      </div>
     </div>
   );
 }
@@ -403,6 +410,36 @@ function PreviewDeviceGroupIcon() {
           <span>{label}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function PreviewRowGlyph() {
+  return (
+    <div className={styles.previewStack}>
+      <div className={styles.previewHoverCard}>
+        <span>Dim (default)</span>
+        <RowGlyph icon={<Link2Off size={14} aria-hidden />} label="Nexus Control is off" />
+      </div>
+      <div className={styles.previewHoverCard}>
+        <span>Accent</span>
+        <RowGlyph icon={<HardDriveDownload size={14} aria-hidden />} label="Update available" tone="accent" />
+      </div>
+    </div>
+  );
+}
+
+function PreviewDeviceUpdateIcon() {
+  return (
+    <div className={styles.previewStack}>
+      <div className={styles.previewHoverCard}>
+        <span>HYTE Q60</span>
+        <DeviceUpdateIcon />
+      </div>
+      <div className={styles.previewHoverCard}>
+        <span>Chip (Devices list)</span>
+        <DeviceUpdateIcon chip />
+      </div>
     </div>
   );
 }
@@ -1326,6 +1363,39 @@ function PreviewConflictAppCard() {
 function PreviewToggleOff() {
   const [on, setOn] = useState(false);
   return <Toggle checked={on} onChange={setOn} ariaLabel="Sample toggle" />;
+}
+
+function PreviewToggleMixed() {
+  const [on, setOn] = useState(false);
+  return <Toggle checked={on} mixed onChange={setOn} ariaLabel="Sample mixed toggle" />;
+}
+
+function PreviewChipGroupPartial() {
+  const [active, setActive] = useState('');
+  return <ChipGroup
+    ariaLabel="Sample partial chip group"
+    options={[
+      { key: 'quiet', label: 'Quiet' },
+      { key: 'balanced', label: 'Balanced' },
+      { key: 'turbo', label: 'Turbo' },
+    ]}
+    activeKey={active}
+    partialKeys={new Set(['quiet', 'turbo'])}
+    partialLabel="Mixed"
+    onChange={setActive}
+  />;
+}
+
+function PreviewSliderMixed() {
+  const [value, setValue] = useState(50);
+  return <Slider label="Brightness" value={value} min={0} max={100} trackFill mixed mixedLabel="Mixed" ariaLabel="Sample mixed slider" onChange={setValue} />;
+}
+
+function PreviewHsvPickerMixed() {
+  const [color, setColor] = useState(DEFAULT_ACCENT);
+  return <div className={styles.previewHsv}>
+    <HsvPicker value={color} mixed mixedLabel="Mixed" onPreview={setColor} onCommit={setColor} />
+  </div>;
 }
 
 function PreviewEmptyState() {
@@ -2504,6 +2574,26 @@ export const REGISTRY: StorybookEntry[] = [
     description: 'Same Toggle primitive in the unchecked state.', Preview: PreviewToggleOff,
   },
   {
+    name: 'Toggle (mixed)', category: 'inputs',
+    filePath: 'src/components/common/Toggle/Toggle.tsx',
+    description: 'Indeterminate Toggle for a multi-target edit whose targets disagree: muted-accent track, ghosted gray knob centered, a checkbox role with aria-checked="mixed". A click sets every target on.', Preview: PreviewToggleMixed,
+  },
+  {
+    name: 'ChipGroup (partial)', category: 'inputs',
+    filePath: 'src/components/common/ChipGroup/ChipGroup.tsx',
+    description: 'Single-select ChipGroup for a multi-target edit whose targets disagree. No chip is active; chips named in partialKeys get the muted-accent mixed fill (between idle and active) and a spoken partialLabel suffix. A click applies that option to every target.', Preview: PreviewChipGroupPartial,
+  },
+  {
+    name: 'Slider (mixed)', category: 'inputs',
+    filePath: 'src/components/common/Slider/Slider.tsx',
+    description: 'Slider for a multi-target edit whose targets disagree: muted-accent track, ghosted gray thumb, the value slot reads mixedLabel and aria-valuetext announces it. A drag sets one value on every target.', Preview: PreviewSliderMixed,
+  },
+  {
+    name: 'HsvPicker (mixed)', category: 'editable',
+    filePath: 'src/components/common/HsvPicker/HsvPicker.tsx',
+    description: 'HsvPicker for a multi-target edit whose targets hold different colors: striped square, no cursors, hex field reads mixedLabel. Picking a color sets it on every target.', Preview: PreviewHsvPickerMixed,
+  },
+  {
     name: 'ChipGroup', category: 'inputs',
     filePath: 'src/components/common/ChipGroup/ChipGroup.tsx',
     description: 'Single-select chip row reusing the cooling curve/mode .chip-action buttons (.chip-active fills the selected one with the accent, labelled in the contrast-paired --accent-text). Single-select renders a radiogroup: one tab stop on the checked chip, arrows move focus without selecting, Space/Enter commits - callers write firmware and device settings on change, so selection must not follow focus. multiSelect keeps aria-pressed toggle buttons. fullWidth stretches the row so it reads as a segmented control; wrap reflows onto further lines for a data-length chip list (the lighting preset app bindings) instead of widening its container.', Preview: PreviewChipGroup,
@@ -2604,7 +2694,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'DeviceWarningIcon', category: 'status',
     filePath: 'src/components/common/DeviceWarningIcon/DeviceWarningIcon.tsx',
-    description: 'Right-aligned warning glyph for a device row/card, shown whenever the service reports a device-level issue via DeviceListItem.warning. Code-driven - the warning code maps to a localized tooltip, so any handler can flag a problem without new UI per device family. Used by the sidebar DEVICES section and the Devices-page card grid.',
+    description: 'Device warning shown whenever the service reports a device-level issue via DeviceListItem.warning: a right-aligned glyph on sidebar rows, or with `chip` a short labelled Badge on the Devices-page cards whose tooltip carries the full message. Code-driven - the code maps to localized strings, so any handler can flag a problem without new UI per device family.',
     Preview: PreviewDeviceWarningIcon,
     notes: 'Renders the raw code as a fallback tooltip if it has no mapped i18n key, so an unmapped code fails visibly instead of silently.',
   },
@@ -2621,6 +2711,18 @@ export const REGISTRY: StorybookEntry[] = [
     description: 'The glyph before a hardware group\'s name on the lighting and cooling rails: curated device art for a known device-id prefix (NP50, SmartHub, Lian Li, Corsair, keeb, Q-series, Kraken, CNVS), a generic board / GPU / RAM / fan / bulb mark for an OpenRGB or smart-light iconType, else the generic device. User-made groups carry no icon.',
     Preview: PreviewDeviceGroupIcon,
     notes: 'Curated art is the same /assets/devices/*.svg the Devices page shows, drawn as a currentColor mask so it matches the lucide glyphs beside it. Sized to the compact CollapsibleSection chevron.',
+  },
+  {
+    name: 'DeviceUpdateIcon', category: 'status',
+    filePath: 'src/components/common/DeviceUpdateIcon/DeviceUpdateIcon.tsx',
+    description: 'Firmware or panel-app update indicator (useFirmwareUpdates): a RowGlyph on sidebar rows, or with `chip` a labelled Badge on the Devices-page cards.',
+    Preview: PreviewDeviceUpdateIcon,
+  },
+  {
+    name: 'RowGlyph', category: 'status',
+    filePath: 'src/components/common/RowGlyph/RowGlyph.tsx',
+    description: 'Right-aligned status glyph with a hover label on a device or nav row; bare (non-focusable) so it can sit inside a row button. tone="dim" (default) or "accent". NexusControlOffIcon and DeviceUpdateIcon wrap it.',
+    Preview: PreviewRowGlyph,
   },
   {
     name: 'NexusControlOffIcon', category: 'status',
@@ -3142,7 +3244,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'Badge', category: 'status',
     filePath: 'src/components/common/Badge/Badge.tsx',
-    description: 'Status pill with tone-tinted color and color-mixed background. Accepts an optional icon ReactNode. Host-renderer bridge for the SDK Badge element.',
+    description: 'Status pill with tone-tinted color and color-mixed background. Accepts an optional icon ReactNode, and an optional `tooltip` ({ title?, body }) that also becomes its accessible name. Host-renderer bridge for the SDK Badge element.',
     Preview: PreviewBadge,
   },
   {
