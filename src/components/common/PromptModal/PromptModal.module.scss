@@ -10,6 +10,12 @@
   box-shadow: var(--shadow-xl);
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .title {
   margin: 0;
   font-size: var(--type-heading);

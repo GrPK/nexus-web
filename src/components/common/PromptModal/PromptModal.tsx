@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from '../../../lib/i18n';
 import { Overlay } from '../Overlay/Overlay';
 import { Button } from '../Button/Button';
@@ -28,6 +28,8 @@ interface PromptModalProps {
    */
   onConfirm: (value: string) => void | string | null | undefined | Promise<void | string | null | undefined>;
   onCancel: () => void;
+  /** Rendered after the title from the current input, e.g. a chip saying what submitting will do. */
+  titleAdornment?: (value: string) => ReactNode;
 }
 
 /**
@@ -49,6 +51,7 @@ export function PromptModal({
   validate,
   onConfirm,
   onCancel,
+  titleAdornment,
 }: PromptModalProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -127,7 +130,14 @@ export function PromptModal({
   return (
     <Overlay open={open} onClose={onCancel} variant="alert" onEnter={submit}
       className={styles.modal} ariaLabel={title}>
-      <h2 id={inputId + '-title'} className={styles.title}>{title}</h2>
+      {titleAdornment ? (
+        <div className={styles.titleRow}>
+          <h2 id={inputId + '-title'} className={styles.title}>{title}</h2>
+          {titleAdornment(value)}
+        </div>
+      ) : (
+        <h2 id={inputId + '-title'} className={styles.title}>{title}</h2>
+      )}
       <div className={styles.fieldWrap}>
         {message && <label htmlFor={inputId} className={styles.message}>{message}</label>}
         <input

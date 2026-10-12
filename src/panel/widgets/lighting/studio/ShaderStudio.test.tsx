@@ -22,12 +22,13 @@ vi.mock('./StudioPreview', () => ({ StudioPreview: () => null }));
 vi.mock('./CustomEffectsGrid', () => ({ CustomEffectsGrid: () => null }));
 
 const put = vi.fn();
+let savedEntries: unknown[] = [];
 vi.mock('../../../../api/customEffects', () => ({
   STUDIO_UID_RE: /^[a-z0-9]{1,24}$/,
   customEffectKey: (id: string) => `custom:${id}`,
   customEffectId: (key: string) => key.slice('custom:'.length),
-  getCustomEffects: () => [],
-  useCustomEffects: () => [],
+  getCustomEffects: () => savedEntries,
+  useCustomEffects: () => savedEntries,
   refreshCustomEffects: async () => {},
   putCustomEffect: (...a: unknown[]) => put(...a),
   deleteCustomEffect: async () => true,
@@ -115,8 +116,8 @@ describe('ShaderStudio live on devices', () => {
 
   it('is off on open, sends the effect when switched on, and ends the session on switch-off and close', async () => {
     const { unmount } = render(<ShaderStudio open effectId={null} onClose={() => {}} />);
-    const toggle = screen.getByRole('switch');
-    expect(toggle).not.toBeChecked();
+    const toggle = screen.getByRole('button', { name: 'lighting.studio.live' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
     expect(startLive).not.toHaveBeenCalled();
 
     fireEvent.click(toggle);
@@ -134,7 +135,7 @@ describe('ShaderStudio live on devices', () => {
   it('renews and stops the session under the id the service gave it', async () => {
     startLive.mockResolvedValue({ active: true, leaseMs: 15000, sessionId: 's1' });
     render(<ShaderStudio open effectId={null} onClose={() => {}} />);
-    const toggle = screen.getByRole('switch');
+    const toggle = screen.getByRole('button', { name: 'lighting.studio.live' });
     fireEvent.click(toggle);
     await waitFor(() => expect(startLive).toHaveBeenCalledTimes(1));
     expect(startLive.mock.calls[0][2]).toBeNull();
@@ -148,10 +149,10 @@ describe('ShaderStudio live on devices', () => {
   it('switches live off on a refusal and keeps the message until switched on again', async () => {
     startLive.mockResolvedValueOnce(null);
     render(<ShaderStudio open effectId={null} onClose={() => {}} />);
-    const toggle = screen.getByRole('switch');
+    const toggle = screen.getByRole('button', { name: 'lighting.studio.live' });
     fireEvent.click(toggle);
     expect(await screen.findByText('lighting.studio.liveFailed')).toBeInTheDocument();
-    expect(toggle).not.toBeChecked();
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
     // Refused before any session was ours: no id-less stop that could end another tab's session.
     await act(async () => {});
     expect(stopLive).not.toHaveBeenCalled();
@@ -163,7 +164,7 @@ describe('ShaderStudio live on devices', () => {
     let finish!: (v: unknown) => void;
     startLive.mockReturnValueOnce(new Promise(r => { finish = r; }));
     render(<ShaderStudio open effectId={null} onClose={() => {}} />);
-    const toggle = screen.getByRole('switch');
+    const toggle = screen.getByRole('button', { name: 'lighting.studio.live' });
     fireEvent.click(toggle);
     await waitFor(() => expect(startLive).toHaveBeenCalledTimes(1));
     fireEvent.click(toggle);
@@ -172,5 +173,24 @@ describe('ShaderStudio live on devices', () => {
     await act(async () => { finish({ active: true, leaseMs: 15000, sessionId: 's9' }); });
     await waitFor(() => expect(stopLive).toHaveBeenCalledWith('s9'));
     expect(screen.queryByText('lighting.studio.liveFailed')).not.toBeInTheDocument();
+  });
+});
+
+describe('ShaderStudio save prompt', () => {
+  it('says whether the name saves a new effect or replaces one, and saves to match', async () => {
+    const recipe = { v: 1, blocks: [{ uid: 'a1', type: 'rings', params: {} }, { uid: 'b2', type: 'palette', params: {} }], speed: 50, hue: 0, saturation: 1, contrast: 1 };
+    savedEntries = [{ id: 'fx1', name: 'Glow', recipe: JSON.stringify(recipe), updatedAt: 1, audio: false }];
+    put.mockReset().mockResolvedValue({ entry: {} });
+    render(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
+    const field = screen.getByPlaceholderText('lighting.studio.namePlaceholder');
+    fireEvent.change(field, { target: { value: 'Fresh' } });
+    expect(screen.getByText('lighting.studio.saveNew')).toBeInTheDocument();
+    fireEvent.change(field, { target: { value: ' glow ' } });
+    expect(screen.getByText('lighting.studio.saveReplaces')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'lighting.studio.save' }).at(-1)!);
+    await waitFor(() => expect(put).toHaveBeenCalled());
+    expect(put.mock.calls[0][0]).toBe('fx1');
+    savedEntries = [];
   });
 });

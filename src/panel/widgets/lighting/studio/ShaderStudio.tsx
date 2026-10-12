@@ -8,7 +8,6 @@ import { Slider } from '../../../../components/common/Slider/Slider';
 import { Badge } from '../../../../components/common/Badge/Badge';
 import { SearchInput } from '../../../../components/common/SearchInput/SearchInput';
 import { SettingsSection } from '../../../../components/common/SettingsSection/SettingsSection';
-import { Toggle } from '../../../../components/common/Toggle/Toggle';
 import { InlineError } from '../../../../components/common/InlineError/InlineError';
 import { PromptModal } from '../../../../components/common/PromptModal/PromptModal';
 import { ConfirmModal } from '../../../../components/common/ConfirmModal/ConfirmModal';
@@ -34,6 +33,7 @@ import { StudioBlockCard } from './StudioBlockCard';
 import { StudioPreview } from './StudioPreview';
 import { CustomEffectsGrid } from './CustomEffectsGrid';
 import pageStyles from '../LightingPage.module.scss';
+import mapStyles from '../page/LedMapEditor.module.scss';
 import styles from './ShaderStudio.module.scss';
 
 const STACKED = 'stacked' as const;
@@ -298,11 +298,18 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
     openVariations(v);
   };
 
-  // Keeping the name overwrites the open effect; a new name saves a copy. A
-  // returned string is shown in the prompt (the service refused the shader).
+  // A name already in My effects (ignoring case) saves over that effect, the
+  // open one first; any other name saves a new one.
+  const replacedBy = (name: string) => {
+    const key = name.trim().toLocaleLowerCase();
+    if (currentId && currentName?.toLocaleLowerCase() === key) return currentId;
+    return saved.find(s => s.name.toLocaleLowerCase() === key)?.id ?? null;
+  };
+
+  // A returned string is shown in the prompt (the service refused the shader).
   const saveCurrent = async (name: string): Promise<string | undefined> => {
     const trimmed = name.trim();
-    const id = currentId && currentName === trimmed ? currentId : newEffectId();
+    const id = replacedBy(trimmed) ?? newEffectId();
     const snapshot = recipe;
     const previous = getSavedEffects().find(e => e.id === id)?.recipe;
     const error = await saveEffect(id, trimmed, snapshot);
@@ -366,10 +373,6 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
   const varying = !!variations;
   const toolbar = (
     <div className={styles.toolbar}>
-      <label className={styles.liveToggle}>
-        <span>{t('lighting.studio.live')}</span>
-        <Toggle checked={live} onChange={setLive} disabled={varying} />
-      </label>
       <Select
         disabled={varying}
         ariaLabel={t('lighting.studio.starters')}
@@ -390,14 +393,28 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
       ) : (
         <Button size="sm" icon={<Dna size={14} />} onClick={() => openVariations(recipe)}>{t('lighting.studio.variations')}</Button>
       )}
-      <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} aria-label={t('lighting.studio.undo')} disabled={varying || !past.length} onClick={undo} />
-      <Button size="sm" tone="ghost" icon={<Redo2 size={14} />} aria-label={t('lighting.studio.redo')} disabled={varying || !future.length} onClick={redo} />
+      {/* The LED map editor's mode buttons: a pressed state rather than a switch. */}
+      <button
+        type="button"
+        className={`${mapStyles.modeBtn} ${live ? mapStyles.modeBtnActive : ''}`}
+        aria-pressed={live}
+        disabled={varying}
+        onClick={() => setLive(v => !v)}
+      >
+        {t('lighting.studio.live')}
+      </button>
+      <div className={styles.toolbarEnd}>
+        <div className={styles.historyBtns}>
+          <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} aria-label={t('lighting.studio.undo')} disabled={varying || !past.length} onClick={undo} />
+          <Button size="sm" tone="ghost" icon={<Redo2 size={14} />} aria-label={t('lighting.studio.redo')} disabled={varying || !future.length} onClick={redo} />
+        </div>
       <Button size="sm" icon={<Upload size={14} />} disabled={varying} onClick={() => { publishIdRef.current = null; setPublishing(true); }}>
         {t('lighting.studio.publish.button')}
       </Button>
       <Button size="sm" tone="accent" icon={<Save size={14} />} disabled={varying} onClick={() => setSaving(true)}>
         {t('lighting.studio.save')}
       </Button>
+      </div>
     </div>
   );
 
@@ -471,8 +488,8 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
       fullscreen
       title={t('lighting.studio.title')}
       icon={<SprayCan size={18} />}
-      headerRight={toolbar}
     >
+      {toolbar}
       <div className={styles.layout}>
         <div className={styles.viewPane}>
           {variations ? (
@@ -514,6 +531,7 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
           )}
         </div>
         <div className={`${styles.stackPane} ${varying ? styles.locked : ''}`} inert={varying || undefined}>
+          <SettingsSection title={t('lighting.studio.stage.global')} boxClassName={styles.stageBox}>
           <Card compact className={styles.blockCard}>
             <div className={styles.blockParams}>
               <Slider orientation={STACKED} editable trackFill zeroMarker label={t('lighting.controls.speed')}
@@ -530,6 +548,7 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
                 onChange={(v, commit) => apply({ ...recipe, contrast: v / 100 }, !!commit)} onCommit={commitCurrent} />
             </div>
           </Card>
+          </SettingsSection>
           {STUDIO_STAGES.map(renderStage)}
         </div>
       </div>
@@ -550,6 +569,9 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
         maxLength={40}
         confirmLabel={t('lighting.studio.save')}
         validate={v => (v.trim() ? null : t('lighting.studio.nameRequired'))}
+        titleAdornment={v => (v.trim() && replacedBy(v)
+          ? <Badge label={t('lighting.studio.saveReplaces')} color="var(--warn)" compact />
+          : <Badge label={t('lighting.studio.saveNew')} color="var(--accent)" compact />)}
         onConfirm={saveCurrent}
         onCancel={() => setSaving(false)}
       />

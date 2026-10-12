@@ -1,20 +1,27 @@
 @use '../../../../styles/text' as *;
 
+// The strip under the modal header: creation controls on the left, history and
+// save/publish pushed to the right.
 .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+}
+
+.toolbarEnd {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  margin-right: var(--space-sm);
+  margin-left: auto;
 }
 
-.liveToggle {
-  display: inline-flex;
+.historyBtns {
+  display: flex;
   align-items: center;
   gap: var(--space-xs);
-  margin-right: var(--space-xs);
-  font-size: var(--type-small);
-  color: var(--text-dim);
-  white-space: nowrap;
+  margin-right: var(--space-md);
 }
 
 .liveError {
@@ -26,7 +33,7 @@
 
 .layout {
   display: flex;
-  height: 100%;
+  flex: 1;
   min-height: 0;
   gap: var(--space-md);
   padding: 0 var(--space-md) var(--space-md);
