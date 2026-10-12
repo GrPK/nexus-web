@@ -197,6 +197,9 @@ const renderPage = (platform = '') => render(
   </UiSettingsProvider>,
 );
 
+// The rail stub shows device a's pin once the pins have loaded.
+const pinsLoaded = () => waitFor(() => expect(screen.getByTestId('rail').dataset.pin).not.toBe(''));
+
 const device = (id: string, name: string) => ({ id, name, ledsOn: true, ledCount: 10, canvasX: 0, canvasY: 0, canvasW: 1, canvasH: 1, canvasRotation: 0 });
 const withDevices = (...ids: string[]) => vi.mocked(fetchLightingDevices).mockImplementation(
   () => Promise.resolve({ isInit: true, devices: ids.map(id => device(id, `Fan ${id.toUpperCase()}`)) }) as never,
@@ -304,18 +307,22 @@ describe('LightingPage pins', () => {
   });
 
   describe('what a pick with nothing selected reaches', () => {
-    it('says how many pinned devices it skips', async () => {
+    it('says how many devices a pick changes', async () => {
       withDevices('a', 'b');
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
-      expect(await screen.findByText('lighting.pane.allExceptPinned.one')).toBeTruthy();
+      await pinsLoaded();
+      expect(screen.getByText('lighting.pane.appliesDevices.one')).toBeTruthy();
+      fireEvent.click(screen.getByText('select-ab'));
+      expect(screen.getByText('lighting.pane.appliesSelected.other')).toBeTruthy();
     });
 
     it('previews its reach on a hover of the scope chip', async () => {
       withDevices('a', 'b', 'c');
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
-      const chip = (await screen.findByText('lighting.pane.allExceptPinned.one')).closest(`.${styles.scopeChip}`)!;
+      await pinsLoaded();
+      const chip = screen.getByText('lighting.pane.appliesDevices.other').closest(`.${styles.scopeChip}`)!;
       const targets = () => screen.getByTestId('rail').dataset.targets;
       fireEvent.pointerEnter(chip, { pointerType: 'mouse' });
       expect(targets()).toBe('b,c');
@@ -330,7 +337,7 @@ describe('LightingPage pins', () => {
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
       const field = await screen.findByTestId('picker-field');
-      await screen.findByText('lighting.pane.allExceptPinned.one');
+      await pinsLoaded();
       const targets = () => screen.getByTestId('rail').dataset.targets;
       fireEvent.pointerOver(screen.getByTestId('picker-hex'), { pointerType: 'mouse' });
       expect(targets()).toBe('b,c');
@@ -338,10 +345,11 @@ describe('LightingPage pins', () => {
       expect(targets()).toBe('none');
     });
 
-    it('says all pinned when every device wears a pin', async () => {
+    it('asks for a selection when every device wears a pin', async () => {
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
-      expect(await screen.findByText('lighting.pane.allPinned')).toBeTruthy();
+      await pinsLoaded();
+      expect(screen.getByText('lighting.pane.selectToChange')).toBeTruthy();
     });
 
     it('marks every device dotted with nothing selected and a selection solid on what each wears, flagging the pinned', async () => {
@@ -430,7 +438,7 @@ describe('LightingPage pins', () => {
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
       await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
-      await screen.findByText('lighting.pane.allExceptPinned.one');
+      await pinsLoaded();
       const pulse = () => screen.getByTestId('rail').dataset.pulse;
       fireEvent.click(tab('animate'));
       expect(pulse()).toBe('#0');
@@ -445,7 +453,7 @@ describe('LightingPage pins', () => {
       withDevices('a', 'b', 'c');
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
       renderPage();
-      await screen.findByText('lighting.pane.allExceptPinned.one');
+      await pinsLoaded();
       const pulse = () => screen.getByTestId('rail').dataset.pulse;
       fireEvent.click(screen.getByTestId('grid-effect'));
       expect(pulse()).toBe('b,c#1');
@@ -471,7 +479,7 @@ describe('LightingPage pins', () => {
       syncState.rawSync = 'fire';
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' }, b: { kind: 'mirror' } }));
       renderPage();
-      await screen.findByText('lighting.pane.allExceptPinned.other');
+      await pinsLoaded();
       fireEvent.click(screen.getByText('select-a'));
       await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('screen'));
       fireEvent.click(await screen.findByText('selection-pick'));

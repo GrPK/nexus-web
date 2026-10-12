@@ -282,7 +282,7 @@ describe('LightingPage selection in a drive-everything mode', () => {
     </UiSettingsProvider>,
   );
 
-  it('starts with no selection, saying "All devices" and drawing every device with no frame', async () => {
+  it('starts with no selection, saying how many devices a pick changes and drawing every device with no frame', async () => {
     const { findByLabelText, findByText } = renderPage();
 
     // Nothing was seeded: select none has nothing to clear, select all has work to do.
@@ -293,7 +293,7 @@ describe('LightingPage selection in a drive-everything mode', () => {
     expect(canvasHidesFrames.current).toBe(true);
     expect(selectAll).not.toBeDisabled();
     expect(selectNone).toBeDisabled();
-    expect(await findByText('lighting.pane.allDevices')).toBeTruthy();
+    expect(await findByText('lighting.pane.appliesDevices.other')).toBeTruthy();
   });
 
   it('does not restore a stored selection, and clears the keys of the old model', async () => {

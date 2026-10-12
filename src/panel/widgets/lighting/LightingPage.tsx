@@ -2067,9 +2067,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   };
 
   const shaderMode = viewMode === 'animate' || viewMode === 'static';
-  // The preview stands for the selection; with nothing selected it is every
-  // unpinned device, and the chip says how many pins a pick skips.
-  const pinnedShown = visibleDevices.filter(d => d.id in pins).length;
   // The cards a hovered press or pick reaches, outlined. Off and Game Sync have no picks.
   const pickTargetIds = useMemo(() => {
     if (scopeHovered || pickHovered) {
@@ -2080,11 +2077,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     return pressReach(visibleDevices, pins, selectedDeviceIds, hoveredTab === 'gamesync');
   }, [scopeHovered, pickHovered, viewMode, hoveredTab, activeTabKey, scoped.kind, pins, selectedDeviceIds, visibleDevices]);
   const pinnedNames = useMemo(() => visibleDevices.filter(d => d.id in pins).map(canvasLabelName), [visibleDevices, pins]);
+  // How many cards the next pick changes; with none, the way to reach any is a selection.
+  const reachCount = pressReach(visibleDevices, pins, selectedDeviceIds).size;
   const previewBadgeLabel = selectedDeviceIds.size > 0
-    ? t(pluralKey('lighting.pane.selectedCount', language, selectedDeviceIds.size), { count: selectedDeviceIds.size })
-    : pinnedShown === 0 ? t('lighting.pane.allDevices')
-      : pinnedShown === visibleDevices.length ? t('lighting.pane.allPinned')
-        : t(pluralKey('lighting.pane.allExceptPinned', language, pinnedShown), { count: pinnedShown });
+    ? t(pluralKey('lighting.pane.appliesSelected', language, reachCount), { count: reachCount })
+    : reachCount > 0 ? t(pluralKey('lighting.pane.appliesDevices', language, reachCount), { count: reachCount })
+      : t('lighting.pane.selectToChange');
   // The hover span stays mounted as the tooltip comes and goes, so its pointerleave always fires.
   const scopeBadge = (
     <Badge
@@ -2414,7 +2412,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         </div>
         <div className={`${styles.paneHeader} ${styles.headerCenter}`}>
           <span className={styles.paneTitle}>{t('lighting.pane.effects')}</span>
-          {scopeChip}
+          {visibleDevices.length > 0 && scopeChip}
           {SCENE_3D && showCanvas && (
             <ChipGroup
               className={styles.sceneViewSwitch}
