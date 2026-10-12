@@ -2488,6 +2488,7 @@
   "lighting.controls.prismwave": "棱镜波",
   "lighting.controls.pulse": "脉冲",
   "lighting.controls.radar": "雷达",
+  "lighting.controls.radialfill": "径向填充",
   "lighting.controls.rainbow": "笔触",
   "lighting.controls.reactivity": "响应度",
   "lighting.controls.reset": "重置",

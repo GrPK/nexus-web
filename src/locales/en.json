@@ -2488,6 +2488,7 @@
   "lighting.controls.prismwave": "Prism Wave",
   "lighting.controls.pulse": "Pulse",
   "lighting.controls.radar": "Radar",
+  "lighting.controls.radialfill": "Radial fill",
   "lighting.controls.rainbow": "Brushstrokes",
   "lighting.controls.reactivity": "Reactivity",
   "lighting.controls.reset": "Reset",

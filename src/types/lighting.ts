@@ -42,11 +42,11 @@ export type EffectCategory =
   | 'geometric'
   | 'pattern';
 
-// Section order for the effect listing: simple fills first, then organic, then
-// the rest, with the audio-reactive set last.
+// Section order for the effect listing: simple fills first, then organic and
+// pattern, then the rest, with the audio-reactive set last.
 export const EFFECT_CATEGORIES: EffectCategory[] = [
   'simple', 'gradient', 'twotone', 'spectrum',
-  'organic', 'cosmic', 'geometric', 'pattern', 'audio',
+  'organic', 'pattern', 'cosmic', 'geometric', 'audio',
 ];
 
 // The "simple" family: one cheap solid-fill shader (simple.frag) reused for
@@ -139,7 +139,7 @@ export const EFFECT_CATEGORY: Record<string, EffectCategory> = {
   prismwave: 'pattern', ribbonflow: 'pattern', meshgradient: 'pattern',
   tide: 'pattern', ridgeline: 'pattern', chevron: 'pattern', terrace: 'pattern',
   sharplines: 'pattern', synthwave: 'pattern', retropetals: 'pattern',
-  breathing: 'pattern',
+  breathing: 'pattern', radialfill: 'pattern',
 };
 
 export const BASE_DEFAULTS: Omit<EffectState, 'params'> = {
@@ -282,6 +282,11 @@ export const EFFECTS: EffectDef[] = [
   { key: 'breathing',    labelKey: 'lighting.controls.breathing',
      colors: [{ id: 'a', labelKey: 'lighting.controls.color1', range: true }, { id: 'b', labelKey: 'lighting.controls.color2', range: true }], params: [
       { name: 'u_sharpness', label: 'Sharpness', labelKey: 'lighting.controls.param.sharpness' },
+  ]},
+  // Fills outward from the center, the two colors taking turns, for fans and rings.
+  { key: 'radialfill',   labelKey: 'lighting.controls.radialfill',
+     colors: [{ id: 'a', labelKey: 'lighting.controls.color1', range: true }, { id: 'b', labelKey: 'lighting.controls.color2', range: true }], params: [
+      { name: 'u_softness', label: 'Softness', labelKey: 'lighting.controls.param.softness' },
   ]},
   { key: 'spiral',       labelKey: 'lighting.controls.spiral',       params: [
       { name: 'u_arms',      label: 'Arms', labelKey: 'lighting.controls.param.arms' },
