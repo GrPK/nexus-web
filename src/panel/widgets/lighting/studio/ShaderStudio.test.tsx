@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ShaderStudio } from './ShaderStudio';
 import type { MarketLink } from './studioLibrary';
 
@@ -19,11 +19,15 @@ vi.mock('../../../../api/lighting', () => ({
 
 vi.mock('../../../../hooks/useAudioState', () => ({ useAudioState: () => ({ current: null }) }));
 vi.mock('./StudioPreview', () => ({ StudioPreview: () => null }));
-vi.mock('./CustomEffectsGrid', () => ({ CustomEffectsGrid: () => null }));
+vi.mock('./CustomEffectsGrid', () => ({
+  CustomEffectsGrid: ({ onCreate }: { onCreate: () => void }) => <button type="button" onClick={onCreate}>create-tile</button>,
+}));
 
 const put = vi.fn();
 let savedEntries: unknown[] = [];
+let entriesLoaded = true;
 vi.mock('../../../../api/customEffects', () => ({
+  customEffectsLoaded: () => entriesLoaded,
   STUDIO_UID_RE: /^[a-z0-9]{1,24}$/,
   customEffectKey: (id: string) => `custom:${id}`,
   customEffectId: (key: string) => key.slice('custom:'.length),
@@ -198,6 +202,75 @@ describe('ShaderStudio live on devices', () => {
     await act(async () => { finish({ active: true, leaseMs: 15000, sessionId: 's9' }); });
     await waitFor(() => expect(stopLive).toHaveBeenCalledWith('s9'));
     expect(screen.queryByText('lighting.studio.liveFailed')).not.toBeInTheDocument();
+  });
+});
+
+describe('ShaderStudio opening', () => {
+  afterEach(() => {
+    savedEntries = [];
+    entriesLoaded = true;
+  });
+  const recipe = (speed: number) => JSON.stringify({ v: 1, blocks: [{ uid: 'a1', type: 'rings', params: {} }, { uid: 'b2', type: 'palette', params: {} }], speed, hue: 0, saturation: 1, contrast: 1 });
+
+  it('opens the most recently created effect, not a new one, when none is named', () => {
+    // fx + base36 ms: 'fxzz' is newer than 'fx10' whatever their update order.
+    savedEntries = [
+      { id: 'fxzz', name: 'Newest', recipe: recipe(10), updatedAt: 1, audio: false },
+      { id: 'fx10', name: 'Older', recipe: recipe(20), updatedAt: 9, audio: false },
+    ];
+    render(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
+    expect(screen.getByPlaceholderText('lighting.studio.namePlaceholder')).toHaveValue('Newest');
+    savedEntries = [];
+  });
+
+  it('prefers the newest of your own effects over a newer Marketplace download', () => {
+    savedEntries = [
+      { id: 'fx10', name: 'Mine', recipe: recipe(10), updatedAt: 1, audio: false },
+      { id: 'fxzz', name: 'Theirs', recipe: recipe(20), updatedAt: 2, audio: false, marketId: 'L1', marketAuthor: 'bob', downloaded: true },
+    ];
+    render(<ShaderStudio open effectId={null} username="me" onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
+    expect(screen.getByPlaceholderText('lighting.studio.namePlaceholder')).toHaveValue('Mine');
+    savedEntries = [];
+  });
+
+  it('starts a new effect, not another one, when the named effect is gone', () => {
+    savedEntries = [{ id: 'fx10', name: 'Mine', recipe: recipe(10), updatedAt: 1, audio: false }];
+    render(<ShaderStudio open effectId="fxgone" onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
+    expect(screen.getByPlaceholderText('lighting.studio.namePlaceholder')).toHaveValue('');
+    savedEntries = [];
+  });
+
+  it('keeps a new effect the user created before the list arrived', () => {
+    entriesLoaded = false;
+    const { rerender } = render(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'create-tile' }));
+    savedEntries = [{ id: 'fx10', name: 'Mine', recipe: recipe(10), updatedAt: 1, audio: false }];
+    entriesLoaded = true;
+    rerender(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
+    expect(screen.getByPlaceholderText('lighting.studio.namePlaceholder')).toHaveValue('');
+  });
+
+  it('makes the default pick once the list arrives when opened before it loaded', () => {
+    savedEntries = [];
+    entriesLoaded = false;
+    const { rerender } = render(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    savedEntries = [{ id: 'fx10', name: 'Mine', recipe: recipe(10), updatedAt: 1, audio: false }];
+    entriesLoaded = true;
+    rerender(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
+    expect(screen.getByPlaceholderText('lighting.studio.namePlaceholder')).toHaveValue('Mine');
+    savedEntries = [];
+  });
+
+  it('starts a new effect when there is none', () => {
+    savedEntries = [];
+    render(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
+    expect(screen.getByPlaceholderText('lighting.studio.namePlaceholder')).toHaveValue('');
   });
 });
 

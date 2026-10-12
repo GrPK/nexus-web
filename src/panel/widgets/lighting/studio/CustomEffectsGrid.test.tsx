@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { CustomEffectsGrid } from './CustomEffectsGrid';
+import { CustomEffectsGrid, SavedEffectSections } from './CustomEffectsGrid';
 import { makeBlock } from './studioCompiler';
 
 vi.mock('../../../../lib/i18n', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -8,6 +8,8 @@ vi.mock('../../../../hooks/useEffectThumbnail', () => ({ useEffectThumbnail: () 
 const still = vi.fn((recipe: { speed: number }) => `data:still-${recipe.speed}`);
 vi.mock('./recipePreview', () => ({ renderRecipeStill: (r: { speed: number }) => still(r) }));
 vi.mock('./studioLibrary', () => ({
+  isDownloaded: (s: { downloaded?: boolean | null; marketId?: string; marketAuthor?: string }, username?: string | null) =>
+    s.downloaded ?? (!!s.marketId && s.marketAuthor?.toLowerCase() !== username?.toLowerCase()),
   migrateLegacyEffects: async () => {},
   deleteEffect: async () => {},
   useSavedEffects: () => [
@@ -47,7 +49,7 @@ describe('CustomEffectsGrid', () => {
     screen.getByRole('button', { name }).closest('[data-pick]')?.parentElement?.parentElement?.textContent ?? '';
 
   it('lists own effects under Custom and other accounts\' downloads under Marketplace', () => {
-    render(<CustomEffectsGrid effect={null} query="" username="me" onSelect={() => {}} onCreate={() => {}} />);
+    render(<SavedEffectSections effect={null} query="" username="me" onSelect={() => {}} />);
     const text = document.body.textContent ?? '';
     expect(text.indexOf('lighting.category.custom')).toBeLessThan(text.indexOf('lighting.category.marketplace'));
     expect(sectionOf('Delta')).toContain('lighting.category.custom');
@@ -57,11 +59,18 @@ describe('CustomEffectsGrid', () => {
 
   it('files by the recorded downloaded flag over the author, signed in or not', () => {
     for (const username of ['me', null]) {
-      const { unmount } = render(<CustomEffectsGrid effect={null} query="" username={username} onSelect={() => {}} onCreate={() => {}} />);
+      const { unmount } = render(<SavedEffectSections effect={null} query="" username={username} onSelect={() => {}} />);
       expect(sectionOf('Epsilon')).toContain('lighting.category.marketplace');
       expect(sectionOf('Zeta')).toContain('lighting.category.custom');
       unmount();
     }
+  });
+
+  it('shows the Studio every effect in one grid with no section headers', () => {
+    render(<CustomEffectsGrid effect={null} query="" username="me" onSelect={() => {}} onCreate={() => {}} />);
+    expect(screen.queryByText('lighting.category.custom')).not.toBeInTheDocument();
+    expect(screen.queryByText('lighting.category.marketplace')).not.toBeInTheDocument();
+    for (const name of ['Alpha', 'Gamma', 'Epsilon']) expect(screen.getByRole('button', { name })).toBeInTheDocument();
   });
 
   it('shows a new draft at once and re-renders its tile as the recipe changes', async () => {

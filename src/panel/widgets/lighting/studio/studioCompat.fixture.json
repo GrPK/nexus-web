@@ -1,0 +1,4752 @@
+{
+  "bare:bands": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "bands",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "ef57b739db1096f603a541bce4bd23f3698aa75d5b0c78124350a7bb658e6390"
+  },
+  "bare:bend": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "bend",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "b1c897e338a2dd0f0149b169290ed6d7408b3658c8ab830f6f312428d3c5932e"
+  },
+  "bare:cells": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "cells",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "c87ac587b59e4316d74025d5a7fde94eb00abb64987cb196335ef43b08fadf4e"
+  },
+  "bare:checker": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "checker",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "92fe7f56edbd57fcfa910d21d67deb404db712a1a84c18ffc41dcd271f61f1e3"
+  },
+  "bare:clouds": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "clouds",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "1534df6062cad56f94cc7484285729650607f796c952254af2c3d53189e4df68"
+  },
+  "bare:colors": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "colors",
+          "params": {}
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "9f68c97b39ce28facaea4963bba4568e69368b1d7715a6c33c07598dfd208277"
+  },
+  "bare:contour": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "contour",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "ec43b51a6258c2b6e2ee8188be3d483a6bf8eb0dee1049c1cd68fe60c161b9b7"
+  },
+  "bare:dots": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "dots",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "ef12cb9c58b412e60bc311b0824e6c2ee72092ca4a87f04c77a1d2c4e37df26b"
+  },
+  "bare:glow": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "glow",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "22e31223b108fe3a457077d216849bfe92c033ad10fc0282a5e2c937754e6d85"
+  },
+  "bare:gradient": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "gradient",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "6266a82b4d118a2b3d1e18a7f94c6388a4951371b1c8b7c2b6bf1852923efa1a"
+  },
+  "bare:grain": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "grain",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "74092b976829941e119518b7bd8fcee0bd87032c2a943deacdbb6470876c4de8"
+  },
+  "bare:invert": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "invert",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "992fdfe9d512782aaeda11a4d73f4f54910c1a634b50adc560cbc993bb382b17"
+  },
+  "bare:kaleidoscope": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "kaleidoscope",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "ff4632badf4d16a358b23bab084583d988d5f24bddd40e09a411e967795d1f20"
+  },
+  "bare:lines": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "lines",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "258486a06f2366ac90df12a73a2cd6df0abf4d9c7c6a91d44151cffd959f9bce"
+  },
+  "bare:mirror": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "mirror",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "a64524054861758026ccfd3b4652162d15905b8824481f0b2aafaa45f17e8231"
+  },
+  "bare:palette": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {}
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "e6091d7ae11dc0cb618968e8b3e99f6719c2e82a07260ce7aedfda81ce36fd0d"
+  },
+  "bare:pixelate": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "pixelate",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "dc8ee1c322e82b165643d1651b626074bb9346756d9e90e7e9e5aa6cd3d66049"
+  },
+  "bare:plasma": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "e6091d7ae11dc0cb618968e8b3e99f6719c2e82a07260ce7aedfda81ce36fd0d"
+  },
+  "bare:pulse": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "pulse",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "7d01538edf430ee005e40162ec552828ed814f6619d4d44c3ec9095ff04249a2"
+  },
+  "bare:rings": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "ad6dd377660a835df7fccdd99f333545f82b8af2ecc98fba8837292350be4dcf"
+  },
+  "bare:ripple": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "ripple",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "563c36110b63f5de01cde1298c736dbbbde13935a8dc6239c8c637b93a8ff5b3"
+  },
+  "bare:scanlines": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "scanlines",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "ec2ac088692f0a2684f42c0b87bdd65476d648131f205f11871a92922e60e24c"
+  },
+  "bare:shape": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "shape",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "05c3c4cc38d37ec175ea3350ee8fe71e479907e52b58deab949e79d4a7d6cdb6"
+  },
+  "bare:sharpen": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "sharpen",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "e632cc067679e8876af5c3fad1d54bd45c753f3cf8f8151d9501e6e7effd4e99"
+  },
+  "bare:solid": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "solid",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "8bf5a1d7c99306b1504e23086b2a2a6042838a4f78dad9732ecc88f859625ab7"
+  },
+  "bare:sparkle": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "sparkle",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "4335c592ce965b0866ba0c00366357ffe58a9be61e0c21e23a67f39b47b3d61a"
+  },
+  "bare:spin": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "spin",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "1ecc97c484d13c4bda2f3d065bcc6333716360627eb1950981a33de1fc7c00fb"
+  },
+  "bare:spiral": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "spiral",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "8a5184a0a7546baf9b1d49111e332248f1c51b6efbc5af2ad1fbe47941d83332"
+  },
+  "bare:stripes": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "stripes",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "e1bd0b12683f9311d45e4029ca3e0fdc7077008764e05344a16995d1f7f802c6"
+  },
+  "bare:sweep": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "sweep",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "56f8eacd6ce660fc0268ff649e396ae1db0031bfc7c3a442ad459004f3798c88"
+  },
+  "bare:swirl": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "swirl",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "5b5ca79bc4c422a51047a794baefcc6cd819c668e7735ccfda15702c69a227f2"
+  },
+  "bare:threshold": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "threshold",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "8448f2436ac2dfffb1e819faff9b0a5573e68ac5ec436ae819f0b493deeab3d9"
+  },
+  "bare:tile": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "tile",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "29956e91eee991ff3e2b3fde4a90b73c8a7565f1f10dd596f2b873dd04b179a3"
+  },
+  "bare:tunnel": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "tunnel",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "04c765e4905a7428ba9da4587e875cb0519c99c47b2150b1dea2871156f51623"
+  },
+  "bare:vignette": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "vignette",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "e08067c459fada43fd208a79f85b9de78979a9323d9f5849b58e3bc43a7c6d74"
+  },
+  "bare:warp": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "warp",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "2b57fa7ccc74c3a5a74e353b20dd385de2765ab939123fba49ace1bbdaf1b9a9"
+  },
+  "bare:wipe": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "wipe",
+          "params": {}
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "e537f3af9fbb0224da9a85dc3f829efd15f4e3d18068570552137e6b9c1802cd"
+  },
+  "bare:zoom": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "zoom",
+          "params": {}
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "25de6fd6ec71ed0dc72da1f44c1bdb0f96c67f59bd4871a4cb07840cac88a8b9"
+  },
+  "blend:cells": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "cells",
+          "params": {
+            "scale": 5.1000000000000005,
+            "speed": 0.74,
+            "style": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "3d615720bcc46837230eec31678d00008f38e5b92ec58e3c83072b36aa037bff"
+  },
+  "blend:checker": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "checker",
+          "params": {
+            "count": 8,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "ec0e4f8a93a34043dd293c5f0f2771080123e1f87e18f626ee891c2895d9909b"
+  },
+  "blend:clouds": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "clouds",
+          "params": {
+            "scale": 3.15,
+            "speed": 0.74,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "986f52a83c2ac4c86b82f07cc3b464bcef27de4df6d3a6d6743001b0d9621b17"
+  },
+  "blend:dots": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "dots",
+          "params": {
+            "count": 12.4,
+            "size": 0.22,
+            "speed": 1.48,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "a7da9827d939ade0645ac37e721aa34339658b214e183f0b9c9ec521e667ee23"
+  },
+  "blend:gradient": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "gradient",
+          "params": {
+            "angle": 133,
+            "spread": 1.17,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "de15fa8d447d16dfac0a9e851c61d723429cdff16a672cbe8bc90da80cc1dba0"
+  },
+  "blend:lines": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "lines",
+          "params": {
+            "count": 8,
+            "wobble": 0.37,
+            "glow": 23.5,
+            "speed": -0.78,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "5f158c6502fd01ee6015f6ba74fa2bbb12132a3714ba954c99dd6dd79d866ebe"
+  },
+  "blend:plasma": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "25ea92871fec7a1c952b119f13db2ea4e83d2674e33571eabb85bfe2784b5f4f"
+  },
+  "blend:rings": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "rings",
+          "params": {
+            "count": 15.4,
+            "speed": -1.04,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "6a04cdcea0ddc579da654668b0d16886494404c158fc6cb89850619c937991e8"
+  },
+  "blend:shape": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "shape",
+          "params": {
+            "sides": 6,
+            "size": 0.62,
+            "glow": 23.5,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "900d124276cb5120f20177764ac855cce0c35bfb8731812de993da7d60be10fa"
+  },
+  "blend:solid": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "solid",
+          "params": {
+            "level": 0.37,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "73a71a5b552dd4c321682e1923f3e0f31de9af000938185f28ef0272ff42ea07"
+  },
+  "blend:sparkle": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "sparkle",
+          "params": {
+            "density": 17.3,
+            "amount": 0.37,
+            "speed": 1.48,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "2f3cc62a9b7a55a86d1568fc77d78b17db70251ee4c1994a147df41ba4fddb18"
+  },
+  "blend:spiral": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "spiral",
+          "params": {
+            "arms": 5,
+            "twist": 7.4,
+            "speed": -1.04,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "54dcdf604136931b646cdf88b94a176ec001b6c356292fe4a6a24b87ef7df602"
+  },
+  "blend:stripes": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "stripes",
+          "params": {
+            "count": 15.4,
+            "angle": 67,
+            "speed": -1.04,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "055c94116e8526d20e027914ef3b7ed37663f209575158feb9844062933f6346"
+  },
+  "blend:sweep": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "sweep",
+          "params": {
+            "count": 4,
+            "speed": -1.04,
+            "tail": 5.1000000000000005,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "e050d2435561950db59fe2c9d07f77efc3a71b6e43d29062acabdc2f59c1510b"
+  },
+  "blend:wipe": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "wipe",
+          "params": {
+            "shape": 2,
+            "angle": 133,
+            "speed": -1.04,
+            "softness": 0.186,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "0bbe937b659350849fac27459f6a20762175971f782fbb58d339813ceda5ab22"
+  },
+  "block:bands": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "bands",
+          "params": {
+            "steps": 7
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "1db0c4f9213e6abb6f5733d0180b3e4854989cd7cbbb5dca210400c53dcd455f"
+  },
+  "block:bend": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "bend",
+          "params": {
+            "amount": 0.37,
+            "frequency": 4.800000000000001,
+            "speed": -0.78
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "5ffd3b8cba7e70628bf10d1d81dc985e8e1fef5d570abfcd7fb9cfa7893d719f"
+  },
+  "block:cells": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "cells",
+          "params": {
+            "scale": 5.1000000000000005,
+            "speed": 0.74,
+            "style": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "035a8ed7120ffd1daf3e0ada3528ad42ee7bf1d90384188da4f6dbe5971f41f7"
+  },
+  "block:checker": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "checker",
+          "params": {
+            "count": 8,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "4ed04cc1c4b3be5e2f77ca88d777d40379c65d02a76481a8eaabe7f7ca44ba01"
+  },
+  "block:clouds": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "clouds",
+          "params": {
+            "scale": 3.15,
+            "speed": 0.74,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "d5e8a5133141c81ae30c2c5980b414c29cf00348bd4f2a3fa6b036b5509d1a9f"
+  },
+  "block:colors": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "colors",
+          "params": {
+            "spread": 1.11,
+            "cycle": -0.52,
+            "shade": 0.37
+          },
+          "colors": {
+            "c1": [
+              0.2,
+              0.6,
+              0.9
+            ],
+            "c2": [
+              0.2,
+              0.6,
+              0.9
+            ],
+            "c3": [
+              0.2,
+              0.6,
+              0.9
+            ]
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "a2a567746f28507808ac72fae69956793dd4fa7e33dacfea5f3e9729b3801eaa"
+  },
+  "block:contour": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "contour",
+          "params": {
+            "count": 12.4,
+            "glow": 32.1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "36e57f811efcc700af2a30f5eb7192ea357214a90b9d5e9e7be5fc6202a9ffeb"
+  },
+  "block:dots": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "dots",
+          "params": {
+            "count": 12.4,
+            "size": 0.22,
+            "speed": 1.48,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "81d913f3595b0f989bb978a0850e7e336739fa94ce076812ebfa26711bdb5bb4"
+  },
+  "block:glow": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "glow",
+          "params": {
+            "amount": 0.74
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "0580bd81060849564ed7890f01e3e53f844d6f2269b8e03220c1fcb1e0dab966"
+  },
+  "block:gradient": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "gradient",
+          "params": {
+            "angle": 133,
+            "spread": 1.17,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "212017410f0bc6ac4660f680a87f466c9872554a3a9894ef9995b9b153ab8ee6"
+  },
+  "block:grain": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "grain",
+          "params": {
+            "amount": 0.11
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "518a995fd82651fd63beb4cc4a6b1767b8856fa78e0b1fe97359dba424e6c388"
+  },
+  "block:invert": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "invert",
+          "params": {
+            "amount": 0.37
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "3013f7ec2da2fb47afe7c4a4ee7282d57596289ba7b06eab6237c5ab168f9ff3"
+  },
+  "block:kaleidoscope": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "kaleidoscope",
+          "params": {
+            "sides": 7,
+            "spin": -0.26
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "448a900ce16efdbf29d9ae4975b92ee2a182fc40a352ce78a6a8947c89775bc7"
+  },
+  "block:lines": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "lines",
+          "params": {
+            "count": 8,
+            "wobble": 0.37,
+            "glow": 23.5,
+            "speed": -0.78,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "8b144bf3d23f84e027e3bb637029b173f1de1efdbd7e71141f51caffc67c469d"
+  },
+  "block:mirror": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "mirror",
+          "params": {
+            "axis": 2
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "bfd9d7329765fc9fc4d5a56b9f649e65e7ab31ac4d13b0208a4038e6efc8c3ab"
+  },
+  "block:palette": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "1a24021c8c58a1a6fb59faf61b830e4615a5f7fe696fb9e17e07cdbca59ffe62"
+  },
+  "block:pixelate": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "pixelate",
+          "params": {
+            "size": 26
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "9df85332c86ca243e4a60eca904f28eff4a04533e731415fb96984d1ef3c1251"
+  },
+  "block:plasma": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "1a24021c8c58a1a6fb59faf61b830e4615a5f7fe696fb9e17e07cdbca59ffe62"
+  },
+  "block:pulse": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "pulse",
+          "params": {
+            "rate": 1.48,
+            "depth": 0.37
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "00a95c58a1ed30c7055b2964bd64d18b22f5caadbe01abb6f6b5683441f3c952"
+  },
+  "block:rings": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 15.4,
+            "speed": -1.04,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "8b4a58c673c1e6c42e234a2621a8b1506f9fee887caaab93ade07c45dfe2b547"
+  },
+  "block:ripple": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "ripple",
+          "params": {
+            "amount": 0.15,
+            "frequency": 15.4,
+            "speed": -1.04
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "ad6e75c4b1bc51e4a36c1c16fc04abeaf32fc5b585c4544139540c76eafefa07"
+  },
+  "block:scanlines": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "scanlines",
+          "params": {
+            "count": 124,
+            "amount": 0.37
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "f82f984c28fea1388eb3e58959562dc189aec0274c3324d4331556baef30afd7"
+  },
+  "block:shape": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "shape",
+          "params": {
+            "sides": 6,
+            "size": 0.62,
+            "glow": 23.5,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "d4ec62acb5bd8dcc9a0fa023248ac7749b75235acb2af39ddcae448dbcda7f7b"
+  },
+  "block:sharpen": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "sharpen",
+          "params": {
+            "power": 2.35
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "9266ee31adc383b530cca8d7666f083eb3c16e56ae0f8ab35e9170a5593fe121"
+  },
+  "block:solid": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "solid",
+          "params": {
+            "level": 0.37,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "704afa7a6e210f6a8f6b10a4fb387713534768be858718d96eb14dc206d54f5a"
+  },
+  "block:sparkle": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "sparkle",
+          "params": {
+            "density": 17.3,
+            "amount": 0.37,
+            "speed": 1.48,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "552251d1fbb5ac8e8a6b3436f16ddb39ad522751d719634dd2e8c6cdda350992"
+  },
+  "block:spin": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "spin",
+          "params": {
+            "angle": 133,
+            "speed": -0.52
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "582e9d0b8073781d550c6c99e560535515fd9e0ac439787fa7d90fec9c47b7d2"
+  },
+  "block:spiral": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "spiral",
+          "params": {
+            "arms": 5,
+            "twist": 7.4,
+            "speed": -1.04,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "a6f41b0566f2547b70baa0307492f7ade2cf587c55332b20902c530f73adad4f"
+  },
+  "block:stripes": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "stripes",
+          "params": {
+            "count": 15.4,
+            "angle": 67,
+            "speed": -1.04,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "857fc07ba884e96505094273173a6598106885071271b08245a823e89081fb75"
+  },
+  "block:sweep": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "sweep",
+          "params": {
+            "count": 4,
+            "speed": -1.04,
+            "tail": 5.1000000000000005,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "52f419b5c2779e02fbf1828b9670e6e401c8b1400dadcb45aae1041f925a3b5b"
+  },
+  "block:swirl": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "swirl",
+          "params": {
+            "amount": -2.1,
+            "size": 1.24
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "605cdb0608a38cb90e773b7eb50425c79ffa5b7e7b80f25dc64f34ddb007ab1e"
+  },
+  "block:threshold": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "threshold",
+          "params": {
+            "level": 0.37,
+            "softness": 0.19
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "ac377c3630951052740337320ae4981d6757b04a6692161a6f072a6c789e7ab5"
+  },
+  "block:tile": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "tile",
+          "params": {
+            "count": 4.3
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "09ee69eb91c4c83ce991e3bcdb5a2ecfaec6118d6d0c359f602f548126bfc2b6"
+  },
+  "block:tunnel": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "tunnel",
+          "params": {
+            "depth": 0.8,
+            "speed": -0.78,
+            "twist": -0.78
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "ee98f93f732cf7ffcb2994843be8693bd5f2e0c053e8f18ce26ffe067efd1d64"
+  },
+  "block:vignette": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "vignette",
+          "params": {
+            "amount": 0.55
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "8abe99924d22ae642569708245a64bb5f61bb3dd8b495e9e60304235280a069f"
+  },
+  "block:warp": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "warp",
+          "params": {
+            "amount": 0.55,
+            "scale": 2.04,
+            "speed": 0.74
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "cef7adc76a89fa482de48893c5b2336d60bc1847a5592be9cbe4baa235a5b7f3"
+  },
+  "block:wipe": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "wipe",
+          "params": {
+            "shape": 2,
+            "angle": 133,
+            "speed": -1.04,
+            "softness": 0.186,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "a9da7c21030cc8b05acaf62fcd0714a8bc8bb2f36c0598d6eb1a4d040b3e3b0b"
+  },
+  "block:zoom": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "plasma",
+          "params": {
+            "scale": 2.41,
+            "speed": 1.11,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "zoom",
+          "params": {
+            "scale": 1.6400000000000001,
+            "drift": 0.37,
+            "speed": 0.74
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 8,
+            "spread": 1.11,
+            "offset": 0.37,
+            "cycle": -0.52,
+            "shade": 0.37
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "9a85a980cfddd0fca3947829bd91c298068ba14f9eef9ff03754a510668712d6"
+  },
+  "mod:bass": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "count": {
+              "source": "bass",
+              "amount": 0.4
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "f45f63b7882ea77bdb45d6616b510e292d7a8e14de7a0815f373029c9bb341ee"
+  },
+  "mod:beat": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "count": {
+              "source": "beat",
+              "amount": 0.4
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "fc4809b78049211e224462750066b6a7fbb7f5a0b0b24a085d200c7ba7977a6d"
+  },
+  "mod:high": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "count": {
+              "source": "high",
+              "amount": 0.4
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "29d3ce4d1e09435f202f814d62e8aa0be0bbb4d5b563001efb1af58396cc190c"
+  },
+  "mod:level": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "count": {
+              "source": "level",
+              "amount": 0.4
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "8088097a81c085381e2a6640f02101e2fb7dd4c6b8f1d7856a8dcae53e21fec5"
+  },
+  "mod:mid": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "count": {
+              "source": "mid",
+              "amount": 0.4
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "da69654a429bb6aaeb0ccc37297605b653c65971488fd513351fefb186e7f6ad"
+  },
+  "starter:aurora": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "zoom",
+          "params": {
+            "scale": 0.8,
+            "drift": 0,
+            "speed": 0.3
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "bend",
+          "params": {
+            "amount": 0.4,
+            "frequency": 1.5,
+            "speed": 0.5
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "lines",
+          "params": {
+            "count": 3,
+            "wobble": 0.8,
+            "glow": 6,
+            "speed": 0.7,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "clouds",
+          "params": {
+            "scale": 1.2,
+            "speed": 0.2,
+            "blend": 0,
+            "mix": 0.4
+          }
+        },
+        {
+          "uid": "k4",
+          "type": "palette",
+          "params": {
+            "palette": 5,
+            "spread": 0.7,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.9
+          }
+        },
+        {
+          "uid": "k5",
+          "type": "glow",
+          "params": {
+            "amount": 1
+          }
+        },
+        {
+          "uid": "k6",
+          "type": "vignette",
+          "params": {
+            "amount": 0.4
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k2",
+          "key": "wobble"
+        },
+        {
+          "uid": "k1",
+          "key": "speed"
+        }
+      ]
+    },
+    "sha256": "72dad2de4c9614da0e015621259668e11f93171b14efa7235abbb9ee378af38b"
+  },
+  "starter:breathing": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "solid",
+          "params": {
+            "level": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "colors",
+          "params": {
+            "spread": 0,
+            "cycle": 0,
+            "shade": 0
+          },
+          "colors": {
+            "c1": [
+              0,
+              0.9,
+              1
+            ],
+            "c2": [
+              0,
+              0.9,
+              1
+            ],
+            "c3": [
+              0,
+              0.9,
+              1
+            ]
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "pulse",
+          "params": {
+            "rate": 0.6,
+            "depth": 0.9
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k2",
+          "key": "rate"
+        },
+        {
+          "uid": "k2",
+          "key": "depth"
+        }
+      ]
+    },
+    "sha256": "7f37de2e80ceca43e581a2dc132ea40e86268a0d321c306bd042718a5b8c1b82"
+  },
+  "starter:clockWipe": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "wipe",
+          "params": {
+            "shape": 2,
+            "angle": 0,
+            "speed": 1,
+            "softness": 0.02,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "colors",
+          "params": {
+            "spread": 0.333,
+            "cycle": 0,
+            "shade": 0
+          },
+          "colors": {
+            "c1": [
+              1,
+              0.6,
+              0
+            ],
+            "c2": [
+              0.5,
+              0,
+              1
+            ],
+            "c3": [
+              1,
+              0.6,
+              0
+            ]
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "speed"
+        },
+        {
+          "uid": "k0",
+          "key": "softness"
+        }
+      ]
+    },
+    "sha256": "491396454829f9ddb0dbb7e02fe1b5e45c892eeb2e648c4f8de4f5e930ddc39c"
+  },
+  "starter:colorCycle": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "solid",
+          "params": {
+            "level": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 0,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 1,
+            "shade": 0
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k1",
+          "key": "cycle"
+        }
+      ]
+    },
+    "sha256": "c910032470a45ed2177021c461bcf77199456c346bc3e30418811498035d6323"
+  },
+  "starter:cometOrbit": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "sweep",
+          "params": {
+            "count": 1,
+            "speed": 1.5,
+            "tail": 6,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "shape",
+          "params": {
+            "sides": 2,
+            "size": 0.7,
+            "glow": 8,
+            "blend": 1,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 4,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 1
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "glow",
+          "params": {
+            "amount": 1
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "speed"
+        },
+        {
+          "uid": "k0",
+          "key": "tail"
+        }
+      ]
+    },
+    "sha256": "5fc396719e41df798295caa788e2eb07c9404294391452e7ca331e774ad50d36"
+  },
+  "starter:discoGrid": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "spin",
+          "params": {
+            "angle": 0,
+            "speed": 0.15
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "dots",
+          "params": {
+            "count": 10,
+            "size": 0.32,
+            "speed": 2,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 6,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0.5,
+            "shade": 0.9
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "glow",
+          "params": {
+            "amount": 0.5
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k1",
+          "key": "count"
+        },
+        {
+          "uid": "k0",
+          "key": "speed"
+        }
+      ]
+    },
+    "sha256": "3c594c615cbc41e1ea5a9f40b4cb41835b00656bdaa9800c3fe57dbb7e959871"
+  },
+  "starter:fanSpinner": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "spiral",
+          "params": {
+            "arms": 3,
+            "twist": 0,
+            "speed": 2,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "threshold",
+          "params": {
+            "level": 0.6,
+            "softness": 0.1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 0.5,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 1
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "glow",
+          "params": {
+            "amount": 0.5
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "arms"
+        },
+        {
+          "uid": "k0",
+          "key": "speed"
+        }
+      ]
+    },
+    "sha256": "12d7c4930cbc7866cc2c29658d31a071774a23182b48c09779d1ff1c67b9df38"
+  },
+  "starter:horizontalWipe": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "wipe",
+          "params": {
+            "shape": 0,
+            "angle": 0,
+            "speed": 1,
+            "softness": 0.02,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "colors",
+          "params": {
+            "spread": 0.333,
+            "cycle": 0,
+            "shade": 0
+          },
+          "colors": {
+            "c1": [
+              1,
+              0.1,
+              0.3
+            ],
+            "c2": [
+              0.1,
+              0.4,
+              1
+            ],
+            "c3": [
+              1,
+              0.1,
+              0.3
+            ]
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "speed"
+        },
+        {
+          "uid": "k0",
+          "key": "softness"
+        }
+      ]
+    },
+    "sha256": "c482c2696169c8febc228358841a21733ca59f0e3eb6c4732ea44e191dfa869f"
+  },
+  "starter:hypnoTunnel": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "tunnel",
+          "params": {
+            "depth": 0.5,
+            "speed": 1.2,
+            "twist": 0.5
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "checker",
+          "params": {
+            "count": 4,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0.6,
+            "shade": 0.5
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "vignette",
+          "params": {
+            "amount": 0.9
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "speed"
+        },
+        {
+          "uid": "k1",
+          "key": "count"
+        }
+      ]
+    },
+    "sha256": "391969d135f42091bd0dc16670c25ce02382e4d6a59cc38236e2277675a7f721"
+  },
+  "starter:lavaLamp": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "warp",
+          "params": {
+            "amount": 0.6,
+            "scale": 1.2,
+            "speed": 0.3
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "clouds",
+          "params": {
+            "scale": 1.5,
+            "speed": 0.2,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "threshold",
+          "params": {
+            "level": 0.58,
+            "softness": 0.12
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "palette",
+          "params": {
+            "palette": 4,
+            "spread": 0.9,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.85
+          }
+        },
+        {
+          "uid": "k4",
+          "type": "glow",
+          "params": {
+            "amount": 0.4
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "speed"
+        },
+        {
+          "uid": "k2",
+          "key": "level"
+        }
+      ]
+    },
+    "sha256": "24006ca0a181e07394ef500918fb6afa13689eaeed471e6585e8cbc3cd395eca"
+  },
+  "starter:neonKaleido": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "kaleidoscope",
+          "params": {
+            "sides": 8,
+            "spin": 0.1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "shape",
+          "params": {
+            "sides": 6,
+            "size": 0.5,
+            "glow": 12,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "rings",
+          "params": {
+            "count": 6,
+            "speed": 1,
+            "blend": 2,
+            "mix": 0.6
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1.2,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.8
+          }
+        },
+        {
+          "uid": "k4",
+          "type": "glow",
+          "params": {
+            "amount": 0.6
+          }
+        },
+        {
+          "uid": "k5",
+          "type": "vignette",
+          "params": {
+            "amount": 0.5
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "sides"
+        },
+        {
+          "uid": "k2",
+          "key": "speed"
+        }
+      ]
+    },
+    "sha256": "56083df9fcbc3eb1436fd0870052f5954b50846ecf8fbca431b41f2d7d6ccd2b"
+  },
+  "starter:oceanCaustics": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "bend",
+          "params": {
+            "amount": 0.3,
+            "frequency": 2.5,
+            "speed": 0.6
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "cells",
+          "params": {
+            "scale": 5,
+            "speed": 0.6,
+            "style": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "invert",
+          "params": {
+            "amount": 1
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "sharpen",
+          "params": {
+            "power": 3
+          }
+        },
+        {
+          "uid": "k4",
+          "type": "palette",
+          "params": {
+            "palette": 2,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.7
+          }
+        },
+        {
+          "uid": "k5",
+          "type": "glow",
+          "params": {
+            "amount": 0.8
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k1",
+          "key": "speed"
+        },
+        {
+          "uid": "k0",
+          "key": "amount"
+        }
+      ]
+    },
+    "sha256": "73a13afc2013eff7c9ad564bb1d611f078ec7b32814972e8aace16c43bda920c"
+  },
+  "starter:pulseRings": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 3,
+            "speed": 2,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "threshold",
+          "params": {
+            "level": 0.75,
+            "softness": 0.05
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 2,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 1
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "count"
+        },
+        {
+          "uid": "k0",
+          "key": "speed"
+        }
+      ]
+    },
+    "sha256": "55fd9e516a8b9c700eb888dbf66a16b3c426cb03f4ace1d6dfd4210e6e12c30c"
+  },
+  "starter:radar": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "sweep",
+          "params": {
+            "count": 1,
+            "speed": 1,
+            "tail": 5,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "rings",
+          "params": {
+            "count": 5,
+            "speed": 0,
+            "blend": 2,
+            "mix": 0.25
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 5,
+            "spread": 0.4,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 1
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "vignette",
+          "params": {
+            "amount": 0.3
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "speed"
+        }
+      ]
+    },
+    "sha256": "6ff520a4b27a4af9ba45d48f668a80ac0082ec50fa775e1e08e294f36fcf154f"
+  },
+  "starter:radialFill": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "wipe",
+          "params": {
+            "shape": 1,
+            "angle": 0,
+            "speed": 1,
+            "softness": 0.02,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "colors",
+          "params": {
+            "spread": 0.333,
+            "cycle": 0,
+            "shade": 0
+          },
+          "colors": {
+            "c1": [
+              0,
+              0.9,
+              1
+            ],
+            "c2": [
+              1,
+              0.2,
+              0.8
+            ],
+            "c3": [
+              0,
+              0.9,
+              1
+            ]
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "speed"
+        },
+        {
+          "uid": "k0",
+          "key": "softness"
+        }
+      ]
+    },
+    "sha256": "31d9397279e194962926a0742af74b525a85aa35174d900414b295a58263d820"
+  },
+  "starter:rainbowWheel": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "sweep",
+          "params": {
+            "count": 1,
+            "speed": 0.5,
+            "tail": 1,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 0,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "speed"
+        },
+        {
+          "uid": "k0",
+          "key": "count"
+        }
+      ]
+    },
+    "sha256": "5ac191e43f2f00ecb73fe31c1e643a121d23853e81f2f0822b0a3ac38712c98c"
+  },
+  "starter:retroBands": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "ripple",
+          "params": {
+            "amount": 0.05,
+            "frequency": 10,
+            "speed": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "plasma",
+          "params": {
+            "scale": 4,
+            "speed": 0.8,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "bands",
+          "params": {
+            "steps": 6
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "colors",
+          "params": {
+            "spread": 1,
+            "cycle": 0,
+            "shade": 0.4
+          },
+          "colors": {
+            "c1": [
+              1,
+              0.3,
+              0.1
+            ],
+            "c2": [
+              1,
+              0.85,
+              0.2
+            ],
+            "c3": [
+              0.6,
+              0.1,
+              0.6
+            ]
+          }
+        },
+        {
+          "uid": "k4",
+          "type": "scanlines",
+          "params": {
+            "count": 120,
+            "amount": 0.3
+          }
+        },
+        {
+          "uid": "k5",
+          "type": "grain",
+          "params": {
+            "amount": 0.05
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k2",
+          "key": "steps"
+        },
+        {
+          "uid": "k1",
+          "key": "speed"
+        }
+      ]
+    },
+    "sha256": "e022bbb5523de69043d969a5f76e65e5e7fde6d9aa492ecceef31f36359e14fd"
+  },
+  "starter:starWarp": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "swirl",
+          "params": {
+            "amount": 2,
+            "size": 1.5
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "sparkle",
+          "params": {
+            "density": 20,
+            "amount": 0.5,
+            "speed": 1.5,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k2",
+          "type": "palette",
+          "params": {
+            "palette": 7,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 1
+          }
+        },
+        {
+          "uid": "k3",
+          "type": "glow",
+          "params": {
+            "amount": 1.5
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k1",
+          "key": "density"
+        },
+        {
+          "uid": "k0",
+          "key": "amount"
+        }
+      ]
+    },
+    "sha256": "d14c1690ae97b72314e54807326adff8737aef4cf58163373077b006847d58ef"
+  },
+  "starter:verticalWipe": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "wipe",
+          "params": {
+            "shape": 0,
+            "angle": 90,
+            "speed": 1,
+            "softness": 0.02,
+            "blend": 0,
+            "mix": 1
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "colors",
+          "params": {
+            "spread": 0.333,
+            "cycle": 0,
+            "shade": 0
+          },
+          "colors": {
+            "c1": [
+              1,
+              0.1,
+              0.3
+            ],
+            "c2": [
+              0.1,
+              0.4,
+              1
+            ],
+            "c3": [
+              1,
+              0.1,
+              0.3
+            ]
+          }
+        }
+      ],
+      "speed": 50,
+      "hue": 0,
+      "saturation": 1,
+      "contrast": 1,
+      "knobs": [
+        {
+          "uid": "k0",
+          "key": "speed"
+        },
+        {
+          "uid": "k0",
+          "key": "softness"
+        }
+      ]
+    },
+    "sha256": "c023919714a2d15c44100c79ea19f0f57f1d800cfbe6f171bbd422e0cc4171f6"
+  }
+}

@@ -8,7 +8,7 @@ import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import { useTranslation } from '../../../../lib/i18n';
 import { matchesAllWords } from '../../../../search/match';
 import { renderRecipeStill } from './recipePreview';
-import { deleteEffect, migrateLegacyEffects, useSavedEffects, type SavedEffect } from './studioLibrary';
+import { deleteEffect, isDownloaded, migrateLegacyEffects, useSavedEffects, type SavedEffect } from './studioLibrary';
 import type { StudioRecipe } from './studioCompiler';
 import pageStyles from '../LightingPage.module.scss';
 import styles from './ShaderStudio.module.scss';
@@ -84,7 +84,7 @@ function NewDraftCell({ recipe, label }: { recipe: StudioRecipe; label: string }
  * `onCreate`, Custom leads with a create tile; with `draft`, the edited effect's
  * tile shows the unsaved recipe.
  */
-export function SavedEffectSections({ effect, query, username, gpuAvailable = true, draft, onSelect, onCreate, onDeleted }: {
+export function SavedEffectSections({ effect, query, username, gpuAvailable = true, draft, flat, onSelect, onCreate, onDeleted }: {
   /** Running effect key, highlighted when it is one of these. */
   effect: string | null;
   query: string;
@@ -92,6 +92,8 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
   username?: string | null;
   gpuAvailable?: boolean;
   draft?: StudioDraft | null;
+  /** One grid with no section headers. */
+  flat?: boolean;
   onSelect: (key: string) => void;
   onCreate?: () => void;
   /** After an effect was deleted from this grid. */
@@ -105,14 +107,16 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
   useEffect(() => { void migrateLegacyEffects(); }, []);
 
   const searching = query.trim() !== '';
-  const me = username?.toLowerCase();
-  // Effects saved before the service recorded `downloaded` fall back to comparing the author.
-  const downloaded = (s: SavedEffect) => s.downloaded ?? (!!s.marketId && s.marketAuthor?.toLowerCase() !== me);
+  const downloaded = (s: SavedEffect) => isDownloaded(s, username);
   const shown = saved.filter(s => matchesAllWords(query, [s.name]));
-  const sections: { key: Section; items: SavedEffect[]; lead: boolean }[] = [
-    { key: SECTION_CUSTOM, items: shown.filter(s => !downloaded(s)), lead: !!onCreate },
-    { key: SECTION_MARKET, items: shown.filter(downloaded), lead: false },
-  ];
+  const own = shown.filter(s => !downloaded(s));
+  const fromMarket = shown.filter(downloaded);
+  const sections: { key: Section; items: SavedEffect[]; lead: boolean }[] = flat
+    ? [{ key: SECTION_CUSTOM, items: [...own, ...fromMarket], lead: !!onCreate }]
+    : [
+      { key: SECTION_CUSTOM, items: own, lead: !!onCreate },
+      { key: SECTION_MARKET, items: fromMarket, lead: false },
+    ];
   const newDraft = draft && !draft.id ? draft.recipe : null;
 
   const toggle = (key: Section) => setCollapsed(prev => {
@@ -121,9 +125,32 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
     return next;
   });
 
+  const grid = (s: typeof sections[number]) => (
+    <div key={s.key} data-pick className={pageStyles.animateGridSection}>
+      {s.lead && (
+        <button type="button" className={`${pageStyles.addSmartLights} ${styles.createTile}`} onClick={onCreate}>
+          <Plus size={20} aria-hidden />
+          <span>{t('lighting.studio.create')}</span>
+        </button>
+      )}
+      {s.lead && newDraft && <NewDraftCell recipe={newDraft} label={t('lighting.studio.create')} />}
+      {s.items.map(item => (
+        <CustomEffectCell
+          key={item.id}
+          effect={item}
+          active={effect === customEffectKey(item.id)}
+          draft={draft?.id === item.id ? draft.recipe : null}
+          gpuAvailable={gpuAvailable}
+          onSelect={() => onSelect(customEffectKey(item.id))}
+          onDelete={() => setPendingDelete(item)}
+        />
+      ))}
+    </div>
+  );
+
   return (
     <>
-      {sections.filter(s => s.lead || s.items.length > 0).map(s => (
+      {sections.filter(s => s.lead || s.items.length > 0).map(s => (flat ? grid(s) : (
         <CollapsibleSection
           key={s.key}
           compact
@@ -131,28 +158,9 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
           open={searching || !collapsed.has(s.key)}
           onToggle={() => toggle(s.key)}
         >
-          <div data-pick className={pageStyles.animateGridSection}>
-            {s.lead && (
-              <button type="button" className={`${pageStyles.addSmartLights} ${styles.createTile}`} onClick={onCreate}>
-                <Plus size={20} aria-hidden />
-                <span>{t('lighting.studio.create')}</span>
-              </button>
-            )}
-            {s.lead && newDraft && <NewDraftCell recipe={newDraft} label={t('lighting.studio.create')} />}
-            {s.items.map(item => (
-              <CustomEffectCell
-                key={item.id}
-                effect={item}
-                active={effect === customEffectKey(item.id)}
-                draft={draft?.id === item.id ? draft.recipe : null}
-                gpuAvailable={gpuAvailable}
-                onSelect={() => onSelect(customEffectKey(item.id))}
-                onDelete={() => setPendingDelete(item)}
-              />
-            ))}
-          </div>
+          {grid(s)}
         </CollapsibleSection>
-      ))}
+      )))}
       <ConfirmModal
         open={!!pendingDelete}
         title={t('lighting.studio.deleteTitle')}
@@ -170,7 +178,7 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
   );
 }
 
-/** The Studio's My effects: the saved-effect sections in their own scroller, with a create tile. */
+/** The Studio's My effects: every saved effect in one headerless grid, in its own scroller, with a create tile. */
 export function CustomEffectsGrid({ query, ...rest }: Parameters<typeof SavedEffectSections>[0] & { onCreate: () => void }) {
   const { t } = useTranslation();
   const saved = useSavedEffects();
@@ -178,7 +186,7 @@ export function CustomEffectsGrid({ query, ...rest }: Parameters<typeof SavedEff
   return (
     <div className={pageStyles.animateGridWrap}>
       <div className={pageStyles.animateGrid}>
-        <SavedEffectSections query={query} {...rest} />
+        <SavedEffectSections query={query} flat {...rest} />
         {none && <p className={pageStyles.browserHint}>{t('lighting.effects.noMatches')}</p>}
       </div>
     </div>

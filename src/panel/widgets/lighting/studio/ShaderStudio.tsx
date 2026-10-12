@@ -14,7 +14,7 @@ import { PromptModal } from '../../../../components/common/PromptModal/PromptMod
 import { ConfirmModal } from '../../../../components/common/ConfirmModal/ConfirmModal';
 import { SortableList, type SortableRowArgs } from '../../../../components/common/SortableList/SortableList';
 import { forgetShaderSource, primeShaderSource, startStudioLive, stopStudioLive } from '../../../../api/lighting';
-import { customEffectId, customEffectKey } from '../../../../api/customEffects';
+import { customEffectId, customEffectKey, customEffectsLoaded } from '../../../../api/customEffects';
 import { useAudioState } from '../../../../hooks/useAudioState';
 import { useTranslation } from '../../../../lib/i18n';
 import { isApplePlatform } from '../../../../lib/platform';
@@ -28,7 +28,7 @@ import {
   type CompiledStudio, type StudioBlock, type StudioRecipe,
 } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, randomRecipe } from './studioRecipes';
-import { getSavedEffects, newEffectId, saveEffect, useSavedEffects, type MarketLink } from './studioLibrary';
+import { getSavedEffects, lastCreatedEffect, newEffectId, saveEffect, useSavedEffects, type MarketLink } from './studioLibrary';
 import { PublishEffectModal } from './PublishEffectModal';
 import { StudioBlockCard } from './StudioBlockCard';
 import { StudioPreview } from './StudioPreview';
@@ -81,7 +81,7 @@ function VariationTile({ recipe, label, onPick }: { recipe: StudioRecipe; label:
   );
 }
 
-/** `effectId` opens that saved effect; null starts a new one. */
+/** `effectId` opens that saved effect; null opens the most recently created one, or a new one when there is none. */
 export function ShaderStudio({ open, effectId, username, gpuAvailable = true, onSaved, onViewListing, onClose }: {
   open: boolean;
   effectId: string | null;
@@ -97,11 +97,15 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
 }) {
   const { t } = useTranslation();
   const saved = useSavedEffects();
-  const [currentId, setCurrentId] = useState<string | null>(
-    () => (effectId && getSavedEffects().some(s => s.id === effectId) ? effectId : null),
-  );
+  const [initial] = useState(() => {
+    const list = getSavedEffects();
+    return effectId ? list.find(s => s.id === effectId) : lastCreatedEffect(list, username);
+  });
+  // Opened before the list loaded: the default pick is made once it arrives, unless the user acted first.
+  const adoptOnLoad = useRef(!effectId && !customEffectsLoaded());
+  const [currentId, setCurrentId] = useState<string | null>(initial?.id ?? null);
   const [recipe, setRecipe] = useState<StudioRecipe>(() => {
-    const existing = getSavedEffects().find(s => s.id === effectId);
+    const existing = initial;
     return existing ? structuredClone(existing.recipe) : (STUDIO_STARTERS.find(s => s.id === NEW_EFFECT_STARTER) ?? STUDIO_STARTERS[0]).build();
   });
   const [past, setPast] = useState<StudioRecipe[]>([]);
@@ -150,6 +154,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
   const close = () => unlessDirty(finishClose);
 
   const apply = (next: StudioRecipe, commit: boolean) => {
+    adoptOnLoad.current = false;
     setRecipe(next);
     recipeRef.current = next;
     if (!commit || next === committedRef.current) return;
@@ -346,6 +351,19 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
     const pinned = knobs.some(k => k.uid === uid && k.key === key);
     apply({ ...recipe, knobs: pinned ? knobs.filter(k => !(k.uid === uid && k.key === key)) : [...knobs, { uid, key }] }, true);
   };
+
+  useEffect(() => {
+    if (!adoptOnLoad.current || !customEffectsLoaded()) return;
+    adoptOnLoad.current = false;
+    const pick = lastCreatedEffect(saved, username);
+    if (!pick || currentId !== null) return;
+    const next = structuredClone(pick.recipe);
+    setRecipe(next);
+    recipeRef.current = next;
+    committedRef.current = next;
+    setCurrentId(pick.id);
+    setBaseline(JSON.stringify(pick.recipe));
+  }, [saved, username, currentId]);
 
   const loadSaved = (id: string) => unlessDirty(() => {
     const s = getSavedEffects().find(e => e.id === id);

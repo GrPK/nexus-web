@@ -2727,17 +2727,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                         )}
                       </div>
                     )}
-                    {ShaderStudio && activeCustom && (
-                      <Button
-                        size="sm"
-                        pill
-                        className={styles.editEffectBtn}
-                        icon={<SprayCan size={14} />}
-                        onClick={() => setStudioTarget({ id: activeCustom.id })}
-                      >
-                        {t('lighting.studio.title')}
-                      </Button>
-                    )}
                     <HoverTooltip body={t('lighting.fullscreen')} side="left">
                       <button type="button" className={styles.fullscreenBtn} onClick={() => setFullscreenOpen(true)} aria-label={t('lighting.fullscreen')}>
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2763,7 +2752,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     ariaLabel={t('lighting.effects.search')}
                   />
                   {ShaderStudio && viewMode === 'animate' && (
-                    <Button size="sm" icon={<SprayCan size={14} />} onClick={() => setStudioTarget({ id: null })}>
+                    <Button size="sm" icon={<SprayCan size={14} />} onClick={() => setStudioTarget({ id: activeCustom?.id ?? null })}>
                       {t('lighting.studio.title')}
                     </Button>
                   )}

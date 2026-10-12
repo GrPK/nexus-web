@@ -97,6 +97,19 @@ export function useSavedEffects(): SavedEffect[] {
 
 export const newEffectId = () => `fx${Date.now().toString(36)}`;
 
+/** A Marketplace download; effects saved before the service recorded `downloaded` compare the listing author with `username`. */
+export function isDownloaded(s: SavedEffect, username: string | null | undefined): boolean {
+  return s.downloaded ?? (!!s.marketId && s.marketAuthor?.toLowerCase() !== username?.toLowerCase());
+}
+
+/** The most recently created of the user's own effects (any effect when there are none): a newEffectId's base36 suffix is its creation time. */
+export function lastCreatedEffect(list: SavedEffect[], username: string | null | undefined): SavedEffect | undefined {
+  const createdAt = (id: string) => (/^fx[0-9a-z]+$/.test(id) ? parseInt(id.slice(2), 36) : 0);
+  const own = list.filter(s => !isDownloaded(s, username));
+  return (own.length ? own : list)
+    .reduce<SavedEffect | undefined>((best, s) => (!best || createdAt(s.id) >= createdAt(best.id) ? s : best), undefined);
+}
+
 export interface MarketLink {
   marketId: string;
   marketAuthor: string;
