@@ -23,6 +23,7 @@ function recipe(specs: BlockSpec[], knobs: [number, string][] = []): StudioRecip
 const RED: [number, number, number] = [1, 0.1, 0.3];
 const BLUE: [number, number, number] = [0.1, 0.4, 1];
 const CYAN: [number, number, number] = [0, 0.9, 1];
+const GOLD: [number, number, number] = [1, 0.7, 0.2];
 // Two-color wipes: the spread puts v's top end exactly on c2 of the three-stop gradient.
 const twoColors = (a: [number, number, number], b: [number, number, number]): BlockSpec =>
   ['colors', { spread: 0.333, shade: 0 }, { c1: a, c2: b, c3: a }];
@@ -72,6 +73,18 @@ export const STUDIO_STARTERS: readonly StudioStarter[] = [
       ['palette', { palette: 3, spread: 0.5, shade: 1 }],
       ['glow', { amount: 0.5 }],
     ], [[0, 'arms'], [0, 'speed']]),
+  },
+  {
+    id: 'larsonScanner',
+    build: () => recipe([['scanner'], ['colors', { spread: 0, shade: 1 }, { c1: RED, c2: RED, c3: RED }]], [[0, 'speed'], [0, 'tail']]),
+  },
+  {
+    id: 'theaterChase',
+    build: () => recipe([['chase'], ['colors', { spread: 0, shade: 1 }, { c1: GOLD, c2: GOLD, c3: GOLD }]], [[0, 'count'], [0, 'speed']]),
+  },
+  {
+    id: 'campfire',
+    build: () => recipe([['flame'], ['palette', { palette: 4, shade: 1 }]], [[0, 'size'], [0, 'speed']]),
   },
   {
     id: 'cometOrbit',

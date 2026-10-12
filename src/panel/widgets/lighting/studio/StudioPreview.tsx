@@ -11,11 +11,12 @@ interface StudioPreviewProps {
   stateRef: React.RefObject<EffectState | null>;
   audioRef?: React.RefObject<AudioSnapshot | null>;
   className?: string;
+  maxFps?: number;
 }
 
-export function StudioPreview({ effectKey, stateRef, audioRef, className }: StudioPreviewProps) {
+export function StudioPreview({ effectKey, stateRef, audioRef, className, maxFps }: StudioPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { error } = useShaderRenderer(canvasRef, effectKey, stateRef, audioRef);
+  const { error } = useShaderRenderer(canvasRef, effectKey, stateRef, audioRef, maxFps ? { maxFps } : undefined);
   // Chromium caps live WebGL contexts per page and evicts the oldest (possibly the
   // lighting page's own canvas), so release this one on unmount instead of waiting
   // for GC. StrictMode and Fast Refresh re-run setup synchronously on the same

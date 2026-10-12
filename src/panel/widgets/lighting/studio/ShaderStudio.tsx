@@ -34,6 +34,7 @@ import { copyText } from '../../../../lib/clipboard';
 import { PublishEffectModal } from './PublishEffectModal';
 import { StudioBlockCard } from './StudioBlockCard';
 import { StudioPreview } from './StudioPreview';
+import { GALLERY_FPS } from './recipePreview';
 import { CustomEffectsGrid } from './CustomEffectsGrid';
 import pageStyles from '../LightingPage.module.scss';
 import mapStyles from '../page/LedMapEditor.module.scss';
@@ -79,7 +80,7 @@ function VariationTile({ recipe, label, onPick }: { recipe: StudioRecipe; label:
   }, [recipe, compiled]);
   return (
     <button type="button" className={styles.variationTile} onClick={onPick} aria-label={label}>
-      <StudioPreview effectKey={compiled.key} stateRef={stateRef} />
+      <StudioPreview effectKey={compiled.key} stateRef={stateRef} maxFps={GALLERY_FPS} />
     </button>
   );
 }

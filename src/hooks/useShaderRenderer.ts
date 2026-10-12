@@ -219,7 +219,9 @@ export function useShaderRenderer(
       let energy = 0;
       let pulse = 0;
       let lastDrawTs = 0;
-      const cap = options?.maxFps ?? streamFrameCap(window.location.search);
+      const streamCap = streamFrameCap(window.location.search);
+      // A caller's cap never runs faster than the stream's own.
+      const cap = options?.maxFps ? Math.min(options.maxFps, streamCap || Infinity) : streamCap;
       const shouldDraw = cap ? createFramePacer(cap) : createDisplayDivider(panelDisplayHz(window.location.search));
 
       const render = (ts: number) => {

@@ -331,6 +331,63 @@ export const STUDIO_BLOCKS: readonly StudioBlockDef[] = [
       'f = step(1.0 - $amount, h) * exp(-length(g - o) * 18.0) * (0.5 + 0.5 * sin(t * $speed * 3.0 + h * 6.2831853));',
     ].join('\n'),
   },
+  {
+    // A Larson scanner: one bar bouncing end to end, trailing a fading tail.
+    type: 'scanner', stage: 'pattern', cost: 1,
+    params: [
+      { key: 'shape', min: 0, max: 2, step: 1, def: 0, options: ['lighting.studio.shape.linear', 'lighting.studio.shape.radial', 'lighting.studio.shape.clock'] },
+      { key: 'angle', min: 0, max: 360, step: 1, def: 0 },
+      { key: 'speed', min: 0, max: 4, step: 0.01, def: 1 },
+      { key: 'size', min: 0.02, max: 0.5, step: 0.01, def: 0.1 },
+      { key: 'tail', min: 0, max: 1, step: 0.01, def: 0.4 },
+    ],
+    code: [
+      'float ar = u_resolution.x / u_resolution.y; float x;',
+      'if ($shape < 0.5) { float a = radians($angle); vec2 dir = vec2(cos(a), sin(a)); x = dot(p, dir) / (2.0 * (abs(dir.x) * ar + abs(dir.y))) + 0.5; }',
+      'else if ($shape < 1.5) { x = length(p) / length(vec2(ar, 1.0)); }',
+      'else { x = fract(atan(p.y, p.x) / 6.2831853 + 0.25); }',
+      'float u = fract(t * $speed * 0.25); float at = 1.0 - abs(u * 2.0 - 1.0); float dx = abs(x - at);',
+      'if ($shape > 1.5) dx = min(dx, 1.0 - dx);',
+      'float head = 1.0 - smoothstep($size * 0.5, $size, dx);',
+      // The trail fades with the time since the bar last passed, so it shrinks into each end on the bounce.
+      'float since = min(fract(u - x * 0.5), fract(u - 1.0 + x * 0.5));',
+      'float trail = exp(-since / max($tail * 0.25, 0.001)) * step(0.001, $tail);',
+      'f = max(head, trail * 0.8);',
+    ].join('\n'),
+  },
+  {
+    // A theater chase: evenly spaced lit segments marching along, like marquee bulbs.
+    type: 'chase', stage: 'pattern', cost: 1,
+    params: [
+      { key: 'shape', min: 0, max: 2, step: 1, def: 0, options: ['lighting.studio.shape.linear', 'lighting.studio.shape.radial', 'lighting.studio.shape.clock'] },
+      { key: 'angle', min: 0, max: 360, step: 1, def: 0 },
+      { key: 'count', min: 2, max: 40, step: 1, def: 12, whole: true },
+      { key: 'size', min: 0.1, max: 0.9, step: 0.01, def: 0.4 },
+      { key: 'speed', min: -4, max: 4, step: 0.01, def: 1 },
+    ],
+    code: [
+      'float ar = u_resolution.x / u_resolution.y; float x;',
+      'if ($shape < 0.5) { float a = radians($angle); vec2 dir = vec2(cos(a), sin(a)); x = dot(p, dir) / (2.0 * (abs(dir.x) * ar + abs(dir.y))) + 0.5; }',
+      'else if ($shape < 1.5) { x = length(p) / length(vec2(ar, 1.0)); }',
+      'else { x = fract(atan(p.y, p.x) / 6.2831853 + 0.25); }',
+      'float c = fract(x * $count - t * $speed * 0.5);',
+      'f = smoothstep(0.0, 0.03, c) * (1.0 - smoothstep($size - 0.03, $size, c));',
+    ].join('\n'),
+  },
+  {
+    // Flames rising from the bottom edge (p.y grows downward); size is how high they reach.
+    type: 'flame', stage: 'pattern', cost: 2, helpers: ['fbm'],
+    params: [
+      { key: 'scale', min: 0.5, max: 6, step: 0.01, def: 2.5 },
+      { key: 'speed', min: 0, max: 3, step: 0.01, def: 1 },
+      { key: 'size', min: 0, max: 1, step: 0.01, def: 0.5 },
+    ],
+    code: [
+      'float h = clamp((1.0 - p.y) * 0.5, 0.0, 1.0);',
+      'float n = fbm(vec2(p.x * $scale, h * 2.0 * $scale - t * $speed * 1.5));',
+      'f = clamp(n * 1.6 - h * (2.2 - $size * 1.6), 0.0, 1.0);',
+    ].join('\n'),
+  },
   // ---- tone ----
   {
     type: 'bands', stage: 'tone', cost: 1,

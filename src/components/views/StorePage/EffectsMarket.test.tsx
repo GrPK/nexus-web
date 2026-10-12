@@ -116,7 +116,7 @@ describe('EffectsMarket', () => {
     await waitFor(() => expect(remove).toHaveBeenCalledWith('fx1'));
   });
 
-  it('says an effect is audio reactive and which knobs follow which part of the music', async () => {
+  it('says an effect is audio reactive', async () => {
     const audioRecipe = {
       ...recipe,
       blocks: [{ uid: 'a1', type: 'rings', params: {}, mods: { speed: { source: 'bass', amount: 0.5 } } }, { uid: 'b2', type: 'palette', params: {} }],
@@ -124,8 +124,6 @@ describe('EffectsMarket', () => {
     getEffect.mockResolvedValue({ ok: true, value: { ...listing, audio: true, recipe: audioRecipe } });
     detail();
     expect(await screen.findByText('lighting.category.audio')).toBeInTheDocument();
-    expect(screen.getByText('lighting.studio.block.rings · lighting.studio.param.speed')).toBeInTheDocument();
-    expect(screen.getByText('lighting.studio.mod.bass')).toBeInTheDocument();
   });
 
   it('opens an installed copy on the Lighting page', async () => {

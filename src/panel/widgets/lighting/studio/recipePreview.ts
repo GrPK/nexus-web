@@ -10,7 +10,9 @@ layout (location = 0) in vec2 a_pos;
 void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
 `;
 
-const FRAME_MS = 1000 / 30;
+/** Frame rate for grids of animated effect previews (Marketplace, downloads, Studio variations). */
+export const GALLERY_FPS = 20;
+const FRAME_MS = 1000 / GALLERY_FPS;
 const MAX_DPR = 1.5;
 const PROGRAM_CACHE = 48;
 const NEUTRAL: Record<string, number> = { u_speed: 1, u_hue: 0, u_colorize: 0, u_saturation: 1, u_contrast: 1 };
