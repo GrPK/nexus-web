@@ -19,6 +19,8 @@ import { canvasLabelName } from '../../../lib/canvasLabelName';
 import styles from './DeviceCanvas.module.scss';
 
 interface DeviceCanvasProps {
+  /** Drawn over the canvas stream and under the shader canvas and frames; it must not take pointer events. */
+  backdrop?: React.ReactNode;
   devices: LightingDevice[];
   /** Draw only the preview: no frames, names or frame gestures. */
   hideFrames?: boolean;
@@ -1055,7 +1057,7 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, select
   );
 });
 
-export function DeviceCanvas({ devices, hideFrames, selectedIds, primaryDeviceId, onSelectDevice, onSetSelection, shaderEffect, shaderState, shaderPaused, audioRef, hiddenFrameIds, selectedDeviceLeds, onOpenSettings, onOpenKeyReactions, keyReactiveIds, onDragActiveChange, onBeforeLayoutSave, onLayoutCommit, onSetDevicesPower, gpuAvailable, gpuState, onPickRenderGpu, stacks, stackActionsFor }: DeviceCanvasProps) {
+export function DeviceCanvas({ backdrop, devices, hideFrames, selectedIds, primaryDeviceId, onSelectDevice, onSetSelection, shaderEffect, shaderState, shaderPaused, audioRef, hiddenFrameIds, selectedDeviceLeds, onOpenSettings, onOpenKeyReactions, keyReactiveIds, onDragActiveChange, onBeforeLayoutSave, onLayoutCommit, onSetDevicesPower, gpuAvailable, gpuState, onPickRenderGpu, stacks, stackActionsFor }: DeviceCanvasProps) {
   const notice = gpuNotice(gpuState, gpuAvailable);
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1071,6 +1073,7 @@ export function DeviceCanvas({ devices, hideFrames, selectedIds, primaryDeviceId
   return (
     <div ref={containerRef} className={styles.canvas}>
       <CanvasBackground />
+      {backdrop}
       <canvas ref={glCanvasRef} className={`${styles.glCanvas} ${ready ? styles.glCanvasReady : ''}`} />
       {!hideFrames && <DeviceOverlays devices={devices} hiddenIds={hiddenIds} selectedIds={selectedIds} primaryDeviceId={primaryDeviceId} onSelectDevice={onSelectDevice} onSetSelection={onSetSelection} containerRef={containerRef} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={onOpenSettings} onOpenKeyReactions={onOpenKeyReactions} keyReactiveIds={keyReactiveIds} onDragActiveChange={onDragActiveChange} onBeforeLayoutSave={onBeforeLayoutSave} onLayoutCommit={onLayoutCommit} onSetDevicesPower={onSetDevicesPower} stacks={stacks} stackActionsFor={stackActionsFor} />}
       <CanvasNoticeBar

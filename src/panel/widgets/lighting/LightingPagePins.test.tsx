@@ -118,6 +118,7 @@ vi.mock('./page/DevicePanel', () => ({
   ),
 }));
 vi.mock('./page/LedMapEditor', () => ({ LedMapEditor: () => null }));
+vi.mock('./page/MediaBackdrop', () => ({ MediaBackdrop: () => <div data-testid="media-backdrop" /> }));
 vi.mock('./page/RightPaneTabs', () => ({ RightPaneTabs: () => null }));
 // A typed slider edit is onChange(v, true) followed synchronously by onCommit.
 vi.mock('./page/EffectTab', () => ({
@@ -160,8 +161,8 @@ vi.mock('../../../components/common/ViewHeader/ViewHeader', () => ({
 }));
 vi.mock('../../../components/views/ServiceRequired', () => ({ ServiceRequired: () => null }));
 vi.mock('../../../components/common/DeviceCanvas/DeviceCanvas', () => ({
-  DeviceCanvas: ({ shaderEffect }: { shaderEffect?: string | null }) => (
-    <div data-testid="preview" data-effect={shaderEffect ?? ''} />
+  DeviceCanvas: ({ shaderEffect, backdrop }: { shaderEffect?: string | null; backdrop?: React.ReactNode }) => (
+    <div data-testid="preview" data-effect={shaderEffect ?? ''}>{backdrop}</div>
   ),
 }));
 
@@ -826,6 +827,18 @@ describe('LightingPage pins', () => {
       await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('gif'));
     });
 
+    it('previews no effect while a selected card is pinned to another mode', async () => {
+      syncState.mode = 'animate';
+      syncState.rawSync = 'fire';
+      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'static', effect: 'stripes', slot: 0, intensity: 1 } }));
+      renderPage();
+      await waitFor(() => expect(pinOf()?.effect).toBe('stripes'));
+      await waitFor(() => expect(screen.getByTestId('preview').dataset.effect).toBe('fire'));
+      fireEvent.click(screen.getByText('select-a'));
+      await waitFor(() => expect(screen.getByTestId('preview').dataset.effect).toBe(''));
+      expect(screen.getByTestId('tabs').dataset.active).toBe('animate');
+    });
+
     it('focuses the first-selected card when the selected cards wear different animations', async () => {
       vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({
         a: { kind: 'animate', effect: 'aurora' },
@@ -914,6 +927,25 @@ describe('LightingPage pins', () => {
       fireEvent.click(screen.getByText('tab:screen'));
       expect(lastPinsCall()).toEqual([['a'], { kind: 'mirror' }]);
       expect(startAnimate).not.toHaveBeenCalled();
+    });
+
+    it('draws no media still while Media is the global mode', async () => {
+      syncState.mode = 'gif';
+      syncState.rawSync = 'gif';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('gif'));
+      // Media is global: the canvas stream already shows it.
+      expect(screen.queryByTestId('media-backdrop')).toBeNull();
+    });
+
+    it('draws the media still on the Media tab opened for a selection while another mode runs', async () => {
+      syncState.mode = 'animate';
+      syncState.rawSync = 'fire';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(screen.getByText('tab:gif'));
+      await waitFor(() => expect(screen.getByTestId('media-backdrop')).toBeTruthy());
     });
 
     it('keeps the Mirror dock editable for a mixed selection', async () => {

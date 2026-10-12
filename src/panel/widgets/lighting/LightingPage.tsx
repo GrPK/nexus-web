@@ -88,6 +88,7 @@ import { EffectCard } from '../../../components/common/EffectCard/EffectCard';
 import { FullscreenShader } from './page/FullscreenShader';
 import { ModeControls } from './page/ModeControls';
 import { MediaCanvasNotice } from './page/MediaCanvasNotice';
+import { MediaBackdrop } from './page/MediaBackdrop';
 import { DevicePanel } from './page/DevicePanel';
 import { type DiscoveryState } from './page/DeviceDiscoveryCard';
 import { zoneCardSelectable, zoneCardUnavailable } from './page/ZoneCard';
@@ -1126,7 +1127,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The preview renders client-side from these, not from the service canvas, so
   // a selection held on a pinned shader previews that shader with the look the
   // drawer is editing; otherwise it previews the running effect.
-  const previewEffect = pinTarget && !isPaletteKey(dockEffect) ? dockEffect : activeEffect;
+  // A selection reaching outside the open tab shows no effect: the running one may belong to another mode.
+  const previewEffect = scoped.kind === 'mixed' ? '' : pinTarget && !isPaletteKey(dockEffect) ? dockEffect : activeEffect;
   const previewShaderState = pinTarget && !isPaletteKey(dockEffect) ? dockState : previewState;
   // The slot strip highlights what the dock edits, so a scoped bundle carries
   // the pin's slot rather than the effect's shared pointer.
@@ -2752,7 +2754,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     />
                   </Suspense>
                 ) : (
-                  <DeviceCanvas devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
+                  <DeviceCanvas backdrop={viewMode === 'gif' && effectiveMode !== 'gif' ? <MediaBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
                 )}
                 {viewMode === 'gif' && <MediaCanvasNotice />}
                 {shaderMode && dockEffect && dockState && !mixedSelection && (

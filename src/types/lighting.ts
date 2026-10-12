@@ -139,7 +139,7 @@ export const EFFECT_CATEGORY: Record<string, EffectCategory> = {
   prismwave: 'pattern', ribbonflow: 'pattern', meshgradient: 'pattern',
   tide: 'pattern', ridgeline: 'pattern', chevron: 'pattern', terrace: 'pattern',
   sharplines: 'pattern', synthwave: 'pattern', retropetals: 'pattern',
-  breathing: 'pattern', radialfill: 'pattern',
+  breathing: 'pattern', clockfill: 'pattern',
 };
 
 export const BASE_DEFAULTS: Omit<EffectState, 'params'> = {
@@ -283,10 +283,11 @@ export const EFFECTS: EffectDef[] = [
      colors: [{ id: 'a', labelKey: 'lighting.controls.color1', range: true }, { id: 'b', labelKey: 'lighting.controls.color2', range: true }], params: [
       { name: 'u_sharpness', label: 'Sharpness', labelKey: 'lighting.controls.param.sharpness' },
   ]},
-  // Fills outward from the center, the two colors taking turns, for fans and rings.
-  { key: 'radialfill',   labelKey: 'lighting.controls.radialfill',
+  // Sweeps around like a clock hand, the two colors taking turns, for fans and rings.
+  { key: 'clockfill',    labelKey: 'lighting.controls.clockfill',
      colors: [{ id: 'a', labelKey: 'lighting.controls.color1', range: true }, { id: 'b', labelKey: 'lighting.controls.color2', range: true }], params: [
       { name: 'u_softness', label: 'Softness', labelKey: 'lighting.controls.param.softness' },
+      { name: 'u_arms',     label: 'Arms', labelKey: 'lighting.controls.param.arms' },
   ]},
   { key: 'spiral',       labelKey: 'lighting.controls.spiral',       params: [
       { name: 'u_arms',      label: 'Arms', labelKey: 'lighting.controls.param.arms' },
