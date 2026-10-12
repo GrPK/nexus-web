@@ -220,20 +220,27 @@ export interface StudioLiveResponse {
   active?: boolean;
   /** How long the session lasts without another send. */
   leaseMs?: number;
+  /** Identifies the session; renewals and the stop carry it. */
+  sessionId?: string;
 }
 
 /**
  * Plays Shader Studio GLSL on every device, full canvas, until stopStudioLive
  * or a lapsed lease. Nothing is persisted, and ending the session restores
- * what the devices showed before. Null when the request failed.
+ * what the devices showed before. Without `sessionId` it starts a session;
+ * with one it renews that session and is refused once it has ended. Null when
+ * the request failed or was refused.
  */
-export const startStudioLive = (frag: string, s: EffectState) =>
+export const startStudioLive = (frag: string, s: EffectState, sessionId?: string | null) =>
   postService<StudioLiveResponse>('/lighting/studio-live', {
     frag, speed: s.speed, intensity: s.intensity, hue: s.hue, colorize: s.colorize,
     saturation: s.saturation, contrast: s.contrast, params: s.params,
+    ...(sessionId ? { sessionId } : {}),
   });
 
-export const stopStudioLive = () => deleteService<unknown>('/lighting/studio-live');
+/** Ends the session `sessionId` names; a stale id is a no-op. */
+export const stopStudioLive = (sessionId: string) =>
+  deleteService<unknown>(`/lighting/studio-live?sessionId=${encodeURIComponent(sessionId)}`);
 
 /** Runs a static fill or frozen pattern. No speed: the service pins it to 0. */
 export const startStatic = (

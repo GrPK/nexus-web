@@ -206,6 +206,8 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
   const liveSession = useRef({ id: 0 });
   // At most one send waits behind the one in flight; it reads the latest state when it runs.
   const liveWaiting = useRef(false);
+  // The service's id for the running session: set by the first answer, cleared by the stop.
+  const liveServerId = useRef<string | null>(null);
   const sendLive = () => {
     liveSentAt.current = Date.now();
     if (liveWaiting.current) return;
@@ -216,7 +218,9 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
       liveWaiting.current = false;
       const state = stateRef.current;
       if (session !== counter.id || !state) return;
-      const res = await startStudioLive(fragRef.current, state);
+      const res = await startStudioLive(fragRef.current, state, liveServerId.current);
+      // Kept even for an ended session: its stop, queued behind this send, needs the id.
+      if (res?.sessionId) liveServerId.current = res.sessionId;
       if (session !== counter.id) return;
       if (res?.leaseMs) liveLease.current = res.leaseMs;
       // A refusal ends live mode: re-sending would retake devices another client just changed.
@@ -249,7 +253,13 @@ export function ShaderStudio({ open, effectId, gpuAvailable = true, onSaved, onV
       clearTimeout(heartbeat);
       counter.id++;
       waiting.current = false;
-      enqueueLive(() => stopStudioLive());
+      // No id means no session of ours ever started (or its lease will lapse);
+      // an id-less stop would end another tab's session.
+      enqueueLive(async () => {
+        const id = liveServerId.current;
+        liveServerId.current = null;
+        if (id) await stopStudioLive(id);
+      });
     };
   }, [live]);
 

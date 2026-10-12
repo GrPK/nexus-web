@@ -14,7 +14,7 @@ vi.mock('../../../../api/lighting', () => ({
   forgetShaderSource: () => {},
   invalidateShaderSource: () => {},
   startStudioLive: (...a: unknown[]) => startLive(...a),
-  stopStudioLive: () => stopLive(),
+  stopStudioLive: (...a: unknown[]) => stopLive(...a),
 }));
 
 vi.mock('../../../../hooks/useAudioState', () => ({ useAudioState: () => ({ current: null }) }));
@@ -109,7 +109,7 @@ describe('ShaderStudio variations', () => {
 
 describe('ShaderStudio live on devices', () => {
   beforeEach(() => {
-    startLive.mockReset().mockResolvedValue({});
+    startLive.mockReset().mockResolvedValue({ active: true, leaseMs: 15000, sessionId: 's0' });
     stopLive.mockReset().mockResolvedValue({});
   });
 
@@ -131,6 +131,20 @@ describe('ShaderStudio live on devices', () => {
     await waitFor(() => expect(stopLive).toHaveBeenCalledTimes(2));
   });
 
+  it('renews and stops the session under the id the service gave it', async () => {
+    startLive.mockResolvedValue({ active: true, leaseMs: 15000, sessionId: 's1' });
+    render(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    const toggle = screen.getByRole('switch');
+    fireEvent.click(toggle);
+    await waitFor(() => expect(startLive).toHaveBeenCalledTimes(1));
+    expect(startLive.mock.calls[0][2]).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.surprise' }));
+    await waitFor(() => expect(startLive).toHaveBeenCalledTimes(2));
+    expect(startLive.mock.calls[1][2]).toBe('s1');
+    fireEvent.click(toggle);
+    await waitFor(() => expect(stopLive).toHaveBeenCalledWith('s1'));
+  });
+
   it('switches live off on a refusal and keeps the message until switched on again', async () => {
     startLive.mockResolvedValueOnce(null);
     render(<ShaderStudio open effectId={null} onClose={() => {}} />);
@@ -138,7 +152,9 @@ describe('ShaderStudio live on devices', () => {
     fireEvent.click(toggle);
     expect(await screen.findByText('lighting.studio.liveFailed')).toBeInTheDocument();
     expect(toggle).not.toBeChecked();
-    await waitFor(() => expect(stopLive).toHaveBeenCalledTimes(1));
+    // Refused before any session was ours: no id-less stop that could end another tab's session.
+    await act(async () => {});
+    expect(stopLive).not.toHaveBeenCalled();
     fireEvent.click(toggle);
     expect(screen.queryByText('lighting.studio.liveFailed')).not.toBeInTheDocument();
   });
@@ -153,8 +169,8 @@ describe('ShaderStudio live on devices', () => {
     fireEvent.click(toggle);
     await act(async () => {});
     expect(stopLive).not.toHaveBeenCalled();
-    await act(async () => { finish(null); });
-    await waitFor(() => expect(stopLive).toHaveBeenCalledTimes(1));
+    await act(async () => { finish({ active: true, leaseMs: 15000, sessionId: 's9' }); });
+    await waitFor(() => expect(stopLive).toHaveBeenCalledWith('s9'));
     expect(screen.queryByText('lighting.studio.liveFailed')).not.toBeInTheDocument();
   });
 });

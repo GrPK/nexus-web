@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  ChevronLeft, ChevronRight, Hand, HardDrive, LayoutGrid, Ruler, ShieldCheck, Sparkles, Tag,
+  ChevronLeft, ChevronRight, Hand, HardDrive, LayoutGrid, Lightbulb, Ruler, ShieldCheck, Sparkles, Tag,
 } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { Badge } from '../../common/Badge/Badge';
@@ -685,8 +685,8 @@ export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES }: 
           className={styles.sectionTabs}
           ariaLabel={t('apps.tabs.store')}
           tabs={[
-            { key: APPS_TAB, label: t('store.section.apps') },
-            { key: EFFECTS_ROUTE, label: t('store.effects.tab') },
+            { key: APPS_TAB, label: t('store.section.apps'), icon: <LayoutGrid size={14} /> },
+            { key: EFFECTS_ROUTE, label: t('store.effects.tab'), icon: <Lightbulb size={14} /> },
           ]}
           activeKey={effectsPath === null ? APPS_TAB : EFFECTS_ROUTE}
           onChange={key => open(key === EFFECTS_ROUTE ? EFFECTS_ROUTE : null)}
