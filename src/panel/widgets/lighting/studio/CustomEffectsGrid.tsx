@@ -92,7 +92,7 @@ function NewDraftCell({ recipe, label }: { recipe: StudioRecipe; label: string }
  * `onCreate`, Custom leads with a create tile; with `draft`, the edited effect's
  * tile shows the unsaved recipe.
  */
-export function SavedEffectSections({ effect, query, username, gpuAvailable = true, draft, flat, onSelect, onCreate, onDeleted }: {
+export function SavedEffectSections({ effect, query, username, gpuAvailable = true, draft, onSelect, onCreate, onDeleted }: {
   /** Running effect key, highlighted when it is one of these. */
   effect: string | null;
   query: string;
@@ -100,8 +100,6 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
   username?: string | null;
   gpuAvailable?: boolean;
   draft?: StudioDraft | null;
-  /** One grid with no section headers. */
-  flat?: boolean;
   onSelect: (key: string) => void;
   onCreate?: () => void;
   /** After an effect was deleted from this grid, with the effect listed after it (before it when it was last). */
@@ -119,12 +117,10 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
   const shown = saved.filter(s => matchesAllWords(query, [s.name]));
   const own = shown.filter(s => !downloaded(s));
   const fromMarket = shown.filter(downloaded);
-  const sections: { key: Section; items: SavedEffect[]; lead: boolean }[] = flat
-    ? [{ key: SECTION_CUSTOM, items: [...own, ...fromMarket], lead: !!onCreate }]
-    : [
-      { key: SECTION_CUSTOM, items: own, lead: !!onCreate },
-      { key: SECTION_MARKET, items: fromMarket, lead: false },
-    ];
+  const sections: { key: Section; items: SavedEffect[]; lead: boolean }[] = [
+    { key: SECTION_CUSTOM, items: own, lead: !!onCreate },
+    { key: SECTION_MARKET, items: fromMarket, lead: false },
+  ];
   const newDraft = draft && !draft.id ? draft.recipe : null;
 
   const toggle = (key: Section) => setCollapsed(prev => {
@@ -159,7 +155,7 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
 
   return (
     <>
-      {sections.filter(s => s.lead || s.items.length > 0).map(s => (flat ? grid(s) : (
+      {sections.filter(s => s.lead || s.items.length > 0).map(s => (
         <CollapsibleSection
           key={s.key}
           compact
@@ -169,7 +165,7 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
         >
           {grid(s)}
         </CollapsibleSection>
-      )))}
+      ))}
       <ConfirmModal
         open={!!pendingDelete}
         title={t('lighting.studio.deleteTitle')}
@@ -192,7 +188,7 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
   );
 }
 
-/** The Studio's My effects: every saved effect in one headerless grid, in its own scroller, with a create tile. */
+/** The Studio's My effects in its own scroller: the user's own under Custom with a create tile, downloads under Marketplace. */
 export function CustomEffectsGrid({ query, ...rest }: Parameters<typeof SavedEffectSections>[0] & { onCreate: () => void }) {
   const { t } = useTranslation();
   const saved = useSavedEffects();
@@ -200,7 +196,7 @@ export function CustomEffectsGrid({ query, ...rest }: Parameters<typeof SavedEff
   return (
     <div className={pageStyles.animateGridWrap}>
       <div className={pageStyles.animateGrid}>
-        <SavedEffectSections query={query} flat {...rest} />
+        <SavedEffectSections query={query} {...rest} />
         {none && <p className={pageStyles.browserHint}>{t('lighting.effects.noMatches')}</p>}
       </div>
     </div>

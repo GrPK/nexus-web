@@ -66,11 +66,13 @@ describe('CustomEffectsGrid', () => {
     }
   });
 
-  it('shows the Studio every effect in one grid with no section headers', () => {
+  it('shows the Studio your own effects under Custom and downloads under Marketplace', () => {
     render(<CustomEffectsGrid effect={null} query="" username="me" onSelect={() => {}} onCreate={() => {}} />);
-    expect(screen.queryByText('lighting.category.custom')).not.toBeInTheDocument();
-    expect(screen.queryByText('lighting.category.marketplace')).not.toBeInTheDocument();
-    for (const name of ['Alpha', 'Gamma', 'Epsilon']) expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    expect(screen.getByText('lighting.category.custom')).toBeInTheDocument();
+    const market = screen.getByText('lighting.category.marketplace');
+    const underMarket = (name: string) => !!(market.compareDocumentPosition(screen.getByRole('button', { name })) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(['Alpha', 'Delta', 'Zeta'].map(underMarket)).toEqual([false, false, false]);
+    expect(['Gamma', 'Epsilon'].map(underMarket)).toEqual([true, true]);
   });
 
   it('badges only the effects you published, not downloads', () => {
