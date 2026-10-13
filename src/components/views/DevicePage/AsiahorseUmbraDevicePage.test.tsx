@@ -67,9 +67,22 @@ const withSync = (effect: string) => {
   return s;
 };
 
-async function mount(state: UmbraState) {
+type Tab = 'device' | 'lighting' | 'fans' | 'settings';
+const TAB_NAMES: Record<Tab, string> = {
+  device: `${P}statusSection`,
+  lighting: 'lighting.title',
+  fans: `${P}fanSection`,
+  settings: 'nav.settings',
+};
+
+function openTab(tab: Tab) {
+  fireEvent.click(screen.getByRole('tab', { name: new RegExp(`^${TAB_NAMES[tab]}$`) }));
+}
+
+async function mount(state: UmbraState, tab: Tab = 'lighting', onSectionNavigate?: (s: string) => void) {
   mockGet.mockResolvedValue(state);
-  await act(async () => { render(<AsiahorseUmbraDevicePage />); });
+  await act(async () => { render(<AsiahorseUmbraDevicePage onSectionNavigate={onSectionNavigate} />); });
+  if (tab !== 'device') openTab(tab);
 }
 
 beforeEach(() => {
@@ -89,12 +102,27 @@ afterEach(() => { vi.clearAllMocks(); });
 
 describe('AsiahorseUmbraDevicePage', () => {
   it('shows the not-connected state', async () => {
-    await mount(makeState({ isConnected: false }));
+    await mount(makeState({ isConnected: false }), 'device');
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     expect(screen.getByText(`${P}notConnected`)).toBeInTheDocument();
   });
 
+  it('opens on the Device tab and switches between the four tabs', async () => {
+    mockGet.mockResolvedValue(makeState());
+    await act(async () => { render(<AsiahorseUmbraDevicePage />); });
+    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual([
+      `${P}statusSection`, 'lighting.title', `${P}fanSection`, 'nav.settings',
+    ]);
+    expect(screen.getByText('1.0.6')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: `${P}fanSync` })).not.toBeInTheDocument();
+    openTab('fans');
+    expect(screen.getByRole('switch', { name: `${P}fanSync` })).toBeInTheDocument();
+    openTab('settings');
+    expect(screen.getByRole('switch', { name: `${P}selfCheck` })).toBeInTheDocument();
+  });
+
   it('shows the device identity', async () => {
-    await mount(makeState());
+    await mount(makeState(), 'device');
     expect(screen.getByText('1.0.6')).toBeInTheDocument();
     expect(screen.getByText('CDAB2F9648BC44FE')).toBeInTheDocument();
   });
@@ -165,7 +193,7 @@ describe('AsiahorseUmbraDevicePage', () => {
   });
 
   it('writes a port edit to that port index', async () => {
-    await mount(makeState());
+    await mount(makeState(), 'device');
     // Port 10 holds the only LEDs; pick it, then change its RGB flow.
     await act(async () => { fireEvent.click(screen.getAllByRole('radio', { name: `${P}portN:{"n":10}` })[0]); });
     fireEvent.click(screen.getByRole('button', { name: `${P}flow` }));
@@ -176,7 +204,7 @@ describe('AsiahorseUmbraDevicePage', () => {
   });
 
   it('shows auto-detect progress and the result', async () => {
-    await mount(makeState());
+    await mount(makeState(), 'device');
     let finish: (s: UmbraState | null) => void = () => {};
     mockDetect.mockReturnValue(new Promise<UmbraState | null>(r => { finish = r; }));
 
@@ -195,14 +223,14 @@ describe('AsiahorseUmbraDevicePage', () => {
   });
 
   it('reports a failed auto-detect', async () => {
-    await mount(makeState());
+    await mount(makeState(), 'device');
     mockDetect.mockResolvedValue(null);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: `${P}autoDetect` })); });
     expect(screen.getByRole('alert')).toHaveTextContent(`${P}autoDetectFailed`);
   });
 
   it('keeps the page up through the reconnect while detecting', async () => {
-    await mount(makeState());
+    await mount(makeState(), 'device');
     mockGet.mockResolvedValue(makeState({ isConnected: false }));
     mockDetect.mockReturnValue(new Promise(() => {}));
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: `${P}autoDetect` })); });
@@ -211,9 +239,7 @@ describe('AsiahorseUmbraDevicePage', () => {
   });
 
   it('toggles the fan sync and links to Cooling only while the Umbra drives the fans', async () => {
-    const onNavigate = vi.fn();
-    mockGet.mockResolvedValue(makeState());
-    await act(async () => { render(<AsiahorseUmbraDevicePage onSectionNavigate={onNavigate} />); });
+    await mount(makeState(), 'fans', vi.fn());
     expect(screen.getByText('devices.coolingPage.speedHint')).toBeInTheDocument();
 
     await act(async () => { fireEvent.click(screen.getByRole('switch', { name: `${P}fanSync` })); });
@@ -221,7 +247,7 @@ describe('AsiahorseUmbraDevicePage', () => {
   });
 
   it('writes boot mode and self-check', async () => {
-    await mount(makeState());
+    await mount(makeState(), 'settings');
     fireEvent.click(screen.getByRole('button', { name: `${P}bootMode` }));
     await act(async () => { fireEvent.click(screen.getByRole('option', { name: `${P}bootFixed` })); });
     expect(mockBoot).toHaveBeenCalledWith({ mode: 'fixed' });
@@ -231,7 +257,7 @@ describe('AsiahorseUmbraDevicePage', () => {
 
   // The stacked sliders' value buttons, in page order: speed, brightness, LED count.
   const typeInto = async (slider: 'speed' | 'brightness' | 'leds', value: string) => {
-    const index = { speed: 0, brightness: 1, leds: 2 }[slider];
+    const index = { speed: 0, brightness: 1, leds: 0 }[slider];
     fireEvent.click(screen.getAllByRole('button', { name: /^\d+%?$/ })[index]);
     const input = screen.getByRole('spinbutton');
     fireEvent.change(input, { target: { value } });
@@ -253,26 +279,29 @@ describe('AsiahorseUmbraDevicePage', () => {
   });
 
   it('writes a typed LED count once', async () => {
-    await mount(makeState());
+    await mount(makeState(), 'device');
     await typeInto('leds', '12');
     expect(mockPort).toHaveBeenCalledTimes(1);
     expect(mockPort).toHaveBeenCalledWith(9, { ledCount: 12 });
   });
 
-  it('shows a failed write only in the card that wrote', async () => {
-    await mount(makeState());
+  it('shows a failed write only on the tab that wrote', async () => {
+    await mount(makeState(), 'fans');
     mockFan.mockResolvedValue(null);
     await act(async () => { fireEvent.click(screen.getByRole('switch', { name: `${P}fanSync` })); });
-    expect(screen.getAllByRole('alert')).toHaveLength(1);
     expect(screen.getByRole('alert')).toHaveTextContent(`${P}saveFailed`);
 
+    openTab('lighting');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     mockLighting.mockResolvedValue(null);
     await act(async () => { fireEvent.click(screen.getByRole('radio', { name: `${P}effect.runway` })); });
-    expect(screen.getAllByRole('alert')).toHaveLength(2);
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    openTab('fans');
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
   });
 
   it('keeps a card error across polls until that card writes again', async () => {
-    await mount(makeState());
+    await mount(makeState(), 'fans');
     mockFan.mockResolvedValueOnce(null);
     await act(async () => { fireEvent.click(screen.getByRole('switch', { name: `${P}fanSync` })); });
     expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -319,21 +348,24 @@ describe('AsiahorseUmbraDevicePage', () => {
     s.lighting.group = 'async';
     s.ports[2] = { ...s.ports[2], ledCount: 4 };
     await mount(s);
-    const [asyncPicker, portsPicker] = screen.getAllByRole('radiogroup', { name: `${P}port` });
     const chip = (group: Element, key: string) => group.querySelector(`[data-chip-key="${key}"]`) as HTMLElement;
-    expect(chip(asyncPicker, '2')).toHaveAttribute('aria-checked', 'true');
-    await act(async () => { fireEvent.click(chip(portsPicker, '9')); });
-    expect(chip(portsPicker, '9')).toHaveAttribute('aria-checked', 'true');
-    expect(chip(asyncPicker, '2')).toHaveAttribute('aria-checked', 'true');
-    await act(async () => { fireEvent.click(chip(asyncPicker, '9')); });
-    await act(async () => { fireEvent.click(chip(portsPicker, '2')); });
-    expect(chip(asyncPicker, '9')).toHaveAttribute('aria-checked', 'true');
+    const picker = () => screen.getByRole('radiogroup', { name: `${P}port` });
+    expect(chip(picker(), '2')).toHaveAttribute('aria-checked', 'true');
+    await act(async () => { fireEvent.click(chip(picker(), '9')); });
+
+    openTab('device');
+    expect(chip(picker(), '2')).toHaveAttribute('aria-checked', 'true');
+    await act(async () => { fireEvent.click(chip(picker(), '9')); });
+    await act(async () => { fireEvent.click(chip(picker(), '2')); });
+
+    openTab('lighting');
+    expect(chip(picker(), '9')).toHaveAttribute('aria-checked', 'true');
   });
 
   it('writes a dragged LED count to the port it started on, even when it hits zero', async () => {
     const s = makeState();
     s.ports[2] = { ...s.ports[2], ledCount: 4 };
-    await mount(s);
+    await mount(s, 'device');
     const slider = screen.getByRole('slider', { name: /ledCountAria.*3/ });
     fireEvent.change(slider, { target: { value: '0' } });
     fireEvent.pointerUp(slider);
@@ -342,7 +374,7 @@ describe('AsiahorseUmbraDevicePage', () => {
   });
 
   it('opens the ports card on the first port that has LEDs', async () => {
-    await mount(makeState());
+    await mount(makeState(), 'device');
     const group = screen.getByRole('radiogroup', { name: `${P}port` });
     expect(group.querySelector('[data-chip-key="9"]')).toHaveAttribute('aria-checked', 'true');
     expect(group.querySelector('[data-chip-key="9"]')).toHaveTextContent(`${P}portChip:{"port":"10","leds":"6"}`);
