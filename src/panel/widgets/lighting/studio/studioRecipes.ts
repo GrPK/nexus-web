@@ -96,6 +96,26 @@ export const STUDIO_STARTERS: readonly StudioStarter[] = [
     ], [[0, 'speed'], [0, 'tail']]),
   },
   {
+    id: 'spectrumBars',
+    build: () => recipe([['spectrum'], ['palette', { palette: 0, spread: 1.4, shade: 1 }]], [[0, 'count'], [0, 'gain']]),
+  },
+  {
+    id: 'vuMeter',
+    build: () => recipe(
+      // The three-stop gradient is cyclic: two thirds of it runs green to red without wrapping back.
+      [['vu', { shape: 2 }], ['colors', { spread: 0.667, shade: 1 }, { c1: [0.1, 1, 0.3], c2: GOLD, c3: RED }]],
+      [[0, 'source'], [0, 'gain']],
+    ),
+  },
+  {
+    id: 'beatRings',
+    build: () => recipe([
+      ['beatrings'],
+      ['palette', { palette: 3, spread: 0.6, shade: 1 }],
+      ['glow', { amount: 0.6 }],
+    ], [[0, 'size'], [0, 'count']]),
+  },
+  {
     id: 'pulseRings',
     build: () => recipe([
       ['rings', { count: 3, speed: 2 }],

@@ -25,6 +25,9 @@ export interface StudioColor {
 
 export type StudioHelper = 'rot' | 'hash21' | 'vnoise' | 'fbm' | 'blendV' | 'presetPal' | 'grad3';
 
+/** Service audio uniforms a block reads; u_spectrum is the service's log-spaced band array. */
+export type StudioAudioInput = 'u_audioLevel' | 'u_audioBass' | 'u_audioMid' | 'u_audioHigh' | 'u_audioBeat' | 'u_spectrum';
+
 export interface StudioBlockDef {
   type: string;
   stage: StudioStage;
@@ -33,6 +36,7 @@ export interface StudioBlockDef {
   params: readonly StudioParam[];
   colors?: readonly StudioColor[];
   helpers?: readonly StudioHelper[];
+  audio?: readonly StudioAudioInput[];
   /**
    * GLSL statements. `$key` reads a param (or a color as vec3). Space blocks
    * rewrite `vec2 p`, pattern blocks assign `float f`, tone blocks rewrite
@@ -386,6 +390,73 @@ export const STUDIO_BLOCKS: readonly StudioBlockDef[] = [
       'float h = clamp((1.0 - p.y) * 0.5, 0.0, 1.0);',
       'float n = fbm(vec2(p.x * $scale, h * 2.0 * $scale - t * $speed * 1.5));',
       'f = clamp(n * 1.6 - h * (2.2 - $size * 1.6), 0.0, 1.0);',
+    ].join('\n'),
+  },
+  {
+    // Equalizer bars: each bar follows its slice of the spectrum, bass on the left (or at 12 o'clock).
+    type: 'spectrum', stage: 'pattern', cost: 1, audio: ['u_spectrum'],
+    params: [
+      { key: 'shape', min: 0, max: 2, step: 1, def: 0, options: ['lighting.studio.shape.linear', 'lighting.studio.shape.mirror', 'lighting.studio.shape.radial'] },
+      { key: 'count', min: 4, max: 32, step: 1, def: 16, whole: true },
+      { key: 'size', min: 0.2, max: 1, step: 0.01, def: 0.75 },
+      { key: 'gain', min: 0.5, max: 3, step: 0.01, def: 1.2 },
+    ],
+    code: [
+      'float ar = u_resolution.x / u_resolution.y; float x; float y;',
+      'if ($shape < 0.5) { x = p.x / (2.0 * ar) + 0.5; y = (1.0 - p.y) * 0.5; }',
+      'else if ($shape < 1.5) { x = p.x / (2.0 * ar) + 0.5; y = abs(p.y); }',
+      'else { x = fract(atan(p.y, p.x) / 6.2831853 + 0.25); y = (length(p) - 0.3) / 0.7; }',
+      'float n = floor($count + 0.5); float xc = clamp(x, 0.0, 0.9999); float cell = fract(xc * n);',
+      'float pos = (floor(xc * n) + 0.5) / n * 15.0; int i0 = int(pos); int i1 = min(i0 + 1, 15);',
+      'float lv = clamp(mix(u_spectrum[i0], u_spectrum[i1], fract(pos)) * $gain, 0.0, 1.0);',
+      // A low idle ripple keeps the bars alive in silence and where the PC has no audio capture.
+      'lv = max(lv, 0.07 + 0.05 * sin(t * 2.0 + pos * 0.8));',
+      'float bar = step(abs(cell - 0.5), $size * 0.5);',
+      'float lit = bar * step(0.0, y) * (1.0 - smoothstep(lv - 0.015, lv, y));',
+      // Height drives the field, so a palette colors the bars from base to tip.
+      'f = lit * (0.5 + 0.5 * clamp(y, 0.0, 1.0));',
+    ].join('\n'),
+  },
+  {
+    // A segmented level meter for one band of the music.
+    type: 'vu', stage: 'pattern', cost: 1, audio: ['u_audioLevel', 'u_audioBass', 'u_audioMid', 'u_audioHigh'],
+    params: [
+      { key: 'source', min: 0, max: 3, step: 1, def: 0, options: ['lighting.studio.mod.level', 'lighting.studio.mod.bass', 'lighting.studio.mod.mid', 'lighting.studio.mod.high'] },
+      { key: 'shape', min: 0, max: 2, step: 1, def: 0, options: ['lighting.studio.shape.linear', 'lighting.studio.shape.mirror', 'lighting.studio.shape.clock'] },
+      { key: 'count', min: 4, max: 40, step: 1, def: 16, whole: true },
+      { key: 'size', min: 0.2, max: 1, step: 0.01, def: 0.7 },
+      { key: 'gain', min: 0.5, max: 3, step: 0.01, def: 1.2 },
+    ],
+    code: [
+      'float ar = u_resolution.x / u_resolution.y; float x;',
+      'if ($shape < 0.5) x = p.x / (2.0 * ar) + 0.5;',
+      'else if ($shape < 1.5) x = abs(p.x) / ar;',
+      'else x = fract(atan(p.y, p.x) / 6.2831853 + 0.25);',
+      'float src = $source < 0.5 ? u_audioLevel : $source < 1.5 ? u_audioBass : $source < 2.5 ? u_audioMid : u_audioHigh;',
+      'float lv = clamp(src * $gain, 0.0, 1.0);',
+      // An idle breath keeps the first segments lit in silence and where the PC has no audio capture.
+      'lv = max(lv, 0.12 + 0.08 * sin(t * 1.5));',
+      'float n = floor($count + 0.5); float xc = clamp(x, 0.0, 0.9999); float seg = floor(xc * n); float cell = fract(xc * n);',
+      'f = step((seg + 0.5) / n, lv) * step(abs(cell - 0.5), $size * 0.5) * (0.3 + 0.7 * (seg + 1.0) / n);',
+    ].join('\n'),
+  },
+  {
+    // A ring bursts out from the center on each beat, trailed by fainter echoes.
+    type: 'beatrings', stage: 'pattern', cost: 1, audio: ['u_audioBeat'],
+    params: [
+      { key: 'size', min: 0.3, max: 2, step: 0.01, def: 1.3 },
+      { key: 'width', min: 0.02, max: 0.4, step: 0.01, def: 0.1 },
+      { key: 'count', min: 0, max: 4, step: 1, def: 2, whole: true },
+      { key: 'spread', min: 0.05, max: 0.5, step: 0.01, def: 0.2 },
+    ],
+    code: [
+      // The beat envelope decays geometrically after each hit, so -log(beat) grows steadily with the time since it.
+      'float d = length(p); float prog = clamp(-log(max(u_audioBeat, 0.0001)) / 4.0, 0.0, 1.0);',
+      // Once the beats stop (or the PC has no audio capture), a dim ring keeps rolling out on its own.
+      'float idle = 1.0 - smoothstep(0.0, 0.001, u_audioBeat); float iprog = fract(t * 0.35);',
+      'float pr = mix(prog, iprog, idle); float r = pr * $size;',
+      'float k = clamp(floor((r - d) / $spread + 0.5), 0.0, floor($count + 0.5)); float rk = r - k * $spread;',
+      'f = (1.0 - smoothstep(0.0, $width, abs(d - rk))) * step(0.0, rk) * pow(0.6, k) * (1.0 - pr) * mix(1.0, 0.45, idle);',
     ].join('\n'),
   },
   // ---- tone ----

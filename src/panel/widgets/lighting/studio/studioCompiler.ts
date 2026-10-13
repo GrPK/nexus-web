@@ -227,6 +227,11 @@ function collectHelpers(defs: StudioBlockDef[], needsBlend: boolean, extra: Read
   return HELPER_ORDER.filter(h => wanted.has(h)).map(h => HELPERS[h].src);
 }
 
+/** Whether `recipe` reads the music: a music mod or a block that visualizes it. */
+export function recipeUsesAudio(recipe: StudioRecipe): boolean {
+  return recipe.blocks.some(b => !!studioBlock(b.type)?.audio?.length || Object.values(b.mods ?? {}).some(m => isMusicSource(m.source)));
+}
+
 function fnv1a(text: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
@@ -253,10 +258,11 @@ export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: b
   const blocks = orderedBlocks(recipe);
   const defs = blocks.map(b => studioBlock(b.type)!);
   const uniforms: string[] = [];
-  // Audio inputs are declared only when a mod reads them. The service starts
+  // Audio inputs are declared only when a mod or block reads them. The service starts
   // audio capture for a shader with an active audio uniform, and whether a
   // declared-but-unused one stays active after linking differs by driver.
   const audioInputs = new Set<string>();
+  defs.forEach(d => d.audio?.forEach(a => audioInputs.add(a)));
   const params: Record<string, number> = {};
   const extraHelpers = new Set<StudioHelper>();
   const body: string[] = [];
@@ -343,7 +349,7 @@ export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: b
     `const float S_HUE = ${fmt(base[1])};`,
     `const float S_SAT = ${fmt(base[2])};`,
     `const float S_CON = ${fmt(base[3])};`,
-    ...[...audioInputs].sort().map(u => `uniform float ${u};`),
+    ...[...audioInputs].sort().map(u => (u === 'u_spectrum' ? 'uniform float u_spectrum[16];' : `uniform float ${u};`)),
     ...uniforms,
     ...collectHelpers(defs, needsBlend, extraHelpers),
     FOOTER_HELPERS,

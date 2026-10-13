@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Dices, Dna, Link2, Redo2, Save, Undo2, SprayCan, Upload } from 'lucide-react';
 import { DeviceModal } from '../../../../components/common/DeviceModal/DeviceModal';
 import { Button } from '../../../../components/common/Button/Button';
@@ -10,6 +10,7 @@ import { SearchInput } from '../../../../components/common/SearchInput/SearchInp
 import { SettingsSection } from '../../../../components/common/SettingsSection/SettingsSection';
 import { InlineError } from '../../../../components/common/InlineError/InlineError';
 import { Notice } from '../../../../components/common/Notice/Notice';
+import { Toggle } from '../../../../components/common/Toggle/Toggle';
 import { PromptModal } from '../../../../components/common/PromptModal/PromptModal';
 import { ConfirmModal } from '../../../../components/common/ConfirmModal/ConfirmModal';
 import { SortableList, type SortableRowArgs } from '../../../../components/common/SortableList/SortableList';
@@ -24,7 +25,7 @@ import {
   type StudioStage,
 } from './studioBlocks';
 import {
-  compileStudio, isMusicSource, makeBlock, recipeCost, stageCount, staleParamsBetween,
+  compileStudio, makeBlock, recipeCost, recipeUsesAudio, stageCount, staleParamsBetween,
   type CompiledStudio, type StudioBlock, type StudioRecipe,
 } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, randomRecipe } from './studioRecipes';
@@ -34,6 +35,7 @@ import { copyText } from '../../../../lib/clipboard';
 import { PublishEffectModal } from './PublishEffectModal';
 import { StudioBlockCard } from './StudioBlockCard';
 import { StudioPreview } from './StudioPreview';
+import { useStudioAudio } from './syntheticAudio';
 import { GALLERY_FPS } from './recipePreview';
 import { CustomEffectsGrid } from './CustomEffectsGrid';
 import pageStyles from '../LightingPage.module.scss';
@@ -153,9 +155,11 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
     recipeRef.current = recipe;
   }, [recipe, compiled]);
 
-  // Waves need no audio; only a music mod subscribes to it.
-  const hasMusicMods = recipe.blocks.some(b => Object.values(b.mods ?? {}).some(m => isMusicSource(m.source)));
-  const audioRef = useAudioState(open && hasMusicMods);
+  const usesAudio = recipeUsesAudio(recipe);
+  const [simulateMusic, setSimulateMusic] = useState(false);
+  const simulateLabelId = useId();
+  const liveAudioRef = useAudioState(open && usesAudio && !simulateMusic);
+  const audioRef = useStudioAudio(liveAudioRef, usesAudio && simulateMusic);
 
   // Evicts on the explicit close, not an unmount cleanup: StrictMode re-runs cleanups
   // while the previews still need their keys.
@@ -563,7 +567,17 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
           ) : (
             <>
               <SettingsSection title={t('lighting.studio.preview')} className={styles.fill} boxClassName={styles.bareBox}
-                action={<Badge label={`${t(`lighting.studio.cost.${costLevel}`)} ${cost}/${STUDIO_COST_BUDGET}`} compact />}>
+                action={(
+                  <span className={styles.previewActions}>
+                    {usesAudio && (
+                      <span className={styles.toggleItem} title={t('lighting.studio.simulateMusicHint')}>
+                        <Toggle checked={simulateMusic} onChange={setSimulateMusic} ariaLabelledBy={simulateLabelId} />
+                        <span id={simulateLabelId}>{t('lighting.studio.simulateMusic')}</span>
+                      </span>
+                    )}
+                    <Badge label={`${t(`lighting.studio.cost.${costLevel}`)} ${cost}/${STUDIO_COST_BUDGET}`} compact />
+                  </span>
+                )}>
                 <StudioPreview effectKey={compiled.key} stateRef={stateRef} audioRef={audioRef} />
                 {liveFailed && <InlineError className={styles.liveError}>{t('lighting.studio.liveFailed')}</InlineError>}
                 {live && liveOff && <Notice tone="info" role="status" className={styles.liveError}>{t('lighting.studio.liveOff')}</Notice>}

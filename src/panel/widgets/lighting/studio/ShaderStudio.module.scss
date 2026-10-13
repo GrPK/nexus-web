@@ -268,3 +268,24 @@
     filter: drop-shadow(var(--shadow-sm));
   }
 }
+
+// Chromium 83 (the Q60 panel floor) has no flex `gap`.
+.previewActions {
+  display: flex;
+  align-items: center;
+
+  > * + * {
+    margin-left: var(--space-md);
+  }
+}
+
+.toggleItem {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--type-small);
+  color: var(--text-dim);
+
+  > span:last-child {
+    margin-left: var(--space-sm);
+  }
+}

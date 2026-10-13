@@ -106,6 +106,21 @@ describe('ShaderStudio history keys', () => {
   });
 });
 
+describe('ShaderStudio simulated music', () => {
+  it('offers the toggle only while the effect reads the music', () => {
+    render(<ShaderStudio open effectId={null} onClose={() => {}} />);
+    const pick = (id: string) => {
+      fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.starters' }));
+      fireEvent.click(screen.getByRole('option', { name: `lighting.studio.starter.${id}` }));
+    };
+    pick('larsonScanner');
+    expect(screen.queryByText('lighting.studio.simulateMusic')).toBeNull();
+    pick('spectrumBars');
+    expect(screen.getByText('lighting.studio.simulateMusic')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'lighting.studio.simulateMusic' })).toBeInTheDocument();
+  });
+});
+
 describe('ShaderStudio variations', () => {
   it('leaves only Done available until a variation is decided', () => {
     render(<ShaderStudio open effectId={null} onClose={() => {}} />);

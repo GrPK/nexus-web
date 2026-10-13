@@ -1,4 +1,5 @@
 import { compileStudio, type StudioRecipe } from './studioCompiler';
+import { syntheticAudio } from './syntheticAudio';
 
 // Many previews share ONE WebGL2 context: Chromium caps live contexts per page
 // and evicts the oldest, so a grid of per-card contexts would black out cards
@@ -107,15 +108,12 @@ function compile(g: WebGL2RenderingContext, frag: string): Program | null {
   return result;
 }
 
-/** A stand-in music signal, so audio-reactive effects move in a preview without capturing audio. */
-function syntheticAudio(t: number): Record<string, number> {
-  const beatPhase = (t / 0.6) % 1;
+/** The stand-in music as uniforms, so audio-reactive effects move in a preview without capturing audio. */
+function audioUniforms(t: number): { scalars: Record<string, number>; spectrum: number[] } {
+  const a = syntheticAudio(t);
   return {
-    u_audioBeat: Math.exp(-beatPhase * 6),
-    u_audioBass: 0.5 + 0.45 * Math.sin(t * 2.3),
-    u_audioMid: 0.45 + 0.35 * Math.sin(t * 3.1 + 1),
-    u_audioHigh: 0.35 + 0.3 * Math.sin(t * 5.3 + 2),
-    u_audioLevel: 0.55 + 0.3 * Math.sin(t * 1.7),
+    scalars: { u_audioBeat: a.beat, u_audioBass: a.bass, u_audioMid: a.mid, u_audioHigh: a.high, u_audioLevel: a.level },
+    spectrum: a.spectrum,
   };
 }
 
@@ -131,7 +129,7 @@ function draw(ts: number) {
   if (!g || !glCanvas) return;
   const still = reducedMotion();
   const t = still ? 12 : (Date.now() % 86_400_000) / 1000;
-  const audio = syntheticAudio(t);
+  const audio = audioUniforms(t);
   const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
   for (const e of entries) {
     if (!e.visible || e.failed || (still && e.drawn)) continue;
@@ -147,7 +145,9 @@ function draw(ts: number) {
     for (const [name, loc] of program.locs) {
       if (name === 'u_resolution') g.uniform2f(loc, w, h);
       else if (name === 'u_time') g.uniform1f(loc, t);
-      else g.uniform1f(loc, e.params[name] ?? NEUTRAL[name] ?? audio[name] ?? 0);
+      // An array uniform is listed by its first element's name.
+      else if (name === 'u_spectrum[0]') g.uniform1fv(loc, audio.spectrum);
+      else g.uniform1f(loc, e.params[name] ?? NEUTRAL[name] ?? audio.scalars[name] ?? 0);
     }
     g.drawArrays(g.TRIANGLE_STRIP, 0, 4);
     // GL rows start at the bottom of the drawing buffer; the copy reads the top-left-origin image.

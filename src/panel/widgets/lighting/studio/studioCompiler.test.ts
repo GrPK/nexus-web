@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseShaderParams } from '../../../../lib/shaderParams';
 import { STUDIO_BLOCKS, STUDIO_COST_BUDGET, STUDIO_STAGES, STUDIO_STAGE_LIMIT, studioBlock } from './studioBlocks';
-import { compileStudio, makeBlock, orderedBlocks, recipeCost, stageCount, staleParamsBetween, studioUniform, type StudioRecipe } from './studioCompiler';
+import { compileStudio, makeBlock, orderedBlocks, recipeCost, recipeUsesAudio, stageCount, staleParamsBetween, studioUniform, type StudioRecipe } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, randomRecipe } from './studioRecipes';
 
 const recipeOf = (...types: string[]): StudioRecipe => ({
@@ -84,6 +84,22 @@ describe('compileStudio', () => {
     const compiled = compileStudio(r);
     expect(compiled.params[`${u}_g`]).toBe(0.25);
     expect(compiled.frag).toContain(`clamp((u_audioBass - ${u}_g) / (1.0 - ${u}_g), 0.0, 1.0)`);
+  });
+
+  it('declares the audio a visualizer block reads, the spectrum as its 16 bands', () => {
+    const frag = compileStudio(recipeOf('spectrum', 'palette')).frag;
+    expect(frag).toContain('uniform float u_spectrum[16];');
+    expect(compileStudio(recipeOf('beatrings', 'palette')).frag).toContain('uniform float u_audioBeat;');
+    expect(compileStudio(recipeOf('rings', 'palette')).frag).not.toMatch(/u_spectrum|u_audio/);
+  });
+
+  it('counts a recipe as reading the music for a visualizer block or a music mod, not a wave', () => {
+    expect(recipeUsesAudio(recipeOf('vu', 'palette'))).toBe(true);
+    const r = recipeOf('plasma', 'palette');
+    r.blocks[0].mods = { scale: { source: 'sine', amount: 0.5, rate: 1 } };
+    expect(recipeUsesAudio(r)).toBe(false);
+    r.blocks[0].mods = { scale: { source: 'mid', amount: 0.5 } };
+    expect(recipeUsesAudio(r)).toBe(true);
   });
 
   it('rounds a modulated whole-number param so it never lands between integers', () => {
