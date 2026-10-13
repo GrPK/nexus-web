@@ -8,7 +8,7 @@ import { NexusControlOffIcon } from '../components/common/NexusControlOffIcon/Ne
 import { NexusControlConflictModal } from '../components/common/NexusControlConflictModal/NexusControlConflictModal';
 import { ExperimentalEnableModal } from '../components/common/ExperimentalEnableModal/ExperimentalEnableModal';
 import { useToastSafe } from '../components/common/Toast/Toast';
-import { useUnifiedDevices, isSimulatedDevice, sidebarDeviceName, sidebarSortName, type UnifiedDevice } from '../hooks/useUnifiedDevices';
+import { useUnifiedDevices, claimsKey, isSimulatedDevice, sidebarDeviceName, sidebarSortName, type UnifiedDevice } from '../hooks/useUnifiedDevices';
 import { useConflictGuardedEnable } from '../hooks/useConflictGuardedEnable';
 import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
 import { promoteDisplayToPanel, demoteDisplayPanel } from '../api/displays';
@@ -174,8 +174,9 @@ export function SidebarDevicesSection({
         )
       ) : (
         sorted.map(device => {
-          const isActive = device.key === activeDeviceKey;
+          const isActive = device.key === activeDeviceKey || claimsKey(device, activeDeviceKey);
           const isSimulated = isSimulatedDevice(device);
+          const controlOff = device.supportsNexusControl && !device.nexusControlEnabled;
           const name = sidebarDeviceName(device);
           const tooltip = isSimulated
             ? `${name} (${t('devices.simulated')})`
@@ -212,9 +213,9 @@ export function SidebarDevicesSection({
                       </span>
                     </HoverTooltip>
                   )}
-                  {device.warning && <DeviceWarningIcon code={device.warning} />}
-                  {!isSimulated && device.curatedId && firmwareUpdates.has(device.curatedId) && <DeviceUpdateIcon />}
-                  {device.supportsNexusControl && !device.nexusControlEnabled && <NexusControlOffIcon className={styles.controlOff} />}
+                  {device.warning && !controlOff && <DeviceWarningIcon code={device.warning} />}
+                  {!isSimulated && !controlOff && device.curatedId && firmwareUpdates.has(device.curatedId) && <DeviceUpdateIcon />}
+                  {controlOff && <NexusControlOffIcon className={styles.controlOff} />}
                 </>
               )}
             </button>

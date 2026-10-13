@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UnifiedDevice } from '../hooks/useUnifiedDevices';
 import type { PanelDevice } from '../panel/device/panelDevices';
 
@@ -57,6 +57,10 @@ vi.mock('../api/conflicts', () => ({
 }));
 vi.mock('../hooks/useConflictApps', () => ({
   useConflictApps: () => ({ conflicts: [], ready: false }),
+}));
+let mockFirmwareUpdates: ReadonlySet<string> = new Set();
+vi.mock('../hooks/useFirmwareUpdates', () => ({
+  useFirmwareUpdates: () => mockFirmwareUpdates,
 }));
 // Menu gating for the simulated-device remover; flipped per test.
 let devTools = true;
@@ -162,6 +166,41 @@ describe('SidebarDevicesSection Nexus Link off indicator', () => {
       nexusControlEnabled: false,
     })];
     renderSidebar();
+    expect(screen.getByRole('img', { name: 'devices.nexusControlOff.sidebarTooltip' })).toBeInTheDocument();
+  });
+});
+
+describe('SidebarDevicesSection warning and update glyphs', () => {
+  const deck = (nexusControlEnabled: boolean) => monitorDevice({
+    key: 'streamdeck:SN1',
+    kind: 'curated',
+    curatedId: 'streamdeck-plus',
+    panelDevice: undefined,
+    supportsNexusControl: true,
+    nexusControlEnabled,
+    warning: 'elgato-software-running',
+  });
+
+  beforeEach(() => {
+    mockFirmwareUpdates = new Set(['streamdeck-plus']);
+  });
+
+  afterEach(() => {
+    mockFirmwareUpdates = new Set();
+  });
+
+  it('shows both glyphs while Nexus Control is on', () => {
+    mockUnified = [deck(true)];
+    renderSidebar();
+    expect(screen.getByRole('img', { name: 'devices.warning.elgatoSoftwareRunning' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'devices.firmwareUpdate.tooltip' })).toBeInTheDocument();
+  });
+
+  it('hides both glyphs while Nexus Control is off', () => {
+    mockUnified = [deck(false)];
+    renderSidebar();
+    expect(screen.queryByRole('img', { name: 'devices.warning.elgatoSoftwareRunning' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'devices.firmwareUpdate.tooltip' })).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'devices.nexusControlOff.sidebarTooltip' })).toBeInTheDocument();
   });
 });
@@ -409,6 +448,33 @@ describe('SidebarDevicesSection SMBus pseudo-device exclusion', () => {
     renderSidebar();
     expect(screen.queryByText('devices.smbusDram.name')).not.toBeInTheDocument();
     expect(screen.getByText('sidebar.devices.empty')).toBeInTheDocument();
+  });
+});
+
+describe('SidebarDevicesSection cooler LCD rows', () => {
+  it('lists a cooler LCD with Nexus Control off', () => {
+    mockUnified = [monitorDevice({
+      key: 'curated-lianli-hydroshift2',
+      shortName: 'Lian Li HydroShift II',
+      name: 'Lian Li HydroShift II',
+      kind: 'curated',
+      curatedId: 'lianli-hydroshift2',
+      panelDevice: undefined,
+      supportsNexusControl: true,
+      nexusControlEnabled: false,
+    })];
+    renderSidebar();
+    expect(screen.getByText('Lian Li HydroShift II')).toBeInTheDocument();
+  });
+
+  it('highlights the panel row while its page is open on the curated key', () => {
+    mockUnified = [monitorDevice({
+      key: 'panel-stream-rec1',
+      shortName: 'Lian Li HydroShift II LCD-S',
+      curatedId: 'lianli-hydroshift2',
+    })];
+    render(<SidebarDevicesSection serviceOnline activeDeviceKey="curated-lianli-hydroshift2" compact={false} onSelect={() => {}} onHeaderClick={() => {}} headerActive={false} />);
+    expect(screen.getByText('Lian Li HydroShift II LCD-S').closest('button')?.className).toMatch(/active/);
   });
 });
 
