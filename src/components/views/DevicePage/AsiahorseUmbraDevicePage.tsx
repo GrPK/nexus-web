@@ -94,10 +94,12 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   const detectingRef = useRef(false);
   // Bumped by every edit and write; a response older than the latest one is stale.
   const seqRef = useRef(0);
+  const cardSeqRef = useRef<Record<WriteCard, number>>({ lighting: 0, ports: 0, fan: 0, boot: 0 });
 
   const apply = useCallback((next: UmbraState) => {
     if (!aliveRef.current) return;
-    setFailed({});
+    // Pinned on the first state so the card does not follow the LED counts around.
+    setPortIndex(prev => prev ?? populatedPorts(next.ports)[0]?.index ?? 0);
     setState(next);
     setConnection(next.isConnected ? 'connected' : 'disconnected');
   }, []);
@@ -127,18 +129,15 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   // unless a newer edit has been made since.
   const write = useCallback(async (card: WriteCard, call: () => Promise<UmbraState | null>) => {
     const id = ++seqRef.current;
+    const cardId = ++cardSeqRef.current[card];
     busyRef.current += 1;
     setSaving(true);
+    setFailed(prev => ({ ...prev, [card]: false }));
     try {
       const next = await call();
       if (!aliveRef.current) return;
-      if (!next) {
-        setFailed(prev => ({ ...prev, [card]: true }));
-      } else if (id === seqRef.current) {
-        apply(next);
-      } else {
-        setFailed(prev => ({ ...prev, [card]: false }));
-      }
+      if (cardId === cardSeqRef.current[card]) setFailed(prev => ({ ...prev, [card]: next === null }));
+      if (next && id === seqRef.current) apply(next);
     } finally {
       busyRef.current -= 1;
       if (aliveRef.current && busyRef.current === 0) setSaving(false);
@@ -150,14 +149,15 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   }, [write]);
 
   const detect = useCallback(async () => {
+    const id = ++seqRef.current;
     detectingRef.current = true;
     setDetecting(true);
     setDetectFailed(false);
     try {
       const next = await autoDetectUmbra();
       if (!aliveRef.current) return;
-      if (next) apply(next);
-      else setDetectFailed(true);
+      if (!next) setDetectFailed(true);
+      else if (id === seqRef.current) apply(next);
     } finally {
       detectingRef.current = false;
       if (aliveRef.current) setDetecting(false);
@@ -190,7 +190,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   const spec = effectList.find(e => e.key === settings?.effect) ?? null;
   const slots = Math.min(spec?.colors ?? 0, COLOR_SLOTS);
   const slot = Math.min(colorSlot, Math.max(slots - 1, 0));
-  const port = ports.find(p => p.index === portIndex) ?? populated[0] ?? ports[0];
+  const port = ports.find(p => p.index === portIndex) ?? ports[0];
   const pct = (v: number) => localizeNumbers(`${v}%`, numberFormat);
 
   const touch = () => {
@@ -316,105 +316,105 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
               )}
 
               {settings && (
-              <>
-              {group === 'async' && (
-                <SettingRow label={t('devices.asiahorse-umbra.port')}>
+                <>
+                {group === 'async' && (
+                  <SettingRow label={t('devices.asiahorse-umbra.port')}>
+                    <ChipGroup
+                      wrap
+                      ariaLabel={t('devices.asiahorse-umbra.port')}
+                      activeKey={String(asyncPort ?? 0)}
+                      options={populated.map(p => ({
+                        key: String(p.index),
+                        label: localizeNumbers(String(p.index + 1), numberFormat),
+                        ariaLabel: t('devices.asiahorse-umbra.portN', { n: p.index + 1 }),
+                        tooltip: t('devices.asiahorse-umbra.ledCount', { n: p.ledCount }),
+                      }))}
+                      onChange={key => { setAsyncIndex(Number(key)); setColorSlot(0); }}
+                    />
+                  </SettingRow>
+                )}
+
+                <div className={styles.colorBlock} data-settings-aside="true">
+                  <span className={styles.colorLabel}>{t('devices.asiahorse-umbra.effectLabel')}</span>
                   <ChipGroup
                     wrap
-                    ariaLabel={t('devices.asiahorse-umbra.port')}
-                    activeKey={String(asyncPort ?? 0)}
-                    options={populated.map(p => ({
-                      key: String(p.index),
-                      label: localizeNumbers(String(p.index + 1), numberFormat),
-                      ariaLabel: t('devices.asiahorse-umbra.portN', { n: p.index + 1 }),
-                      tooltip: t('devices.asiahorse-umbra.ledCount', { n: p.ledCount }),
-                    }))}
-                    onChange={key => { setAsyncIndex(Number(key)); setColorSlot(0); }}
+                    ariaLabel={t('devices.asiahorse-umbra.effectLabel')}
+                    activeKey={settings.effect}
+                    options={effectList.map(e => ({ key: e.key, label: t(`devices.asiahorse-umbra.effect.${e.key}`) }))}
+                    onChange={key => {
+                      // Only the effect goes out: the service restores that effect's own last values.
+                      edit({ effect: key }, true);
+                      setColorSlot(0);
+                    }}
                   />
-                </SettingRow>
-              )}
+                </div>
 
-              <div className={styles.colorBlock} data-settings-aside="true">
-                <span className={styles.colorLabel}>{t('devices.asiahorse-umbra.effectLabel')}</span>
-                <ChipGroup
-                  wrap
-                  ariaLabel={t('devices.asiahorse-umbra.effectLabel')}
-                  activeKey={settings.effect}
-                  options={effectList.map(e => ({ key: e.key, label: t(`devices.asiahorse-umbra.effect.${e.key}`) }))}
-                  onChange={key => {
-                    // Only the effect goes out: the service restores that effect's own last values.
-                    edit({ effect: key }, true);
-                    setColorSlot(0);
-                  }}
-                />
-              </div>
+                {spec?.speed && (
+                  <Slider
+                    // eslint-disable-next-line i18next/no-literal-string -- slider layout enum
+                    orientation="stacked"
+                    editable
+                    trackFill
+                    label={t('devices.lianli.lightingSpeed')}
+                    ariaLabel={t('devices.lianli.lightingSpeedAria')}
+                    value={levelToPercent(settings.speed)}
+                    min={0}
+                    max={100}
+                    step={PERCENT_PER_LEVEL}
+                    formatValue={pct}
+                    onChange={v => edit({ speed: percentToLevel(v, 0) }, false)}
+                    onCommit={v => edit({ speed: percentToLevel(v, 0) }, true)}
+                  />
+                )}
 
-              {spec?.speed && (
                 <Slider
                   // eslint-disable-next-line i18next/no-literal-string -- slider layout enum
                   orientation="stacked"
                   editable
                   trackFill
-                  label={t('devices.lianli.lightingSpeed')}
-                  ariaLabel={t('devices.lianli.lightingSpeedAria')}
-                  value={levelToPercent(settings.speed)}
-                  min={0}
+                  label={t('devices.lianli.lightingBrightness')}
+                  ariaLabel={t('devices.lianli.lightingBrightnessAria')}
+                  value={levelToPercent(settings.brightness)}
+                  min={levelToPercent(MIN_BRIGHTNESS_LEVEL)}
                   max={100}
                   step={PERCENT_PER_LEVEL}
                   formatValue={pct}
-                  onChange={v => edit({ speed: percentToLevel(v, 0) }, false)}
-                  onCommit={v => edit({ speed: percentToLevel(v, 0) }, true)}
+                  onChange={v => edit({ brightness: percentToLevel(v, MIN_BRIGHTNESS_LEVEL) }, false)}
+                  onCommit={v => edit({ brightness: percentToLevel(v, MIN_BRIGHTNESS_LEVEL) }, true)}
                 />
-              )}
 
-              <Slider
-                // eslint-disable-next-line i18next/no-literal-string -- slider layout enum
-                orientation="stacked"
-                editable
-                trackFill
-                label={t('devices.lianli.lightingBrightness')}
-                ariaLabel={t('devices.lianli.lightingBrightnessAria')}
-                value={levelToPercent(settings.brightness)}
-                min={levelToPercent(MIN_BRIGHTNESS_LEVEL)}
-                max={100}
-                step={PERCENT_PER_LEVEL}
-                formatValue={pct}
-                onChange={v => edit({ brightness: percentToLevel(v, MIN_BRIGHTNESS_LEVEL) }, false)}
-                onCommit={v => edit({ brightness: percentToLevel(v, MIN_BRIGHTNESS_LEVEL) }, true)}
-              />
-
-              {spec?.direction && (
-                <SettingSelect
-                  label={t('devices.lianli.lightingDirection')}
-                  value={settings.direction}
-                  onChange={v => edit({ direction: v as UmbraDirection }, true)}
-                  options={DIRECTIONS.map(d => ({
-                    value: d,
-                    label: t(d === 'forward' ? 'devices.asiahorse-umbra.directionForward' : 'devices.asiahorse-umbra.directionReverse'),
-                  }))}
-                />
-              )}
-
-              {slots > 0 && (
-                <div className={styles.colorBlock} data-settings-aside="true">
-                  <span className={styles.colorLabel}>{t('devices.asiahorse-umbra.colors')}</span>
-                  {slots > 1 && (
-                    <ColorSlots
-                      ariaLabel={t('devices.asiahorse-umbra.colors')}
-                      colors={Array.from({ length: slots }, (_, i) => settings.colors[i] ?? DEFAULT_COLOR)}
-                      activeIndex={slot}
-                      onSelect={setColorSlot}
-                      slotLabel={i => t('devices.lianli.colorN', { n: i + 1 })}
-                    />
-                  )}
-                  <HsvPicker
-                    value={settings.colors[slot] ?? DEFAULT_COLOR}
-                    onPreview={hex => edit({ colors: withColor(settings.colors, slot, hex, DEFAULT_COLOR) }, false)}
-                    onCommit={hex => edit({ colors: withColor(settings.colors, slot, hex, DEFAULT_COLOR) }, true)}
+                {spec?.direction && (
+                  <SettingSelect
+                    label={t('devices.lianli.lightingDirection')}
+                    value={settings.direction}
+                    onChange={v => edit({ direction: v as UmbraDirection }, true)}
+                    options={DIRECTIONS.map(d => ({
+                      value: d,
+                      label: t(d === 'forward' ? 'devices.asiahorse-umbra.directionForward' : 'devices.asiahorse-umbra.directionReverse'),
+                    }))}
                   />
-                </div>
-              )}
-              </>
+                )}
+
+                {slots > 0 && (
+                  <div className={styles.colorBlock} data-settings-aside="true">
+                    <span className={styles.colorLabel}>{t('devices.asiahorse-umbra.colors')}</span>
+                    {slots > 1 && (
+                      <ColorSlots
+                        ariaLabel={t('devices.asiahorse-umbra.colors')}
+                        colors={Array.from({ length: slots }, (_, i) => settings.colors[i] ?? DEFAULT_COLOR)}
+                        activeIndex={slot}
+                        onSelect={setColorSlot}
+                        slotLabel={i => t('devices.lianli.colorN', { n: i + 1 })}
+                      />
+                    )}
+                    <HsvPicker
+                      value={settings.colors[slot] ?? DEFAULT_COLOR}
+                      onPreview={hex => edit({ colors: withColor(settings.colors, slot, hex, DEFAULT_COLOR) }, false)}
+                      onCommit={hex => edit({ colors: withColor(settings.colors, slot, hex, DEFAULT_COLOR) }, true)}
+                    />
+                  </div>
+                )}
+                </>
               )}
             </>
           )}
@@ -460,7 +460,10 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
               options={ports.map(p => ({
                 key: String(p.index),
                 label: p.ledCount > 0
-                  ? `${localizeNumbers(String(p.index + 1), numberFormat)} (${localizeNumbers(String(p.ledCount), numberFormat)})`
+                  ? t('devices.asiahorse-umbra.portChip', {
+                      port: localizeNumbers(String(p.index + 1), numberFormat),
+                      leds: localizeNumbers(String(p.ledCount), numberFormat),
+                    })
                   : localizeNumbers(String(p.index + 1), numberFormat),
                 ariaLabel: t('devices.asiahorse-umbra.portN', { n: p.index + 1 }),
                 tooltip: t('devices.asiahorse-umbra.ledCount', { n: p.ledCount }),

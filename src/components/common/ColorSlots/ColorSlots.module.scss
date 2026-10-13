@@ -1,3 +1,5 @@
+@use '../../../styles/interactions' as *;
+
 .row {
   display: flex;
   align-items: center;
@@ -12,9 +14,13 @@
   border: 2px solid var(--border);
   padding: 0;
   cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
 }
 
 .active {
   border-color: var(--text);
-  box-shadow: 0 0 0 2px var(--bg);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }

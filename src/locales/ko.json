@@ -623,6 +623,7 @@
   "devices.asiahorse-umbra.notConnected": "Asiahorse Umbra V2가 연결되지 않았습니다",
   "devices.asiahorse-umbra.order": "순서",
   "devices.asiahorse-umbra.port": "포트",
+  "devices.asiahorse-umbra.portChip": "{port} ({leds})",
   "devices.asiahorse-umbra.portN": "포트 {n}",
   "devices.asiahorse-umbra.portsHint": "포트마다 LED 수, 색상이 흐르는 방향, 체인 내 위치를 설정합니다.",
   "devices.asiahorse-umbra.portsSection": "LED 포트",

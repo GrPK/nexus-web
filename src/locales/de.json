@@ -623,6 +623,7 @@
   "devices.asiahorse-umbra.notConnected": "Asiahorse Umbra V2 nicht verbunden",
   "devices.asiahorse-umbra.order": "Reihenfolge",
   "devices.asiahorse-umbra.port": "Anschluss",
+  "devices.asiahorse-umbra.portChip": "{port} ({leds})",
   "devices.asiahorse-umbra.portN": "Anschluss {n}",
   "devices.asiahorse-umbra.portsHint": "Legen Sie für jeden Anschluss die LED-Anzahl, die Richtung des Farbflusses und die Position in der Kette fest.",
   "devices.asiahorse-umbra.portsSection": "LED-Anschlüsse",

@@ -623,6 +623,7 @@
   "devices.asiahorse-umbra.notConnected": "Asiahorse Umbra V2 bağlı değil",
   "devices.asiahorse-umbra.order": "Sıra",
   "devices.asiahorse-umbra.port": "Bağlantı noktası",
+  "devices.asiahorse-umbra.portChip": "{port} ({leds})",
   "devices.asiahorse-umbra.portN": "Bağlantı noktası {n}",
   "devices.asiahorse-umbra.portsHint": "Her bağlantı noktası için LED sayısını, rengin akış yönünü ve zincirdeki konumu ayarlayın.",
   "devices.asiahorse-umbra.portsSection": "LED bağlantı noktaları",

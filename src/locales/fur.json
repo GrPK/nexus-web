@@ -623,6 +623,7 @@
   "devices.asiahorse-umbra.notConnected": "Asiahorse Umbra V2 no connetût",
   "devices.asiahorse-umbra.order": "Ordin",
   "devices.asiahorse-umbra.port": "Puarte",
+  "devices.asiahorse-umbra.portChip": "{port} ({leds})",
   "devices.asiahorse-umbra.portN": "Puarte {n}",
   "devices.asiahorse-umbra.portsHint": "Stabilìs par ogni puarte il numar di LED, la direzion dal flus dal colôr e la posizion te catene.",
   "devices.asiahorse-umbra.portsSection": "Puartis LED",

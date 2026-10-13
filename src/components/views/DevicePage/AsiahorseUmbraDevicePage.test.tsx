@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AsiahorseUmbraDevicePage } from './AsiahorseUmbraDevicePage';
 import type { UmbraEffectSettings, UmbraState } from '../../../api/asiahorse-umbra';
@@ -271,15 +271,22 @@ describe('AsiahorseUmbraDevicePage', () => {
     expect(screen.getAllByRole('alert')).toHaveLength(2);
   });
 
-  it('clears a card error once a poll reconciles the state', async () => {
+  it('keeps a card error across polls until that card writes again', async () => {
     await mount(makeState());
-    mockFan.mockResolvedValue(null);
+    mockFan.mockResolvedValueOnce(null);
     await act(async () => { fireEvent.click(screen.getByRole('switch', { name: `${P}fanSync` })); });
     expect(screen.getByRole('alert')).toBeInTheDocument();
-    const before = Date.now();
-    vi.spyOn(Date, 'now').mockReturnValue(before + 10_000);
-    await act(async () => { window.dispatchEvent(new Event('focus')); });
-    vi.restoreAllMocks();
+
+    const now = vi.spyOn(Date, 'now');
+    try {
+      now.mockReturnValue(Date.now() + 10_000);
+      await act(async () => { window.dispatchEvent(new Event('focus')); });
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    } finally {
+      now.mockRestore();
+    }
+
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: `${P}fanSync` })); });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -313,18 +320,32 @@ describe('AsiahorseUmbraDevicePage', () => {
     s.ports[2] = { ...s.ports[2], ledCount: 4 };
     await mount(s);
     const [asyncPicker, portsPicker] = screen.getAllByRole('radiogroup', { name: `${P}port` });
-    expect(asyncPicker).toBeDefined();
-    await act(async () => {
-      fireEvent.click(portsPicker.querySelector('[data-chip-key="5"]') as HTMLElement);
-    });
-    expect(asyncPicker.querySelector('[data-chip-key="2"]')).toHaveAttribute('aria-checked', 'true');
+    const chip = (group: Element, key: string) => group.querySelector(`[data-chip-key="${key}"]`) as HTMLElement;
+    expect(chip(asyncPicker, '2')).toHaveAttribute('aria-checked', 'true');
+    await act(async () => { fireEvent.click(chip(portsPicker, '9')); });
+    expect(chip(portsPicker, '9')).toHaveAttribute('aria-checked', 'true');
+    expect(chip(asyncPicker, '2')).toHaveAttribute('aria-checked', 'true');
+    await act(async () => { fireEvent.click(chip(asyncPicker, '9')); });
+    await act(async () => { fireEvent.click(chip(portsPicker, '2')); });
+    expect(chip(asyncPicker, '9')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('writes a dragged LED count to the port it started on, even when it hits zero', async () => {
+    const s = makeState();
+    s.ports[2] = { ...s.ports[2], ledCount: 4 };
+    await mount(s);
+    const slider = screen.getByRole('slider', { name: /ledCountAria.*3/ });
+    fireEvent.change(slider, { target: { value: '0' } });
+    fireEvent.pointerUp(slider);
+    await waitFor(() => expect(mockPort).toHaveBeenCalledTimes(1));
+    expect(mockPort).toHaveBeenCalledWith(2, { ledCount: 0 });
   });
 
   it('opens the ports card on the first port that has LEDs', async () => {
     await mount(makeState());
     const group = screen.getByRole('radiogroup', { name: `${P}port` });
     expect(group.querySelector('[data-chip-key="9"]')).toHaveAttribute('aria-checked', 'true');
-    expect(group.querySelector('[data-chip-key="9"]')).toHaveTextContent('10 (6)');
+    expect(group.querySelector('[data-chip-key="9"]')).toHaveTextContent(`${P}portChip:{"port":"10","leds":"6"}`);
     expect(group.querySelector('[data-chip-key="0"]')).toHaveTextContent(/^1$/);
   });
 

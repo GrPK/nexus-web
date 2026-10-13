@@ -623,6 +623,7 @@
   "devices.asiahorse-umbra.notConnected": "Asiahorse Umbra V2 niet verbonden",
   "devices.asiahorse-umbra.order": "Volgorde",
   "devices.asiahorse-umbra.port": "Poort",
+  "devices.asiahorse-umbra.portChip": "{port} ({leds})",
   "devices.asiahorse-umbra.portN": "Poort {n}",
   "devices.asiahorse-umbra.portsHint": "Stel per poort het aantal leds, de richting van de kleurstroom en de plek in de keten in.",
   "devices.asiahorse-umbra.portsSection": "Ledpoorten",

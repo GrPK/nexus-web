@@ -630,6 +630,7 @@
   "devices.asiahorse-umbra.notConnected": "Asiahorse Umbra V2 не подключен",
   "devices.asiahorse-umbra.order": "Порядок",
   "devices.asiahorse-umbra.port": "Порт",
+  "devices.asiahorse-umbra.portChip": "{port} ({leds})",
   "devices.asiahorse-umbra.portN": "Порт {n}",
   "devices.asiahorse-umbra.portsHint": "Для каждого порта задайте число светодиодов, направление потока цвета и положение в цепочке.",
   "devices.asiahorse-umbra.portsSection": "Порты светодиодов",

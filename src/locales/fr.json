@@ -623,6 +623,7 @@
   "devices.asiahorse-umbra.notConnected": "Asiahorse Umbra V2 non connecté",
   "devices.asiahorse-umbra.order": "Ordre",
   "devices.asiahorse-umbra.port": "Port",
+  "devices.asiahorse-umbra.portChip": "{port} ({leds})",
   "devices.asiahorse-umbra.portN": "Port {n}",
   "devices.asiahorse-umbra.portsHint": "Réglez pour chaque port le nombre de LED, le sens du flux de couleur et la position dans la chaîne.",
   "devices.asiahorse-umbra.portsSection": "Ports LED",

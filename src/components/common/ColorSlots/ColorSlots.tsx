@@ -16,6 +16,7 @@ export interface ColorSlotsProps {
  * selects, the same radio behavior as ChipGroup.
  */
 export function ColorSlots({ colors, activeIndex, onSelect, slotLabel, ariaLabel }: ColorSlotsProps) {
+  const tabStop = activeIndex >= 0 && activeIndex < colors.length ? activeIndex : 0;
   const groupRef = useRef<HTMLDivElement>(null);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -39,7 +40,7 @@ export function ColorSlots({ colors, activeIndex, onSelect, slotLabel, ariaLabel
           role="radio"
           aria-checked={i === activeIndex}
           aria-label={slotLabel(i)}
-          tabIndex={i === activeIndex ? 0 : -1}
+          tabIndex={i === tabStop ? 0 : -1}
           className={`${styles.swatch} ${i === activeIndex ? styles.active : ''}`}
           style={{ background: hex }}
           onClick={() => onSelect(i)}
