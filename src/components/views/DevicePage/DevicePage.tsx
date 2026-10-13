@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Unplug } from 'lucide-react';
-import { useUnifiedDevices, type UnifiedDevice } from '../../../hooks/useUnifiedDevices';
+import { useUnifiedDevices, claimsKey, type UnifiedDevice } from '../../../hooks/useUnifiedDevices';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { ServiceRequired } from '../ServiceRequired';
-import { Placeholder } from '../Placeholder';
 import { PanelDevicePage } from './PanelDevicePage';
 import { KeebDevicePage } from './KeebDevicePage';
 import { LianLiDevicePage } from './LianLiDevicePage';
@@ -39,7 +38,7 @@ import { promoteDisplayToPanel } from '../../../api/displays';
 import { isLianLiHubId } from '../../../api/lianli';
 import { useTranslation } from '../../../lib/i18n';
 import type { ConnectionState } from '../../../hooks/useServiceStatus';
-import { DeviceDetectingContext } from './deviceDetecting';
+import { DeviceDetectingContext, useReportDeviceWaiting } from './deviceDetecting';
 import styles from './DevicePage.module.scss';
 
 /**
@@ -79,8 +78,10 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
   const { t } = useTranslation();
   const { push } = useToast();
   const { unified, controlDevice, turnedOffMonitorKeys } = useUnifiedDevices(serviceOnline);
+  // A connected cooler LCD's panel row replaces its curated row, so a page
+  // opened on the curated key shows the panel in place.
   const device = useMemo<UnifiedDevice | undefined>(
-    () => unified.find(d => d.key === deviceKey),
+    () => unified.find(d => d.key === deviceKey) ?? unified.find(d => claimsKey(d, deviceKey)),
     [unified, deviceKey],
   );
   const title = device?.shortName;
@@ -217,8 +218,6 @@ interface DeviceBodyProps {
 }
 
 function DeviceBody({ device, controlDevice, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
-  const { t } = useTranslation();
-
   if (device.kind === 'panel' && device.panelDevice) {
     // `key` forces unmount + remount when navigating between panel device
     // pages (e.g. Q60 → Y70). Without it React reuses the same
@@ -297,13 +296,23 @@ function DeviceBody({ device, controlDevice, onOpenFirmware, onSectionNavigate }
     );
   }
 
-  // Curated devices with no bespoke page: render the name + a hint so a
-  // sidebar deep link still lands on something readable.
+  return <PanelNotConnected name={device.shortName} />;
+}
+
+/** A screen whose page is its panel (a cooler LCD, a Q-series), before that panel connects. */
+function PanelNotConnected({ name }: { name: string }) {
+  const { t } = useTranslation();
+  useReportDeviceWaiting(true);
+  // Unmounts when the panel row claims the key, which ends the detecting hold.
+  const report = useContext(DeviceDetectingContext);
+  useEffect(() => () => report?.(false), [report]);
   return (
-    <section>
-      <ViewHeader title={device.shortName} />
-      <Placeholder title={t('devices.page.noPageYet', { category: device.category })} />
-    </section>
+    <div className={styles.page}>
+      <ViewHeader title={name} />
+      <div className={`${styles.pageBody} pageBody`}>
+        <EmptyState icon={<Unplug size={40} />} title={t('devices.page.notConnected')} />
+      </div>
+    </div>
   );
 }
 

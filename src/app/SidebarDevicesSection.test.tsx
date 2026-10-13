@@ -412,6 +412,33 @@ describe('SidebarDevicesSection SMBus pseudo-device exclusion', () => {
   });
 });
 
+describe('SidebarDevicesSection cooler LCD rows', () => {
+  it('lists a cooler LCD with Nexus Control off', () => {
+    mockUnified = [monitorDevice({
+      key: 'curated-lianli-hydroshift2',
+      shortName: 'Lian Li HydroShift II',
+      name: 'Lian Li HydroShift II',
+      kind: 'curated',
+      curatedId: 'lianli-hydroshift2',
+      panelDevice: undefined,
+      supportsNexusControl: true,
+      nexusControlEnabled: false,
+    })];
+    renderSidebar();
+    expect(screen.getByText('Lian Li HydroShift II')).toBeInTheDocument();
+  });
+
+  it('highlights the panel row while its page is open on the curated key', () => {
+    mockUnified = [monitorDevice({
+      key: 'panel-stream-rec1',
+      shortName: 'Lian Li HydroShift II LCD-S',
+      curatedId: 'lianli-hydroshift2',
+    })];
+    render(<SidebarDevicesSection serviceOnline activeDeviceKey="curated-lianli-hydroshift2" compact={false} onSelect={() => {}} onHeaderClick={() => {}} headerActive={false} />);
+    expect(screen.getByText('Lian Li HydroShift II LCD-S').closest('button')?.className).toMatch(/active/);
+  });
+});
+
 describe('SidebarDevicesSection order', () => {
   it('lists rows alphabetically by label, a disconnected device keeping its place', () => {
     mockUnified = [

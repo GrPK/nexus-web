@@ -94,7 +94,7 @@ const SIMULATED_SURFACE_CAPABILITIES: Partial<Record<PanelSurface, PanelDeviceCa
 
 // Streamed-panel branding by capabilities.family, which the service stamps with the
 // handler id; surfaces are shared ('lcd-round' cannot tell a Lian Li from an ID-Cooling).
-const STREAMED_FAMILY_ICONS: Partial<Record<string, string>> = {
+export const STREAMED_FAMILY_ICONS: Partial<Record<string, string>> = {
   'nzxt-kraken': '/assets/devices/nzxt.svg',
   'asus-ryujin-lcd': '/assets/devices/asus.svg',
   'lianli-galahad2-lcd': '/assets/devices/lianli.svg',
