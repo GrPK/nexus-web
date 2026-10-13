@@ -166,6 +166,30 @@ describe('SidebarDevicesSection Nexus Link off indicator', () => {
   });
 });
 
+describe('SidebarDevicesSection device warning', () => {
+  const deck = (nexusControlEnabled: boolean) => monitorDevice({
+    key: 'streamdeck:SN1',
+    kind: 'curated',
+    panelDevice: undefined,
+    supportsNexusControl: true,
+    nexusControlEnabled,
+    warning: 'elgato-software-running',
+  });
+
+  it('shows the warning glyph while Nexus Control is on', () => {
+    mockUnified = [deck(true)];
+    renderSidebar();
+    expect(screen.getByRole('img', { name: 'devices.warning.elgatoSoftwareRunning' })).toBeInTheDocument();
+  });
+
+  it('hides the warning glyph while Nexus Control is off', () => {
+    mockUnified = [deck(false)];
+    renderSidebar();
+    expect(screen.queryByRole('img', { name: 'devices.warning.elgatoSoftwareRunning' })).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'devices.nexusControlOff.sidebarTooltip' })).toBeInTheDocument();
+  });
+});
+
 describe('SidebarDevicesSection simulated badge', () => {
   // Device-agnostic: the badge also marks a simulated Tryx cooler and a
   // simulated Stream Deck, neither of which is a panel.
