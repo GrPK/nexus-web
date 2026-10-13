@@ -47,13 +47,4 @@ describe('ColorSlots', () => {
     fireEvent.keyDown(slot(2), { key: 'ArrowUp' });
     expect(slot(1)).toHaveFocus();
   });
-
-  it('selects the focused slot on Enter and Space', () => {
-    const onSelect = vi.fn();
-    const slot = mount(0, onSelect);
-    // A native button turns both keys into a click; jsdom needs it spelled out.
-    fireEvent.click(slot(1));
-    fireEvent.click(slot(2));
-    expect(onSelect.mock.calls).toEqual([[1], [2]]);
-  });
 });

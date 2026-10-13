@@ -623,7 +623,7 @@
   "devices.asiahorse-umbra.notConnected": "Asiahorse Umbra V2 は接続されていません",
   "devices.asiahorse-umbra.order": "順序",
   "devices.asiahorse-umbra.port": "ポート",
-  "devices.asiahorse-umbra.portChip": "{port} ({leds})",
+  "devices.asiahorse-umbra.portChip": "{port}（{leds}）",
   "devices.asiahorse-umbra.portN": "ポート {n}",
   "devices.asiahorse-umbra.portsHint": "ポートごとに LED 数、色が流れる方向、チェーン内の位置を設定します。",
   "devices.asiahorse-umbra.portsSection": "LED ポート",

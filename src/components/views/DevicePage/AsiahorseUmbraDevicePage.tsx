@@ -101,8 +101,8 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
 
   const apply = useCallback((next: UmbraState) => {
     if (!aliveRef.current) return;
-    // Pinned on the first state so the card does not follow the LED counts around.
-    setPortIndex(prev => prev ?? populatedPorts(next.ports)[0]?.index ?? 0);
+    // Pinned on the first connected state so the card does not follow the LED counts around.
+    if (next.isConnected) setPortIndex(prev => prev ?? populatedPorts(next.ports)[0]?.index ?? 0);
     setState(next);
     setConnection(next.isConnected ? 'connected' : 'disconnected');
   }, []);
@@ -410,7 +410,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
 
                   <div className={own.split}>
                     <div className={own.column}>
-                      <div className={styles.colorBlock} data-settings-aside="true">
+                      <div className={styles.colorBlock}>
                         <ChipGroup
                           fullWidth
                           ariaLabel={t('devices.asiahorse-umbra.mode')}
@@ -427,7 +427,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                       </div>
 
                       {asyncBlocked && (
-                        <div data-settings-aside="true">
+                        <div>
                           <Notice tone="info">{t('devices.asiahorse-umbra.asyncNoPorts')}</Notice>
                         </div>
                       )}
@@ -450,7 +450,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                             </SettingRow>
                           )}
 
-                          <div className={styles.colorBlock} data-settings-aside="true">
+                          <div className={styles.colorBlock}>
                             <span className={styles.colorLabel}>{t('devices.asiahorse-umbra.effectLabel')}</span>
                             <ChipGroup
                               wrap
@@ -517,7 +517,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                           )}
 
                           {slots > 0 && (
-                            <div className={styles.colorBlock} data-settings-aside="true">
+                            <div className={styles.colorBlock}>
                               <span className={styles.colorLabel}>{t('devices.asiahorse-umbra.colors')}</span>
                               {slots > 1 && (
                                 <ColorSlots

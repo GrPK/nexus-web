@@ -381,6 +381,29 @@ describe('AsiahorseUmbraDevicePage', () => {
     expect(group.querySelector('[data-chip-key="0"]')).toHaveTextContent(/^1$/);
   });
 
+  it('pins the ports card on the first connected state, not on a disconnected one', async () => {
+    const empty = makeState({ isConnected: false });
+    empty.ports = empty.ports.map(p => ({ ...p, ledCount: 0 }));
+    mockGet.mockResolvedValue(empty);
+    await act(async () => { render(<AsiahorseUmbraDevicePage />); });
+    expect(screen.getByText(`${P}notConnected`)).toBeInTheDocument();
+
+    mockGet.mockResolvedValue(makeState());
+    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    const group = screen.getByRole('radiogroup', { name: `${P}port` });
+    expect(group.querySelector('[data-chip-key="9"]')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('keeps the pinned port when auto-detect finds no LEDs on it', async () => {
+    await mount(makeState(), 'device');
+    const found = makeState();
+    found.ports = found.ports.map(p => (p.index === 9 ? { ...p, ledCount: 0 } : p.index === 2 ? { ...p, ledCount: 4 } : p));
+    mockDetect.mockResolvedValue(found);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: `${P}autoDetect` })); });
+    const group = screen.getByRole('radiogroup', { name: `${P}port` });
+    expect(group.querySelector('[data-chip-key="9"]')).toHaveAttribute('aria-checked', 'true');
+  });
+
   it('explains an empty async editor instead of writing to port 1', async () => {
     const s = makeState();
     s.lighting.group = 'async';

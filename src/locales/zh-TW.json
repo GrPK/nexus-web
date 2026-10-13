@@ -623,7 +623,7 @@
   "devices.asiahorse-umbra.notConnected": "Asiahorse Umbra V2 未連線",
   "devices.asiahorse-umbra.order": "順序",
   "devices.asiahorse-umbra.port": "連接埠",
-  "devices.asiahorse-umbra.portChip": "{port} ({leds})",
+  "devices.asiahorse-umbra.portChip": "{port}（{leds}）",
   "devices.asiahorse-umbra.portN": "連接埠 {n}",
   "devices.asiahorse-umbra.portsHint": "為每個連接埠設定 LED 數量、顏色流動方向以及在鏈路中的位置。",
   "devices.asiahorse-umbra.portsSection": "LED 連接埠",
