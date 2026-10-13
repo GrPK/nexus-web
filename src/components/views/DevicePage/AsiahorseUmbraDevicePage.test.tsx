@@ -138,6 +138,7 @@ describe('AsiahorseUmbraDevicePage', () => {
   it('shows one swatch per color slot and commits the whole color list', async () => {
     await mount(withSync('breath'));
     expect(screen.getAllByRole('radio', { name: /colorN/ })).toHaveLength(4);
+    expect(screen.getByRole('radiogroup', { name: `${P}colors` })).toBeInTheDocument();
     await act(async () => { fireEvent.click(screen.getByRole('radio', { name: 'devices.lianli.colorN:{"n":3}' })); });
     expect(screen.getByTestId('picker')).toHaveAttribute('data-value', '#0000ff');
     await act(async () => { fireEvent.click(screen.getByTestId('picker')); });
@@ -189,7 +190,8 @@ describe('AsiahorseUmbraDevicePage', () => {
     await act(async () => { finish(found); });
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(button).not.toBeDisabled();
-    expect(screen.getByText(`${P}autoDetectDone:{"ports":"2","leds":"24"}`)).toBeInTheDocument();
+    expect(screen.getByText(`${P}portsWithLeds`)).toBeInTheDocument();
+    expect(screen.getByText('24')).toBeInTheDocument();
   });
 
   it('reports a failed auto-detect', async () => {
@@ -254,7 +256,7 @@ describe('AsiahorseUmbraDevicePage', () => {
     await mount(makeState());
     await typeInto('leds', '12');
     expect(mockPort).toHaveBeenCalledTimes(1);
-    expect(mockPort).toHaveBeenCalledWith(0, { ledCount: 12 });
+    expect(mockPort).toHaveBeenCalledWith(9, { ledCount: 12 });
   });
 
   it('shows a failed write only in the card that wrote', async () => {
@@ -316,6 +318,14 @@ describe('AsiahorseUmbraDevicePage', () => {
       fireEvent.click(portsPicker.querySelector('[data-chip-key="5"]') as HTMLElement);
     });
     expect(asyncPicker.querySelector('[data-chip-key="2"]')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('opens the ports card on the first port that has LEDs', async () => {
+    await mount(makeState());
+    const group = screen.getByRole('radiogroup', { name: `${P}port` });
+    expect(group.querySelector('[data-chip-key="9"]')).toHaveAttribute('aria-checked', 'true');
+    expect(group.querySelector('[data-chip-key="9"]')).toHaveTextContent('10 (6)');
+    expect(group.querySelector('[data-chip-key="0"]')).toHaveTextContent(/^1$/);
   });
 
   it('explains an empty async editor instead of writing to port 1', async () => {

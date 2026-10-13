@@ -5,6 +5,7 @@ import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { SettingRow, SettingSelect, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
+import { ColorSlots } from '../../common/ColorSlots/ColorSlots';
 import { Slider } from '../../common/Slider/Slider';
 import { HsvPicker } from '../../common/HsvPicker/HsvPicker';
 import { Button } from '../../common/Button/Button';
@@ -48,7 +49,6 @@ import { useTranslation } from '../../../lib/i18n';
 import { localizeNumbers } from '../../../lib/units';
 import { useReportDeviceWaiting } from './deviceDetecting';
 import styles from './LianLiDevicePage.module.scss';
-import own from './AsiahorseUmbraDevicePage.module.scss';
 
 const POLL_MS = 3000;
 type WriteCard = 'lighting' | 'ports' | 'fan' | 'boot';
@@ -83,7 +83,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   const [failed, setFailed] = useState<Partial<Record<WriteCard, boolean>>>({});
   const [detecting, setDetecting] = useState(false);
   const [detectFailed, setDetectFailed] = useState(false);
-  const [portIndex, setPortIndex] = useState(0);
+  const [portIndex, setPortIndex] = useState<number | null>(null);
   const [asyncIndex, setAsyncIndex] = useState(0);
   const [colorSlot, setColorSlot] = useState(0);
   const aliveRef = useRef(true);
@@ -190,7 +190,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   const spec = effectList.find(e => e.key === settings?.effect) ?? null;
   const slots = Math.min(spec?.colors ?? 0, COLOR_SLOTS);
   const slot = Math.min(colorSlot, Math.max(slots - 1, 0));
-  const port = ports.find(p => p.index === portIndex) ?? ports[0];
+  const port = ports.find(p => p.index === portIndex) ?? populated[0] ?? ports[0];
   const pct = (v: number) => localizeNumbers(`${v}%`, numberFormat);
 
   const touch = () => {
@@ -219,13 +219,6 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
 
   const connectedState = loaded ? { label: t('devices.asiahorse-umbra.connected'), tone: CONNECTED_TONE } : undefined;
   const bootOptions = BOOT_MODES.map(m => ({ value: m, label: t(BOOT_KEYS[m]) }));
-
-  const summary = state
-    ? t('devices.asiahorse-umbra.autoDetectDone', {
-        ports: localizeNumbers(String(populated.length), numberFormat),
-        leds: localizeNumbers(String(totalLeds(ports)), numberFormat),
-      })
-    : '';
 
   return (
     <div className={styles.page}>
@@ -406,15 +399,12 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                 <div className={styles.colorBlock} data-settings-aside="true">
                   <span className={styles.colorLabel}>{t('devices.asiahorse-umbra.colors')}</span>
                   {slots > 1 && (
-                    <ChipGroup
+                    <ColorSlots
                       ariaLabel={t('devices.asiahorse-umbra.colors')}
-                      activeKey={String(slot)}
-                      options={Array.from({ length: slots }, (_, i) => ({
-                        key: String(i),
-                        label: <span className={own.dot} style={{ background: settings.colors[i] ?? DEFAULT_COLOR }} />,
-                        ariaLabel: t('devices.lianli.colorN', { n: i + 1 }),
-                      }))}
-                      onChange={key => setColorSlot(Number(key))}
+                      colors={Array.from({ length: slots }, (_, i) => settings.colors[i] ?? DEFAULT_COLOR)}
+                      activeIndex={slot}
+                      onSelect={setColorSlot}
+                      slotLabel={i => t('devices.lianli.colorN', { n: i + 1 })}
                     />
                   )}
                   <HsvPicker
@@ -451,8 +441,15 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
           {detectFailed && (
             <div data-settings-aside="true"><InlineError>{t('devices.asiahorse-umbra.autoDetectFailed')}</InlineError></div>
           )}
-          {!detecting && !detectFailed && loaded && (
-            <p className={styles.customNote} data-settings-aside="true">{summary}</p>
+          {loaded && (
+            <>
+              <SettingRow label={t('devices.asiahorse-umbra.portsWithLeds')}>
+                <span className={styles.rowValue}>{localizeNumbers(String(populated.length), numberFormat)}</span>
+              </SettingRow>
+              <SettingRow label={t('devices.asiahorse-umbra.totalLeds')}>
+                <span className={styles.rowValue}>{localizeNumbers(String(totalLeds(ports)), numberFormat)}</span>
+              </SettingRow>
+            </>
           )}
 
           <SettingRow label={t('devices.asiahorse-umbra.port')}>
@@ -462,7 +459,9 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
               activeKey={String(port?.index ?? 0)}
               options={ports.map(p => ({
                 key: String(p.index),
-                label: localizeNumbers(String(p.index + 1), numberFormat),
+                label: p.ledCount > 0
+                  ? `${localizeNumbers(String(p.index + 1), numberFormat)} (${localizeNumbers(String(p.ledCount), numberFormat)})`
+                  : localizeNumbers(String(p.index + 1), numberFormat),
                 ariaLabel: t('devices.asiahorse-umbra.portN', { n: p.index + 1 }),
                 tooltip: t('devices.asiahorse-umbra.ledCount', { n: p.ledCount }),
               }))}
