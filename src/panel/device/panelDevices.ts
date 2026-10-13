@@ -63,14 +63,11 @@ export interface PanelDevice {
   experimental?: boolean;
 }
 
-export const PANEL_DEVICE_ICON = '/assets/devices/y70.svg';
 export const PANEL_MONITOR_ICON = '/assets/devices/monitor.svg';
-// Lucide's monitor glyph, for an OS monitor promoted to a panel.
-export const PROMOTED_MONITOR_ICON = '/assets/devices/monitor-panel.svg';
 export const HYTE_LOGO = '/assets/devices/hyte.svg';
 
 // Per-panel-family icon for PanelDevice.iconSrc: the brand's mark. Falls back
-// to PANEL_DEVICE_ICON for unknown source ids.
+// to the generic monitor for unknown source ids.
 export const PANEL_FAMILY_ICONS: Readonly<Record<string, string>> = {
   y70:      HYTE_LOGO,
   'y70-4k': HYTE_LOGO,
@@ -86,5 +83,5 @@ export const PANEL_FAMILY_ICONS: Readonly<Record<string, string>> = {
 };
 
 export function panelIconForSource(sourceId: string): string {
-  return PANEL_FAMILY_ICONS[sourceId] ?? PANEL_DEVICE_ICON;
+  return PANEL_FAMILY_ICONS[sourceId] ?? PANEL_MONITOR_ICON;
 }

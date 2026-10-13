@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {  } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Minimize2 } from 'lucide-react';
 import type { AudioSnapshot } from '../../../../hooks/useAudioState';
 import type { EffectState, EffectTemplateBundle } from '../../../../types/lighting';
 import { useShaderRenderer } from '../../../../hooks/useShaderRenderer';
@@ -96,14 +96,10 @@ export function FullscreenShader({
       {loading && <div className={styles.overlay}>{t('lighting.fullscreen.loadingShader')}</div>}
       {error && <div className={styles.overlay}>{error}</div>}
       <button type="button" aria-label={t('lighting.fullscreen.prevEffect')} className={`${styles.navZone} ${styles.navZoneLeft}`} onClick={onPrev}>
-        <svg className={styles.navArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="15,18 9,12 15,6" />
-        </svg>
+        <ChevronLeft className={styles.navArrow} strokeWidth={1.5} />
       </button>
       <button type="button" aria-label={t('lighting.fullscreen.nextEffect')} className={`${styles.navZone} ${styles.navZoneRight}`} onClick={onNext}>
-        <svg className={styles.navArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="9,18 15,12 9,6" />
-        </svg>
+        <ChevronRight className={styles.navArrow} strokeWidth={1.5} />
       </button>
       <button
         type="button"
@@ -111,10 +107,7 @@ export function FullscreenShader({
         className={`${styles.closeBtn} ${closeVisible ? styles.closeBtnVisible : ''}`}
         onClick={() => document.exitFullscreen?.().catch(() => onClose())}
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="1,5 5,5 5,1" /><polyline points="13,9 9,9 9,13" />
-          <line x1="5" y1="5" x2="0.5" y2="0.5" /><line x1="9" y1="9" x2="13.5" y2="13.5" />
-        </svg>
+        <Minimize2 size={14} strokeWidth={1.5} />
       </button>
       {drawerOpen && (
         <AnimateDrawer
