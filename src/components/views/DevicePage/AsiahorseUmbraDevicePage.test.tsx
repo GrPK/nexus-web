@@ -213,7 +213,7 @@ describe('AsiahorseUmbraDevicePage', () => {
     await act(async () => { fireEvent.click(button); });
     expect(button).toBeDisabled();
     expect(button).toHaveTextContent(`${P}autoDetecting`);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(`${P}autoDetecting`);
     expect(document.body.querySelectorAll('*').length).toBe(before);
     expect(screen.getByRole('slider', { name: /ledCountAria/ })).toBeDisabled();
     expect(screen.getByRole('radio', { name: `${P}portN:{"n":1}` })).toBeDisabled();
@@ -222,31 +222,112 @@ describe('AsiahorseUmbraDevicePage', () => {
     found.ports[0] = { ...found.ports[0], ledCount: 18 };
     await act(async () => { finish(found); });
     expect(button).not.toBeDisabled();
-    expect(button).toHaveTextContent(`${P}autoDetect`);
+    expect(screen.getByRole('status')).toHaveTextContent(`${P}restartDone`);
     expect(screen.getByText('24')).toBeInTheDocument();
   });
 
-  it('restarts the controller on an LED count commit and then shows the live count', async () => {
+  // Drives the slider the way a drag or a key press does: input, then release.
+  const commitLed = (value: string) => {
+    const slider = screen.getByRole('slider', { name: /ledCountAria/ });
+    fireEvent.change(slider, { target: { value } });
+    fireEvent.pointerUp(slider);
+  };
+
+  it('restarts the controller on an LED count commit and keeps the slider usable meanwhile', async () => {
     await mount(makeState(), 'device');
     let finish: (s: UmbraState | null) => void = () => {};
     mockPort.mockReturnValue(new Promise<UmbraState | null>(r => { finish = r; }));
 
-    const slider = screen.getByRole('slider', { name: /ledCountAria/ });
-    fireEvent.change(slider, { target: { value: '20' } });
-    fireEvent.pointerUp(slider);
+    commitLed('20');
     await waitFor(() => expect(mockPort).toHaveBeenCalledWith(9, { ledCount: 20 }));
-
-    // Mid-restart the slider keeps the committed value and the card is locked.
-    expect(slider).toBeDisabled();
-    expect((slider as HTMLInputElement).value).toBe('20');
+    const slider = screen.getByRole('slider', { name: /ledCountAria/ }) as HTMLInputElement;
+    expect(slider).not.toBeDisabled();
+    expect(slider.value).toBe('20');
     expect(screen.getByRole('button', { name: `${P}autoDetecting` })).toBeDisabled();
 
-    // The controller reports what it really found.
     const live = makeState();
     live.ports[9] = { ...live.ports[9], ledCount: 6 };
     await act(async () => { finish(live); });
-    expect(screen.getByRole('slider', { name: /ledCountAria/ })).not.toBeDisabled();
     expect((screen.getByRole('slider', { name: /ledCountAria/ }) as HTMLInputElement).value).toBe('6');
+    expect(screen.getByRole('button', { name: `${P}autoDetect` })).not.toBeDisabled();
+  });
+
+  it('reports a refused LED count and unlocks the card', async () => {
+    await mount(makeState(), 'device');
+    mockPort.mockResolvedValue(null);
+    commitLed('20');
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(`${P}saveFailed`));
+    expect(screen.getByRole('button', { name: `${P}autoDetect` })).not.toBeDisabled();
+    expect(screen.getByRole('radio', { name: `${P}portN:{"n":1}` })).not.toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent(`${P}saveFailed`);
+  });
+
+  it('ignores polls and focus while the controller restarts', async () => {
+    await mount(makeState(), 'device');
+    mockPort.mockReturnValue(new Promise(() => {}));
+    commitLed('20');
+    await waitFor(() => expect(mockPort).toHaveBeenCalled());
+    const calls = mockGet.mock.calls.length;
+    const now = vi.spyOn(Date, 'now');
+    try {
+      now.mockReturnValue(Date.now() + 10_000);
+      await act(async () => { window.dispatchEvent(new Event('focus')); });
+    } finally {
+      now.mockRestore();
+    }
+    expect(mockGet.mock.calls.length).toBe(calls);
+  });
+
+  it('coalesces repeated LED count commits into at most one more restart', async () => {
+    await mount(makeState(), 'device');
+    const resolvers: Array<(s: UmbraState) => void> = [];
+    mockPort.mockImplementation(() => new Promise<UmbraState>(r => { resolvers.push(r); }));
+
+    commitLed('7');
+    await waitFor(() => expect(mockPort).toHaveBeenCalledTimes(1));
+    for (const v of ['8', '9', '10']) commitLed(v);
+    await act(async () => { await new Promise(r => setTimeout(r, 10)); });
+    expect(mockPort).toHaveBeenCalledTimes(1);
+
+    await act(async () => { resolvers[0](makeState()); });
+    await waitFor(() => expect(mockPort).toHaveBeenCalledTimes(2));
+    expect(mockPort).toHaveBeenLastCalledWith(9, { ledCount: 10 });
+
+    const live = makeState();
+    live.ports[9] = { ...live.ports[9], ledCount: 10 };
+    await act(async () => { resolvers[1](live); });
+    expect(mockPort).toHaveBeenCalledTimes(2);
+    expect((screen.getByRole('slider', { name: /ledCountAria/ }) as HTMLInputElement).value).toBe('10');
+  });
+
+  it('locks writes on every tab while the controller restarts', async () => {
+    await mount(makeState(), 'device');
+    let finish: (s: UmbraState | null) => void = () => {};
+    mockDetect.mockReturnValue(new Promise<UmbraState | null>(r => { finish = r; }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: `${P}autoDetect` })); });
+
+    openTab('lighting');
+    expect(screen.getByRole('radio', { name: `${P}sourceNexus` })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: `${P}effect.runway` })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: `${P}lightOn` })).toBeDisabled();
+    openTab('fans');
+    expect(screen.getByRole('switch', { name: `${P}fanSync` })).toBeDisabled();
+    openTab('settings');
+    expect(screen.getByRole('switch', { name: `${P}selfCheck` })).toBeDisabled();
+    expect(mockLighting).not.toHaveBeenCalled();
+    expect(mockFan).not.toHaveBeenCalled();
+    expect(mockBoot).not.toHaveBeenCalled();
+
+    await act(async () => { finish(makeState()); });
+    expect(screen.getByRole('switch', { name: `${P}selfCheck` })).not.toBeDisabled();
+  });
+
+  it('writes RGB flow and order directly when idle', async () => {
+    await mount(makeState(), 'device');
+    fireEvent.click(screen.getByRole('button', { name: `${P}order` }));
+    await act(async () => { fireEvent.click(screen.getByRole('option', { name: '3' })); });
+    expect(mockPort).toHaveBeenCalledWith(9, { order: 3 });
+    expect(mockDetect).not.toHaveBeenCalled();
   });
 
   it('explains the LED count rule under the slider', async () => {

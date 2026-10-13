@@ -23,6 +23,27 @@
   }
 }
 
-.detectButton {
-  min-width: 9rem;
+// Both labels share one cell, so the button is as wide as the longer one in every locale.
+.labelStack {
+  display: inline-grid;
+
+  > span {
+    grid-area: 1 / 1;
+  }
+}
+
+.labelHidden {
+  visibility: hidden;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

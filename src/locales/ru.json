@@ -636,6 +636,7 @@
   "devices.asiahorse-umbra.portsHint": "Для каждого порта задайте число светодиодов, направление потока цвета и положение в цепочке.",
   "devices.asiahorse-umbra.portsSection": "Порты светодиодов",
   "devices.asiahorse-umbra.portsWithLeds": "Порты со светодиодами",
+  "devices.asiahorse-umbra.restartDone": "Контроллер перезапущен. Число светодиодов обновлено.",
   "devices.asiahorse-umbra.saveFailed": "Не удалось отправить это изменение на контроллер.",
   "devices.asiahorse-umbra.selfCheck": "Самопроверка при запуске",
   "devices.asiahorse-umbra.selfCheckHint": "Выполняет быструю проверку светодиодов при каждом включении контроллера.",

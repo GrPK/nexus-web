@@ -629,6 +629,7 @@
   "devices.asiahorse-umbra.portsHint": "Her bağlantı noktası için LED sayısını, rengin akış yönünü ve zincirdeki konumu ayarlayın.",
   "devices.asiahorse-umbra.portsSection": "LED bağlantı noktaları",
   "devices.asiahorse-umbra.portsWithLeds": "LED'li bağlantı noktaları",
+  "devices.asiahorse-umbra.restartDone": "Denetleyici yeniden başlatıldı. LED sayıları güncellendi.",
   "devices.asiahorse-umbra.saveFailed": "Bu değişiklik denetleyiciye gönderilemedi.",
   "devices.asiahorse-umbra.selfCheck": "Açılış öz denetimi",
   "devices.asiahorse-umbra.selfCheckHint": "Denetleyici her açıldığında hızlı bir LED denetimi çalıştırır.",

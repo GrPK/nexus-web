@@ -629,6 +629,7 @@
   "devices.asiahorse-umbra.portsHint": "Stel per poort het aantal leds, de richting van de kleurstroom en de plek in de keten in.",
   "devices.asiahorse-umbra.portsSection": "Ledpoorten",
   "devices.asiahorse-umbra.portsWithLeds": "Poorten met leds",
+  "devices.asiahorse-umbra.restartDone": "De controller is opnieuw opgestart. Ledaantallen bijgewerkt.",
   "devices.asiahorse-umbra.saveFailed": "Die wijziging kon niet naar de controller worden gestuurd.",
   "devices.asiahorse-umbra.selfCheck": "Zelftest bij opstarten",
   "devices.asiahorse-umbra.selfCheckHint": "Voert elke keer dat de controller aangaat een snelle ledtest uit.",

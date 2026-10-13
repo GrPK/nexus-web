@@ -636,6 +636,7 @@
   "devices.asiahorse-umbra.portsHint": "Dla każdego portu ustaw liczbę diod LED, kierunek przepływu kolorów i pozycję w łańcuchu.",
   "devices.asiahorse-umbra.portsSection": "Porty LED",
   "devices.asiahorse-umbra.portsWithLeds": "Porty z diodami LED",
+  "devices.asiahorse-umbra.restartDone": "Kontroler został zrestartowany. Liczby diod LED zaktualizowane.",
   "devices.asiahorse-umbra.saveFailed": "Nie udało się wysłać tej zmiany do kontrolera.",
   "devices.asiahorse-umbra.selfCheck": "Autotest przy uruchomieniu",
   "devices.asiahorse-umbra.selfCheckHint": "Przy każdym włączeniu kontrolera uruchamia szybki test diod LED.",

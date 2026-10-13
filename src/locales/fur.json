@@ -629,6 +629,7 @@
   "devices.asiahorse-umbra.portsHint": "Stabilìs par ogni puarte il numar di LED, la direzion dal flus dal colôr e la posizion te catene.",
   "devices.asiahorse-umbra.portsSection": "Puartis LED",
   "devices.asiahorse-umbra.portsWithLeds": "Puartis cun LED",
+  "devices.asiahorse-umbra.restartDone": "Il controlôr si è tornât a inviâ. Numars di LED inzornâts.",
   "devices.asiahorse-umbra.saveFailed": "No si à rivât a mandâ chê modifiche al controlôr.",
   "devices.asiahorse-umbra.selfCheck": "Autoverifiche a l’inviament",
   "devices.asiahorse-umbra.selfCheckHint": "Al fâs une verifiche svelte dai LED ogni volte che si impie il controlôr.",

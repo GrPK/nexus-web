@@ -629,6 +629,7 @@
   "devices.asiahorse-umbra.portsHint": "为每个接口设置 LED 数量、颜色流动方向以及在链路中的位置。",
   "devices.asiahorse-umbra.portsSection": "LED 接口",
   "devices.asiahorse-umbra.portsWithLeds": "带 LED 的接口",
+  "devices.asiahorse-umbra.restartDone": "控制器已重启，LED 数量已更新。",
   "devices.asiahorse-umbra.saveFailed": "无法将该更改发送到控制器。",
   "devices.asiahorse-umbra.selfCheck": "开机自检",
   "devices.asiahorse-umbra.selfCheckHint": "每次控制器上电时快速检查一次 LED。",

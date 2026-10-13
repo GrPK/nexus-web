@@ -629,6 +629,7 @@
   "devices.asiahorse-umbra.portsHint": "ポートごとに LED 数、色が流れる方向、チェーン内の位置を設定します。",
   "devices.asiahorse-umbra.portsSection": "LED ポート",
   "devices.asiahorse-umbra.portsWithLeds": "LED のあるポート",
+  "devices.asiahorse-umbra.restartDone": "コントローラーが再起動しました。LED 数を更新しました。",
   "devices.asiahorse-umbra.saveFailed": "その変更をコントローラーに送信できませんでした。",
   "devices.asiahorse-umbra.selfCheck": "起動時セルフチェック",
   "devices.asiahorse-umbra.selfCheckHint": "コントローラーの電源が入るたびに、LED の簡易チェックを実行します。",

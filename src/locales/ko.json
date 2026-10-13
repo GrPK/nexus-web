@@ -629,6 +629,7 @@
   "devices.asiahorse-umbra.portsHint": "포트마다 LED 수, 색상이 흐르는 방향, 체인 내 위치를 설정합니다.",
   "devices.asiahorse-umbra.portsSection": "LED 포트",
   "devices.asiahorse-umbra.portsWithLeds": "LED가 있는 포트",
+  "devices.asiahorse-umbra.restartDone": "컨트롤러가 다시 시작되었습니다. LED 수가 업데이트되었습니다.",
   "devices.asiahorse-umbra.saveFailed": "해당 변경 사항을 컨트롤러로 보내지 못했습니다.",
   "devices.asiahorse-umbra.selfCheck": "부팅 자가 점검",
   "devices.asiahorse-umbra.selfCheckHint": "컨트롤러 전원이 켜질 때마다 간단한 LED 점검을 실행합니다.",

@@ -629,6 +629,7 @@
   "devices.asiahorse-umbra.portsHint": "Legen Sie für jeden Anschluss die LED-Anzahl, die Richtung des Farbflusses und die Position in der Kette fest.",
   "devices.asiahorse-umbra.portsSection": "LED-Anschlüsse",
   "devices.asiahorse-umbra.portsWithLeds": "Anschlüsse mit LEDs",
+  "devices.asiahorse-umbra.restartDone": "Der Controller wurde neu gestartet. LED-Anzahlen aktualisiert.",
   "devices.asiahorse-umbra.saveFailed": "Diese Änderung konnte nicht an den Controller gesendet werden.",
   "devices.asiahorse-umbra.selfCheck": "Selbsttest beim Start",
   "devices.asiahorse-umbra.selfCheckHint": "Führt bei jedem Einschalten des Controllers einen kurzen LED-Test aus.",

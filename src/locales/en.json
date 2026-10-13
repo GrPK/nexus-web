@@ -629,6 +629,7 @@
   "devices.asiahorse-umbra.portsHint": "Set the LED count, the direction colors flow, and the position in the chain for each port.",
   "devices.asiahorse-umbra.portsSection": "LED ports",
   "devices.asiahorse-umbra.portsWithLeds": "Ports with LEDs",
+  "devices.asiahorse-umbra.restartDone": "The controller restarted. LED counts updated.",
   "devices.asiahorse-umbra.saveFailed": "That change could not be sent to the controller.",
   "devices.asiahorse-umbra.selfCheck": "Boot self-check",
   "devices.asiahorse-umbra.selfCheckHint": "Runs a quick LED check each time the controller powers on.",

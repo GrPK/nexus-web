@@ -629,6 +629,7 @@
   "devices.asiahorse-umbra.portsHint": "為每個連接埠設定 LED 數量、顏色流動方向以及在鏈路中的位置。",
   "devices.asiahorse-umbra.portsSection": "LED 連接埠",
   "devices.asiahorse-umbra.portsWithLeds": "有 LED 的連接埠",
+  "devices.asiahorse-umbra.restartDone": "控制器已重新啟動，LED 數量已更新。",
   "devices.asiahorse-umbra.saveFailed": "無法將該變更傳送到控制器。",
   "devices.asiahorse-umbra.selfCheck": "開機自我檢查",
   "devices.asiahorse-umbra.selfCheckHint": "每次控制器通電時快速檢查一次 LED。",

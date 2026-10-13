@@ -629,6 +629,7 @@
   "devices.asiahorse-umbra.portsHint": "Imposta per ogni porta il numero di LED, la direzione del flusso dei colori e la posizione nella catena.",
   "devices.asiahorse-umbra.portsSection": "Porte LED",
   "devices.asiahorse-umbra.portsWithLeds": "Porte con LED",
+  "devices.asiahorse-umbra.restartDone": "Il controller si è riavviato. Numeri di LED aggiornati.",
   "devices.asiahorse-umbra.saveFailed": "Impossibile inviare la modifica al controller.",
   "devices.asiahorse-umbra.selfCheck": "Autotest all'avvio",
   "devices.asiahorse-umbra.selfCheckHint": "Esegue un rapido controllo dei LED a ogni accensione del controller.",
