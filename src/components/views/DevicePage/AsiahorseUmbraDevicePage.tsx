@@ -148,13 +148,14 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
     void write('lighting', () => setUmbraLighting(patch));
   }, [write]);
 
-  const detect = useCallback(async () => {
+  // Auto-detect and an LED count write both restart the controller; the answer is the live state.
+  const restart = useCallback(async (call: () => Promise<UmbraState | null>) => {
     const id = ++seqRef.current;
     detectingRef.current = true;
     setDetecting(true);
     setDetectFailed(false);
     try {
-      const next = await autoDetectUmbra();
+      const next = await call();
       if (!aliveRef.current) return;
       if (!next) setDetectFailed(true);
       else if (id === seqRef.current) apply(next);
@@ -163,6 +164,8 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
       if (aliveRef.current) setDetecting(false);
     }
   }, [apply]);
+
+  const detect = useCallback(() => restart(autoDetectUmbra), [restart]);
 
   if (connection === 'disconnected') {
     return (
@@ -261,13 +264,10 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                 label={t('devices.asiahorse-umbra.autoDetect')}
                 description={t('devices.asiahorse-umbra.autoDetectHint')}
               >
-                <Button size="sm" tone="neutral" disabled={!loaded || detecting} onClick={() => { void detect(); }}>
-                  {t('devices.asiahorse-umbra.autoDetect')}
+                <Button className={own.detectButton} size="sm" tone="neutral" disabled={!loaded || detecting} onClick={() => { void detect(); }}>
+                  {t(detecting ? 'devices.asiahorse-umbra.autoDetecting' : 'devices.asiahorse-umbra.autoDetect')}
                 </Button>
               </SettingRow>
-              <div role="status" data-settings-aside="true">
-                {detecting && <Notice tone="info">{t('devices.asiahorse-umbra.autoDetecting')}</Notice>}
-              </div>
               {detectFailed && (
                 <div data-settings-aside="true"><InlineError>{t('devices.asiahorse-umbra.autoDetectFailed')}</InlineError></div>
               )}
@@ -289,6 +289,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                   activeKey={String(port?.index ?? 0)}
                   options={ports.map(p => ({
                     key: String(p.index),
+                    disabled: detecting,
                     label: p.ledCount > 0
                       ? t('devices.asiahorse-umbra.portChip', {
                           port: localizeNumbers(String(p.index + 1), numberFormat),
@@ -324,8 +325,12 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                         ports: prev.ports.map(p => (p.index === port.index ? { ...p, ledCount } : p)),
                       }));
                     }}
-                    onCommit={v => editPort({ ledCount: Math.round(v) })}
+                    onCommit={v => {
+                      const index = port.index;
+                      void restart(() => setUmbraPort(index, { ledCount: Math.round(v) }));
+                    }}
                   />
+                  <p className={styles.customNote} data-settings-aside="true">{t('devices.asiahorse-umbra.ledCountHint')}</p>
                   <SettingSelect
                     label={t('devices.asiahorse-umbra.flow')}
                     value={port.direction}

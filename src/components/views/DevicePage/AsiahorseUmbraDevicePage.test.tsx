@@ -203,23 +203,55 @@ describe('AsiahorseUmbraDevicePage', () => {
     expect(mockPort).toHaveBeenCalledWith(9, { direction: 'reverse' });
   });
 
-  it('shows auto-detect progress and the result', async () => {
+  it('shows auto-detect progress on the button without inserting anything', async () => {
     await mount(makeState(), 'device');
     let finish: (s: UmbraState | null) => void = () => {};
     mockDetect.mockReturnValue(new Promise<UmbraState | null>(r => { finish = r; }));
 
     const button = screen.getByRole('button', { name: `${P}autoDetect` });
+    const before = document.body.querySelectorAll('*').length;
     await act(async () => { fireEvent.click(button); });
     expect(button).toBeDisabled();
-    expect(screen.getByRole('status')).toHaveTextContent(`${P}autoDetecting`);
+    expect(button).toHaveTextContent(`${P}autoDetecting`);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(document.body.querySelectorAll('*').length).toBe(before);
+    expect(screen.getByRole('slider', { name: /ledCountAria/ })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: `${P}portN:{"n":1}` })).toBeDisabled();
 
     const found = makeState();
     found.ports[0] = { ...found.ports[0], ledCount: 18 };
     await act(async () => { finish(found); });
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(button).not.toBeDisabled();
-    expect(screen.getByText(`${P}portsWithLeds`)).toBeInTheDocument();
+    expect(button).toHaveTextContent(`${P}autoDetect`);
     expect(screen.getByText('24')).toBeInTheDocument();
+  });
+
+  it('restarts the controller on an LED count commit and then shows the live count', async () => {
+    await mount(makeState(), 'device');
+    let finish: (s: UmbraState | null) => void = () => {};
+    mockPort.mockReturnValue(new Promise<UmbraState | null>(r => { finish = r; }));
+
+    const slider = screen.getByRole('slider', { name: /ledCountAria/ });
+    fireEvent.change(slider, { target: { value: '20' } });
+    fireEvent.pointerUp(slider);
+    await waitFor(() => expect(mockPort).toHaveBeenCalledWith(9, { ledCount: 20 }));
+
+    // Mid-restart the slider keeps the committed value and the card is locked.
+    expect(slider).toBeDisabled();
+    expect((slider as HTMLInputElement).value).toBe('20');
+    expect(screen.getByRole('button', { name: `${P}autoDetecting` })).toBeDisabled();
+
+    // The controller reports what it really found.
+    const live = makeState();
+    live.ports[9] = { ...live.ports[9], ledCount: 6 };
+    await act(async () => { finish(live); });
+    expect(screen.getByRole('slider', { name: /ledCountAria/ })).not.toBeDisabled();
+    expect((screen.getByRole('slider', { name: /ledCountAria/ }) as HTMLInputElement).value).toBe('6');
+  });
+
+  it('explains the LED count rule under the slider', async () => {
+    await mount(makeState(), 'device');
+    expect(screen.getByText(`${P}ledCountHint`)).toBeInTheDocument();
   });
 
   it('reports a failed auto-detect', async () => {
