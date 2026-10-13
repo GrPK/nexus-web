@@ -510,4 +510,15 @@ export const directApiBackend: AuthBackend = {
     const res = await authedRequest(`/account/devices/${encodeURIComponent(installId)}`, 'DELETE');
     return Boolean(res?.ok);
   },
+
+  listOwnBenchmarks: async () => {
+    const res = await authedRequest('/benchmarks/mine', 'GET');
+    if (!res?.ok) return null;
+    return (await tryParseJson<{ ids: string[] }>(res))?.ids ?? null;
+  },
+
+  deleteBenchmark: async (id) => {
+    const res = await authedRequest(`/benchmarks/${encodeURIComponent(id)}`, 'DELETE');
+    return Boolean(res?.ok);
+  },
 };

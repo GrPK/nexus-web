@@ -12,6 +12,8 @@ import { requestOpenBuild } from '../../../components/views/BuildPage/buildNav';
 import { publicProfileUrl } from '../../../lib/publicProfile';
 import { LeaderboardList } from './LeaderboardList';
 import { BenchmarkEntryDetail } from './BenchmarkEntryDetail';
+import { RemoveFromLeaderboard } from './RemoveFromLeaderboard';
+import { deleteCloudBenchmark } from '../../../api/cloud';
 import styles from './LeaderboardView.module.scss';
 
 const PAGE_SIZE = 50;
@@ -33,7 +35,14 @@ function revealTop(section: HTMLElement, scroller: HTMLElement) {
   if (offset < 0) scroller.scrollTop += offset;
 }
 
-export function LeaderboardView() {
+interface LeaderboardViewProps {
+  /** Entries this PC's history submitted; their pages offer removal. */
+  ownSubmissionIds?: ReadonlySet<string>;
+  /** Removal is offered only when set: the panel surfaces cannot reach the delete route. */
+  onRemoved?: (submissionId: string) => void;
+}
+
+export function LeaderboardView({ ownSubmissionIds, onRemoved }: LeaderboardViewProps = {}) {
   const { t } = useTranslation();
   const { numberFormat, dateFormat } = useUnitPrefs();
   const [data, setData] = useState<LeaderboardResponse | null>(null);
@@ -54,6 +63,12 @@ export function LeaderboardView() {
   const openEntry = (entry: LeaderboardEntry) => {
     if (sectionRef.current) listScrollTop.current = scrollParent(sectionRef.current).scrollTop;
     setSelected(entry);
+  };
+
+  const handleRemoved = (submissionId: string) => {
+    onRemoved?.(submissionId);
+    setSelected(null);
+    setReloadKey(k => k + 1);
   };
 
   const changePage = (next: number) => {
@@ -117,6 +132,7 @@ export function LeaderboardView() {
   ];
 
   if (selected) {
+    const canRemove = !!onRemoved && (selected.id === myId || !!ownSubmissionIds?.has(selected.id));
     return (
       <section className={styles.leaderboard} ref={sectionRef}>
         <div className={styles.backBar}>
@@ -126,14 +142,23 @@ export function LeaderboardView() {
         </div>
         <BenchmarkEntryDetail
           entry={selected}
+          total={data?.total}
           numberFormat={numberFormat}
           dateFormat={dateFormat}
           ownerHref={selected.displayName ? publicProfileUrl(selected.displayName) : undefined}
           ownerNewTab
           actions={(
-            <Button tone="accent" onClick={() => requestOpenBuild(`/builder?bench=${encodeURIComponent(selected.id)}`)}>
-              {t('benchmark.detail.openInBuilder')}
-            </Button>
+            <>
+              {canRemove && (
+                <RemoveFromLeaderboard
+                  remove={() => deleteCloudBenchmark(selected.id)}
+                  onRemoved={() => handleRemoved(selected.id)}
+                />
+              )}
+              <Button tone="accent" onClick={() => requestOpenBuild(`/builder?bench=${encodeURIComponent(selected.id)}`)}>
+                {t('benchmark.detail.openInBuilder')}
+              </Button>
+            </>
           )}
         />
       </section>
@@ -181,7 +206,7 @@ export function LeaderboardView() {
         )}
 
         {!loading && !error && data && data.entries.length > 0 && (
-          <LeaderboardList entries={data.entries} ownId={myId} onOpen={openEntry} dateFormat={dateFormat} />
+          <LeaderboardList entries={data.entries} ownId={myId} total={data.total} onOpen={openEntry} dateFormat={dateFormat} />
         )}
       </div>
 

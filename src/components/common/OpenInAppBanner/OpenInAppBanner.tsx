@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { NexusMark } from '../../icons/NexusBrand';
 
@@ -73,9 +74,7 @@ export function OpenInAppBanner() {
   return (
     <div style={banner} role="region" aria-label={t('openInApp.region')}>
       <button type="button" style={dismissBtn} onClick={dismiss} aria-label={t('openInApp.dismiss')}>
-        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
+        <X size={14} aria-hidden />
       </button>
       <div style={icon} aria-hidden="true">
         <NexusMark size={22} />

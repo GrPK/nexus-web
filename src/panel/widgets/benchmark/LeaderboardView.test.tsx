@@ -10,6 +10,11 @@ vi.mock('../../../api/nexusApi', () => ({
   getLastSubmissionId: (...args: unknown[]) => getLastSubmissionIdMock(...args),
 }));
 
+const deleteCloudBenchmarkMock = vi.fn();
+vi.mock('../../../api/cloud', () => ({
+  deleteCloudBenchmark: (...args: unknown[]) => deleteCloudBenchmarkMock(...args),
+}));
+
 vi.mock('../../../lib/i18n', () => ({
   useTranslation: () => ({
     t: (key: string, params?: Record<string, string | number>) => {
@@ -44,6 +49,7 @@ beforeEach(() => {
   getLeaderboardMock.mockReset();
   getBenchmarkVersionsMock.mockReset();
   getLastSubmissionIdMock.mockReset().mockReturnValue(null);
+  deleteCloudBenchmarkMock.mockReset();
 });
 
 afterEach(() => {
@@ -115,6 +121,77 @@ describe('LeaderboardView', () => {
     expect(await screen.findByRole('button', { name: /Ryzen 9/ })).toBeInTheDocument();
     expect(screen.queryByText('DDR5')).not.toBeInTheDocument();
     expect(getLeaderboardMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers removal only on this PC\'s own entries', async () => {
+    getBenchmarkVersionsMock.mockResolvedValue(null);
+    getLeaderboardMock.mockResolvedValue({ total: 2, entries: [mkEntry(), mkEntry({ id: 'mine', rank: 2, hardware: { ...mkEntry().hardware, cpuModel: 'Core i9' } })] });
+
+    render(<LeaderboardView ownSubmissionIds={new Set(['mine'])} onRemoved={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Ryzen 9/ }));
+    await screen.findByText('DDR5');
+    expect(screen.queryByRole('button', { name: 'benchmark.remove.action' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'benchmark.detail.back' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Core i9/ }));
+    expect(await screen.findByRole('button', { name: 'benchmark.remove.action' })).toBeInTheDocument();
+  });
+
+  it('removes an own entry after the confirm and reloads the board', async () => {
+    getBenchmarkVersionsMock.mockResolvedValue(null);
+    getLeaderboardMock.mockResolvedValue({ total: 1, entries: [mkEntry({ id: 'mine' })] });
+    deleteCloudBenchmarkMock.mockResolvedValue(true);
+    const onRemoved = vi.fn();
+
+    render(<LeaderboardView ownSubmissionIds={new Set(['mine'])} onRemoved={onRemoved} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Ryzen 9/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'benchmark.remove.action' }));
+    getLeaderboardMock.mockResolvedValue({ total: 0, entries: [] });
+    fireEvent.click(await screen.findByRole('button', { name: 'benchmark.remove.confirm' }));
+
+    await waitFor(() => expect(onRemoved).toHaveBeenCalledWith('mine'));
+    expect(deleteCloudBenchmarkMock).toHaveBeenCalledWith('mine');
+    expect(await screen.findByText('benchmark.leaderboard.empty')).toBeInTheDocument();
+    expect(getLeaderboardMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the entry and says so when the removal fails', async () => {
+    getBenchmarkVersionsMock.mockResolvedValue(null);
+    getLeaderboardMock.mockResolvedValue({ total: 1, entries: [mkEntry({ id: 'mine' })] });
+    deleteCloudBenchmarkMock.mockResolvedValue(false);
+    const onRemoved = vi.fn();
+
+    render(<LeaderboardView ownSubmissionIds={new Set(['mine'])} onRemoved={onRemoved} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Ryzen 9/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'benchmark.remove.action' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'benchmark.remove.confirm' }));
+
+    expect(await screen.findByText('benchmark.remove.failed')).toBeInTheDocument();
+    expect(onRemoved).not.toHaveBeenCalled();
+    expect(screen.getByText('DDR5')).toBeInTheDocument();
+  });
+
+  it('shows a Top % badge past the top 100 on the entry page', async () => {
+    getBenchmarkVersionsMock.mockResolvedValue(null);
+    getLeaderboardMock.mockResolvedValue({ total: 1281, entries: [mkEntry({ rank: 200 })] });
+
+    render(<LeaderboardView />);
+    fireEvent.click(await screen.findByRole('button', { name: /Ryzen 9/ }));
+
+    expect(await screen.findByText('benchmark.leaderboard.top pct=20')).toBeInTheDocument();
+    expect(screen.queryByText(/#200/)).not.toBeInTheDocument();
+  });
+
+  it('shows no standing on the entry page below the top half', async () => {
+    getBenchmarkVersionsMock.mockResolvedValue(null);
+    getLeaderboardMock.mockResolvedValue({ total: 1281, entries: [mkEntry({ rank: 1245 })] });
+
+    render(<LeaderboardView />);
+    fireEvent.click(await screen.findByRole('button', { name: /Ryzen 9/ }));
+
+    await screen.findByText('DDR5');
+    expect(screen.queryByText(/#1245/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/benchmark.leaderboard.top/)).not.toBeInTheDocument();
   });
 
   it('requests one page at a time and pages through the total', async () => {

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { Music } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { CardDeleteButton } from '../CardDeleteButton/CardDeleteButton';
 import styles from './EffectCard.module.scss';
@@ -91,10 +92,7 @@ export function EffectCard({
         {/* Before the badge: an overlay canvas fills the thumbnail and would hide it. */}
         {thumbOverlay}
         {audio && (
-          <svg className={styles.audioBadge} width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 10.5a1.5 1.5 0 1 0 3 0v-7l6 -1.5v7" />
-            <circle cx="10.5" cy="9.5" r="1.5" />
-          </svg>
+          <Music className={styles.audioBadge} size={10} />
         )}
         {cornerBadge}
         {onDelete && (

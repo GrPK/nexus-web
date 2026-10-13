@@ -391,6 +391,49 @@ describe('useUnifiedDevices - cooler LCD rows', () => {
   });
 });
 
+describe('useUnifiedDevices - brand icons', () => {
+  function iconOf(row: Partial<DeviceListItem>): string | undefined {
+    mockUseDevices.mockReturnValue({ devices: [makeHandlerRow({ connected: true, ...row })], controlDevice: vi.fn() });
+    const { result } = renderHook(() => useUnifiedDevices(true));
+    return result.current.unified.find(d => d.curatedId === row.id)?.iconSrc;
+  }
+
+  it('gives any Lian Li row the Lian Li logo', () => {
+    expect(iconOf({ id: 'lianli-future-aio', name: 'Lian Li Galahad III', category: 'cooler' })).toBe('/assets/devices/lianli.svg');
+  });
+
+  it('gives any Corsair row the Corsair logo', () => {
+    expect(iconOf({ id: 'corsair-future-lcd', name: 'Corsair iCUE LINK TITAN', category: 'cooler' })).toBe('/assets/devices/corsair.svg');
+  });
+
+  it('gives an unbranded cooler the generic fan, never the NP50 art', () => {
+    expect(iconOf({ id: 'generic-lcd', name: 'Thermalright Frozen Warframe', category: 'cooler' })).toBe('/assets/devices/fan.svg');
+  });
+
+  it('matches the brand prefix case-insensitively, and strips it from the sidebar label', () => {
+    mockUseDevices.mockReturnValue({ devices: [makeHandlerRow({ id: 'corsair-shouty', name: 'CORSAIR XENEON EDGE', category: 'display', connected: true })], controlDevice: vi.fn() });
+    const { result } = renderHook(() => useUnifiedDevices(true));
+    const row = result.current.unified.find(d => d.curatedId === 'corsair-shouty')!;
+    expect(row.iconSrc).toBe('/assets/devices/corsair.svg');
+    expect(sidebarDeviceName(row)).toBe('XENEON EDGE');
+  });
+
+  it('gives an unbranded display and controller generic icons, never HYTE product art', () => {
+    expect(iconOf({ id: 'generic-display', name: 'Acme Panel', category: 'display' })).toBe('/assets/devices/monitor.svg');
+    expect(iconOf({ id: 'generic-controller', name: 'Acme Controller', category: 'controller' })).toBe('/assets/devices/device.svg');
+  });
+
+  it('gives a branded panel row its logo instead of the generic monitor', () => {
+    mockUseDevices.mockReturnValue({ devices: [], controlDevice: vi.fn() });
+    mockUsePanelDevices.mockReturnValue({
+      devices: [makePanelDevice({ id: 'stream-rec9', name: 'Corsair XD5 LCD', iconSrc: '/assets/devices/monitor.svg', connectionKind: 'usb-display' })],
+      loading: false,
+    });
+    const { result } = renderHook(() => useUnifiedDevices(true));
+    expect(result.current.unified.find(d => d.key === 'panel-stream-rec9')?.iconSrc).toBe('/assets/devices/corsair.svg');
+  });
+});
+
 function makePanelDevice(over: Partial<PanelDevice> = {}): PanelDevice {
   return {
     id: 'device:y70',

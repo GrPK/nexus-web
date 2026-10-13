@@ -13,7 +13,7 @@
 // Card chrome from Card.module.scss .root/.interactive, on a link or button.
 .row {
   display: grid;
-  grid-template-columns: 3rem 4.5rem minmax(0, 1fr) auto auto;
+  grid-template-columns: 5rem 4.5rem minmax(0, 1fr) auto auto;
   align-items: center;
   column-gap: var(--space-lg);
   width: 100%;
@@ -50,6 +50,7 @@
   @include text-numeric;
   font-weight: var(--weight-heading);
   color: var(--text);
+  white-space: nowrap;
 }
 
 .score {

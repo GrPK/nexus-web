@@ -20,7 +20,6 @@ import { useDevices, type DeviceListItem } from './useDevices';
 import {
   panelIconForSource,
   PANEL_MONITOR_ICON,
-  PROMOTED_MONITOR_ICON,
   type PanelDevice,
   type PanelDeviceCapabilities,
 } from '../panel/device/panelDevices';
@@ -107,7 +106,7 @@ export const STREAMED_FAMILY_ICONS: Partial<Record<string, string>> = {
   'corsair-xc7-lcd': '/assets/devices/corsair.svg',
   'corsair-capellix-lcd': '/assets/devices/corsair.svg',
   'lianli-screen88': '/assets/devices/lianli.svg',
-  'zmatrices-lcd': '/assets/devices/wide-screen.svg',
+  'zmatrices-lcd': PANEL_MONITOR_ICON,
 };
 
 const WIDGET_PANEL_PROFILES: Partial<Record<string, {
@@ -420,7 +419,7 @@ export function buildPanelDevices({
       previewSize: cssWidth > 0 && cssHeight > 0 ? { width: cssWidth, height: cssHeight } : undefined,
       previewDpi: record.capabilities?.dpi,
       previewDpr: record.capabilities?.dpr,
-      iconSrc: branding?.icon ?? PROMOTED_MONITOR_ICON,
+      iconSrc: branding?.icon ?? PANEL_MONITOR_ICON,
       capabilities: { ...HOSTED_MONITOR_CAPABILITIES, touch: record.capabilities?.touch ?? false },
       modalKind: 'panel-editor',
       linkEnabled,
