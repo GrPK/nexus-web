@@ -176,6 +176,7 @@ export function SidebarDevicesSection({
         sorted.map(device => {
           const isActive = device.key === activeDeviceKey || claimsKey(device, activeDeviceKey);
           const isSimulated = isSimulatedDevice(device);
+          const controlOff = device.supportsNexusControl && !device.nexusControlEnabled;
           const name = sidebarDeviceName(device);
           const tooltip = isSimulated
             ? `${name} (${t('devices.simulated')})`
@@ -212,9 +213,9 @@ export function SidebarDevicesSection({
                       </span>
                     </HoverTooltip>
                   )}
-                  {device.warning && <DeviceWarningIcon code={device.warning} />}
-                  {!isSimulated && device.curatedId && firmwareUpdates.has(device.curatedId) && <DeviceUpdateIcon />}
-                  {device.supportsNexusControl && !device.nexusControlEnabled && <NexusControlOffIcon className={styles.controlOff} />}
+                  {device.warning && !controlOff && <DeviceWarningIcon code={device.warning} />}
+                  {!isSimulated && !controlOff && device.curatedId && firmwareUpdates.has(device.curatedId) && <DeviceUpdateIcon />}
+                  {controlOff && <NexusControlOffIcon className={styles.controlOff} />}
                 </>
               )}
             </button>
