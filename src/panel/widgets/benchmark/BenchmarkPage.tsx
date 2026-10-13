@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { BenchmarkResult } from '../../../types/benchmark';
 import { Gauge, Play, RotateCcw, History, Trophy, Cpu, Monitor, MemoryStick, HardDrive, CircuitBoard, AppWindow } from 'lucide-react';
@@ -20,12 +20,13 @@ import { SectionHeader } from '../../../components/common/SectionHeader/SectionH
 import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
 import { SystemSpecsPanel } from '../../../components/common/SystemSpecsPanel/SystemSpecsPanel';
 import { getDeviceId, setLastSubmissionId } from '../../../api/nexusApi';
-import { submitCloudBenchmark } from '../../../api/cloud';
+import { deleteCloudBenchmark, submitCloudBenchmark } from '../../../api/cloud';
 import { fetchTelemetryConsent } from '../../../api/telemetry';
 import { buildBenchmarkSubmission } from './benchmarkSubmission';
 import { BenchmarkProgress } from './BenchmarkProgress';
 import { BenchmarkResults } from './BenchmarkResults';
 import { LeaderboardView } from './LeaderboardView';
+import { RemoveFromLeaderboard } from './RemoveFromLeaderboard';
 import { takeBenchmarkStartRequest } from './benchmarkNav';
 import { OFFICIAL_BUILD } from '../../../lib/officialBuild';
 import styles from './BenchmarkPage.module.scss';
@@ -90,7 +91,11 @@ export function BenchmarkPage({ serviceOnline, connectionState, tab: urlTab, onT
   const { t } = useTranslation();
   const { dateFormat, timeFormat } = useUnitPrefs();
   const { status, progress, result, error, start, cancel, reset } = useBenchmark(serviceOnline);
-  const { history, addRun, updateRunSubmission } = useBenchmarkHistory();
+  const { history, addRun, updateRunSubmission, clearRunSubmission } = useBenchmarkHistory();
+  const ownSubmissionIds = useMemo(
+    () => new Set(history.flatMap(run => (run.submissionId ? [run.submissionId] : []))),
+    [history],
+  );
   const { specs } = useSystemSpecs(serviceOnline);
   // null only while the first read is in flight; a failed read counts as off,
   // so a run is always saved and never auto-uploads without confirmed consent.
@@ -289,6 +294,7 @@ export function BenchmarkPage({ serviceOnline, connectionState, tab: urlTab, onT
       return renderIntro(() => { onTabChange('run'); startRun(); });
     }
     const pickOptions = RESULTS_PICKS.map(key => ({ key, label: t(`benchmark.results.${key}`) }));
+    const submissionId = shown.submissionId;
     let activePick: string = '';
     if (typeof resultsView === 'string') activePick = resultsView;
     else if (shown.id === latest.id) activePick = RESULTS_PICKS[0];
@@ -308,6 +314,14 @@ export function BenchmarkPage({ serviceOnline, connectionState, tab: urlTab, onT
             submission={shown.submission ?? null}
             submitting={uploadingRunId === shown.id}
             onUpload={uploadHandlerFor(shown)}
+            standingAction={submissionId
+              ? (
+                <RemoveFromLeaderboard
+                  remove={() => deleteCloudBenchmark(submissionId)}
+                  onRemoved={() => clearRunSubmission(submissionId)}
+                />
+              )
+              : undefined}
             actions={(
               <ChipGroup ariaLabel={t('benchmark.results.pickLabel')} options={pickOptions} activeKey={activePick} onChange={onPick} />
             )}
@@ -350,7 +364,9 @@ export function BenchmarkPage({ serviceOnline, connectionState, tab: urlTab, onT
     switch (tab) {
       case 'run': return renderRunTab();
       case 'results': return renderResultsTab();
-      case 'leaderboards': return OFFICIAL_BUILD ? <LeaderboardView /> : null;
+      case 'leaderboards': return OFFICIAL_BUILD
+        ? <LeaderboardView ownSubmissionIds={ownSubmissionIds} onRemoved={clearRunSubmission} />
+        : null;
     }
   };
 

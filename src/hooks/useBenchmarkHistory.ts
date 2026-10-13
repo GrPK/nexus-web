@@ -88,6 +88,14 @@ export function useBenchmarkHistory() {
     setHistory(next);
   }, []);
 
+  // A removed leaderboard entry leaves its runs unsubmitted.
+  const clearRunSubmission = useCallback((submissionId: string) => {
+    const clear = (runs: BenchmarkRun[]) =>
+      runs.map(run => run.submissionId === submissionId ? { ...run, submissionId: null, submission: null } : run);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(clear(loadHistory()))); } catch { /* quota */ }
+    setHistory(clear);
+  }, []);
+
   const latest = history[0] ?? null;
-  return { history, latest, addRun, updateRunSubmission };
+  return { history, latest, addRun, updateRunSubmission, clearRunSubmission };
 }

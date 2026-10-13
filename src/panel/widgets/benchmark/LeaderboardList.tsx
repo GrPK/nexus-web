@@ -3,11 +3,14 @@ import { ChevronRight } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { DEFAULT_DATE_FORMAT, formatDate, type DateFormat } from '../../../lib/units';
 import type { LeaderboardEntry } from '../../../types/benchmark';
+import { standingFor } from './standing';
 import styles from './LeaderboardList.module.scss';
 
 interface LeaderboardListProps {
   entries: LeaderboardEntry[];
   ownId: string | null;
+  /** The board's entry count, for the Top % standing past the ranked places. */
+  total: number;
   /** Rows render as real links (crawlable, cmd+click): the Build portal's /bench/:id pages. */
   entryHref?: (entry: LeaderboardEntry) => string;
   /** Rows render as buttons: the app opens the entry in place. */
@@ -20,7 +23,7 @@ interface LeaderboardListProps {
  * Benchmark leaderboard rows as cards, each opening the entry's detail page.
  * Shared with the Build portal through @app so both surfaces show the same view.
  */
-export function LeaderboardList({ entries, ownId, entryHref, onOpen, dateFormat = DEFAULT_DATE_FORMAT }: LeaderboardListProps) {
+export function LeaderboardList({ entries, ownId, total, entryHref, onOpen, dateFormat = DEFAULT_DATE_FORMAT }: LeaderboardListProps) {
   const { t, language } = useTranslation();
 
   return (
@@ -28,9 +31,14 @@ export function LeaderboardList({ entries, ownId, entryHref, onOpen, dateFormat 
       {entries.map(entry => {
         const isOwn = entry.id === ownId;
         const className = `${styles.row} ${isOwn ? styles.own : ''}`;
+        const standing = standingFor(entry.rank, total);
         const body: ReactNode = (
           <>
-            <span className={styles.rank}>#{entry.rank}</span>
+            <span className={styles.rank}>
+              {standing && ('rank' in standing
+                ? `#${standing.rank}`
+                : t('benchmark.leaderboard.top', { pct: String(standing.topPercent) }))}
+            </span>
             <span className={styles.score}>{Math.round(entry.composite)}</span>
             <span className={styles.hardware}>
               <span className={styles.name}>

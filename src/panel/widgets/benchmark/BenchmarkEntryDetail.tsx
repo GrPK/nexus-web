@@ -7,6 +7,7 @@ import {
 import type { LeaderboardEntry } from '../../../types/benchmark';
 import { SectionHeader } from '../../../components/common/SectionHeader/SectionHeader';
 import { SpecList, type SpecListRow } from '../../../components/common/SpecList/SpecList';
+import { standingFor } from './standing';
 import styles from './BenchmarkEntryDetail.module.scss';
 
 // Hardware-category acronyms plus "Storage" stay untranslated.
@@ -27,6 +28,8 @@ function withExtra(model: string, extra: string): string {
 interface BenchmarkEntryDetailProps {
   /** `percentile` comes only from the single-entry endpoint (the Build portal's /bench/:id). */
   entry: LeaderboardEntry & { percentile?: number };
+  /** The board's entry count; without it a place past the ranked places shows no standing. */
+  total?: number;
   /** Headline actions; each surface wires its own navigation. */
   actions?: ReactNode;
   /** The owner's public profile; the name renders as plain text without it. */
@@ -44,11 +47,12 @@ interface BenchmarkEntryDetailProps {
  * tools and scoring version. Shared with the Build portal through @app.
  */
 export function BenchmarkEntryDetail({
-  entry, actions, ownerHref, ownerNewTab, ownerIsPageTitle, numberFormat = DEFAULT_NUMBER_FORMAT, dateFormat = DEFAULT_DATE_FORMAT,
+  entry, total, actions, ownerHref, ownerNewTab, ownerIsPageTitle, numberFormat = DEFAULT_NUMBER_FORMAT, dateFormat = DEFAULT_DATE_FORMAT,
 }: BenchmarkEntryDetailProps) {
   const { t, language } = useTranslation();
   const owner = entry.displayName ?? t('benchmark.leaderboard.anonymous');
   const OwnerHeading = ownerIsPageTitle ? 'h1' : 'h2';
+  const standing = standingFor(entry.rank, total);
   const tools = Object.entries(entry.tools);
   const { cpuMaxClockMhz, ramBytes } = entry.hardware;
   const cpuClock = cpuMaxClockMhz ? localizeNumbers(`${(cpuMaxClockMhz / 1000).toFixed(1)} GHz`, numberFormat) : '';
@@ -84,14 +88,20 @@ export function BenchmarkEntryDetail({
               )
               : owner}
           </OwnerHeading>
-          <div className={styles.badges}>
-            <span className={styles.badge}>{t('benchmark.leaderboard.rank')} #{entry.rank}</span>
-            {entry.percentile != null && (
-              <span className={`${styles.badge} ${styles.percentile}`}>
-                {t('benchmark.detail.beats', { value: String(Math.round(entry.percentile)) })}
+          {standing && (
+            <div className={styles.badges}>
+              <span className={styles.badge}>
+                {'rank' in standing
+                  ? `${t('benchmark.leaderboard.rank')} #${standing.rank}`
+                  : t('benchmark.leaderboard.top', { pct: String(standing.topPercent) })}
               </span>
-            )}
-          </div>
+              {entry.percentile != null && (
+                <span className={`${styles.badge} ${styles.percentile}`}>
+                  {t('benchmark.detail.beats', { value: String(Math.round(entry.percentile)) })}
+                </span>
+              )}
+            </div>
+          )}
           <span className={styles.submitted}>
             {t('benchmark.detail.submitted', { date: formatDate(new Date(entry.createdAt), dateFormat, { variant: 'year', locale: language, system: {} }) })}
           </span>
