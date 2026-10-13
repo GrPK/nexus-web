@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UnifiedDevice } from '../hooks/useUnifiedDevices';
 import type { PanelDevice } from '../panel/device/panelDevices';
 
@@ -57,6 +57,10 @@ vi.mock('../api/conflicts', () => ({
 }));
 vi.mock('../hooks/useConflictApps', () => ({
   useConflictApps: () => ({ conflicts: [], ready: false }),
+}));
+let mockFirmwareUpdates: ReadonlySet<string> = new Set();
+vi.mock('../hooks/useFirmwareUpdates', () => ({
+  useFirmwareUpdates: () => mockFirmwareUpdates,
 }));
 // Menu gating for the simulated-device remover; flipped per test.
 let devTools = true;
@@ -166,26 +170,37 @@ describe('SidebarDevicesSection Nexus Link off indicator', () => {
   });
 });
 
-describe('SidebarDevicesSection device warning', () => {
+describe('SidebarDevicesSection warning and update glyphs', () => {
   const deck = (nexusControlEnabled: boolean) => monitorDevice({
     key: 'streamdeck:SN1',
     kind: 'curated',
+    curatedId: 'streamdeck-plus',
     panelDevice: undefined,
     supportsNexusControl: true,
     nexusControlEnabled,
     warning: 'elgato-software-running',
   });
 
-  it('shows the warning glyph while Nexus Control is on', () => {
+  beforeEach(() => {
+    mockFirmwareUpdates = new Set(['streamdeck-plus']);
+  });
+
+  afterEach(() => {
+    mockFirmwareUpdates = new Set();
+  });
+
+  it('shows both glyphs while Nexus Control is on', () => {
     mockUnified = [deck(true)];
     renderSidebar();
     expect(screen.getByRole('img', { name: 'devices.warning.elgatoSoftwareRunning' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'devices.firmwareUpdate.tooltip' })).toBeInTheDocument();
   });
 
-  it('hides the warning glyph while Nexus Control is off', () => {
+  it('hides both glyphs while Nexus Control is off', () => {
     mockUnified = [deck(false)];
     renderSidebar();
     expect(screen.queryByRole('img', { name: 'devices.warning.elgatoSoftwareRunning' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'devices.firmwareUpdate.tooltip' })).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'devices.nexusControlOff.sidebarTooltip' })).toBeInTheDocument();
   });
 });

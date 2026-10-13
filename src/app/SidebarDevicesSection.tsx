@@ -214,7 +214,7 @@ export function SidebarDevicesSection({
                     </HoverTooltip>
                   )}
                   {device.warning && !controlOff && <DeviceWarningIcon code={device.warning} />}
-                  {!isSimulated && device.curatedId && firmwareUpdates.has(device.curatedId) && <DeviceUpdateIcon />}
+                  {!isSimulated && !controlOff && device.curatedId && firmwareUpdates.has(device.curatedId) && <DeviceUpdateIcon />}
                   {controlOff && <NexusControlOffIcon className={styles.controlOff} />}
                 </>
               )}
