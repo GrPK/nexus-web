@@ -10,7 +10,8 @@ vi.mock('./useDevices', () => ({
 }));
 
 const mockUsePanelDevices = vi.fn();
-vi.mock('./usePanelDevices', () => ({
+vi.mock('./usePanelDevices', async importOriginal => ({
+  ...(await importOriginal<typeof import('./usePanelDevices')>()),
   usePanelDevices: () => ({ turnedOffMonitorIds: [], ...mockUsePanelDevices() }),
 }));
 
@@ -363,6 +364,30 @@ describe('useUnifiedDevices - hasPage gates navigable', () => {
 
     const { result } = renderHook(() => useUnifiedDevices(true));
     expect(result.current.unified.find(d => d.curatedId === 'legacy')?.navigable).toBe(true);
+  });
+});
+
+describe('useUnifiedDevices - cooler LCD rows', () => {
+  function lcd(over: Partial<DeviceListItem> = {}): DeviceListItem {
+    return makeHandlerRow({ id: 'lianli-hydroshift2', name: 'Lian Li HydroShift II', category: 'cooler', connected: true, warning: 'bulk-pipe-unavailable', ...over });
+  }
+
+  it('drops the pipe-unavailable warning while Nexus Control is off', () => {
+    mockUseDevices.mockReturnValue({ devices: [lcd({ nexusControlEnabled: false })], controlDevice: vi.fn() });
+    const { result } = renderHook(() => useUnifiedDevices(true));
+    expect(result.current.unified.find(d => d.curatedId === 'lianli-hydroshift2')?.warning).toBeUndefined();
+  });
+
+  it('keeps the pipe-unavailable warning while Nexus Control is on', () => {
+    mockUseDevices.mockReturnValue({ devices: [lcd()], controlDevice: vi.fn() });
+    const { result } = renderHook(() => useUnifiedDevices(true));
+    expect(result.current.unified.find(d => d.curatedId === 'lianli-hydroshift2')?.warning).toBe('bulk-pipe-unavailable');
+  });
+
+  it('takes the brand icon its panel row uses', () => {
+    mockUseDevices.mockReturnValue({ devices: [lcd()], controlDevice: vi.fn() });
+    const { result } = renderHook(() => useUnifiedDevices(true));
+    expect(result.current.unified.find(d => d.curatedId === 'lianli-hydroshift2')?.iconSrc).toBe('/assets/devices/lianli.svg');
   });
 });
 

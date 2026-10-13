@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useDevices, type DeviceListItem } from './useDevices';
-import { usePanelDevices } from './usePanelDevices';
+import { usePanelDevices, STREAMED_FAMILY_ICONS } from './usePanelDevices';
 import { useStreamDecks } from './useStreamDecks';
 import {
   getConnectedSimulatedPanels,
@@ -82,6 +82,11 @@ export interface UnifiedDevice {
 /** The device-page key of a panel device. */
 export function panelDeviceKey(panelId: string): string {
   return `panel-${panelId}`;
+}
+
+/** A panel row that took over the curated row keyed `deviceKey`. */
+export function claimsKey(device: UnifiedDevice, deviceKey: string): boolean {
+  return device.kind === 'panel' && !!device.curatedId && deviceKey === `curated-${device.curatedId}`;
 }
 
 export function isSimulatedDevice(device: UnifiedDevice): boolean {
@@ -382,7 +387,8 @@ function buildUnifiedList(
       name: displayName,
       subtitle: d.category,
       category: d.category,
-      iconSrc: CURATED_ICONS[isLianLiHubId(d.id) ? LIANLI_PRIMARY_HUB : d.id] || CATEGORY_ICONS[d.category] || FALLBACK_ICON,
+      // A cooler LCD's row wears the icon its panel row takes over with.
+      iconSrc: CURATED_ICONS[isLianLiHubId(d.id) ? LIANLI_PRIMARY_HUB : d.id] || STREAMED_FAMILY_ICONS[d.id] || CATEGORY_ICONS[d.category] || FALLBACK_ICON,
       connected: d.connected,
       kind: 'curated',
       curatedId: d.id,
@@ -391,7 +397,8 @@ function buildUnifiedList(
       supportsNexusControl: d.supportsNexusControl ?? false,
       experimental: d.experimental ?? false,
       requiresBeta: d.requiresBeta ?? false,
-      warning: d.warning ?? undefined,
+      // Off never opens a cooler LCD's pipe, so its unavailable warning only restates the off state.
+      warning: (d.nexusControlEnabled === false && d.warning === 'bulk-pipe-unavailable' ? undefined : d.warning) ?? undefined,
       conflictAppId: d.conflictAppId,
       bus: d.bus ?? 'usb',
     });
