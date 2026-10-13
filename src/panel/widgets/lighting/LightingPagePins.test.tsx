@@ -63,8 +63,8 @@ vi.mock('./page/FullscreenShader', () => ({
   ),
 }));
 vi.mock('./page/ModeControls', () => ({
-  ModeControls: ({ mode, onSelectionPick }: { mode: string; onSelectionPick?: () => void }) => (
-    <div data-testid="mode-controls" data-mode={mode}>
+  ModeControls: ({ mode, onSelectionPick, keepMode, onBlockedPick }: { mode: string; onSelectionPick?: () => void; keepMode?: boolean; onBlockedPick?: () => void }) => (
+    <div data-testid="mode-controls" data-mode={mode} data-keep-mode={String(!!keepMode)} data-blocked={String(!!onBlockedPick)}>
       {onSelectionPick && <button type="button" onClick={onSelectionPick}>selection-pick</button>}
     </div>
   ),
@@ -161,8 +161,8 @@ vi.mock('../../../components/common/ViewHeader/ViewHeader', () => ({
 }));
 vi.mock('../../../components/views/ServiceRequired', () => ({ ServiceRequired: () => null }));
 vi.mock('../../../components/common/DeviceCanvas/DeviceCanvas', () => ({
-  DeviceCanvas: ({ shaderEffect, backdrop }: { shaderEffect?: string | null; backdrop?: React.ReactNode }) => (
-    <div data-testid="preview" data-effect={shaderEffect ?? ''}>{backdrop}</div>
+  DeviceCanvas: ({ shaderEffect, backdrop, foreignFrames }: { shaderEffect?: string | null; backdrop?: React.ReactNode; foreignFrames?: ReadonlyMap<string, string> }) => (
+    <div data-testid="preview" data-effect={shaderEffect ?? ''} data-foreign={[...(foreignFrames ?? [])].map(([id, mode]) => `${id}:${mode}`).sort().join(',')}>{backdrop}</div>
   ),
 }));
 
@@ -572,6 +572,48 @@ describe('LightingPage pins', () => {
   });
 
   describe('picks', () => {
+    it('on a tab other than the running mode with nothing selected, a pick changes nothing and flashes the scope chip', async () => {
+      localStorage.setItem('nexus.lighting.effectDockCollapsed', 'false');
+      syncState.mode = 'animate';
+      syncState.rawSync = 'fire';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(screen.getByText('tab:static'));
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('static'));
+      fireEvent.click(screen.getByText('clear-selection'));
+      expect(screen.getByTestId('tabs').dataset.active).toBe('static');
+      vi.mocked(startStatic).mockClear();
+      vi.mocked(startAnimate).mockClear();
+      vi.mocked(setPins).mockClear();
+      const chip = screen.getByText('lighting.pane.selectToChange').closest(`.${styles.scopeChip}`)!;
+      expect(chip.classList.contains(styles.scopeFlash)).toBe(false);
+      fireEvent.click(screen.getByTestId('grid-effect'));
+      fireEvent.click(screen.getByText('pick-green'));
+      await waitFor(() => expect(screen.getByText('lighting.pane.selectToChange').closest(`.${styles.scopeChip}`)!.classList.contains(styles.scopeFlash)).toBe(true));
+      expect(startStatic).not.toHaveBeenCalled();
+      expect(startAnimate).not.toHaveBeenCalled();
+      expect(setPins).not.toHaveBeenCalled();
+      expect(screen.getByTestId('tabs').dataset.active).toBe('static');
+      // The dock would edit the running animation, so it is locked as for a mixed selection.
+      expect(document.querySelector(`.${styles.effectTabBody}`)?.hasAttribute('inert')).toBe(true);
+    });
+
+    it('keeps the running mode on a detached Media tab and blocks its picks', async () => {
+      syncState.mode = 'animate';
+      syncState.rawSync = 'fire';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(screen.getByText('tab:gif'));
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('gif'));
+      expect(screen.getByTestId('mode-controls').dataset.blocked).toBe('false');
+      fireEvent.click(screen.getByText('clear-selection'));
+      const controls = screen.getByTestId('mode-controls');
+      expect(controls.dataset.keepMode).toBe('true');
+      expect(controls.dataset.blocked).toBe('true');
+    });
+
     it('with nothing selected a Static pick is global, never a pin, and needs no selection', async () => {
       syncState.mode = 'static';
       syncState.rawSync = 'static';
@@ -822,9 +864,11 @@ describe('LightingPage pins', () => {
       expect(screen.getByTestId('grid-effect').textContent).toBe('aurora');
       // The card already wears an Animation pin, so the press keeps it.
       expect(vi.mocked(setPins).mock.calls.length).toBe(writes);
-      // Clearing the selection goes back to the global mode.
+      // Selecting and deselecting cards never moves the open tab.
       fireEvent.click(screen.getByText('clear-selection'));
-      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('gif'));
+      expect(screen.getByTestId('tabs').dataset.active).toBe('animate');
+      fireEvent.click(screen.getByText('select-a'));
+      expect(screen.getByTestId('tabs').dataset.active).toBe('animate');
     });
 
     it('previews no effect while a selected card is pinned to another mode', async () => {
@@ -837,6 +881,8 @@ describe('LightingPage pins', () => {
       fireEvent.click(screen.getByText('select-a'));
       await waitFor(() => expect(screen.getByTestId('preview').dataset.effect).toBe(''));
       expect(screen.getByTestId('tabs').dataset.active).toBe('animate');
+      // Its frame is marked as not part of this canvas, captioned with the mode it wears.
+      expect(screen.getByTestId('preview').dataset.foreign).toBe('a:lighting.mode.static');
     });
 
     it('focuses the first-selected card when the selected cards wear different animations', async () => {

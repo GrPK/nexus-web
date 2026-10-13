@@ -111,6 +111,16 @@
   display: flex;
 }
 
+// A pick that reached no card points at why: the chip asks for a selection.
+.scopeFlash {
+  border-radius: var(--radius-sm);
+  animation: scope-flash var(--ease-slow) ease-in-out 4;
+}
+
+@keyframes scope-flash {
+  50% { box-shadow: 0 0 0 2px var(--accent-glow); filter: brightness(1.6); }
+}
+
 .paneTitle {
   font-size: var(--type-body);
   font-weight: 600;

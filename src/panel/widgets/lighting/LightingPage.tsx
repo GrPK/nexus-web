@@ -978,23 +978,28 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // the dock locks. Inside the tab, the first-selected card is in focus: its
   // pin's target, or the global source when it follows the global mode.
   const selectionIds = useMemo(() => [...selectedDeviceIds], [selectedDeviceIds]);
-  // The tab a press opened for the selection; with nothing selected the open tab is the global mode.
+  // The tab a press opened for a selection, null for the global mode's tab. Selecting and
+  // deselecting cards never moves it.
   const [selectionTab, setSelectionTab] = useState<LightingMode | null>(null);
   const [tabBaseMode, setTabBaseMode] = useState(effectiveMode);
   if (tabBaseMode !== effectiveMode) {
     // A global mode change from anywhere (a press, Off, simple mode, another client) reopens the global tab.
     setTabBaseMode(effectiveMode);
     setSelectionTab(null);
-  } else if (selectedDeviceIds.size === 0 && selectionTab !== null) {
-    setSelectionTab(null);
   }
   const viewMode: LightingMode = selectionTab ?? effectiveMode;
+  // Nothing selected on a tab other than the running mode: its picks reach no card until a
+  // selection gives them one (or a press of the tab starts the mode), so they flash the scope chip.
+  const detachedTab = selectedDeviceIds.size === 0 && viewMode !== effectiveMode;
+  const [scopeFlash, setScopeFlash] = useState(0);
+  const flashScope = useCallback(() => setScopeFlash(n => n + 1), []);
   const cardMode = useCallback((id: string): LightingMode => {
     const p = pins[id];
     return p ? pinMode(p.kind) : effectiveMode;
   }, [pins, effectiveMode]);
   const scoped: ScopedTarget = useMemo(() => {
-    if (selectionIds.length === 0) return { kind: 'none' };
+    // A detached tab reaches outside the running mode just as a selection can.
+    if (selectionIds.length === 0) return detachedTab ? { kind: 'mixed' } : { kind: 'none' };
     if (selectionIds.some(id => cardMode(id) !== viewMode)) return { kind: 'mixed' };
     const pin = pins[selectionIds[0]];
     if (!pin) return { kind: 'none' };
@@ -1006,7 +1011,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       slot: pin.kind === 'static' ? (pin.slot ?? 0) : slotOf(pin.effect ?? ''),
       hex: pin.kind === 'static' ? pinHex(pin) : '',
     };
-  }, [pins, selectionIds, slotOf, cardMode, viewMode]);
+  }, [pins, selectionIds, slotOf, cardMode, viewMode, detachedTab]);
   // The cards the focused look belongs to: the first-selected card and every selected card wearing
   // the same pin (or following the global mode with it). Dock edits reach only these.
   const focusIds = useMemo(() => {
@@ -1028,6 +1033,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // wore; the running effect is untouched. Unselected pinned devices are
     // never reached.
     const ids = [...selectedDeviceIds];
+    if (detachedTab) { flashScope(); return; }
     if (ids.length > 0 && (viewMode === 'animate' || viewMode === 'static')) {
       if (viewMode === 'static') {
         if (isStaticEffect(key)) pinStaticLook(key, slotOf(key), ids);
@@ -1053,13 +1059,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       rawSync: selectMode === 'static' ? 'static' : key,
       effect: key,
     });
-  }, [activeEffect, applyAnimate, applyPins, viewMode, pinStaticLook, selectedDeviceIds, setGlobalColor, slotOf, stateFor]);
+  }, [activeEffect, applyAnimate, applyPins, viewMode, pinStaticLook, selectedDeviceIds, setGlobalColor, slotOf, stateFor, detachedTab, flashScope]);
 
   // Paces the pin writes a color drag produces; the local copy is recorded
   // per move, the write follows when the previous one lands.
   const queueColorWrite = useColorWriteQueue(useCallback((ids: string[], pin: Pin) => applyPins(ids, pin, false), [applyPins]));
 
   const handleCustomSelect = useCallback((hex: string) => {
+    if (detachedTab) { flashScope(); return; }
     setCustomStaticColor(hex);
     const ids = [...selectedDeviceIds];
     // Nothing selected: the color is the exact global flat color.
@@ -1072,7 +1079,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const pin = colorPin(hex);
     recordPins(ids, pin);
     queueColorWrite(pin, ids);
-  }, [queueColorWrite, recordPins, selectedDeviceIds, setCustomStaticColor, setGlobalColor]);
+  }, [queueColorWrite, recordPins, selectedDeviceIds, setCustomStaticColor, setGlobalColor, detachedTab, flashScope]);
 
   // Records as well as writes: the marks and the device cards read the pin, so
   // a drag has to move them with the pointer, not on release.
@@ -2179,6 +2186,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // lives on. Every other mode still marks its own tab.
   const activeTabKey = !synced ? undefined
     : (viewMode === 'none' ? MODE_MENU_TAB_KEY : viewMode);
+  const globalTabKey = !synced ? undefined
+    : (effectiveMode === 'none' ? MODE_MENU_TAB_KEY : effectiveMode);
   // What a tab press gives the selected cards: that mode's global look, or the
   // one shared Mirror or Media. Game Sync and Off cannot be pinned, so they
   // always change everything.
@@ -2217,9 +2226,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       const ids = tabPressPins(pins, selectedDeviceIds, key);
       return ids.length ? pressReach(visibleDevices, pins, new Set(ids)) : undefined;
     }
-    if (tabPressChangesNothing(key, activeTabKey, selectedDeviceIds.size, false)) return undefined;
+    // With nothing selected a press changes the running mode, which a detached open tab is not.
+    if (tabPressChangesNothing(key, detachedTab ? globalTabKey : activeTabKey, selectedDeviceIds.size, false)) return undefined;
     return pressReach(visibleDevices, pins, selectedDeviceIds, key === 'gamesync');
-  }, [activeTabKey, pins, selectedDeviceIds, visibleDevices]);
+  }, [activeTabKey, globalTabKey, detachedTab, pins, selectedDeviceIds, visibleDevices]);
   // A tab press either opens the mode menu or applies a mode: to the selected
   // cards when there are any, else to every unpinned one. A mode switch also
   // drops the menu, which the tab row keeps "inside" its anchor.
@@ -2247,14 +2257,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The cards a hovered press or pick reaches, outlined. Off and Game Sync have no picks.
   const pickTargetIds = useMemo(() => {
     if (scopeHovered || pickHovered) {
-      return viewMode === 'none' || viewMode === 'gamesync' ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
+      return viewMode === 'none' || viewMode === 'gamesync' || detachedTab ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
     }
     if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
     return tabPressReach(hoveredTab);
-  }, [scopeHovered, pickHovered, viewMode, hoveredTab, tabPressReach, pins, selectedDeviceIds, visibleDevices]);
+  }, [scopeHovered, pickHovered, viewMode, detachedTab, hoveredTab, tabPressReach, pins, selectedDeviceIds, visibleDevices]);
   const pinnedNames = useMemo(() => visibleDevices.filter(d => d.id in pins).map(canvasLabelName), [visibleDevices, pins]);
   // How many cards the next pick changes; with none, the way to reach any is a selection.
-  const reachCount = pressReach(visibleDevices, pins, selectedDeviceIds).size;
+  const reachCount = detachedTab ? 0 : pressReach(visibleDevices, pins, selectedDeviceIds).size;
   const previewBadgeLabel = selectedDeviceIds.size > 0
     ? t(pluralKey('lighting.pane.appliesSelected', language, reachCount), { count: reachCount })
     : reachCount > 0 ? t(pluralKey('lighting.pane.appliesDevices', language, reachCount), { count: reachCount })
@@ -2270,7 +2280,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   );
   const scopeChip = (
     <span
-      className={styles.scopeChip}
+      key={scopeFlash}
+      className={`${styles.scopeChip} ${scopeFlash > 0 ? styles.scopeFlash : ''}`}
       onPointerEnter={e => { if (e.pointerType === 'mouse') setScopeHovered(true); }}
       onPointerLeave={e => { if (e.pointerType === 'mouse') setScopeHovered(false); }}
     >
@@ -2299,6 +2310,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Selected devices wearing different pins have no single value for the
   // controls to edit, so the dock locks until the selection agrees. Mirror's
   // and Media's controls are shared, so their dock never locks.
+  // A detached tab locks it too: the dock would edit the running mode's effect.
   const mixedSelection = scoped.kind === 'mixed' && viewMode !== 'screen' && viewMode !== 'gif';
   const allSelected = selectAllIds.length > 0 && selectAllIds.every(id => selectedDeviceIds.has(id));
   // The canvas previews the shared effect canvas, which Static does not sample
@@ -2312,6 +2324,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     () => selectedDeviceIds.size === 0 ? visibleDevices : visibleDevices.filter(d => selectedDeviceIds.has(d.id)),
     [visibleDevices, selectedDeviceIds],
   );
+  // Cards lit by another mode than the open tab, captioned with that mode: their frames are not part of this canvas.
+  const foreignFrames = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const d of canvasDevices) {
+      const mode = cardMode(d.id);
+      if (mode !== viewMode) out.set(d.id, t(`lighting.mode.${mode === 'none' ? 'off' : mode}`));
+    }
+    return out;
+  }, [canvasDevices, cardMode, viewMode, t]);
 
   // Static's canvas is the color picker. A pattern replaces the field with the
   // effect's own render: a selection's pattern pin, or with nothing selected
@@ -2754,7 +2775,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     />
                   </Suspense>
                 ) : (
-                  <DeviceCanvas backdrop={viewMode === 'gif' && effectiveMode !== 'gif' ? <MediaBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
+                  <DeviceCanvas backdrop={viewMode === 'gif' && effectiveMode !== 'gif' ? <MediaBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} foreignFrames={foreignFrames} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
                 )}
                 {viewMode === 'gif' && <MediaCanvasNotice />}
                 {shaderMode && dockEffect && dockState && !mixedSelection && (
@@ -2872,8 +2893,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     mode={viewMode}
                     screenPP={screenPP}
                     onScreenPPChange={setScreenPP}
-                    keepMode={selectedDeviceIds.size > 0 && viewMode !== effectiveMode}
+                    keepMode={viewMode !== effectiveMode}
                     onSelectionPick={handleSharedPick}
+                    onBlockedPick={detachedTab ? flashScope : undefined}
                   />
                 </div>
               )}
