@@ -34,6 +34,19 @@ describe('useBenchmarkHistory', () => {
     expect(hook.current.latest?.submission).toBeNull();
   });
 
+  it('clears a removed entry from its run and from storage', () => {
+    const { result: hook } = renderHook(() => useBenchmarkHistory());
+    act(() => { hook.current.addRun(result, 'sub-1', { percentile: 60, rank: 41, total: 100 }); });
+    act(() => { hook.current.addRun(result, 'sub-2', { percentile: 70, rank: 30, total: 100 }); });
+
+    act(() => hook.current.clearRunSubmission('sub-1'));
+    expect(hook.current.history.map(run => run.submissionId)).toEqual(['sub-2', null]);
+    expect(hook.current.history[1].submission).toBeNull();
+
+    const { result: reloaded } = renderHook(() => useBenchmarkHistory());
+    expect(reloaded.current.history.map(run => run.submissionId)).toEqual(['sub-2', null]);
+  });
+
   it('fills in a deferred upload on the matching run without adding a new entry', () => {
     const { result: hook } = renderHook(() => useBenchmarkHistory());
     let id = '';

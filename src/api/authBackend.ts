@@ -93,4 +93,8 @@ export interface AuthBackend {
   deleteDevice?(installId: string): Promise<boolean>;
   /** Null when the request failed. */
   setDeviceCase?(installId: string, caseId: string | null): Promise<AccountDeviceItem | null>;
+  /** Leaderboard entries the signed-in account submitted; null when the request failed. Website only. */
+  listOwnBenchmarks?(): Promise<string[] | null>;
+  /** Removes one of the signed-in account's leaderboard entries. Website only. */
+  deleteBenchmark?(id: string): Promise<boolean>;
 }

@@ -454,6 +454,27 @@ describe('directApiBackend', () => {
 
       expect(await backend.deleteDevice?.('manual-abc')).toBe(false);
     });
+
+    it('listOwnBenchmarks reads the signed-in account\'s entry ids', async () => {
+      const backend = await loggedInBackend();
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { ids: ['b-2', 'b-1'] }));
+
+      expect(await backend.listOwnBenchmarks?.()).toEqual(['b-2', 'b-1']);
+      expect(fetchMock).toHaveBeenLastCalledWith(`${BASE}/benchmarks/mine`, expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('deleteBenchmark DELETEs the entry with the bearer and reports the outcome', async () => {
+      const backend = await loggedInBackend();
+      fetchMock.mockResolvedValueOnce(emptyResponse(204));
+      expect(await backend.deleteBenchmark?.('b 1')).toBe(true);
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        `${BASE}/benchmarks/b%201`,
+        expect.objectContaining({ method: 'DELETE', headers: expect.objectContaining({ Authorization: expect.stringMatching(/^Bearer /) }) }),
+      );
+
+      fetchMock.mockResolvedValueOnce(jsonResponse(404, {}));
+      expect(await backend.deleteBenchmark?.('b-1')).toBe(false);
+    });
   });
 
   describe('isWebCookieMode', () => {

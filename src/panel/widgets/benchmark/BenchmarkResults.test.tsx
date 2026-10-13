@@ -89,4 +89,33 @@ describe('BenchmarkResults', () => {
     );
     expect(screen.queryByText('benchmark.result.uploadCta')).not.toBeInTheDocument();
   });
+
+  describe('standing', () => {
+    const renderWith = (submission: { percentile: number; rank: number; total: number }) =>
+      render(<BenchmarkResults result={mkResult()} submission={submission} submitting={false} standingAction={<button type="button">remove</button>} />);
+
+    it('hides the standing for the only run on the board but keeps the action', () => {
+      renderWith({ percentile: 0, rank: 1, total: 1 });
+      expect(screen.queryByText(/benchmark\.result\.percentile/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/benchmark\.result\.rank/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'remove' })).toBeInTheDocument();
+    });
+
+    it('shows the rank inside the top 100', () => {
+      renderWith({ percentile: 99.2, rank: 2, total: 135 });
+      expect(screen.getByText('benchmark.result.rank rank=2 total=135')).toBeInTheDocument();
+    });
+
+    it('shows a Top % bucket past the top 100', () => {
+      renderWith({ percentile: 90, rank: 120, total: 1281 });
+      expect(screen.getByText('benchmark.leaderboard.top pct=10')).toBeInTheDocument();
+      expect(screen.queryByText(/benchmark\.result\.rank/)).not.toBeInTheDocument();
+    });
+
+    it('shows no standing below the top half', () => {
+      renderWith({ percentile: 3, rank: 1245, total: 1281 });
+      expect(screen.queryByText(/benchmark\.result\.percentile/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/benchmark\.leaderboard\.top/)).not.toBeInTheDocument();
+    });
+  });
 });

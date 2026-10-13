@@ -9,6 +9,7 @@ import { DomainGlyph } from '../../../components/common/DomainGlyph/DomainGlyph'
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
 import { Button } from '../../../components/common/Button/Button';
 import { BenchmarkChip } from './BenchmarkChip';
+import { standingFor } from './standing';
 import styles from './BenchmarkPage.module.scss';
 
 interface Props {
@@ -19,6 +20,8 @@ interface Props {
   onUpload?: () => void;
   /** Controls docked top-right in the score header. */
   actions?: ReactNode;
+  /** Shown under the leaderboard standing, e.g. removing the entry. */
+  standingAction?: ReactNode;
 }
 
 const SUBSYSTEM_ICONS: Record<string, LucideIcon> = {
@@ -67,7 +70,7 @@ function SubsystemCard({ s, model }: { s: BenchmarkSubScore; model: string }) {
   );
 }
 
-export function BenchmarkResults({ result, submission, submitting, onUpload, actions }: Props) {
+export function BenchmarkResults({ result, submission, submitting, onUpload, actions, standingAction }: Props) {
   const { t } = useTranslation();
   const { numberFormat } = useUnitPrefs();
   const hw = result.hardware;
@@ -80,7 +83,10 @@ export function BenchmarkResults({ result, submission, submitting, onUpload, act
   };
 
   const showUpload = !!onUpload && !submission && !submitting;
-  const hasAside = (submitting && !submission) || !!submission || showUpload;
+  // A lone run has no one to compare against.
+  const standing = submission && submission.total > 1 ? standingFor(submission.rank, submission.total) : null;
+  const showStandingAction = !!submission && !!standingAction;
+  const hasAside = (submitting && !submission) || !!standing || showStandingAction || showUpload;
 
   return (
     <div className={styles.resultsPanel}>
@@ -96,7 +102,7 @@ export function BenchmarkResults({ result, submission, submitting, onUpload, act
             {submitting && !submission && (
               <span className={styles.percentilePending}>{t('benchmark.result.submitting')}</span>
             )}
-            {submission && (
+            {submission && standing && (
               <>
                 <span className={styles.percentile}>
                   {t('benchmark.result.percentile', {
@@ -105,13 +111,16 @@ export function BenchmarkResults({ result, submission, submitting, onUpload, act
                   })}
                 </span>
                 <span className={styles.rankLine}>
-                  {t('benchmark.result.rank', {
-                    rank: String(submission.rank),
-                    total: String(submission.total),
-                  })}
+                  {'rank' in standing
+                    ? t('benchmark.result.rank', {
+                      rank: String(standing.rank),
+                      total: String(submission.total),
+                    })
+                    : t('benchmark.leaderboard.top', { pct: String(standing.topPercent) })}
                 </span>
               </>
             )}
+            {showStandingAction && standingAction}
             {showUpload && (
               <>
                 <span className={styles.percentilePending}>{t('benchmark.result.uploadPrompt', { setting: t('settings.telemetry.label') })}</span>

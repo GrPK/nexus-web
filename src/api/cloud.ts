@@ -1,5 +1,6 @@
 import { getToken, handleUnauthorized } from './auth';
 import { authFetchWithStatus, deleteService, fetchService, loopbackFetchInit, patchService, postService, resolveHttp } from './service';
+import { getDeviceId } from './nexusApi';
 import type { GameLeaderboardEntry, GameType } from '../types/games';
 
 export interface CloudAvatar {
@@ -232,6 +233,13 @@ export interface CloudBenchmarkSubmitResponse {
 // upstream failure collapses to null like every other postService call.
 export const submitCloudBenchmark = (payload: CloudBenchmarkSubmitBody) =>
   postService<CloudBenchmarkSubmitResponse>('/cloud/benchmarks/submit', payload);
+
+// Upstream answers 404 when the entry is gone or neither this browser's
+// deviceId nor the signed-in account submitted it.
+export async function deleteCloudBenchmark(id: string): Promise<boolean> {
+  const { status } = await cloudFetch<CloudEnvelope>(`/cloud/benchmarks/${encodeURIComponent(id)}`, 'DELETE', { deviceId: getDeviceId() });
+  return status >= 200 && status < 300;
+}
 
 export interface CloudGameScoreSubmitBody {
   gameType: GameType;
