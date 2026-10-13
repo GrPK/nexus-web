@@ -81,7 +81,6 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   const [state, setState] = useState<UmbraState | null>(null);
   const [connection, setConnection] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
   useReportDeviceWaiting(connection !== 'connected');
-  const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<Partial<Record<WriteCard, boolean>>>({});
   const [detecting, setDetecting] = useState(false);
   const [detectFailed, setDetectFailed] = useState(false);
@@ -134,7 +133,6 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
     const id = ++seqRef.current;
     const cardId = ++cardSeqRef.current[card];
     busyRef.current += 1;
-    setSaving(true);
     setFailed(prev => ({ ...prev, [card]: false }));
     try {
       const next = await call();
@@ -143,7 +141,6 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
       if (next && id === seqRef.current) apply(next);
     } finally {
       busyRef.current -= 1;
-      if (aliveRef.current && busyRef.current === 0) setSaving(false);
     }
   }, [apply]);
 
@@ -235,7 +232,6 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
       <ViewHeader
         // eslint-disable-next-line i18next/no-literal-string -- brand + model name
         title="Asiahorse Umbra V2"
-        actions={saving ? <span className={styles.savingBadge}>{t('devices.saving')}</span> : null}
         tabs={tabs}
         activeTab={tab}
         onTabChange={key => setTab(key as UmbraTab)}
