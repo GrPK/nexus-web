@@ -59,7 +59,6 @@ export function LianLiDevicePage({ hubId = LIANLI_PRIMARY_HUB, onSectionNavigate
   useReportDeviceWaiting(connection !== 'connected');
   const [lianliState, setLianliState] = useState<LianLiState | null>(null);
   const [lighting, setLighting] = useState<LianLiLighting | null>(null);
-  const [saving, setSaving] = useState(false);
   // Port the effect controls edit; null edits every port.
   const [target, setTarget] = useState<number | null>(null);
   const aliveRef = useRef(true);
@@ -118,26 +117,16 @@ export function LianLiDevicePage({ hubId = LIANLI_PRIMARY_HUB, onSectionNavigate
     const fansPerPort = [...(lianliState?.fansPerPort ?? [])];
     fansPerPort[port] = count;
     setLianliState(prev => (prev ? { ...prev, fansPerPort } : prev));
-    setSaving(true);
-    try {
-      await setLianLiFanCount(port, count, hubId);
-      // A header too short for the new chain drops off the source list; refetching shows it as unchosen.
-      if (lighting?.argbSync && lighting.argbSyncSource
-        && !await wireArgbSyncFans(lighting.argbSyncSource, longestChain(fansPerPort))) {
-        void refresh();
-      }
-    } finally {
-      if (aliveRef.current) setSaving(false);
+    await setLianLiFanCount(port, count, hubId);
+    // A header too short for the new chain drops off the source list; refetching shows it as unchosen.
+    if (lighting?.argbSync && lighting.argbSyncSource
+      && !await wireArgbSyncFans(lighting.argbSyncSource, longestChain(fansPerPort))) {
+      void refresh();
     }
   }, [hubId, lianliState, lighting, refresh]);
 
   const commitLighting = useCallback(async (patch: LianLiLightingPatch) => {
-    setSaving(true);
-    try {
-      return (await setLianLiLighting(patch, hubId)) !== null;
-    } finally {
-      if (aliveRef.current) setSaving(false);
-    }
+    return (await setLianLiLighting(patch, hubId)) !== null;
   }, [hubId]);
 
   if (connection === 'disconnected') {
@@ -220,7 +209,6 @@ export function LianLiDevicePage({ hubId = LIANLI_PRIMARY_HUB, onSectionNavigate
     <div className={styles.page}>
       <ViewHeader
         title={lianLiHubName(hubId)}
-        actions={saving ? <span className={styles.savingBadge}>{t('devices.saving')}</span> : null}
         tabs={tabs}
         activeTab={tab}
         onTabChange={key => setActiveTab(key as LianLiTab)}

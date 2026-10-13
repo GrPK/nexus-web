@@ -125,7 +125,7 @@ export function CorsairDevicePage({ onSectionNavigate }: CorsairDevicePageProps)
               action={
                 <div className={styles.hubActions}>
                   {hub.firmware && (
-                    <span className={styles.savingBadge}>fw {hub.firmware}</span>
+                    <span className={styles.firmwareLabel}>fw {hub.firmware}</span>
                   )}
                   <Button
                     size="sm"

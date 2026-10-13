@@ -30,7 +30,6 @@ export function StrimerDevicePage({ onSectionNavigate }: StrimerDevicePageProps)
   const { t } = useTranslation();
   const { numberFormat } = useUnitPrefs();
   const [lighting, setLighting] = useState<StrimerLighting | null>(null);
-  const [saving, setSaving] = useState(false);
   const aliveRef = useRef(true);
 
   const refresh = useCallback(async () => {
@@ -51,12 +50,7 @@ export function StrimerDevicePage({ onSectionNavigate }: StrimerDevicePageProps)
   }, [refresh]);
 
   const commitLighting = useCallback(async (patch: StrimerLightingPatch) => {
-    setSaving(true);
-    try {
-      await setStrimerLighting(patch);
-    } finally {
-      if (aliveRef.current) setSaving(false);
-    }
+    await setStrimerLighting(patch);
   }, []);
 
   const lightingLoaded = lighting !== null;
@@ -74,7 +68,6 @@ export function StrimerDevicePage({ onSectionNavigate }: StrimerDevicePageProps)
       <ViewHeader
         // eslint-disable-next-line i18next/no-literal-string -- brand + model name
         title="Lian Li Strimer Plus"
-        actions={saving ? <span className={styles.savingBadge}>{t('devices.saving')}</span> : null}
       />
       <div className={`${styles.pageBody} pageBody`}>
         <SettingsSection title={t('devices.lianli.argbSyncSection')} boxClassName={styles.sectionBox}>
@@ -87,11 +80,9 @@ export function StrimerDevicePage({ onSectionNavigate }: StrimerDevicePageProps)
               if (!lighting) return;
               const previous = lighting;
               setLighting({ ...lighting, argbSync: on });
-              setSaving(true);
               // It decides which controls lock, so a refused save must not leave the page showing it.
               void setStrimerLighting({ argbSync: on }).catch(() => null).then(r => {
                 if (!aliveRef.current) return;
-                setSaving(false);
                 if (r === null) setLighting(previous);
               });
             }}

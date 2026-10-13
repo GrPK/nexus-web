@@ -45,7 +45,6 @@ export function SmartHubDevicePage() {
   const [connection, setConnection] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
   useReportDeviceWaiting(connection !== 'connected');
   const [setting, setSetting] = useState<SmartHubFwSetting | null>(null);
-  const [saving, setSaving] = useState(false);
   const aliveRef = useRef(true);
 
   const refresh = useCallback(async () => {
@@ -88,12 +87,7 @@ export function SmartHubDevicePage() {
   // one combined endpoint, so every field patch sends all six fields.
   const commitSetting = useCallback(async (next: SmartHubFwSetting) => {
     setSetting(next);
-    setSaving(true);
-    try {
-      await setSmartHubFwSetting(next);
-    } finally {
-      if (aliveRef.current) setSaving(false);
-    }
+    await setSmartHubFwSetting(next);
   }, []);
 
   // The empty state only renders when the service explicitly says the hub is
@@ -127,7 +121,6 @@ export function SmartHubDevicePage() {
       <ViewHeader
         // eslint-disable-next-line i18next/no-literal-string -- brand + model name
         title="HYTE SmartHub"
-        actions={saving ? <span className={styles.savingBadge}>{t('devices.saving')}</span> : null}
       />
       <div className={`${styles.pageBody} pageBody`}>
         <SettingsSection

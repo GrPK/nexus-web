@@ -723,7 +723,7 @@ export function TryxDevicePage() {
         tabs={TABS}
         activeTab={tab}
         onTabChange={k => setTab(k as TryxTab)}
-        actions={uploading ? <span className={styles.savingBadge}>{t('devices.tryx.uploading')}</span> : null}
+        actions={uploading ? <span className={styles.uploadingBadge}>{t('devices.tryx.uploading')}</span> : null}
       />
       <div className={`${styles.pageBody} pageBody`}>
         <div className={styles.content}>
