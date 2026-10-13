@@ -570,6 +570,7 @@
   "datepicker.popup": "날짜 선택",
   "datepicker.prevMonth": "이전 달",
   "datepicker.today": "오늘",
+  "devices.asiahorse-umbra.asyncNoPorts": "아직 LED가 있는 포트가 없습니다. 아래 LED 포트에서 LED 수를 설정하거나 LED 자동 감지를 실행하세요.",
   "devices.asiahorse-umbra.autoDetect": "LED 자동 감지",
   "devices.asiahorse-umbra.autoDetectDone": "LED가 있는 포트: {ports}. LED 총계: {leds}.",
   "devices.asiahorse-umbra.autoDetectFailed": "컨트롤러가 다시 연결되지 않았습니다. USB 연결을 확인한 후 다시 시도하세요.",

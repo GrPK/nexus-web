@@ -7,9 +7,7 @@ export type UmbraBootMode = 'memory' | 'fixed';
 
 export interface UmbraEffectSettings {
   effect: string;
-  /** 0..5, 20 % steps. */
   speed: number;
-  /** 1..5, 20 % steps. */
   brightness: number;
   direction: UmbraDirection;
   colors: string[];

@@ -187,7 +187,7 @@ describe('AsiahorseUmbraDevicePage', () => {
     const found = makeState();
     found.ports[0] = { ...found.ports[0], ledCount: 18 };
     await act(async () => { finish(found); });
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(button).not.toBeDisabled();
     expect(screen.getByText(`${P}autoDetectDone:{"ports":"2","leds":"24"}`)).toBeInTheDocument();
   });
@@ -225,5 +225,106 @@ describe('AsiahorseUmbraDevicePage', () => {
     expect(mockBoot).toHaveBeenCalledWith({ mode: 'fixed' });
     await act(async () => { fireEvent.click(screen.getByRole('switch', { name: `${P}selfCheck` })); });
     expect(mockBoot).toHaveBeenLastCalledWith({ selfCheck: false });
+  });
+
+  // The stacked sliders' value buttons, in page order: speed, brightness, LED count.
+  const typeInto = async (slider: 'speed' | 'brightness' | 'leds', value: string) => {
+    const index = { speed: 0, brightness: 1, leds: 2 }[slider];
+    fireEvent.click(screen.getAllByRole('button', { name: /^\d+%?$/ })[index]);
+    const input = screen.getByRole('spinbutton');
+    fireEvent.change(input, { target: { value } });
+    await act(async () => { fireEvent.keyDown(input, { key: 'Enter' }); });
+  };
+
+  it('writes a typed speed once, as a 0..5 level', async () => {
+    await mount(makeState());
+    await typeInto('speed', '100');
+    expect(mockLighting).toHaveBeenCalledTimes(1);
+    expect(mockLighting).toHaveBeenCalledWith({ sync: { speed: 5 } });
+  });
+
+  it('keeps brightness at level 1 or above', async () => {
+    await mount(makeState());
+    await typeInto('brightness', '0');
+    expect(mockLighting).toHaveBeenCalledTimes(1);
+    expect(mockLighting).toHaveBeenCalledWith({ sync: { brightness: 1 } });
+  });
+
+  it('writes a typed LED count once', async () => {
+    await mount(makeState());
+    await typeInto('leds', '12');
+    expect(mockPort).toHaveBeenCalledTimes(1);
+    expect(mockPort).toHaveBeenCalledWith(0, { ledCount: 12 });
+  });
+
+  it('shows a failed write only in the card that wrote', async () => {
+    await mount(makeState());
+    mockFan.mockResolvedValue(null);
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: `${P}fanSync` })); });
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('alert')).toHaveTextContent(`${P}saveFailed`);
+
+    mockLighting.mockResolvedValue(null);
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: `${P}effect.runway` })); });
+    expect(screen.getAllByRole('alert')).toHaveLength(2);
+  });
+
+  it('clears a card error once a poll reconciles the state', async () => {
+    await mount(makeState());
+    mockFan.mockResolvedValue(null);
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: `${P}fanSync` })); });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    const before = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(before + 10_000);
+    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    vi.restoreAllMocks();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('does not poll over an edit made moments ago', async () => {
+    await mount(makeState());
+    const calls = mockGet.mock.calls.length;
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: `${P}effect.runway` })); });
+    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    expect(mockGet.mock.calls.length).toBe(calls);
+  });
+
+  it('drops a response older than the latest edit', async () => {
+    await mount(makeState());
+    const resolvers: Array<(s: UmbraState) => void> = [];
+    mockLighting.mockImplementation(() => new Promise<UmbraState>(r => { resolvers.push(r); }));
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: `${P}sourceNexus` })); });
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: `${P}sourceArgb` })); });
+    const nexus = makeState();
+    nexus.lighting.source = 'nexus';
+    const argb = makeState();
+    argb.lighting.source = 'argbInput';
+    await act(async () => { resolvers[1](argb); });
+    await act(async () => { resolvers[0](nexus); });
+    expect(screen.getByText(`${P}sourceArgbHint`)).toBeInTheDocument();
+    expect(screen.queryByText(`${P}sourceNexusHint`)).not.toBeInTheDocument();
+  });
+
+  it('keeps the async port and the ports card selection separate', async () => {
+    const s = makeState();
+    s.lighting.group = 'async';
+    s.ports[2] = { ...s.ports[2], ledCount: 4 };
+    await mount(s);
+    const [asyncPicker, portsPicker] = screen.getAllByRole('radiogroup', { name: `${P}port` });
+    expect(asyncPicker).toBeDefined();
+    await act(async () => {
+      fireEvent.click(portsPicker.querySelector('[data-chip-key="5"]') as HTMLElement);
+    });
+    expect(asyncPicker.querySelector('[data-chip-key="2"]')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('explains an empty async editor instead of writing to port 1', async () => {
+    const s = makeState();
+    s.lighting.group = 'async';
+    s.ports = s.ports.map(p => ({ ...p, ledCount: 0 }));
+    await mount(s);
+    expect(screen.getByText(`${P}asyncNoPorts`)).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: `${P}effect.rainbow` })).not.toBeInTheDocument();
+    expect(mockLighting).not.toHaveBeenCalled();
   });
 });

@@ -577,6 +577,7 @@
   "datepicker.popup": "Выбор даты",
   "datepicker.prevMonth": "Предыдущий месяц",
   "datepicker.today": "Сегодня",
+  "devices.asiahorse-umbra.asyncNoPorts": "Ни у одного порта пока нет светодиодов. Задайте их число в разделе «Порты светодиодов» ниже или запустите автоопределение светодиодов.",
   "devices.asiahorse-umbra.autoDetect": "Автоопределение светодиодов",
   "devices.asiahorse-umbra.autoDetectDone": "Портов со светодиодами: {ports}. Всего светодиодов: {leds}.",
   "devices.asiahorse-umbra.autoDetectFailed": "Контроллер не вернулся. Проверьте USB-подключение и повторите попытку.",

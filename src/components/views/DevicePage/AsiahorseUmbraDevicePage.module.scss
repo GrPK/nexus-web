@@ -6,17 +6,3 @@
   border: 1px solid var(--border);
   vertical-align: middle;
 }
-
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.detectStatus {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: var(--type-small);
-  color: var(--text-dim);
-}

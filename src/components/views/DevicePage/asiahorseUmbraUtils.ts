@@ -7,7 +7,6 @@ import type {
   UmbraState,
 } from '../../../api/asiahorse-umbra';
 
-/** Speed and brightness levels are 20 % steps on the wire. */
 export const PERCENT_PER_LEVEL = 20;
 export const MAX_LEVEL = 5;
 export const MIN_BRIGHTNESS_LEVEL = 1;

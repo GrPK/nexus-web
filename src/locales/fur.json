@@ -570,6 +570,7 @@
   "datepicker.popup": "Seletôr di date",
   "datepicker.prevMonth": "Mês precedent",
   "datepicker.today": "Vuê",
+  "devices.asiahorse-umbra.asyncNoPorts": "Nissune puarte e à ancjemò LED. Stabilìs un numar di LED sot Puartis LED, o invie il rilevament automatic dai LED.",
   "devices.asiahorse-umbra.autoDetect": "Rileve i LED in automatic",
   "devices.asiahorse-umbra.autoDetectDone": "Puartis cun LED: {ports}. LED in dut: {leds}.",
   "devices.asiahorse-umbra.autoDetectFailed": "Il controlôr nol è tornât. Controle la conession USB e torne prove.",

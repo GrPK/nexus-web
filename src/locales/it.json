@@ -570,6 +570,7 @@
   "datepicker.popup": "Selettore data",
   "datepicker.prevMonth": "Mese precedente",
   "datepicker.today": "Oggi",
+  "devices.asiahorse-umbra.asyncNoPorts": "Nessuna porta ha ancora LED. Imposta un numero di LED in Porte LED qui sotto, oppure usa Rileva LED automaticamente.",
   "devices.asiahorse-umbra.autoDetect": "Rileva LED automaticamente",
   "devices.asiahorse-umbra.autoDetectDone": "Porte con LED: {ports}. LED totali: {leds}.",
   "devices.asiahorse-umbra.autoDetectFailed": "Il controller non è tornato online. Controlla la connessione USB e riprova.",

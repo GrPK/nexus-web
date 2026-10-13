@@ -570,6 +570,7 @@
   "datepicker.popup": "日期選擇器",
   "datepicker.prevMonth": "上一月",
   "datepicker.today": "今天",
+  "devices.asiahorse-umbra.asyncNoPorts": "目前沒有連接 LED 的連接埠。請在下方的 LED 連接埠中設定 LED 數量，或執行自動偵測 LED。",
   "devices.asiahorse-umbra.autoDetect": "自動偵測 LED",
   "devices.asiahorse-umbra.autoDetectDone": "有 LED 的連接埠：{ports}。LED 總數：{leds}。",
   "devices.asiahorse-umbra.autoDetectFailed": "控制器沒有恢復連線。請檢查 USB 連線後再試一次。",

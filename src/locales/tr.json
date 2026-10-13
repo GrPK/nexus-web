@@ -570,6 +570,7 @@
   "datepicker.popup": "Tarih seçici",
   "datepicker.prevMonth": "Önceki ay",
   "datepicker.today": "Bugün",
+  "devices.asiahorse-umbra.asyncNoPorts": "Henüz hiçbir bağlantı noktasında LED yok. Aşağıdaki LED bağlantı noktaları bölümünden LED sayısını ayarlayın veya LED'leri otomatik algılayın.",
   "devices.asiahorse-umbra.autoDetect": "LED'leri otomatik algıla",
   "devices.asiahorse-umbra.autoDetectDone": "LED'li bağlantı noktaları: {ports}. Toplam LED: {leds}.",
   "devices.asiahorse-umbra.autoDetectFailed": "Denetleyici geri dönmedi. USB bağlantısını kontrol edip yeniden deneyin.",

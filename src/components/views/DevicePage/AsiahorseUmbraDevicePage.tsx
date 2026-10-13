@@ -8,7 +8,8 @@ import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
 import { Slider } from '../../common/Slider/Slider';
 import { HsvPicker } from '../../common/HsvPicker/HsvPicker';
 import { Button } from '../../common/Button/Button';
-import { Spinner } from '../../common/Spinner/Spinner';
+import { Notice } from '../../common/Notice/Notice';
+import { InlineError } from '../../common/InlineError/InlineError';
 import { CoolingPageLink } from './CoolingPageLink';
 import {
   autoDetectUmbra,
@@ -50,6 +51,7 @@ import styles from './LianLiDevicePage.module.scss';
 import own from './AsiahorseUmbraDevicePage.module.scss';
 
 const POLL_MS = 3000;
+type WriteCard = 'lighting' | 'ports' | 'fan' | 'boot';
 const SOURCES: readonly UmbraSource[] = ['nexus', 'firmware', 'argbInput'];
 const SOURCE_KEYS: Record<UmbraSource, string> = {
   nexus: 'sourceNexus',
@@ -78,10 +80,11 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   const [connection, setConnection] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
   useReportDeviceWaiting(connection !== 'connected');
   const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<Partial<Record<WriteCard, boolean>>>({});
   const [detecting, setDetecting] = useState(false);
   const [detectFailed, setDetectFailed] = useState(false);
   const [portIndex, setPortIndex] = useState(0);
+  const [asyncIndex, setAsyncIndex] = useState(0);
   const [colorSlot, setColorSlot] = useState(0);
   const aliveRef = useRef(true);
   // A write in flight, or an edit made moments ago: a poll landing then would
@@ -89,9 +92,12 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   const busyRef = useRef(0);
   const lastEditRef = useRef(0);
   const detectingRef = useRef(false);
+  // Bumped by every edit and write; a response older than the latest one is stale.
+  const seqRef = useRef(0);
 
   const apply = useCallback((next: UmbraState) => {
     if (!aliveRef.current) return;
+    setFailed({});
     setState(next);
     setConnection(next.isConnected ? 'connected' : 'disconnected');
   }, []);
@@ -117,16 +123,22 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
     };
   }, [refresh]);
 
-  // Runs a write; the service answers with the canonical state, which replaces the optimistic one.
-  const write = useCallback(async (call: () => Promise<UmbraState | null>) => {
+  // Runs a write; the service answers with the canonical state, which replaces the optimistic one
+  // unless a newer edit has been made since.
+  const write = useCallback(async (card: WriteCard, call: () => Promise<UmbraState | null>) => {
+    const id = ++seqRef.current;
     busyRef.current += 1;
     setSaving(true);
-    setFailed(false);
     try {
       const next = await call();
       if (!aliveRef.current) return;
-      if (next) apply(next);
-      else setFailed(true);
+      if (!next) {
+        setFailed(prev => ({ ...prev, [card]: true }));
+      } else if (id === seqRef.current) {
+        apply(next);
+      } else {
+        setFailed(prev => ({ ...prev, [card]: false }));
+      }
     } finally {
       busyRef.current -= 1;
       if (aliveRef.current && busyRef.current === 0) setSaving(false);
@@ -134,7 +146,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   }, [apply]);
 
   const commitLighting = useCallback((patch: UmbraLightingPatch) => {
-    void write(() => setUmbraLighting(patch));
+    void write('lighting', () => setUmbraLighting(patch));
   }, [write]);
 
   const detect = useCallback(async () => {
@@ -171,8 +183,9 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   const ports = state?.ports ?? [];
   const populated = populatedPorts(ports);
   const group = lighting?.group ?? 'sync';
-  const asyncPort = populated.some(p => p.index === portIndex) ? portIndex : populated[0]?.index ?? 0;
-  const settings = state ? activeSettings(state, asyncPort) : null;
+  const asyncPort = populated.some(p => p.index === asyncIndex) ? asyncIndex : populated[0]?.index ?? null;
+  const asyncBlocked = group === 'async' && asyncPort === null;
+  const settings = state && !asyncBlocked ? activeSettings(state, asyncPort ?? 0) : null;
   const effectList = state ? effectsForGroup(state.effects, group) : [];
   const spec = effectList.find(e => e.key === settings?.effect) ?? null;
   const slots = Math.min(spec?.colors ?? 0, COLOR_SLOTS);
@@ -180,23 +193,29 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
   const port = ports.find(p => p.index === portIndex) ?? ports[0];
   const pct = (v: number) => localizeNumbers(`${v}%`, numberFormat);
 
+  const touch = () => {
+    lastEditRef.current = Date.now();
+    seqRef.current += 1;
+  };
+
   // One edit of the shown effect: patch the cached value now, send it on commit.
   const edit = (patch: UmbraEffectPatch, commit: boolean) => {
     if (!state) return;
-    lastEditRef.current = Date.now();
-    setState(previewEffect(state, asyncPort, patch));
+    touch();
+    const target = asyncPort ?? 0;
+    setState(prev => prev && previewEffect(prev, target, patch));
     if (commit) {
-      if (group === 'async') commitLighting({ async: { ...patch, port: asyncPort } });
+      if (group === 'async') commitLighting({ async: { ...patch, port: target } });
       else if (group === 'merge') commitLighting({ merge: patch });
       else commitLighting({ sync: patch });
     }
   };
   const editPort = (patch: UmbraPortPatch) => {
     if (!port) return;
-    void write(() => setUmbraPort(port.index, patch));
+    void write('ports', () => setUmbraPort(port.index, patch));
   };
 
-  const commitBoot = (patch: UmbraBootPatch) => { void write(() => setUmbraBoot(patch)); };
+  const commitBoot = (patch: UmbraBootPatch) => { void write('boot', () => setUmbraBoot(patch)); };
 
   const connectedState = loaded ? { label: t('devices.asiahorse-umbra.connected'), tone: CONNECTED_TONE } : undefined;
   const bootOptions = BOOT_MODES.map(m => ({ value: m, label: t(BOOT_KEYS[m]) }));
@@ -230,7 +249,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
         </SettingsSection>
 
         <SettingsSection title={t('devices.asiahorse-umbra.lightingSection')} boxClassName={styles.sectionBox}>
-          <div className={own.stack} data-settings-aside="true">
+          <div className={styles.colorBlock} data-settings-aside="true">
             <ChipGroup
               fullWidth
               ariaLabel={t('devices.asiahorse-umbra.source')}
@@ -239,7 +258,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
               onChange={key => {
                 if (!state) return;
                 const next = key as UmbraSource;
-                setState({ ...state, lighting: { ...state.lighting, source: next } });
+                setState(prev => prev && { ...prev, lighting: { ...prev.lighting, source: next } });
                 commitLighting({ source: next });
               }}
             />
@@ -268,7 +287,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
             <p className={styles.customNote} data-settings-aside="true">{t('devices.asiahorse-umbra.sourceArgbHint')}</p>
           )}
 
-          {firmwareSource && lighting && settings && (
+          {firmwareSource && lighting && (
             <>
               <SettingToggle
                 label={t('devices.asiahorse-umbra.lightOn')}
@@ -276,12 +295,12 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                 checked={lighting.lightOn}
                 onChange={on => {
                   if (!state) return;
-                  setState({ ...state, lighting: { ...state.lighting, lightOn: on } });
+                  setState(prev => prev && { ...prev, lighting: { ...prev.lighting, lightOn: on } });
                   commitLighting({ lightOn: on });
                 }}
               />
 
-              <div className={own.stack} data-settings-aside="true">
+              <div className={styles.colorBlock} data-settings-aside="true">
                 <ChipGroup
                   fullWidth
                   ariaLabel={t('devices.asiahorse-umbra.mode')}
@@ -290,31 +309,39 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                   onChange={key => {
                     if (!state) return;
                     const next = key as UmbraGroup;
-                    setState({ ...state, lighting: { ...state.lighting, group: next } });
+                    setState(prev => prev && { ...prev, lighting: { ...prev.lighting, group: next } });
                     commitLighting({ group: next });
                   }}
                 />
                 <p className={styles.customNote}>{t(`devices.asiahorse-umbra.${GROUP_KEYS[group]}Hint`)}</p>
               </div>
 
+              {asyncBlocked && (
+                <div data-settings-aside="true">
+                  <Notice tone="info">{t('devices.asiahorse-umbra.asyncNoPorts')}</Notice>
+                </div>
+              )}
+
+              {settings && (
+              <>
               {group === 'async' && (
                 <SettingRow label={t('devices.asiahorse-umbra.port')}>
                   <ChipGroup
                     wrap
                     ariaLabel={t('devices.asiahorse-umbra.port')}
-                    activeKey={String(asyncPort)}
+                    activeKey={String(asyncPort ?? 0)}
                     options={populated.map(p => ({
                       key: String(p.index),
                       label: localizeNumbers(String(p.index + 1), numberFormat),
                       ariaLabel: t('devices.asiahorse-umbra.portN', { n: p.index + 1 }),
                       tooltip: t('devices.asiahorse-umbra.ledCount', { n: p.ledCount }),
                     }))}
-                    onChange={key => { setPortIndex(Number(key)); setColorSlot(0); }}
+                    onChange={key => { setAsyncIndex(Number(key)); setColorSlot(0); }}
                   />
                 </SettingRow>
               )}
 
-              <div className={own.stack} data-settings-aside="true">
+              <div className={styles.colorBlock} data-settings-aside="true">
                 <span className={styles.colorLabel}>{t('devices.asiahorse-umbra.effectLabel')}</span>
                 <ChipGroup
                   wrap
@@ -342,7 +369,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                   max={100}
                   step={PERCENT_PER_LEVEL}
                   formatValue={pct}
-                  onChange={(v, commit) => edit({ speed: percentToLevel(v, 0) }, commit === true)}
+                  onChange={v => edit({ speed: percentToLevel(v, 0) }, false)}
                   onCommit={v => edit({ speed: percentToLevel(v, 0) }, true)}
                 />
               )}
@@ -359,7 +386,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                 max={100}
                 step={PERCENT_PER_LEVEL}
                 formatValue={pct}
-                onChange={(v, commit) => edit({ brightness: percentToLevel(v, MIN_BRIGHTNESS_LEVEL) }, commit === true)}
+                onChange={v => edit({ brightness: percentToLevel(v, MIN_BRIGHTNESS_LEVEL) }, false)}
                 onCommit={v => edit({ brightness: percentToLevel(v, MIN_BRIGHTNESS_LEVEL) }, true)}
               />
 
@@ -376,7 +403,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
               )}
 
               {slots > 0 && (
-                <div className={own.stack} data-settings-aside="true">
+                <div className={styles.colorBlock} data-settings-aside="true">
                   <span className={styles.colorLabel}>{t('devices.asiahorse-umbra.colors')}</span>
                   {slots > 1 && (
                     <ChipGroup
@@ -397,14 +424,12 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                   />
                 </div>
               )}
+              </>
+              )}
             </>
           )}
 
-          {failed && (
-            <p className={styles.customNote} role="alert" data-settings-aside="true">
-              {t('devices.asiahorse-umbra.saveFailed')}
-            </p>
-          )}
+          {failed.lighting && <div data-settings-aside="true"><InlineError>{t('devices.asiahorse-umbra.saveFailed')}</InlineError></div>}
         </SettingsSection>
 
         <SettingsSection
@@ -420,16 +445,11 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
               {t('devices.asiahorse-umbra.autoDetect')}
             </Button>
           </SettingRow>
-          {detecting && (
-            <div className={own.detectStatus} role="status" data-settings-aside="true">
-              <Spinner size={16} />
-              <span>{t('devices.asiahorse-umbra.autoDetecting')}</span>
-            </div>
-          )}
+          <div role="status" data-settings-aside="true">
+            {detecting && <Notice tone="info">{t('devices.asiahorse-umbra.autoDetecting')}</Notice>}
+          </div>
           {detectFailed && (
-            <p className={styles.customNote} role="alert" data-settings-aside="true">
-              {t('devices.asiahorse-umbra.autoDetectFailed')}
-            </p>
+            <div data-settings-aside="true"><InlineError>{t('devices.asiahorse-umbra.autoDetectFailed')}</InlineError></div>
           )}
           {!detecting && !detectFailed && loaded && (
             <p className={styles.customNote} data-settings-aside="true">{summary}</p>
@@ -464,14 +484,13 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
                 max={MAX_LED_COUNT}
                 step={1}
                 disabled={detecting}
-                onChange={(v, commit) => {
+                onChange={v => {
                   const ledCount = Math.round(v);
-                  lastEditRef.current = Date.now();
+                  touch();
                   setState(prev => prev && ({
                     ...prev,
                     ports: prev.ports.map(p => (p.index === port.index ? { ...p, ledCount } : p)),
                   }));
-                  if (commit) editPort({ ledCount });
                 }}
                 onCommit={v => editPort({ ledCount: Math.round(v) })}
               />
@@ -494,6 +513,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
               />
             </>
           )}
+          {failed.ports && <div data-settings-aside="true"><InlineError>{t('devices.asiahorse-umbra.saveFailed')}</InlineError></div>}
         </SettingsSection>
 
         <SettingsSection title={t('devices.asiahorse-umbra.fanSection')} boxClassName={styles.sectionBox}>
@@ -504,13 +524,14 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
             disabled={!loaded}
             onChange={on => {
               if (!state) return;
-              setState({ ...state, fan: { ...state.fan, syncMb: on } });
-              void write(() => setUmbraFan(on));
+              setState(prev => prev && { ...prev, fan: { ...prev.fan, syncMb: on } });
+              void write('fan', () => setUmbraFan(on));
             }}
           />
           {loaded && state && !state.fan.syncMb && (
             <CoolingPageLink hint={t('devices.coolingPage.speedHint')} onSectionNavigate={onSectionNavigate} />
           )}
+          {failed.fan && <div data-settings-aside="true"><InlineError>{t('devices.asiahorse-umbra.saveFailed')}</InlineError></div>}
         </SettingsSection>
 
         <SettingsSection title={t('devices.asiahorse-umbra.bootSection')} boxClassName={styles.sectionBox}>
@@ -530,6 +551,7 @@ export function AsiahorseUmbraDevicePage({ onSectionNavigate }: AsiahorseUmbraDe
             disabled={!loaded}
             onChange={on => commitBoot({ selfCheck: on })}
           />
+          {failed.boot && <div data-settings-aside="true"><InlineError>{t('devices.asiahorse-umbra.saveFailed')}</InlineError></div>}
         </SettingsSection>
       </div>
     </div>
