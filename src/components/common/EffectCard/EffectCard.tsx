@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from '../../../lib/i18n';
 import { CardDeleteButton } from '../CardDeleteButton/CardDeleteButton';
 import styles from './EffectCard.module.scss';
@@ -69,6 +69,9 @@ export function EffectCard({
   asDiv, thumbOverlay, thumbStatic, cornerBadge, ariaLabel, dataEffectKey, overlay, thumbAspect, hideLabel, metaSans, nonInteractive,
 }: EffectCardProps) {
   const { t } = useTranslation();
+  // An image that fails to load leaves the plain tile until a new one arrives, never a broken-image glyph.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showImg = !!thumbUrl && thumbUrl !== failedUrl;
   const className = `${styles.card} ${overlay ? styles.cardOverlay : ''} ${active ? styles.cardActive : ''} ${nonInteractive ? styles.cardStatic : ''}`;
   const thumbBoxStyle = thumbAspect !== undefined
     ? { aspectRatio: String(thumbAspect), maxHeight: '360px' }
@@ -82,9 +85,9 @@ export function EffectCard({
   const inner = (
     <>
       <div className={styles.thumbWrap} style={thumbBoxStyle}>
-        {thumbUrl
-          ? <img className={styles.thumbImg} src={thumbUrl} alt={label} style={thumbImgStyle} />
-          : <div className={thumbStatic ? styles.thumbStaticPlaceholder : styles.thumbSkeleton} aria-hidden="true" style={thumbSkeletonStyle} />}
+        {showImg
+          ? <img className={styles.thumbImg} src={thumbUrl} alt={label} style={thumbImgStyle} onError={() => setFailedUrl(thumbUrl)} />
+          : <div className={thumbStatic || thumbUrl ? styles.thumbStaticPlaceholder : styles.thumbSkeleton} aria-hidden="true" style={thumbSkeletonStyle} />}
         {/* Before the badge: an overlay canvas fills the thumbnail and would hide it. */}
         {thumbOverlay}
         {audio && (
