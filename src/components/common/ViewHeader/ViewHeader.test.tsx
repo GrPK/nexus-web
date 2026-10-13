@@ -25,20 +25,17 @@ describe('ViewHeader actions', () => {
     expect(header.children).toHaveLength(1);
   });
 
-  it('shares the rail with tabActions', () => {
+  it('shares the right rail with tabActions', () => {
     render(<ViewHeader title="Page" tabs={tabs} activeTab="one" tabActions={<span>Tools</span>} actions={<span>Busy</span>} />);
-    const rail = screen.getByText('Tools').parentElement as HTMLElement;
-    expect(rail.contains(screen.getByText('Busy'))).toBe(true);
+    const rail = tabRow().lastElementChild as HTMLElement;
+    expect(rail).toContainElement(screen.getByText('Tools'));
+    expect(rail).toContainElement(screen.getByText('Busy'));
   });
 
-  it('without a tab row, renders actions as one out-of-flow element and no row', () => {
-    const { container, rerender } = render(<ViewHeader title="Page" />);
+  it('never adds a row for actions on a header without a tab row', () => {
+    const { container } = render(<ViewHeader title="Page" actions={<span>Busy</span>} />);
     const header = container.querySelector('header') as HTMLElement;
     expect(header.children).toHaveLength(0);
-    rerender(<ViewHeader title="Page" actions={<span>Busy</span>} />);
-    expect(header.children).toHaveLength(1);
-    expect(header.firstElementChild).toContainElement(screen.getByText('Busy'));
-    rerender(<ViewHeader title="Page" />);
-    expect(header.children).toHaveLength(0);
+    expect(screen.queryByText('Busy')).toBeNull();
   });
 });

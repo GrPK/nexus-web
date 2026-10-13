@@ -11,9 +11,9 @@ interface ViewHeaderProps {
   onTabChange?: (key: string, origin?: HTMLButtonElement) => void;
   onTabHover?: (key: string | null) => void;
   tabsDisabled?: boolean;
-  /** Transient, right-aligned status. Never gets a row of its own: with a tab
-   *  row it sits in the tab rail at label height, without one it floats at the
-   *  header's top-right. Appearing or disappearing never changes the height. */
+  /** Right-aligned status in the tab rail at label height; it never adds a row,
+   *  so it renders only when the header has a tab row (tabs, tabsAdjacent or
+   *  tabActions). */
   actions?: ReactNode;
   /** Widget sitting immediately beside the tab bar, sharing the row's gap.
    *  Unlike `tabActions` it stays next to the tabs instead of pinning right. */
@@ -32,7 +32,6 @@ export function ViewHeader({ title, tabs, activeTab, onTabChange, onTabHover, ta
   const hasTabRow = hasTabs || !!tabActions || !!tabsAdjacent;
   return (
     <header className={styles.header}>
-      {!hasTabRow && actions && <div className={styles.actionsFloat}>{actions}</div>}
       {hasTabRow && (
         <div className={styles.tabsRow}>
           {hasTabs && (
