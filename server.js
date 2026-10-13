@@ -205,7 +205,7 @@ app.use(express.static(join(__dirname, 'dist'), {
     if (name === 'sw.js' || name === 'index.html' || name.endsWith('.webmanifest')) {
       res.setHeader('Cache-Control', 'no-cache');
     }
-    // Everything else (favicon, icons.svg, fonts, device SVGs) keeps the
+    // Everything else (favicon, fonts, device SVGs) keeps the
     // maxAge:'1d' default set above - unchanged from prior behavior.
   },
 }));
