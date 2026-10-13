@@ -10,7 +10,7 @@ import {
   getConnectedSimulatedPanels,
   PANEL_SIMULATION_CHANGED_EVENT,
 } from '../lib/panelSimulation';
-import { HYTE_LOGO, isRemotePanel, type PanelDevice } from '../panel/device/panelDevices';
+import { HYTE_LOGO, PANEL_MONITOR_ICON, isRemotePanel, type PanelDevice } from '../panel/device/panelDevices';
 import { useTryxSimulated } from '../lib/tryxSimulation';
 import { useTranslation } from '../lib/i18n';
 import {
@@ -98,9 +98,8 @@ const CATEGORY_ICONS: Record<string, string> = {
   keyboard: '/assets/devices/keyboard.svg',
   headset: '/assets/devices/headset.svg',
   gamepad: '/assets/devices/gamepad.svg',
-  display: '/assets/devices/y70.svg',
-  controller: '/assets/devices/cnvs.svg',
-  cooler: '/assets/devices/np50.svg',
+  display: '/assets/devices/monitor.svg',
+  cooler: '/assets/devices/fan.svg',
   memory: '/assets/devices/memory.svg',
 };
 
@@ -117,6 +116,13 @@ const BRAND_LOGOS: Record<string, string> = {
   Tryx: '/assets/devices/tryx.svg',
 };
 
+/** The logo of the brand a device name starts with ("Lian Li HydroShift II" -> Lian Li). */
+function brandLogoFor(name: string): string | undefined {
+  const lower = name.toLowerCase();
+  const brand = Object.keys(BRAND_LOGOS).find(b => lower.startsWith(`${b.toLowerCase()} `));
+  return brand ? BRAND_LOGOS[brand] : undefined;
+}
+
 function logoBrand(device: UnifiedDevice): string | undefined {
   return Object.keys(BRAND_LOGOS).find(brand => BRAND_LOGOS[brand] === device.iconSrc);
 }
@@ -124,7 +130,7 @@ function logoBrand(device: UnifiedDevice): string | undefined {
 /** Sidebar label: the product name without the brand its logo icon already shows. */
 export function sidebarDeviceName(device: UnifiedDevice): string {
   const brand = logoBrand(device);
-  return brand && device.shortName.startsWith(`${brand} `)
+  return brand && device.shortName.toLowerCase().startsWith(`${brand.toLowerCase()} `)
     ? device.shortName.slice(brand.length + 1)
     : device.shortName;
 }
@@ -350,7 +356,7 @@ function buildUnifiedList(
       name: p.name,
       subtitle: p.subtitle,
       category: 'display',
-      iconSrc: p.iconSrc,
+      iconSrc: (p.iconSrc === PANEL_MONITOR_ICON && brandLogoFor(p.name)) || p.iconSrc,
       connected: p.status !== 'offline',
       kind: 'panel',
       panelDevice: p,
@@ -386,8 +392,10 @@ function buildUnifiedList(
       name: displayName,
       subtitle: d.category,
       category: d.category,
-      // A cooler LCD's row wears the icon its panel row takes over with.
-      iconSrc: CURATED_ICONS[isLianLiHubId(d.id) ? LIANLI_PRIMARY_HUB : d.id] || STREAMED_FAMILY_ICONS[d.id] || CATEGORY_ICONS[d.category] || FALLBACK_ICON,
+      // A cooler LCD's row wears the icon its panel row takes over with; any other
+      // branded row shows its brand's logo, and the category glyph is the last resort.
+      iconSrc: CURATED_ICONS[isLianLiHubId(d.id) ? LIANLI_PRIMARY_HUB : d.id] || STREAMED_FAMILY_ICONS[d.id]
+        || brandLogoFor(displayName) || CATEGORY_ICONS[d.category] || FALLBACK_ICON,
       connected: d.connected,
       kind: 'curated',
       curatedId: d.id,

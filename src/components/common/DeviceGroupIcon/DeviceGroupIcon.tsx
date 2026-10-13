@@ -1,4 +1,4 @@
-import { CircuitBoard, Fan, Gpu, Lightbulb, type LucideIcon } from 'lucide-react';
+import { CircuitBoard, Fan, Gamepad2, Gpu, Headset, Keyboard, Lightbulb, MemoryStick, Mouse, Usb, type LucideIcon } from 'lucide-react';
 import styles from './DeviceGroupIcon.module.scss';
 
 type Look = { glyph: LucideIcon } | { art: string };
@@ -28,17 +28,17 @@ const PREFIX_LOOK: ReadonlyArray<readonly [prefix: string, look: Look]> = [
 const TYPE_LOOK: Record<string, Look> = {
   motherboard: { glyph: CircuitBoard },
   gpu: { glyph: Gpu },
-  dram: art('memory.svg'),
+  dram: { glyph: MemoryStick },
   cooler: { glyph: Fan },
   fan: { glyph: Fan },
   bulb: { glyph: Lightbulb },
   light: { glyph: Lightbulb },
-  keyboard: art('keyboard.svg'),
-  mouse: art('mouse.svg'),
-  headset: art('headset.svg'),
-  gamepad: art('gamepad.svg'),
+  keyboard: { glyph: Keyboard },
+  mouse: { glyph: Mouse },
+  headset: { glyph: Headset },
+  gamepad: { glyph: Gamepad2 },
 };
-const FALLBACK: Look = art('device.svg');
+const FALLBACK: Look = { glyph: Usb };
 
 function lookFor(id: string, iconType: string | undefined): Look {
   if (id === 'motherboard') return TYPE_LOOK.motherboard;
@@ -47,8 +47,7 @@ function lookFor(id: string, iconType: string | undefined): Look {
 
 /**
  * The glyph a hardware group's header carries: curated art for a known device
- * id, a generic board / GPU mark or the RAM art for an OpenRGB type, else the generic
- * device. `id` is the group's device id (the cooling rail's `motherboard` block
+ * id, a Lucide glyph for an OpenRGB type, else the generic USB device. `id` is the group's device id (the cooling rail's `motherboard` block
  * included) and `iconType` the service's type name for its members.
  */
 export function DeviceGroupIcon({ id, iconType, className }: { id: string; iconType?: string; className?: string }) {

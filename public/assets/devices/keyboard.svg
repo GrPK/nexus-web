@@ -1,11 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-  <rect x="4" y="14" width="40" height="20" rx="3" />
-  <line x1="10" y1="20" x2="14" y2="20" />
-  <line x1="18" y1="20" x2="22" y2="20" />
-  <line x1="26" y1="20" x2="30" y2="20" />
-  <line x1="34" y1="20" x2="38" y2="20" />
-  <line x1="12" y1="25" x2="16" y2="25" />
-  <line x1="20" y1="25" x2="28" y2="25" />
-  <line x1="32" y1="25" x2="36" y2="25" />
-  <line x1="16" y1="30" x2="32" y2="30" />
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 8h.01"></path><path d="M12 12h.01"></path><path d="M14 8h.01"></path><path d="M16 12h.01"></path><path d="M18 8h.01"></path><path d="M6 8h.01"></path><path d="M7 16h10"></path><path d="M8 12h.01"></path><rect width="20" height="16" x="2" y="4" rx="2"></rect></svg>
