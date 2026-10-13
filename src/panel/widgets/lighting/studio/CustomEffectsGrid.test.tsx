@@ -7,9 +7,9 @@ vi.mock('../../../../lib/i18n', () => ({ useTranslation: () => ({ t: (key: strin
 vi.mock('../../../../hooks/useEffectThumbnail', () => ({ useEffectThumbnail: () => null }));
 const still = vi.fn((recipe: { speed: number }) => `data:still-${recipe.speed}`);
 vi.mock('./recipePreview', () => ({ renderRecipeStill: (r: { speed: number }) => still(r) }));
-vi.mock('./studioLibrary', () => ({
-  isDownloaded: (s: { downloaded?: boolean | null; marketId?: string; marketAuthor?: string }, username?: string | null) =>
-    s.downloaded ?? (!!s.marketId && s.marketAuthor?.toLowerCase() !== username?.toLowerCase()),
+vi.mock('./studioLibrary', async importOriginal => ({
+  isDownloaded: (await importOriginal<typeof import('./studioLibrary')>()).isDownloaded,
+  isMarketCopy: (await importOriginal<typeof import('./studioLibrary')>()).isMarketCopy,
   migrateLegacyEffects: async () => {},
   deleteEffect: async () => true,
   useSavedEffects: () => [
@@ -48,31 +48,29 @@ describe('CustomEffectsGrid', () => {
   const sectionOf = (name: string) =>
     screen.getByRole('button', { name }).closest('[data-pick]')?.parentElement?.parentElement?.textContent ?? '';
 
-  it('lists own effects under Custom and other accounts\' downloads under Marketplace', () => {
+  it('lists your own effects and your Marketplace copies together under Custom', () => {
     render(<SavedEffectSections effect={null} query="" username="me" onSelect={() => {}} />);
-    const text = document.body.textContent ?? '';
-    expect(text.indexOf('lighting.category.custom')).toBeLessThan(text.indexOf('lighting.category.marketplace'));
-    expect(sectionOf('Delta')).toContain('lighting.category.custom');
-    expect(sectionOf('Gamma')).toContain('lighting.category.marketplace');
-    expect(sectionOf('Gamma')).not.toContain('Delta');
+    expect(screen.getAllByText('lighting.category.custom')).toHaveLength(1);
+    expect(screen.queryByText('lighting.category.marketplace')).toBeNull();
+    for (const name of ['Alpha', 'Delta', 'Gamma', 'Epsilon', 'Zeta']) expect(sectionOf(name)).toContain('lighting.category.custom');
   });
 
-  it('files by the recorded downloaded flag over the author, signed in or not', () => {
-    for (const username of ['me', null]) {
-      const { unmount } = render(<SavedEffectSections effect={null} query="" username={username} onSelect={() => {}} />);
-      expect(sectionOf('Epsilon')).toContain('lighting.category.marketplace');
-      expect(sectionOf('Zeta')).toContain('lighting.category.custom');
-      unmount();
-    }
-  });
-
-  it('shows the Studio your own effects under Custom and downloads under Marketplace', () => {
+  it('shows the Studio every effect in one grid with no section header', () => {
     render(<CustomEffectsGrid effect={null} query="" username="me" onSelect={() => {}} onCreate={() => {}} />);
-    expect(screen.getByText('lighting.category.custom')).toBeInTheDocument();
-    const market = screen.getByText('lighting.category.marketplace');
-    const underMarket = (name: string) => !!(market.compareDocumentPosition(screen.getByRole('button', { name })) & Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(['Alpha', 'Delta', 'Zeta'].map(underMarket)).toEqual([false, false, false]);
-    expect(['Gamma', 'Epsilon'].map(underMarket)).toEqual([true, true]);
+    expect(screen.queryByText('lighting.category.custom')).toBeNull();
+    for (const name of ['Alpha', 'Gamma', 'Epsilon']) expect(screen.getByRole('button', { name })).toBeInTheDocument();
+  });
+
+  it('credits the author on a Marketplace copy, by the recorded downloaded flag over the author', () => {
+    render(<CustomEffectsGrid effect={null} query="" username="me" onSelect={() => {}} onCreate={() => {}} />);
+    const copied = screen.getAllByTestId('effect-copied-badge').map(b => b.closest('[data-effect-key]')?.getAttribute('data-effect-key'));
+    expect(copied.sort()).toEqual(['custom:fxd', 'custom:fxm']);
+  });
+
+  it('signed out, credits only effects recorded as copies, never your own older listings', () => {
+    render(<CustomEffectsGrid effect={null} query="" username={null} onSelect={() => {}} onCreate={() => {}} />);
+    const copied = screen.getAllByTestId('effect-copied-badge').map(b => b.closest('[data-effect-key]')?.getAttribute('data-effect-key'));
+    expect(copied).toEqual(['custom:fxd']);
   });
 
   it('badges only the effects you published, not downloads', () => {

@@ -122,4 +122,18 @@ describe('studioLibrary', () => {
     expect(put.mock.calls[0][1]).not.toHaveProperty('marketId');
     expect(put.mock.calls[1][1]).toMatchObject({ marketId: 'm1', marketAuthor: 'alice' });
   });
+
+  it('names a copy apart from the effects you have, within the name cap', async () => {
+    const lib = await fresh();
+    expect(lib.copyName('Aurora', ['Weird Warp'])).toBe('Aurora');
+    expect(lib.copyName('Aurora', ['aurora', 'Aurora 2'])).toBe('Aurora 3');
+    const long = 'x'.repeat(lib.EFFECT_NAME_MAX);
+    const next = lib.copyName(long, [long]);
+    expect(next.length).toBeLessThanOrEqual(lib.EFFECT_NAME_MAX);
+    expect(next.endsWith(' 2')).toBe(true);
+    // An emoji at the cap is dropped whole, never cut in half.
+    const emoji = lib.copyName(`${'x'.repeat(lib.EFFECT_NAME_MAX - 1)}\u{1F600}`, []);
+    expect(emoji).toBe('x'.repeat(lib.EFFECT_NAME_MAX - 1));
+  });
 });
+

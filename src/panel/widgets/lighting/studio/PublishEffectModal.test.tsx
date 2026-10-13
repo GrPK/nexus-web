@@ -23,7 +23,7 @@ vi.mock('../../../../components/views/SettingsView/Account/AccountSignInModal', 
 }));
 
 const recipe: StudioRecipe = { v: 1, blocks: [makeBlock('rings'), makeBlock('palette')], speed: 50, hue: 0, saturation: 1, contrast: 1 };
-const listing = { id: 'L1', name: 'Spin', author: 'alice', recipe, audio: false, downloads: 0, createdAt: '', updatedAt: '' };
+const listing = { id: 'L1', name: 'Spin', author: 'alice', recipe, audio: false, downloads: 0, version: 1, basedOn: null, createdAt: '', updatedAt: '' };
 const signedIn = (username: string | null) => fetchCloudAccounts.mockResolvedValue(
   username ? { accounts: [{ accountId: 'a', username }], activeAccountId: 'a' } : { accounts: [], activeAccountId: null },
 );
@@ -57,16 +57,20 @@ describe('PublishEffectModal', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'lighting.studio.publish.update' }));
     await screen.findByText('lighting.studio.publish.doneTitle');
     expect(updateEffect.mock.calls[0][0]).toBe('L0');
-    expect(publishEffect).toHaveBeenCalled();
+    // Your own listing credits nothing, even when it is published anew.
+    expect(updateEffect.mock.calls[0][1]).not.toHaveProperty('basedOn');
+    expect(publishEffect.mock.calls[0][0]).not.toHaveProperty('basedOn');
   });
 
-  it('publishes a downloaded effect as a new listing', async () => {
+  it('publishes a copy of a Marketplace effect as a new listing that credits its source', async () => {
     signedIn('bob');
-    publishEffect.mockResolvedValue({ ok: true, value: { ...listing, author: 'bob' } });
+    publishEffect.mockResolvedValue({ ok: true, value: { ...listing, author: 'bob', version: 1 } });
     show({ marketId: 'L0', marketAuthor: 'alice' });
     fireEvent.click(await screen.findByRole('button', { name: 'lighting.studio.publish.confirm' }));
     await screen.findByText('lighting.studio.publish.doneTitle');
     expect(updateEffect).not.toHaveBeenCalled();
+    expect(publishEffect).toHaveBeenCalledWith({ name: 'Spin', recipe, basedOn: 'L0' });
+    expect(screen.getByText('lighting.studio.publish.doneVersion')).toBeInTheDocument();
   });
 
   it('signs in first, then finishes the publish', async () => {

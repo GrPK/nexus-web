@@ -58,7 +58,7 @@ const recipe = {
 };
 const listing: EffectListing = {
   id: ID, name: 'Fan spin', author: 'alice', recipe, audio: false,
-  downloads: 3, createdAt: '2026-10-11T00:00:00Z', updatedAt: '2026-10-11T00:00:00Z',
+  downloads: 3, version: 2, basedOn: null, createdAt: '2026-10-11T00:00:00Z', updatedAt: '2026-10-11T00:00:00Z',
 };
 
 function detail(username: string | null = 'bob') {
@@ -97,7 +97,7 @@ describe('EffectsMarket', () => {
   it('asks for a sign-in when the download is refused, then retries', async () => {
     downloadEffect.mockResolvedValueOnce({ ok: false, error: 'sign_in_required' });
     const onNeedsSignIn = detail(null);
-    fireEvent.click(await screen.findByRole('button', { name: 'store.install' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'store.effects.addCopy' }));
     await waitFor(() => expect(onNeedsSignIn).toHaveBeenCalled());
     expect(put).not.toHaveBeenCalled();
 
@@ -107,13 +107,34 @@ describe('EffectsMarket', () => {
     expect(put.mock.calls[0][1]).toMatchObject({ name: 'Fan spin', marketId: ID, marketAuthor: 'alice', downloaded: true });
   });
 
-  it('uninstalls every local copy of the listing after a confirmation', async () => {
+  it('adds another copy under a name of its own when you already have one, and never removes one', async () => {
     installed = [{ id: 'fx1', name: 'Fan spin', recipe: JSON.stringify(recipe), updatedAt: 1, audio: false, marketId: ID }];
+    downloadEffect.mockResolvedValueOnce({ ok: true, value: listing });
     detail();
-    fireEvent.click(await screen.findByRole('button', { name: 'store.effects.uninstall' }));
+    expect(await screen.findByText('store.effects.inYourEffects')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'store.effects.addAnother' }));
+    await waitFor(() => expect(put).toHaveBeenCalled());
+    expect(put.mock.calls[0][0]).not.toBe('fx1');
+    expect(put.mock.calls[0][1]).toMatchObject({ name: 'Fan spin 2', marketId: ID, marketAuthor: 'alice', downloaded: true });
     expect(remove).not.toHaveBeenCalled();
-    fireEvent.click(screen.getAllByRole('button', { name: 'store.effects.uninstall' }).at(-1)!);
-    await waitFor(() => expect(remove).toHaveBeenCalledWith('fx1'));
+  });
+
+  it('shows no version from an API that sends none', async () => {
+    const older: Partial<EffectListing> = { ...listing };
+    delete older.version;
+    getEffect.mockResolvedValue({ ok: true, value: older });
+    detail();
+    await screen.findByRole('button', { name: 'store.effects.addCopy' });
+    expect(screen.queryByText(/store\.effects\.version/)).toBeNull();
+  });
+
+  it('shows the version and credits the listing it was based on', async () => {
+    getEffect.mockResolvedValue({ ok: true, value: { ...listing, version: 5, basedOn: { id: 'src-1', name: 'Orbit', author: 'carol' } } });
+    const onNavigate = vi.fn();
+    render(<EffectsMarket path={ID} username="bob" onNavigate={onNavigate} onNeedsSignIn={() => {}} />);
+    expect(await screen.findByText('store.effects.version version=5')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /store\.effects\.basedOn name=Orbit author=carol/ }));
+    expect(onNavigate).toHaveBeenCalledWith('src-1');
   });
 
   it('says an effect is audio reactive', async () => {
@@ -171,16 +192,16 @@ describe('EffectsMarket', () => {
     expect(put.mock.calls[0][1]).toMatchObject({ marketId: '' });
   });
 
-  it("offers the author Unpublish instead of Install", async () => {
+  it("offers the author Unpublish instead of a copy", async () => {
     detail('Alice');
     expect(await screen.findByRole('button', { name: 'store.effects.unpublish' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'store.install' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'store.effects.addCopy' })).not.toBeInTheDocument();
   });
 
   it('cannot get an effect this build cannot run', async () => {
     getEffect.mockResolvedValue({ ok: true, value: { ...listing, recipe: { ...recipe, blocks: [{ uid: 'x', type: 'hologram', params: {} }] } } });
     detail();
     expect(await screen.findByText('store.effects.unsupported')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'store.install' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'store.effects.addCopy' })).toBeDisabled();
   });
 });

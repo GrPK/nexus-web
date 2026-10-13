@@ -1,19 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { CopyPlus, ExternalLink } from 'lucide-react';
 import { Button } from '../../../common/Button/Button';
-import { ConfirmModal } from '../../../common/ConfirmModal/ConfirmModal';
 import { InlineError } from '../../../common/InlineError/InlineError';
 import { SettingsSection } from '../../../common/SettingsSection/SettingsSection';
 import { useTranslation } from '../../../../lib/i18n';
 import { useUnitPrefs } from '../../../../hooks/useUiSettings';
 import { formatDate } from '../../../../lib/units';
-import { listEffectDownloads, type EffectDownload } from '../../../../api/effectMarket';
+import { downloadEffect, listEffectDownloads, type EffectDownload } from '../../../../api/effectMarket';
 import { attachRecipePreview } from '../../../../panel/widgets/lighting/studio/recipePreview';
-import { deleteEffect, newEffectId, parseMarketRecipe, saveEffect, useSavedEffects } from '../../../../panel/widgets/lighting/studio/studioLibrary';
+import { copyName, getSavedEffects, newEffectId, parseMarketRecipe, saveEffect } from '../../../../panel/widgets/lighting/studio/studioLibrary';
 import type { StudioRecipe } from '../../../../panel/widgets/lighting/studio/studioCompiler';
 import styles from './AccountPurchases.module.scss';
 
-type RowState = 'working' | 'failed';
+type RowState = 'working' | 'failed' | 'added';
 
 // Parsed once per row object, so a re-render keeps each preview's recipe identity and its canvas attached.
 const parsedRecipes = new WeakMap<EffectDownload, StudioRecipe | null>();
@@ -29,18 +28,16 @@ function Preview({ recipe }: { recipe: StudioRecipe | null }) {
   return <canvas ref={ref} className={styles.effectThumb} aria-hidden={true} />;
 }
 
-/** Lighting effects the account downloaded from the Marketplace, removed ones included, with what this PC has of each. */
+/** Lighting effects the account copied from the Marketplace, removed ones included; any still listed can be copied again. */
 export function AccountEffectDownloadsSection({ onOpenStoreEffect }: {
   /** Opens the effect's Marketplace page. */
   onOpenStoreEffect?: (listingId: string) => void;
 }) {
   const { t } = useTranslation();
   const { dateFormat } = useUnitPrefs();
-  const saved = useSavedEffects();
   const [items, setItems] = useState<EffectDownload[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
-  const [pendingUninstall, setPendingUninstall] = useState<EffectDownload | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,20 +49,16 @@ export function AccountEffectDownloadsSection({ onOpenStoreEffect }: {
     return () => { cancelled = true; };
   }, []);
 
-  const copiesOf = (id: string) => saved.filter(s => s.marketId === id);
-  const run = async (id: string, job: () => Promise<boolean>) => {
-    setRows(prev => ({ ...prev, [id]: 'working' }));
-    const ok = await job();
-    setRows(prev => {
-      const next = { ...prev };
-      if (ok) delete next[id]; else next[id] = 'failed';
-      return next;
-    });
+  // A fresh copy of the listing as it is now, which also records the version copied.
+  const addAgain = async (item: EffectDownload) => {
+    setRows(prev => ({ ...prev, [item.id]: 'working' }));
+    const res = await downloadEffect(item.id);
+    const recipe = res.ok ? parseMarketRecipe(res.value.recipe) : null;
+    const error = !res.ok || !recipe ? 'failed'
+      : await saveEffect(newEffectId(), copyName(res.value.name, getSavedEffects().map(s => s.name)), recipe, { marketId: res.value.id, marketAuthor: res.value.author, downloaded: true });
+    if (res.ok) setItems(prev => prev?.map(i => (i.id === item.id ? { ...i, version: res.value.version, latestVersion: res.value.version } : i)) ?? prev);
+    setRows(prev => ({ ...prev, [item.id]: error ? 'failed' : 'added' }));
   };
-  const install = (item: EffectDownload, recipe: StudioRecipe) => run(item.id, async () =>
-    !await saveEffect(newEffectId(), item.name, recipe, { marketId: item.id, marketAuthor: item.author, downloaded: true }));
-  const uninstall = (item: EffectDownload) => run(item.id, async () =>
-    (await Promise.all(copiesOf(item.id).map(s => deleteEffect(s.id)))).every(Boolean));
 
   const downloadedOn = (iso: string) => {
     const date = new Date(iso);
@@ -80,8 +73,9 @@ export function AccountEffectDownloadsSection({ onOpenStoreEffect }: {
       {items?.length === 0 && <p className={styles.empty}>{t('account.effects.empty')}</p>}
       {items?.map(item => {
         const recipe = recipeOf(item);
-        const installed = copiesOf(item.id).length > 0;
         const state = rows[item.id];
+        const copied = typeof item.version === 'number' ? item.version : null;
+        const newer = copied !== null && typeof item.latestVersion === 'number' && item.latestVersion > copied;
         const date = downloadedOn(item.downloadedAt);
         return (
           <div key={item.id} className={styles.row}>
@@ -94,15 +88,17 @@ export function AccountEffectDownloadsSection({ onOpenStoreEffect }: {
                   ? <li className={styles.removed}>{t('account.effects.removed')}</li>
                   : !recipe ? <li className={styles.value}>{t('store.effects.unsupported')}</li>
                     : null}
-                <li className={styles.value}>{t(installed ? 'account.effects.installed' : 'account.effects.notInstalled')}</li>
+                {copied !== null && <li className={styles.value}>{t('account.effects.copiedVersion', { version: copied })}</li>}
+                {newer && <li className={styles.value}>{t('account.effects.latestVersion', { version: item.latestVersion! })}</li>}
                 {date && <li>{t('account.effects.downloaded')} <span className={styles.value}>{date}</span></li>}
+                {state === 'added' && <li className={styles.value}>{t('account.effects.added')}</li>}
               </ul>
             </div>
             <div className={styles.actions}>
-              {!installed && recipe && (
-                <Button type="button" tone={state === 'failed' ? 'danger' : 'accent'} size="sm"
-                  loading={state === 'working'} disabled={state === 'working'} onClick={() => { void install(item, recipe); }}>
-                  {state === 'failed' ? t('store.retry') : t('store.install')}
+              {recipe && (
+                <Button type="button" tone={state === 'failed' ? 'danger' : 'neutral'} size="sm" icon={<CopyPlus size={14} />}
+                  loading={state === 'working'} disabled={state === 'working'} onClick={() => { void addAgain(item); }}>
+                  {state === 'failed' ? t('store.retry') : t('account.effects.addAgain')}
                 </Button>
               )}
               {!item.removed && onOpenStoreEffect && (
@@ -110,29 +106,10 @@ export function AccountEffectDownloadsSection({ onOpenStoreEffect }: {
                   {t('account.purchases.viewInStore')}
                 </Button>
               )}
-              {installed && (
-                <Button type="button" tone={state === 'failed' ? 'danger' : 'neutral'} size="sm"
-                  loading={state === 'working'} disabled={state === 'working'} onClick={() => setPendingUninstall(item)}>
-                  {state === 'failed' ? t('store.retry') : t('store.effects.uninstall')}
-                </Button>
-              )}
             </div>
           </div>
         );
       })}
-      <ConfirmModal
-        open={!!pendingUninstall}
-        title={t('store.effects.uninstallTitle')}
-        message={t('store.effects.uninstallMessage', { name: pendingUninstall?.name ?? '' })}
-        confirmLabel={t('store.effects.uninstall')}
-        destructive
-        onConfirm={() => {
-          const target = pendingUninstall;
-          setPendingUninstall(null);
-          if (target) void uninstall(target);
-        }}
-        onCancel={() => setPendingUninstall(null)}
-      />
     </SettingsSection>
   );
 }

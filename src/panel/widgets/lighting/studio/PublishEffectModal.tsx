@@ -10,11 +10,9 @@ import {
 } from '../../../../api/effectMarket';
 import { useTranslation } from '../../../../lib/i18n';
 import type { StudioRecipe } from './studioCompiler';
-import type { MarketLink } from './studioLibrary';
+import { EFFECT_NAME_MAX, type MarketLink } from './studioLibrary';
 import promptStyles from '../../../../components/common/PromptModal/PromptModal.module.scss';
 import styles from './ShaderStudio.module.scss';
-
-const NAME_MAX = 40;
 
 const ERROR_KEYS: Partial<Record<EffectMarketError, string>> = {
   unavailable: 'lighting.studio.publish.unavailable',
@@ -79,7 +77,8 @@ export function PublishEffectModal({ open, initialName, recipe, link, save, onVi
     setError(null);
     const saveError = await save(trimmed);
     if (saveError) { setWorking(false); setError(saveError); return; }
-    const body = { name: trimmed, recipe };
+    // A copy of someone else's listing credits it on the new one.
+    const body = { name: trimmed, recipe, ...(link && !updating ? { basedOn: link.marketId } : {}) };
     let res: EffectMarketResult<EffectListing> = updating && link ? await updateEffect(link.marketId, body) : await publishEffect(body);
     // The listing was unpublished from the Marketplace since: publish it anew.
     if (!res.ok && res.error === 'not_found' && updating) res = await publishEffect(body);
@@ -122,6 +121,7 @@ export function PublishEffectModal({ open, initialName, recipe, link, save, onVi
           <>
             <h2 className={promptStyles.title}>{t('lighting.studio.publish.doneTitle')}</h2>
             <p className={promptStyles.message}>{t('lighting.studio.publish.doneBody', { name: published.name, author: published.author })}</p>
+            {typeof published.version === 'number' && <p className={promptStyles.message}>{t('lighting.studio.publish.doneVersion', { version: published.version })}</p>}
             <div className={promptStyles.actions}>
               {onViewListing && (
                 <Button tone="neutral" onClick={() => onViewListing(published.id)}>{t('lighting.studio.publish.view')}</Button>
@@ -140,7 +140,7 @@ export function PublishEffectModal({ open, initialName, recipe, link, save, onVi
             <div className={styles.publishFields}>
               <label className={promptStyles.fieldWrap}>
                 <span className={styles.caption}>{t('lighting.studio.publish.name')}</span>
-                <TextInput value={name} maxLength={NAME_MAX} onInput={setName} ariaLabel={t('lighting.studio.publish.name')} />
+                <TextInput value={name} maxLength={EFFECT_NAME_MAX} onInput={setName} ariaLabel={t('lighting.studio.publish.name')} />
               </label>
             </div>
             {error && <p className={promptStyles.error} role="alert">{error}</p>}

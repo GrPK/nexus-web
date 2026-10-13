@@ -113,6 +113,31 @@ export function isDownloaded(s: SavedEffect, username: string | null | undefined
   return s.downloaded ?? (!!s.marketId && s.marketAuthor?.toLowerCase() !== username?.toLowerCase());
 }
 
+/** A copy of someone else's listing. Without a recorded flag it takes a signed-in account to tell one from your own listing. */
+export function isMarketCopy(s: SavedEffect, username: string | null | undefined): boolean {
+  if (!s.marketId) return false;
+  return s.downloaded ?? (!!username && isDownloaded(s, username));
+}
+
+/** The longest effect name the service stores. */
+export const EFFECT_NAME_MAX = 40;
+
+/** `base`, or with the lowest number after it that no name in `taken` uses, so copies stay tellable apart; never past the name cap. */
+export function copyName(base: string, taken: readonly string[]): string {
+  const used = new Set(taken.map(n => n.toLocaleLowerCase()));
+  const fit = (suffix: string) => {
+    let head = base.slice(0, EFFECT_NAME_MAX - suffix.length);
+    // Never end on half of a surrogate pair (an emoji cut in two).
+    if (/[\uD800-\uDBFF]$/.test(head)) head = head.slice(0, -1);
+    return `${head.trimEnd()}${suffix}`;
+  };
+  if (!used.has(fit('').toLocaleLowerCase())) return fit('');
+  for (let n = 2; ; n++) {
+    const name = fit(` ${n}`);
+    if (!used.has(name.toLocaleLowerCase())) return name;
+  }
+}
+
 /** The most recently created of the user's own effects (any effect when there are none): a newEffectId's base36 suffix is its creation time. */
 export function lastCreatedEffect(list: SavedEffect[], username: string | null | undefined): SavedEffect | undefined {
   const createdAt = (id: string) => (/^fx[0-9a-z]+$/.test(id) ? parseInt(id.slice(2), 36) : 0);

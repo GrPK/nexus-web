@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AudioLines, ChevronLeft, Download, User } from 'lucide-react';
+import { AudioLines, ChevronLeft, CopyPlus, Download, GitBranch, Tag, User } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { Card } from '../../common/Card/Card';
 import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
@@ -25,7 +25,7 @@ import { attachRecipePreview } from '../../../panel/widgets/lighting/studio/reci
 import { HoverTooltip } from '../../common/HoverTooltip/HoverTooltip';
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import { formatNumber } from '../../../lib/units';
-import { deleteEffect, isDownloaded, newEffectId, parseMarketRecipe, saveEffect, unlinkEffect, useSavedEffects } from '../../../panel/widgets/lighting/studio/studioLibrary';
+import { copyName, isDownloaded, isMarketCopy, newEffectId, parseMarketRecipe, saveEffect, unlinkEffect, useSavedEffects } from '../../../panel/widgets/lighting/studio/studioLibrary';
 import { compileStudio, type StudioRecipe } from '../../../panel/widgets/lighting/studio/studioCompiler';
 import storeStyles from './StorePage.module.scss';
 import styles from './EffectsMarket.module.scss';
@@ -276,14 +276,16 @@ function EffectPlayground({ listing, recipe, children }: { listing: EffectListin
   );
 }
 
-function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn, onOpenInLighting }: {
+function EffectDetail({ id, username, onBack, onCreator, onOpenListing, onNeedsSignIn, onOpenInLighting }: {
   id: string;
   /** The signed-in account's username; null when signed out. */
   username: string | null;
   onBack: () => void;
   onCreator: (author: string) => void;
+  /** Opens another listing's page (the one this was based on). */
+  onOpenListing: (id: string) => void;
   onNeedsSignIn: NeedsSignIn;
-  /** Runs an installed copy on the Lighting page. */
+  /** Runs a copy on the Lighting page. */
   onOpenInLighting?: (effectKey: string) => void;
 }) {
   const { t } = useTranslation();
@@ -292,7 +294,6 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn, onOpenIn
   const [loadError, setLoadError] = useState<EffectMarketError | null>(null);
   const [state, setState] = useState<'idle' | 'working' | 'failed'>('idle');
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
-  const [confirmUninstall, setConfirmUninstall] = useState(false);
   const [unpublishFailed, setUnpublishFailed] = useState(false);
   const saved = useSavedEffects();
 
@@ -306,30 +307,24 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn, onOpenIn
   }, [id]);
 
   const recipe = useMemo(() => (listing ? recipeOf(listing) : null), [listing]);
-  const installed = saved.filter(s => s.marketId === id);
+  // Copies of this listing in the user's Custom effects: plain effects of their own from then on.
+  const copies = saved.filter(s => s.marketId === id && isMarketCopy(s, username));
   const mine = !!listing && !!username && listing.author.toLowerCase() === username.toLowerCase();
 
-  const install = async () => {
+  const addCopy = async () => {
     setState('working');
     const res = await downloadEffect(id);
     if (!res.ok) {
       setState(res.error === 'sign_in_required' ? 'idle' : 'failed');
-      if (res.error === 'sign_in_required') onNeedsSignIn(() => { void install(); });
+      if (res.error === 'sign_in_required') onNeedsSignIn(() => { void addCopy(); });
       return;
     }
     setListing(res.value);
     const parsed = recipeOf(res.value);
     const error = parsed
-      ? await saveEffect(newEffectId(), res.value.name, parsed, { marketId: res.value.id, marketAuthor: res.value.author, downloaded: true })
+      ? await saveEffect(newEffectId(), copyName(res.value.name, saved.map(s => s.name)), parsed, { marketId: res.value.id, marketAuthor: res.value.author, downloaded: true })
       : 'unsupported';
     setState(error ? 'failed' : 'idle');
-  };
-
-  const uninstall = async () => {
-    setConfirmUninstall(false);
-    setState('working');
-    const results = await Promise.all(installed.map(s => deleteEffect(s.id)));
-    setState(results.every(Boolean) ? 'idle' : 'failed');
   };
 
   const unpublish = async () => {
@@ -360,7 +355,19 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn, onOpenIn
           <Download size={14} aria-hidden={true} />
           {downloads(listing.downloads)}
         </span>
+        {typeof listing.version === 'number' && (
+          <span className={styles.count}>
+            <Tag size={14} aria-hidden={true} />
+            {t('store.effects.version', { version: listing.version })}
+          </span>
+        )}
       </div>
+      {listing.basedOn && (
+        <button type="button" className={styles.author} onClick={() => onOpenListing(listing.basedOn!.id)}>
+          <GitBranch size={14} aria-hidden={true} />
+          {t('store.effects.basedOn', { name: listing.basedOn.name, author: listing.basedOn.author })}
+        </button>
+      )}
       {listing.audio && (
         <span className={styles.count}>
           <AudioLines size={14} aria-hidden={true} />
@@ -370,22 +377,27 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn, onOpenIn
       <div className={storeStyles.heroActions}>
         {mine ? (
           <Button tone="danger" onClick={() => setConfirmUnpublish(true)}>{t('store.effects.unpublish')}</Button>
-        ) : installed.length > 0 ? (
-          <Button tone="neutral" loading={state === 'working'} disabled={state === 'working'} onClick={() => setConfirmUninstall(true)}>
-            {t('store.effects.uninstall')}
-          </Button>
         ) : (
-          <Button tone="accent" loading={state === 'working'} disabled={!recipe || state === 'working'} onClick={() => { void install(); }}>
-            {state === 'failed' ? t('store.retry') : t('store.install')}
-          </Button>
+          <>
+            {copies.length > 0 && onOpenInLighting && (
+              <Button tone="accent" icon={<AnimationIcon size={14} />} onClick={() => onOpenInLighting(customEffectKey(copies[0].id))}>
+                {t('store.effects.openInLighting')}
+              </Button>
+            )}
+            <Button
+              tone={copies.length > 0 ? 'neutral' : 'accent'}
+              icon={copies.length > 0 ? <CopyPlus size={14} /> : undefined}
+              loading={state === 'working'}
+              disabled={!recipe || state === 'working'}
+              onClick={() => { void addCopy(); }}
+            >
+              {state === 'failed' ? t('store.retry') : t(copies.length > 0 ? 'store.effects.addAnother' : 'store.effects.addCopy')}
+            </Button>
+          </>
         )}
       </div>
-      {installed.length > 0 && onOpenInLighting && (
-        <Button tone="neutral" size="sm" icon={<AnimationIcon size={14} />} onClick={() => onOpenInLighting(customEffectKey(installed[0].id))}>
-          {t('store.effects.openInLighting')}
-        </Button>
-      )}
-      {state === 'failed' && <InlineError>{t(installed.length > 0 ? 'store.effects.uninstallFailed' : 'store.effects.getFailed')}</InlineError>}
+      {!mine && copies.length > 0 && <span className={styles.count}>{t('store.effects.inYourEffects')}</span>}
+      {state === 'failed' && <InlineError>{t('store.effects.addFailed')}</InlineError>}
       {unpublishFailed && <InlineError>{t('store.effects.unpublishFailed')}</InlineError>}
     </header>
   );
@@ -401,15 +413,6 @@ function EffectDetail({ id, username, onBack, onCreator, onNeedsSignIn, onOpenIn
           {header}
         </div>
       )}
-      <ConfirmModal
-        open={confirmUninstall}
-        title={t('store.effects.uninstallTitle')}
-        message={t('store.effects.uninstallMessage', { name: listing.name })}
-        confirmLabel={t('store.effects.uninstall')}
-        destructive
-        onConfirm={() => { void uninstall(); }}
-        onCancel={() => setConfirmUninstall(false)}
-      />
       <ConfirmModal
         open={confirmUnpublish}
         title={t('store.effects.unpublishTitle')}
@@ -444,7 +447,7 @@ export function EffectsMarket({ path, username, onNavigate, onNeedsSignIn, onOpe
       {first === 'by' && second ? (
         <CreatorEffects author={decodeURIComponent(second)} onOpen={open} onBack={() => onNavigate('')} />
       ) : first ? (
-        <EffectDetail id={first} username={username} onBack={() => onNavigate('')} onCreator={creator} onNeedsSignIn={onNeedsSignIn} onOpenInLighting={onOpenInLighting} />
+        <EffectDetail key={first} id={first} username={username} onBack={() => onNavigate('')} onCreator={creator} onOpenListing={open} onNeedsSignIn={onNeedsSignIn} onOpenInLighting={onOpenInLighting} />
       ) : (
         <EffectsBrowse onOpen={open} />
       )}

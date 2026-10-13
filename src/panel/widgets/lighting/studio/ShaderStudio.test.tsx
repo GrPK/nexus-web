@@ -257,35 +257,6 @@ describe('ShaderStudio opening', () => {
     savedEntries = [];
   });
 
-  it('opens a Marketplace download read-only and remixes it into a new effect of your own', async () => {
-    put.mockResolvedValue({ entry: {} });
-    put.mockClear();
-    savedEntries = [
-      { id: 'fx10', name: 'Mine', recipe: recipe(10), updatedAt: 1, audio: false },
-      { id: 'fxzz', name: 'Theirs', recipe: recipe(20), updatedAt: 2, audio: false, marketId: 'L1', marketAuthor: 'bob', downloaded: true },
-    ];
-    render(<ShaderStudio open effectId="fxzz" username="me" onClose={() => {}} />);
-    expect(screen.getByText('lighting.studio.marketReadOnly')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'lighting.studio.save' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'lighting.studio.publish.button' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'lighting.studio.surprise' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.remix' }));
-    const name = screen.getByPlaceholderText('lighting.studio.namePlaceholder');
-    // A name you already use is refused, so a remix never overwrites one of your effects.
-    fireEvent.change(name, { target: { value: 'Mine' } });
-    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'lighting.studio.remix' }).at(-1)!); });
-    expect(screen.getByText('lighting.studio.nameTaken')).toBeInTheDocument();
-    expect(put).not.toHaveBeenCalled();
-    fireEvent.change(name, { target: { value: 'My take' } });
-    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'lighting.studio.remix' }).at(-1)!); });
-    expect(put).toHaveBeenCalledTimes(1);
-    const [id, body] = put.mock.calls[0] as [string, { name: string; marketId?: string }];
-    expect(id).not.toBe('fxzz');
-    expect(body.name).toBe('My take');
-    expect(body.marketId).toBeUndefined();
-    savedEntries = [];
-  });
-
   it('starts a new effect, not another one, when the named effect is gone', () => {
     savedEntries = [{ id: 'fx10', name: 'Mine', recipe: recipe(10), updatedAt: 1, audio: false }];
     render(<ShaderStudio open effectId="fxgone" onClose={() => {}} />);

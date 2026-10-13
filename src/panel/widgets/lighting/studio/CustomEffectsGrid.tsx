@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Plus, Store } from 'lucide-react';
+import { CopyPlus, Plus, Store } from 'lucide-react';
 import { HoverTooltip } from '../../../../components/common/HoverTooltip/HoverTooltip';
 import { EffectCard } from '../../../../components/common/EffectCard/EffectCard';
 import { CollapsibleSection } from '../../../../components/common/CollapsibleSection/CollapsibleSection';
@@ -9,15 +9,14 @@ import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import { useTranslation } from '../../../../lib/i18n';
 import { matchesAllWords } from '../../../../search/match';
 import { renderRecipeStill } from './recipePreview';
-import { deleteEffect, isDownloaded, migrateLegacyEffects, useSavedEffects, type SavedEffect } from './studioLibrary';
+import { deleteEffect, isDownloaded, isMarketCopy, migrateLegacyEffects, useSavedEffects, type SavedEffect } from './studioLibrary';
 import type { StudioRecipe } from './studioCompiler';
 import pageStyles from '../LightingPage.module.scss';
 import styles from './ShaderStudio.module.scss';
 
 const STILL_DEBOUNCE_MS = 150;
 const SECTION_CUSTOM = 'custom';
-const SECTION_MARKET = 'marketplace';
-type Section = typeof SECTION_CUSTOM | typeof SECTION_MARKET;
+type Section = typeof SECTION_CUSTOM;
 
 /** The recipe being edited, shown on its tile while unsaved; `id` null is a new effect. */
 export interface StudioDraft {
@@ -45,11 +44,13 @@ function useRecipeStill(recipe: StudioRecipe | null): string | null {
   return recipe ? url : null;
 }
 
-function CustomEffectCell({ effect, active, published, draft, gpuAvailable, onSelect, onDelete }: {
+function CustomEffectCell({ effect, active, published, copiedFrom, draft, gpuAvailable, onSelect, onDelete }: {
   effect: SavedEffect;
   active: boolean;
   /** The user's own effect, listed in the Marketplace. */
   published: boolean;
+  /** A copy of someone else's Marketplace effect: its author, credited on the tile. */
+  copiedFrom: string | null;
   /** The unsaved edit of this effect, rendered in place of its saved thumbnail. */
   draft: StudioRecipe | null;
   gpuAvailable: boolean;
@@ -76,6 +77,10 @@ function CustomEffectCell({ effect, active, published, draft, gpuAvailable, onSe
         <HoverTooltip body={t('lighting.studio.publishedBadge')} side="top">
           <span className={styles.publishedBadge} data-testid="effect-published-badge"><Store aria-hidden={true} /></span>
         </HoverTooltip>
+      ) : copiedFrom ? (
+        <HoverTooltip body={t('lighting.studio.copiedBadge', { author: copiedFrom })} side="top">
+          <span className={styles.publishedBadge} data-testid="effect-copied-badge"><CopyPlus aria-hidden={true} /></span>
+        </HoverTooltip>
       ) : undefined}
     />
   );
@@ -87,12 +92,12 @@ function NewDraftCell({ recipe, label }: { recipe: StudioRecipe; label: string }
 }
 
 /**
- * Saved Studio effects as the lighting browser's first categories: the
- * account's own under Custom, Marketplace downloads under Marketplace. With
- * `onCreate`, Custom leads with a create tile; with `draft`, the edited effect's
- * tile shows the unsaved recipe.
+ * Saved Studio effects as the lighting browser's first category, Custom: the
+ * account's own and its copies of Marketplace effects alike. With `onCreate`,
+ * it leads with a create tile; with `draft`, the edited effect's tile shows the
+ * unsaved recipe.
  */
-export function SavedEffectSections({ effect, query, username, gpuAvailable = true, draft, onSelect, onCreate, onDeleted }: {
+export function SavedEffectSections({ effect, query, username, gpuAvailable = true, draft, flat, onSelect, onCreate, onDeleted }: {
   /** Running effect key, highlighted when it is one of these. */
   effect: string | null;
   query: string;
@@ -100,6 +105,8 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
   username?: string | null;
   gpuAvailable?: boolean;
   draft?: StudioDraft | null;
+  /** One grid with no section header. */
+  flat?: boolean;
   onSelect: (key: string) => void;
   onCreate?: () => void;
   /** After an effect was deleted from this grid, with the effect listed after it (before it when it was last). */
@@ -115,11 +122,8 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
   const searching = query.trim() !== '';
   const downloaded = (s: SavedEffect) => isDownloaded(s, username);
   const shown = saved.filter(s => matchesAllWords(query, [s.name]));
-  const own = shown.filter(s => !downloaded(s));
-  const fromMarket = shown.filter(downloaded);
   const sections: { key: Section; items: SavedEffect[]; lead: boolean }[] = [
-    { key: SECTION_CUSTOM, items: own, lead: !!onCreate },
-    { key: SECTION_MARKET, items: fromMarket, lead: false },
+    { key: SECTION_CUSTOM, items: shown, lead: !!onCreate },
   ];
   const newDraft = draft && !draft.id ? draft.recipe : null;
 
@@ -144,6 +148,7 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
           effect={item}
           active={effect === customEffectKey(item.id)}
           published={!!item.marketId && !downloaded(item)}
+          copiedFrom={isMarketCopy(item, username) ? item.marketAuthor : null}
           draft={draft?.id === item.id ? draft.recipe : null}
           gpuAvailable={gpuAvailable}
           onSelect={() => onSelect(customEffectKey(item.id))}
@@ -155,7 +160,7 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
 
   return (
     <>
-      {sections.filter(s => s.lead || s.items.length > 0).map(s => (
+      {sections.filter(s => s.lead || s.items.length > 0).map(s => (flat ? grid(s) : (
         <CollapsibleSection
           key={s.key}
           compact
@@ -165,7 +170,7 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
         >
           {grid(s)}
         </CollapsibleSection>
-      ))}
+      )))}
       <ConfirmModal
         open={!!pendingDelete}
         title={t('lighting.studio.deleteTitle')}
@@ -188,7 +193,7 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
   );
 }
 
-/** The Studio's My effects in its own scroller: the user's own under Custom with a create tile, downloads under Marketplace. */
+/** The Studio's My effects: every saved effect in one headerless grid, in its own scroller, with a create tile. */
 export function CustomEffectsGrid({ query, ...rest }: Parameters<typeof SavedEffectSections>[0] & { onCreate: () => void }) {
   const { t } = useTranslation();
   const saved = useSavedEffects();
@@ -196,7 +201,7 @@ export function CustomEffectsGrid({ query, ...rest }: Parameters<typeof SavedEff
   return (
     <div className={pageStyles.animateGridWrap}>
       <div className={pageStyles.animateGrid}>
-        <SavedEffectSections query={query} {...rest} />
+        <SavedEffectSections query={query} flat {...rest} />
         {none && <p className={pageStyles.browserHint}>{t('lighting.effects.noMatches')}</p>}
       </div>
     </div>

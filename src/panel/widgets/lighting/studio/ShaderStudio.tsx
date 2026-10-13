@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Dices, Dna, Link2, Redo2, Save, Shuffle, Undo2, SprayCan, Upload } from 'lucide-react';
+import { Dices, Dna, Link2, Redo2, Save, Undo2, SprayCan, Upload } from 'lucide-react';
 import { DeviceModal } from '../../../../components/common/DeviceModal/DeviceModal';
 import { Button } from '../../../../components/common/Button/Button';
 import { Card } from '../../../../components/common/Card/Card';
@@ -29,7 +29,7 @@ import {
   type CompiledStudio, type StudioBlock, type StudioRecipe,
 } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, randomRecipe } from './studioRecipes';
-import { getSavedEffects, isDownloaded, lastCreatedEffect, newEffectId, saveEffect, useSavedEffects, type MarketLink, type SavedEffect } from './studioLibrary';
+import { EFFECT_NAME_MAX, getSavedEffects, isDownloaded, lastCreatedEffect, newEffectId, saveEffect, useSavedEffects, type MarketLink, type SavedEffect } from './studioLibrary';
 import { marketEffectUrl } from '../../../../lib/marketLinks';
 import { copyText } from '../../../../lib/clipboard';
 import { PublishEffectModal } from './PublishEffectModal';
@@ -87,8 +87,6 @@ function VariationTile({ recipe, label, onPick }: { recipe: StudioRecipe; label:
   );
 }
 
-const NAME_MAX = 40;
-
 /** `effectId` opens that saved effect; null opens the most recently created one, or a new one when there is none. */
 export function ShaderStudio({ open, effectId, username, gpuAvailable = true, onSaved, onViewListing, onClose }: {
   open: boolean;
@@ -136,10 +134,6 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
   const currentLink = current?.marketId && current.marketAuthor ? { marketId: current.marketId, marketAuthor: current.marketAuthor } : null;
   // The user's own listing, which the toolbar can share; a download is someone else's.
   const sharedId = current?.marketId && !isDownloaded(current, username) ? current.marketId : null;
-  // Someone else's Marketplace effect: viewable and runnable, never edited; a remix copies it under Custom.
-  // Without a recorded flag it takes a signed-in account to tell a download from your own listing.
-  const readOnly = !!current && (current.downloaded ?? (!!username && isDownloaded(current, username)));
-  const [remixing, setRemixing] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const copiedTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
@@ -211,7 +205,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
   };
 
   const historyKeysRef = useRef({ undo, redo, blocked: false });
-  historyKeysRef.current = { undo, redo, blocked: saving || publishing || remixing || readOnly || !!pendingDiscard || !!variations };
+  historyKeysRef.current = { undo, redo, blocked: saving || publishing || !!pendingDiscard || !!variations };
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -358,29 +352,6 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
     return undefined;
   };
 
-  // The suggested name, shortening the source's so it fits the name cap.
-  const remixName = (name: string) => {
-    const full = t('lighting.studio.remixName', { name });
-    const over = full.length - NAME_MAX;
-    return over > 0 ? t('lighting.studio.remixName', { name: name.slice(0, Math.max(0, name.length - over)).trimEnd() }) : full;
-  };
-
-  // A remix is always a new effect of the user's own, opened in place of the download it copies.
-  const saveRemix = async (name: string): Promise<string | undefined> => {
-    const trimmed = name.trim();
-    if (saved.some(s => s.name.toLocaleLowerCase() === trimmed.toLocaleLowerCase())) return t('lighting.studio.nameTaken');
-    const id = newEffectId();
-    const snapshot = structuredClone(recipe);
-    const error = await saveEffect(id, trimmed, snapshot);
-    if (error) return t('lighting.studio.saveFailed', { error });
-    setRemixing(false);
-    apply(structuredClone(snapshot), true);
-    setCurrentId(id);
-    setBaseline(JSON.stringify(snapshot));
-    onSaved?.(id, []);
-    return undefined;
-  };
-
   // One id per publish: the dialog saves twice (plain, then linked) before currentId updates.
   const publishIdRef = useRef<string | null>(null);
   // Publishing renames the open effect rather than copying it, so its listing stays linked.
@@ -448,12 +419,10 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
   const costLevel = cost <= 4 ? 'light' : cost <= 8 ? 'medium' : 'heavy';
 
   const varying = !!variations;
-  // What edits the recipe is closed while browsing variations or viewing a Marketplace download.
-  const editLocked = varying || readOnly;
   const toolbar = (
     <div className={styles.toolbar}>
       <Select
-        disabled={editLocked}
+        disabled={varying}
         ariaLabel={t('lighting.studio.starters')}
         placeholder={t('lighting.studio.starters')}
         value=""
@@ -464,13 +433,13 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
         }}
         height={32}
       />
-      <Button size="sm" icon={<Dices size={14} />} disabled={editLocked} onClick={() => apply(randomRecipe(), true)}>
+      <Button size="sm" icon={<Dices size={14} />} disabled={varying} onClick={() => apply(randomRecipe(), true)}>
         {t('lighting.studio.surprise')}
       </Button>
       {varying ? (
         <Button size="sm" tone="accent" onClick={() => setVariations(null)}>{t('lighting.studio.done')}</Button>
       ) : (
-        <Button size="sm" icon={<Dna size={14} />} disabled={readOnly} onClick={() => openVariations(recipe)}>{t('lighting.studio.variations')}</Button>
+        <Button size="sm" icon={<Dna size={14} />} onClick={() => openVariations(recipe)}>{t('lighting.studio.variations')}</Button>
       )}
       {/* The LED map editor's mode buttons: a pressed state rather than a switch. */}
       <button
@@ -490,8 +459,8 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
       </button>
       <div className={styles.toolbarEnd}>
         <div className={styles.historyBtns}>
-          <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} aria-label={t('lighting.studio.undo')} disabled={editLocked || !past.length} onClick={undo} />
-          <Button size="sm" tone="ghost" icon={<Redo2 size={14} />} aria-label={t('lighting.studio.redo')} disabled={editLocked || !future.length} onClick={redo} />
+          <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} aria-label={t('lighting.studio.undo')} disabled={varying || !past.length} onClick={undo} />
+          <Button size="sm" tone="ghost" icon={<Redo2 size={14} />} aria-label={t('lighting.studio.redo')} disabled={varying || !future.length} onClick={redo} />
         </div>
       {sharedId && (
         <>
@@ -501,20 +470,12 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
           </Button>
         </>
       )}
-      {readOnly ? (
-        <Button size="sm" tone="accent" icon={<Shuffle size={14} />} onClick={() => setRemixing(true)}>
-          {t('lighting.studio.remix')}
-        </Button>
-      ) : (
-        <>
-          <Button size="sm" icon={<Upload size={14} />} disabled={varying} onClick={() => { publishIdRef.current = null; setPublishing(true); }}>
-            {t('lighting.studio.publish.button')}
-          </Button>
-          <Button size="sm" tone="accent" icon={<Save size={14} />} disabled={varying} onClick={() => setSaving(true)}>
-            {t('lighting.studio.save')}
-          </Button>
-        </>
-      )}
+      <Button size="sm" icon={<Upload size={14} />} disabled={varying} onClick={() => { publishIdRef.current = null; setPublishing(true); }}>
+        {t('lighting.studio.publish.button')}
+      </Button>
+      <Button size="sm" tone="accent" icon={<Save size={14} />} disabled={varying} onClick={() => setSaving(true)}>
+        {t('lighting.studio.save')}
+      </Button>
       </div>
     </div>
   );
@@ -620,7 +581,6 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
                 <StudioPreview effectKey={compiled.key} stateRef={stateRef} audioRef={audioRef} />
                 {liveFailed && <InlineError className={styles.liveError}>{t('lighting.studio.liveFailed')}</InlineError>}
                 {live && liveOff && <Notice tone="info" role="status" className={styles.liveError}>{t('lighting.studio.liveOff')}</Notice>}
-                {readOnly && <Notice tone="info" className={styles.readOnlyNotice}>{t('lighting.studio.marketReadOnly')}</Notice>}
               </SettingsSection>
               <div className={styles.myEffects}>
                 <div className={pageStyles.effectToolbar}>
@@ -646,7 +606,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
             </>
           )}
         </div>
-        <div className={`${styles.stackPane} ${editLocked ? styles.locked : ''}`} inert={editLocked || undefined}>
+        <div className={`${styles.stackPane} ${varying ? styles.locked : ''}`} inert={varying || undefined}>
           <SettingsSection title={t('lighting.studio.stage.global')} boxClassName={styles.stageBox}>
           <Card compact className={styles.blockCard}>
             <div className={styles.blockParams}>
@@ -682,7 +642,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
         title={t('lighting.studio.saveTitle')}
         placeholder={t('lighting.studio.namePlaceholder')}
         initialValue={currentName ?? ''}
-        maxLength={NAME_MAX}
+        maxLength={EFFECT_NAME_MAX}
         confirmLabel={t('lighting.studio.save')}
         validate={v => (v.trim() ? null : t('lighting.studio.nameRequired'))}
         titleAdornment={v => (v.trim() && replacedBy(v)
@@ -690,17 +650,6 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
           : <Badge label={t('lighting.studio.saveNew')} color="var(--accent)" compact />)}
         onConfirm={saveCurrent}
         onCancel={() => setSaving(false)}
-      />
-      <PromptModal
-        open={remixing}
-        title={t('lighting.studio.remixTitle')}
-        placeholder={t('lighting.studio.namePlaceholder')}
-        initialValue={remixName(currentName ?? '')}
-        maxLength={NAME_MAX}
-        confirmLabel={t('lighting.studio.remix')}
-        validate={v => (v.trim() ? null : t('lighting.studio.nameRequired'))}
-        onConfirm={saveRemix}
-        onCancel={() => setRemixing(false)}
       />
       <PublishEffectModal
         open={publishing}

@@ -14,6 +14,10 @@ export interface EffectListing {
   audio: boolean;
   /** Distinct accounts that downloaded it, the author excluded. */
   downloads: number;
+  /** Starts at 1 and goes up with each update that changes the effect. */
+  version: number;
+  /** The listing this one was published from a copy of; null when none or that one is gone. */
+  basedOn: { id: string; name: string; author: string } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -81,6 +85,8 @@ export function downloadEffect(id: string): Promise<EffectMarketResult<EffectLis
 export interface EffectPublishBody {
   name: string;
   recipe: unknown;
+  /** The listing a copy being published came from, credited on the new listing. */
+  basedOn?: string;
 }
 
 export function publishEffect(body: EffectPublishBody): Promise<EffectMarketResult<EffectListing>> {
@@ -102,6 +108,10 @@ export interface EffectDownload {
   removed: boolean;
   /** Null once removed. */
   recipe: unknown;
+  /** The version last copied; null for downloads recorded before versions. */
+  version: number | null;
+  /** The listing's current version; null once removed. */
+  latestVersion: number | null;
 }
 
 export function listEffectDownloads(): Promise<EffectMarketResult<{ items: EffectDownload[] }>> {
