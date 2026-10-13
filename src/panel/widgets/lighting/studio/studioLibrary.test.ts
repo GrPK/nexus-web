@@ -95,6 +95,24 @@ describe('studioLibrary', () => {
       dupUid.blocks[1].uid = dupUid.blocks[0].uid;
       for (const r of [unknown, overStage, overBudget, dupUid, null, 'x', { v: 2 }]) expect(lib.parseMarketRecipe(r)).toBeNull();
     });
+
+    it('accepts a rate only on a wave and a gate only on music, inside the API ranges', async () => {
+      const lib = await fresh();
+      const withMod = (mod: Record<string, unknown>) => {
+        const r = recipe();
+        r.blocks[0].mods = { speed: mod as never };
+        return r;
+      };
+      expect(lib.parseMarketRecipe(withMod({ source: 'sine', amount: 0.5, rate: 1.5 }))).not.toBeNull();
+      expect(lib.parseMarketRecipe(withMod({ source: 'bass', amount: 0.5, gate: 0.3 }))).not.toBeNull();
+      for (const bad of [
+        { source: 'bass', amount: 0.5, rate: 1 },
+        { source: 'sine', amount: 0.5, gate: 0.2 },
+        { source: 'square', amount: 0.5, rate: 9 },
+        { source: 'level', amount: 0.5, gate: 0.95 },
+        { source: 'saw', amount: 0.5 },
+      ]) expect(lib.parseMarketRecipe(withMod(bad))).toBeNull();
+    });
   });
 
   it('sends the Marketplace link with the save only when given', async () => {

@@ -10,7 +10,10 @@ import { ColorPickerWithPresets } from '../../../../components/common/ColorPicke
 import type { SortableRowArgs } from '../../../../components/common/SortableList/SortableList';
 import { useTranslation } from '../../../../lib/i18n';
 import { blocksForStage, type StudioBlockDef, type StudioParam } from './studioBlocks';
-import { STUDIO_MOD_SOURCES, blockParams, type StudioBlock, type StudioModSource } from './studioCompiler';
+import {
+  MOD_GATE, MOD_RATE, STUDIO_MOD_SOURCES, blockParams, isMusicSource,
+  type StudioBlock, type StudioMod, type StudioModSource, type StudioMusicSource,
+} from './studioCompiler';
 import styles from './ShaderStudio.module.scss';
 
 const STACKED = 'stacked' as const;
@@ -19,15 +22,15 @@ const INLINE = 'inline' as const;
 // How often a modulated slider's live marker follows the music.
 const LIVE_AUDIO_MS = 66;
 
-type Levels = Partial<Record<StudioModSource, number>>;
+type Levels = Partial<Record<StudioMusicSource, number>>;
 
 /** The current level of each of `sources`, sampled while there are any; null when silent. Re-renders only when a level moves. */
-function useLiveLevels(audioRef: React.RefObject<AudioSnapshot | null> | undefined, sources: readonly StudioModSource[]): Levels | null {
+function useLiveLevels(audioRef: React.RefObject<AudioSnapshot | null> | undefined, sources: readonly StudioMusicSource[]): Levels | null {
   const [levels, setLevels] = useState<Levels | null>(null);
   const key = sources.join(',');
   useEffect(() => {
     if (!key || !audioRef) return;
-    const wanted = key.split(',') as StudioModSource[];
+    const wanted = key.split(',') as StudioMusicSource[];
     const id = window.setInterval(() => {
       const snap = audioRef.current;
       const next: Levels | null = snap ? Object.fromEntries(wanted.map(s => [s, Math.round((snap[s] ?? 0) * 100) / 100])) : null;
@@ -75,7 +78,7 @@ export function StudioBlockCard({
   block, def, firstPattern, removable, canSwitchTo, drag, onChange, onCommit, onTypeChange, onRemove, isPinned, onTogglePin, audioRef,
 }: StudioBlockCardProps) {
   const { t } = useTranslation();
-  const audio = useLiveLevels(audioRef, [...new Set(Object.values(block.mods ?? {}).map(m => m.source))]);
+  const audio = useLiveLevels(audioRef, [...new Set(Object.values(block.mods ?? {}).map(m => m.source).filter(isMusicSource))]);
   const typeOptions = blocksForStage(def.stage).map(d => ({
     value: d.type,
     label: t(`lighting.studio.block.${d.type}`),
@@ -92,10 +95,17 @@ export function StudioBlockCard({
     onChange({ ...block, mods }, true);
   };
 
-  const setMod = (key: string, patch: Partial<{ source: StudioModSource; amount: number }>, commit: boolean) => {
+  const setMod = (key: string, patch: Partial<StudioMod>, commit: boolean) => {
     const current = block.mods?.[key];
     if (!current) return;
-    onChange({ ...block, mods: { ...block.mods, [key]: { ...current, ...patch } } }, commit);
+    const next: StudioMod = { ...current, ...patch };
+    // A rate belongs to a wave and a gate to music; switching kinds drops the other's.
+    if (isMusicSource(next.source)) delete next.rate;
+    else {
+      delete next.gate;
+      next.rate ??= MOD_RATE.def;
+    }
+    onChange({ ...block, mods: { ...block.mods, [key]: next } }, commit);
   };
 
   const renderParam = (p: StudioParam) => {
@@ -121,7 +131,7 @@ export function StudioBlockCard({
     const clampP = (v: number) => Math.min(p.max, Math.max(p.min, v));
     const swing = mod ? Math.min(1, Math.max(-1, mod.amount)) * (p.max - p.min) : 0;
     const reach = mod ? clampP(value + swing) : null;
-    const live = mod && audio ? clampP(value + swing * (audio[mod.source] ?? 0)) : null;
+    const live = mod && audio && isMusicSource(mod.source) ? clampP(value + swing * (audio[mod.source] ?? 0)) : null;
     const modLabel = t('lighting.studio.mod.toggle');
     const pinLabel = t('lighting.studio.pin');
     const pinned = isPinned(p.key);
@@ -184,6 +194,33 @@ export function StudioBlockCard({
               onChange={(v, commit) => setMod(p.key, { amount: v / 100 }, !!commit)}
               onCommit={onCommit}
             />
+            {isMusicSource(mod.source) ? (
+              <Slider
+                className={styles.modShape}
+                orientation={INLINE}
+                trackFill
+                label={t('lighting.studio.mod.gate')}
+                value={Math.round((mod.gate ?? 0) * 100)}
+                min={Math.round(MOD_GATE.min * 100)}
+                max={Math.round(MOD_GATE.max * 100)}
+                onChange={(v, commit) => setMod(p.key, { gate: v / 100 }, !!commit)}
+                onCommit={onCommit}
+              />
+            ) : (
+              <Slider
+                className={styles.modShape}
+                orientation={INLINE}
+                trackFill
+                label={t('lighting.studio.mod.rate')}
+                formatValue={v => (v / 100).toFixed(2)}
+                value={Math.round((mod.rate ?? MOD_RATE.def) * 100)}
+                min={Math.round(MOD_RATE.min * 100)}
+                max={Math.round(MOD_RATE.max * 100)}
+                step={Math.round(MOD_RATE.step * 100)}
+                onChange={(v, commit) => setMod(p.key, { rate: v / 100 }, !!commit)}
+                onCommit={onCommit}
+              />
+            )}
           </div>
         )}
       </div>

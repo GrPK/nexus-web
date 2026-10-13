@@ -5,7 +5,10 @@ import {
   type CustomEffectEntry,
 } from '../../../../api/customEffects';
 import { STUDIO_COST_BUDGET, STUDIO_STAGES, STUDIO_STAGE_LIMIT, studioBlock } from './studioBlocks';
-import { STUDIO_MOD_SOURCES, blockParams, compileStudio, recipeCost, stageCount, type StudioBlock, type StudioRecipe } from './studioCompiler';
+import {
+  MOD_GATE, MOD_RATE, STUDIO_MOD_SOURCES, blockParams, compileStudio, isMusicSource, recipeCost, stageCount,
+  type StudioBlock, type StudioMod, type StudioRecipe,
+} from './studioCompiler';
 
 // Where the prototype kept effects before the service stored them; migrated once, then removed.
 const LEGACY_KEY = 'nexus.studio.saved';
@@ -23,10 +26,18 @@ export interface SavedEffect {
 const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 const isObj = (o: unknown): o is Record<string, unknown> => !!o && typeof o === 'object' && !Array.isArray(o);
 
+// The same rules the Marketplace API applies: a rate only on a wave, a gate only on music.
+function isMod(m: StudioMod): boolean {
+  if (!isObj(m) || !STUDIO_MOD_SOURCES.includes(m.source) || !isNum(m.amount)) return false;
+  const music = isMusicSource(m.source);
+  if (m.rate !== undefined && (music || !isNum(m.rate) || m.rate < MOD_RATE.min || m.rate > MOD_RATE.max)) return false;
+  return m.gate === undefined || (music && isNum(m.gate) && m.gate >= MOD_GATE.min && m.gate <= MOD_GATE.max);
+}
+
 function isBlock(b: StudioBlock | null | undefined): boolean {
   if (!b || typeof b.uid !== 'string' || !studioBlock(b.type) || !isObj(b.params)) return false;
   if (!Object.values(b.params).every(isNum)) return false;
-  if (b.mods !== undefined && !(isObj(b.mods) && Object.values(b.mods).every(m => isObj(m) && STUDIO_MOD_SOURCES.includes(m.source) && isNum(m.amount)))) return false;
+  if (b.mods !== undefined && !(isObj(b.mods) && Object.values(b.mods).every(isMod))) return false;
   return b.colors === undefined || (isObj(b.colors) && Object.values(b.colors).every(c => Array.isArray(c) && c.length === 3 && c.every(isNum)));
 }
 

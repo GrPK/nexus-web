@@ -76,6 +76,16 @@ function expectedCases(): Record<string, () => StudioRecipe> {
     if (def.stage === 'pattern') cases[`blend:${def.type}`] = () => frozen(['plasma', def.type, 'palette']);
   }
   for (const s of STUDIO_STARTERS) cases[`starter:${s.id}`] = () => withFixedUids(s.build());
+  cases['mod:bass:gate'] = () => {
+    const r = frozen(['rings', 'palette'], false);
+    r.blocks[0].mods = { speed: { source: 'bass', amount: 0.4, gate: 0.3 } };
+    return r;
+  };
+  cases['mod:sine:rate'] = () => {
+    const r = frozen(['rings', 'palette'], false);
+    r.blocks[0].mods = { speed: { source: 'sine', amount: -0.6, rate: 1.5 } };
+    return r;
+  };
   for (const source of STUDIO_MOD_SOURCES) {
     cases[`mod:${source}`] = () => {
       const r = frozen(['rings', 'palette'], false);

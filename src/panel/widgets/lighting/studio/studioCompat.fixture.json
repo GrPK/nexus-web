@@ -3734,6 +3734,46 @@
     },
     "sha256": "f45f63b7882ea77bdb45d6616b510e292d7a8e14de7a0815f373029c9bb341ee"
   },
+  "mod:bass:gate": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "speed": {
+              "source": "bass",
+              "amount": 0.4,
+              "gate": 0.3
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "a9c548bd5b64a557bf9e1d1da6f41f3f03e1cd0b4af503798964e3671de1ba79"
+  },
   "mod:beat": {
     "recipe": {
       "v": 1,
@@ -3889,6 +3929,202 @@
       "contrast": 0.8
     },
     "sha256": "da69654a429bb6aaeb0ccc37297605b653c65971488fd513351fefb186e7f6ad"
+  },
+  "mod:random": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "count": {
+              "source": "random",
+              "amount": 0.4
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "cba333a5e1c98d350cec043fffec3f8bce8bee4633ee9f3c737c2a7e368e9602"
+  },
+  "mod:sine": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "count": {
+              "source": "sine",
+              "amount": 0.4
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "cdadf1ef63dc732730745e5babaf30842ec7da7b66afc86d7ed7a792737c3270"
+  },
+  "mod:sine:rate": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "speed": {
+              "source": "sine",
+              "amount": -0.6,
+              "rate": 1.5
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "baddb4a1c2106b8dd41f2a6642d97c44be759c5560e15812d89c017739453af5"
+  },
+  "mod:square": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "count": {
+              "source": "square",
+              "amount": 0.4
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "59cb9bde98a60e66ff55890c1bb0a031ba6b7888240c00747e55984d0486d5df"
+  },
+  "mod:triangle": {
+    "recipe": {
+      "v": 1,
+      "blocks": [
+        {
+          "uid": "k0",
+          "type": "rings",
+          "params": {
+            "count": 8,
+            "speed": 1,
+            "blend": 0,
+            "mix": 1
+          },
+          "mods": {
+            "count": {
+              "source": "triangle",
+              "amount": 0.4
+            }
+          }
+        },
+        {
+          "uid": "k1",
+          "type": "palette",
+          "params": {
+            "palette": 3,
+            "spread": 1,
+            "offset": 0,
+            "cycle": 0,
+            "shade": 0.6
+          }
+        }
+      ],
+      "speed": 73,
+      "hue": 0.21,
+      "saturation": 1.3,
+      "contrast": 0.8
+    },
+    "sha256": "e8f58e1cf282b2b97bfabadbabc5e7c4669d3937d6b769f558f3c47da5082b04"
   },
   "starter:aurora": {
     "recipe": {

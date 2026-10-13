@@ -4,11 +4,22 @@ import {
   type StudioBlockDef, type StudioHelper, type StudioParam, type StudioStage,
 } from './studioBlocks';
 
-export type StudioModSource = 'bass' | 'mid' | 'high' | 'level' | 'beat';
+export type StudioMusicSource = 'bass' | 'mid' | 'high' | 'level' | 'beat';
+export type StudioWaveSource = 'sine' | 'triangle' | 'square' | 'random';
+export type StudioModSource = StudioMusicSource | StudioWaveSource;
 
-export const STUDIO_MOD_SOURCES: readonly StudioModSource[] = ['bass', 'mid', 'high', 'level', 'beat'];
+export const STUDIO_MUSIC_SOURCES: readonly StudioMusicSource[] = ['bass', 'mid', 'high', 'level', 'beat'];
+export const STUDIO_WAVE_SOURCES: readonly StudioWaveSource[] = ['sine', 'triangle', 'square', 'random'];
+export const STUDIO_MOD_SOURCES: readonly StudioModSource[] = [...STUDIO_MUSIC_SOURCES, ...STUDIO_WAVE_SOURCES];
 
-const MOD_UNIFORM: Record<StudioModSource, string> = {
+export const isMusicSource = (s: StudioModSource): s is StudioMusicSource => (STUDIO_MUSIC_SOURCES as readonly string[]).includes(s);
+
+/** A wave's cycles per second of effect time; the API enforces the same range. */
+export const MOD_RATE = { min: 0.05, max: 4, step: 0.05, def: 0.5 } as const;
+/** The share of a music level ignored before a mod reacts; the API enforces the same range. */
+export const MOD_GATE = { min: 0, max: 0.9, step: 0.01 } as const;
+
+const MOD_UNIFORM: Record<StudioMusicSource, string> = {
   bass: 'u_audioBass', mid: 'u_audioMid', high: 'u_audioHigh', level: 'u_audioLevel', beat: 'u_audioBeat',
 };
 
@@ -16,6 +27,10 @@ export interface StudioMod {
   source: StudioModSource;
   /** Signed fraction of the param's range. */
   amount: number;
+  /** Wave sources only: cycles per second of effect time. */
+  rate?: number;
+  /** Music sources only: the level below which the mod stays at rest. */
+  gate?: number;
 }
 
 export interface StudioBlock {
@@ -199,7 +214,7 @@ export function studioUniform(uid: string, index: number, key: string): string {
   return `u_${STUDIO_UID_RE.test(uid) ? uid : `b${index}`}_${key}`;
 }
 
-function collectHelpers(defs: StudioBlockDef[], needsBlend: boolean): string[] {
+function collectHelpers(defs: StudioBlockDef[], needsBlend: boolean, extra: ReadonlySet<StudioHelper> = new Set()): string[] {
   const wanted = new Set<StudioHelper>();
   const add = (h: StudioHelper) => {
     if (wanted.has(h)) return;
@@ -207,6 +222,7 @@ function collectHelpers(defs: StudioBlockDef[], needsBlend: boolean): string[] {
     HELPERS[h].deps.forEach(add);
   };
   defs.forEach(d => d.helpers?.forEach(add));
+  extra.forEach(add);
   if (needsBlend) add('blendV');
   return HELPER_ORDER.filter(h => wanted.has(h)).map(h => HELPERS[h].src);
 }
@@ -242,6 +258,7 @@ export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: b
   // declared-but-unused one stays active after linking differs by driver.
   const audioInputs = new Set<string>();
   const params: Record<string, number> = {};
+  const extraHelpers = new Set<StudioHelper>();
   const body: string[] = [];
   let patternIndex = 0;
 
@@ -250,7 +267,7 @@ export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: b
     const first = def.stage === 'pattern' && patternIndex === 0;
     const list = blockParams(def, first);
     const exprs: Record<string, string> = {};
-    for (const p of list) {
+    list.forEach((p, pi) => {
       const name = studioUniform(block.uid, i, p.key);
       const value = clampParam(p, block.params[p.key]);
       uniforms.push(`uniform float ${name}; // hint_range(${fmt(p.min)}, ${fmt(p.max)}, ${fmt(p.step)}) = ${fmt(bake ? value : p.def)}`);
@@ -261,14 +278,37 @@ export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: b
         const amount = Math.min(1, Math.max(-1, mod.amount));
         uniforms.push(`uniform float ${modName}; // hint_range(-1.0, 1.0, 0.01) = ${fmt(bake ? amount : 0.5)}`);
         params[modName] = amount;
-        audioInputs.add(MOD_UNIFORM[mod.source]);
-        const swept = `clamp(${name} + ${modName} * ${fmt(p.max - p.min)} * ${MOD_UNIFORM[mod.source]}, ${fmt(p.min)}, ${fmt(p.max)})`;
+        let signal: string;
+        if (isMusicSource(mod.source)) {
+          audioInputs.add(MOD_UNIFORM[mod.source]);
+          signal = MOD_UNIFORM[mod.source];
+          // Emitted only when set, so a recipe without a gate compiles exactly as before.
+          if (mod.gate !== undefined && mod.gate > 0) {
+            const gateName = `${name}_g`;
+            const gate = Math.min(MOD_GATE.max, Math.max(MOD_GATE.min, mod.gate));
+            uniforms.push(`uniform float ${gateName}; // hint_range(${fmt(MOD_GATE.min)}, ${fmt(MOD_GATE.max)}, ${fmt(MOD_GATE.step)}) = ${fmt(bake ? gate : 0)}`);
+            params[gateName] = gate;
+            signal = `clamp((${signal} - ${gateName}) / (1.0 - ${gateName}), 0.0, 1.0)`;
+          }
+        } else {
+          const rateName = `${name}_r`;
+          const rate = Math.min(MOD_RATE.max, Math.max(MOD_RATE.min, mod.rate ?? MOD_RATE.def));
+          uniforms.push(`uniform float ${rateName}; // hint_range(${fmt(MOD_RATE.min)}, ${fmt(MOD_RATE.max)}, ${fmt(MOD_RATE.step)}) = ${fmt(bake ? rate : MOD_RATE.def)}`);
+          params[rateName] = rate;
+          const ph = `(t * ${rateName})`;
+          signal = mod.source === 'sine' ? `(0.5 + 0.5 * sin(${ph} * 6.2831853))`
+            : mod.source === 'triangle' ? `(1.0 - abs(fract(${ph}) * 2.0 - 1.0))`
+              : mod.source === 'square' ? `step(0.5, fract(${ph}))`
+                : `hash21(vec2(floor(${ph}), ${fmt(i * 16 + pi + 1)}))`;
+          if (mod.source === 'random') extraHelpers.add('hash21');
+        }
+        const swept = `clamp(${name} + ${modName} * ${fmt(p.max - p.min)} * ${signal}, ${fmt(p.min)}, ${fmt(p.max)})`;
         // A count between integers seams at the atan wrap (kaleidoscope, spiral).
         exprs[p.key] = p.whole ? `floor(${swept} + 0.5)` : swept;
       } else {
         exprs[p.key] = name;
       }
-    }
+    });
     for (const c of def.colors ?? []) {
       const rgb = block.colors?.[c.key] ?? c.def;
       const names = ['r', 'g', 'b'].map(ch => studioUniform(block.uid, i, `${c.key}${ch}`));
@@ -305,7 +345,7 @@ export function compileStudio(recipe: StudioRecipe, { bake = false }: { bake?: b
     `const float S_CON = ${fmt(base[3])};`,
     ...[...audioInputs].sort().map(u => `uniform float ${u};`),
     ...uniforms,
-    ...collectHelpers(defs, needsBlend),
+    ...collectHelpers(defs, needsBlend, extraHelpers),
     FOOTER_HELPERS,
     'void main() {',
     '  vec2 p0 = uvCentered();',

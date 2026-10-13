@@ -57,6 +57,35 @@ describe('compileStudio', () => {
     expect(compiled.frag).toContain(`${u}_m * 5.7 * u_audioBeat`);
   });
 
+  it('drives a wave from effect time at its rate, needing no audio', () => {
+    const r = recipeOf('plasma', 'palette');
+    r.blocks[0].mods = { scale: { source: 'triangle', amount: 0.5, rate: 2 } };
+    const compiled = compileStudio(r);
+    const u = studioUniform(r.blocks[0].uid, 0, 'scale');
+    expect(compiled.params[`${u}_r`]).toBe(2);
+    expect(compiled.frag).toContain(`fract((t * ${u}_r))`);
+    expect(compiled.frag).not.toMatch(/uniform float u_audio/);
+  });
+
+  it('gives each random wave its own sequence', () => {
+    const r = recipeOf('plasma', 'palette');
+    r.blocks[0].mods = { scale: { source: 'random', amount: 0.5, rate: 1 }, speed: { source: 'random', amount: 0.5, rate: 1 } };
+    const seeds = [...compileStudio(r).frag.matchAll(/hash21\(vec2\(floor\([^)]*\)\), ([\d.]+)\)\)/g)].map(m => m[1]);
+    expect(seeds).toHaveLength(2);
+    expect(new Set(seeds).size).toBe(2);
+  });
+
+  it('gates a music mod only when a threshold is set', () => {
+    const r = recipeOf('plasma', 'palette');
+    r.blocks[0].mods = { scale: { source: 'bass', amount: 0.5 } };
+    const u = studioUniform(r.blocks[0].uid, 0, 'scale');
+    expect(compileStudio(r).frag).not.toContain(`${u}_g`);
+    r.blocks[0].mods = { scale: { source: 'bass', amount: 0.5, gate: 0.25 } };
+    const compiled = compileStudio(r);
+    expect(compiled.params[`${u}_g`]).toBe(0.25);
+    expect(compiled.frag).toContain(`clamp((u_audioBass - ${u}_g) / (1.0 - ${u}_g), 0.0, 1.0)`);
+  });
+
   it('rounds a modulated whole-number param so it never lands between integers', () => {
     const r = recipeOf('kaleidoscope', 'rings', 'palette');
     r.blocks[0].mods = { sides: { source: 'bass', amount: 0.5 } };

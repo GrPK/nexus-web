@@ -24,7 +24,7 @@ import {
   type StudioStage,
 } from './studioBlocks';
 import {
-  compileStudio, makeBlock, recipeCost, stageCount, staleParamsBetween,
+  compileStudio, isMusicSource, makeBlock, recipeCost, stageCount, staleParamsBetween,
   type CompiledStudio, type StudioBlock, type StudioRecipe,
 } from './studioCompiler';
 import { STUDIO_STARTERS, mutateRecipe, randomRecipe } from './studioRecipes';
@@ -153,8 +153,9 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
     recipeRef.current = recipe;
   }, [recipe, compiled]);
 
-  const hasMods = recipe.blocks.some(b => b.mods && Object.keys(b.mods).length > 0);
-  const audioRef = useAudioState(open && hasMods);
+  // Waves need no audio; only a music mod subscribes to it.
+  const hasMusicMods = recipe.blocks.some(b => Object.values(b.mods ?? {}).some(m => isMusicSource(m.source)));
+  const audioRef = useAudioState(open && hasMusicMods);
 
   // Evicts on the explicit close, not an unmount cleanup: StrictMode re-runs cleanups
   // while the previews still need their keys.

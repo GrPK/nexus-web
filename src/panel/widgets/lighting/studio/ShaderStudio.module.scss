@@ -230,6 +230,11 @@
   gap: var(--space-sm);
 }
 
+// The Rate or Threshold slider takes a full row under the source and amount.
+.modShape {
+  grid-column: 1 / -1;
+}
+
 // Create tile: the lighting rail's dashed add affordance (.addSmartLights),
 // shaped like an effect card's thumbnail.
 .createTile {
