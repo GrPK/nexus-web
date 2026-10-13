@@ -179,6 +179,7 @@ const CURATED_SHORT_NAMES: Record<string, string> = {
   // The Kraken's row is its LCD panel entry, whose record is named for the
   // display; the row is the whole cooler.
   'nzxt-kraken': 'NZXT Kraken',
+  'asiahorse-umbra': 'Asiahorse Umbra V2',
 };
 
 const FALLBACK_ICON = '/assets/devices/device.svg';
