@@ -304,6 +304,18 @@ describe('executeDeckAction → /panel/deck/dispatch', () => {
     resetListedAppIdsForTest();
   });
 
+  it('without a deviceId an unlisted direct launchApp uses the desktop open routes', async () => {
+    resetListedAppIdsForTest();
+    await executeDeckAction({ type: 'launchApp', appId: 'C:\\Games\\a.exe' });
+    expect(postService).toHaveBeenLastCalledWith('/system/open-path', { path: 'C:\\Games\\a.exe' });
+    await executeDeckAction({ type: 'launchApp', appId: 'https://example.com/x' });
+    expect(postService).toHaveBeenLastCalledWith('/system/open-url', { url: 'https://example.com/x' });
+    setListedAppIds(['C:\\Games\\a.exe']);
+    await executeDeckAction({ type: 'launchApp', appId: 'C:\\Games\\a.exe' });
+    expect(postService.mock.calls.at(-1)![0]).toMatch(/^\/shortcuts\/launch/);
+    resetListedAppIdsForTest();
+  });
+
   it('carries the resolved toggle branch on the dispatch body', async () => {
     await executeDeckAction({ type: 'text', text: 'hi' }, location, 'off');
     expect(postService).toHaveBeenCalledWith('/panel/deck/dispatch', {

@@ -300,16 +300,6 @@ function ActionFields({ action, onChange, allowed, surface, desktopEditor, pageC
   const canBrowseFile = canEditFreeText(surface, desktopEditor)
     && (isWindowsAppShell() || isMacAppShell())
     && !isRelayActive() && !isDirectActive();
-  const handleBrowseApp = async () => {
-    setBrowsing(true);
-    try {
-      const path = await pickSystemPath(false);
-      if (path) onChange({ type: 'launchApp', appId: path });
-    } finally {
-      setBrowsing(false);
-    }
-  };
-
   switch (action.type) {
     case 'launchApp':
       // No wrapping Field label: the Action box header already reads "Launch app".
@@ -320,8 +310,7 @@ function ActionFields({ action, onChange, allowed, surface, desktopEditor, pageC
             onSelect={app => onChange({ type: 'launchApp', appId: app.id })}
             customPath={{
               onUse: canEditFreeText(surface, desktopEditor) ? appId => onChange({ type: 'launchApp', appId }) : undefined,
-              onBrowse: canBrowseFile ? handleBrowseApp : undefined,
-              browsing,
+              onBrowse: canBrowseFile ? () => pickSystemPath(false) : undefined,
             }}
           />
           {locked && <DesktopOnlyBadge />}

@@ -118,8 +118,15 @@ export function DeckWidget({ widget, deviceId, selectedSlot, onSelectSlot, editV
   // (file path / key chord / text / audio file) over the wire. No deviceId
   // (the desktop dashboard's own "My Computer" preview, which has no backing
   // panel device record) keeps every action on its unchanged direct route.
-  const dispatchAction = async (action: DeckAction, i: number, branch?: 'on' | 'off') => {
-    if (hasDirectLaunchApp(action)) await ensureListedAppIds();
+  // Routing of a direct-shaped launchApp key depends on the listed-id set;
+  // load it ahead of the press so no press waits on the fetch.
+  const hasDirectKey = slots.some(s => !!s.action && hasDirectLaunchApp(s.action));
+  useEffect(() => {
+    if (hasDirectKey) void ensureListedAppIds();
+  }, [hasDirectKey]);
+
+  const dispatchAction = (action: DeckAction, i: number, branch?: 'on' | 'off') => {
+    if (hasDirectLaunchApp(action)) void ensureListedAppIds();
     if (deviceId && isPrivilegedDeckAction(action)) {
       const location = { deviceId, widgetId: widget.id, page, folderPath, slot: i };
       if (branch) void executeDeckAction(action, location, branch);
@@ -140,7 +147,7 @@ export function DeckWidget({ widget, deviceId, selectedSlot, onSelectSlot, editV
       const key = keyFor(i);
       const target = !toggleOn(a, key);
       if (live.isOn(a.state) === undefined) setFlips(prev => ({ ...prev, [key]: target }));
-      void dispatchAction(target ? a.on : a.off, i, target ? 'on' : 'off');
+      dispatchAction(target ? a.on : a.off, i, target ? 'on' : 'off');
       return;
     }
     if (a.type === 'page') {
@@ -151,7 +158,7 @@ export function DeckWidget({ widget, deviceId, selectedSlot, onSelectSlot, editV
       return;
     }
     if (a.type === 'pageIndicator') return;
-    void dispatchAction(a, i);
+    dispatchAction(a, i);
   };
 
   const onDragEnd = (e: DragEndEvent) => {

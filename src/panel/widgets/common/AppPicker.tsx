@@ -51,13 +51,16 @@ interface AppPickerProps {
    *  id. `onUse` enables typing one; omit it to keep the field read-only while
    *  a stored custom target still reads as selected. `onBrowse` adds a native
    *  file dialog button. The caller owns the gating for both. */
-  customPath?: { onUse?: (path: string) => void; onBrowse?: () => void; browsing?: boolean };
+  customPath?: { onUse?: (path: string) => void; onBrowse?: () => Promise<string | null | undefined> };
 }
 
 export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = false, unavailableIds, customPath }: AppPickerProps) {
   const { t } = useTranslation();
   const [apps, setApps] = useState<Shortcut[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listLoaded, setListLoaded] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
+  const [browseRejected, setBrowseRejected] = useState(false);
   const [query, setQuery] = useState('');
   const [running, setRunning] = useState<string[]>([]);
 
@@ -79,6 +82,7 @@ export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = fal
       const res = await fetchService<{ shortcuts: Shortcut[] }>('/shortcuts');
       if (!cancelled) {
         setApps(res?.shortcuts ?? []);
+        setListLoaded(!!res?.shortcuts);
         if (res?.shortcuts) setListedAppIds(res.shortcuts.map(a => a.id));
         setLoading(false);
       }
@@ -145,19 +149,32 @@ export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = fal
   const typedLooksLikePath = !!customPath?.onUse && looksLikeLaunchPath(typedPath);
   const offerTyped = typedLooksLikePath && isLaunchablePath(typedPath);
   const typedUnsupported = typedLooksLikePath && !offerTyped;
+  const handleBrowse = async () => {
+    if (!customPath?.onBrowse) return;
+    setBrowsing(true);
+    setBrowseRejected(false);
+    try {
+      const path = await customPath.onBrowse();
+      if (!path) return;
+      if (isLaunchablePath(path)) customPath.onUse?.(path);
+      else setBrowseRejected(true);
+    } finally {
+      setBrowsing(false);
+    }
+  };
   const knownIds = new Set([...apps.map(a => a.id), ...runningEntries.map(e => e.id)]);
-  const storedCustom = customPath && !loading && selectedId && !knownIds.has(selectedId) ? selectedId : '';
+  const storedCustom = customPath && !loading && selectedId && !knownIds.has(selectedId) && (listLoaded || isLaunchablePath(selectedId)) ? selectedId : '';
 
   return (
     <div className={styles.picker}>
       <div className={styles.searchRow}>
         <SearchInput
           value={query}
-          onChange={setQuery}
+          onChange={v => { setQuery(v); setBrowseRejected(false); }}
           placeholder={t('panel.settings.searchApps')}
         />
         {customPath?.onBrowse && (
-          <Button type="button" size="sm" tone="neutral" icon={<FolderOpen size={14} aria-hidden />} disabled={customPath.browsing} onClick={customPath.onBrowse}>
+          <Button type="button" size="sm" tone="neutral" icon={<FolderOpen size={14} aria-hidden />} disabled={browsing} onClick={handleBrowse}>
             {t('panel.settings.deck.browse')}
           </Button>
         )}
@@ -180,8 +197,8 @@ export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = fal
             onSelect={() => { customPath?.onUse?.(typedPath); setQuery(''); }}
           />
         )}
-        {typedUnsupported && <div className={styles.empty} role="alert">{t('panel.settings.unsupportedLaunchPath')}</div>}
-        {!loading && !offerTyped && !typedUnsupported && filtered.length === 0 && filteredRunning.length === 0 && !storedCustom && (
+        {(typedUnsupported || browseRejected) && <div className={styles.empty} role="status" aria-live="polite">{t('panel.settings.unsupportedLaunchPath')}</div>}
+        {!loading && !offerTyped && !typedUnsupported && !browseRejected && filtered.length === 0 && filteredRunning.length === 0 && !storedCustom && (
           <div className={styles.empty}>
             {apps.length === 0 ? t('panel.settings.connectForApps') : t('panel.settings.noApps')}
           </div>

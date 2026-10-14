@@ -3859,7 +3859,7 @@
   "panel.settings.textColor.custom.desc": "アクセントカラーの文字も含め、ウィジェットのすべての文字を1色にします",
   "panel.settings.textColor.theme": "テーマ",
   "panel.settings.textColor.theme.desc": "ライトまたはダークテーマに従います",
-  "panel.settings.unsupportedLaunchPath": "起動できるのは、このPC上のドライブパスと http、https、steam のリンクのみです",
+  "panel.settings.unsupportedLaunchPath": "起動できるのは、ローカルのファイルパスと http、https、steam のリンクのみです",
   "panel.settings.url": "URL",
   "panel.settings.useThisPath": "{path} を使用",
   "panel.settings.widgetLabels": "ウィジェットのラベル",

@@ -3859,7 +3859,7 @@
   "panel.settings.textColor.custom.desc": "Eén kleur voor alle widgettekst, ook tekst in de accentkleur",
   "panel.settings.textColor.theme": "Thema",
   "panel.settings.textColor.theme.desc": "Volgt het lichte of donkere thema",
-  "panel.settings.unsupportedLaunchPath": "Alleen stationspaden op deze pc en http-, https- of steam-links kunnen worden gestart",
+  "panel.settings.unsupportedLaunchPath": "Alleen lokale bestandspaden en http-, https- of steam-links kunnen worden gestart",
   "panel.settings.url": "URL",
   "panel.settings.useThisPath": "{path} gebruiken",
   "panel.settings.widgetLabels": "Widgetlabels",

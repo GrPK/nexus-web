@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/useMultiplexSocket', () => ({ useTopicCallback: vi.fn() }));
@@ -48,7 +48,7 @@ describe('AppPicker custom launch path', () => {
     for (const v of ['\\\\host\\share\\a.exe', 'ftp://example.com/a', 'file:///C:/a.exe']) {
       fireEvent.change(search(), { target: { value: v } });
       expect(screen.queryByText('panel.settings.useThisPath')).toBeNull();
-      expect(screen.getByRole('alert').textContent).toBe('panel.settings.unsupportedLaunchPath');
+      expect(screen.getByRole('status').textContent).toBe('panel.settings.unsupportedLaunchPath');
     }
     expect(onUse).not.toHaveBeenCalled();
   });
@@ -71,6 +71,25 @@ describe('AppPicker custom launch path', () => {
     render(<AppPicker selectedId="C:\Games\OnceHuman\launcher.exe" onSelect={vi.fn()} customPath={{}} />);
     const row = (await screen.findByText('launcher.exe')).closest('button')!;
     expect(row.className).toMatch(/appRowSelected/);
+  });
+
+  it('applies a launchable Browse result and rejects a UNC one with the same notice', async () => {
+    const onUse = vi.fn();
+    const onBrowse = vi.fn().mockResolvedValueOnce('C:\\a\\b.exe').mockResolvedValueOnce('\\\\nas\\share\\a.exe');
+    render(<AppPicker onSelect={vi.fn()} customPath={{ onUse, onBrowse }} />);
+    await screen.findByText('Google Chrome');
+    fireEvent.click(screen.getByText('panel.settings.deck.browse'));
+    await waitFor(() => expect(onUse).toHaveBeenCalledWith('C:\\a\\b.exe'));
+    fireEvent.click(screen.getByText('panel.settings.deck.browse'));
+    await screen.findByRole('status');
+    expect(onUse).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show a stored listed-style id as a custom row when the list failed to load', async () => {
+    vi.mocked(fetchService).mockResolvedValue(null);
+    render(<AppPicker selectedId="Pkg.Name!App" onSelect={vi.fn()} customPath={{}} />);
+    await screen.findByText('panel.settings.connectForApps');
+    expect(screen.queryByText('Pkg.Name!App')).toBeNull();
   });
 
   it('renders Browse only when onBrowse is given', async () => {

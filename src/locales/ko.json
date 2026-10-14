@@ -3859,7 +3859,7 @@
   "panel.settings.textColor.custom.desc": "강조 색 텍스트를 포함한 모든 위젯 텍스트에 한 가지 색상을 사용합니다",
   "panel.settings.textColor.theme": "테마",
   "panel.settings.textColor.theme.desc": "라이트 또는 다크 테마를 따릅니다",
-  "panel.settings.unsupportedLaunchPath": "이 PC의 드라이브 경로와 http, https, steam 링크만 실행할 수 있습니다",
+  "panel.settings.unsupportedLaunchPath": "로컬 파일 경로와 http, https, steam 링크만 실행할 수 있습니다",
   "panel.settings.url": "URL",
   "panel.settings.useThisPath": "{path} 사용",
   "panel.settings.widgetLabels": "위젯 라벨",

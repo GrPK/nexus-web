@@ -4,7 +4,7 @@ import { applyProfile, activateCoolingPreset } from '../../../api/cooling';
 import { mediaIdle, playCurrentOrFirstMedia } from '../../../api/mediaLibrary';
 import { controlMedia } from '../../../hooks/useMedia';
 import type { MediaSession } from '../../../hooks/useMedia';
-import { isDirectLaunchTarget } from '../common/customAppPath';
+import { isDirectLaunchTarget, isLaunchablePath } from '../common/customAppPath';
 import { getListedAppIds } from '../common/listedApps';
 import { requestOpenMonitoring } from './deckMonitoringNav';
 import type { DeckAction, DeckActionType, DeckMonitoringPress, DeckSequenceStep, DeckSystemAction, DeckNexusAction } from './types';
@@ -87,9 +87,24 @@ export async function executeDeckAction(action: DeckAction, location?: DeckDispa
     return;
   }
   switch (action.type) {
-    case 'launchApp':
+    case 'launchApp': {
+      // No deviceId (the desktop dashboard deck): no route reaches
+      // DeckActionExecutor, so an unlisted direct target uses the desktop-token
+      // routes openUrl and openFile already use. steam:// has no such route.
+      const id = action.appId.trim();
+      if (isDirectLaunchTarget(id) && !getListedAppIds()?.has(action.appId)) {
+        if (/^https?:\/\//i.test(id)) {
+          await postService('/system/open-url', { url: id });
+          return;
+        }
+        if (isLaunchablePath(id) && !/^[a-zA-Z][a-zA-Z0-9+.-]+:\/\//.test(id)) {
+          await postService('/system/open-path', { path: id });
+          return;
+        }
+      }
       await postService(`/shortcuts/launch?targetId=${encodeURIComponent(action.appId)}`, {});
       return;
+    }
     case 'openFile':
     case 'openFolder':
       await postService('/system/open-path', { path: action.path });

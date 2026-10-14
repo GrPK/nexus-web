@@ -3859,7 +3859,7 @@
   "panel.settings.textColor.custom.desc": "Une seule couleur pour tout le texte des widgets, texte d'accent compris",
   "panel.settings.textColor.theme": "Thème",
   "panel.settings.textColor.theme.desc": "Suit le thème clair ou sombre",
-  "panel.settings.unsupportedLaunchPath": "Seuls les chemins de lecteur de ce PC et les liens http, https ou steam peuvent être lancés",
+  "panel.settings.unsupportedLaunchPath": "Seuls les chemins de fichier locaux et les liens http, https ou steam peuvent être lancés",
   "panel.settings.url": "URL",
   "panel.settings.useThisPath": "Utiliser {path}",
   "panel.settings.widgetLabels": "Étiquettes des widgets",
