@@ -21,7 +21,7 @@ function Harness({ enabled = true, direction = 'down' }: { enabled?: boolean; di
     shouldYield: c => (direction === 'down' ? openSwipeYields(c.clientY, BAND, c.target) : dismissSwipeYields(c.target)),
     onCommit,
   });
-  // A fader's 64px hit box wraps the 48px track that carries role=slider.
+  // A fader's hit box is wider than the track that carries role=slider.
   return (
     <div ref={ref} data-testid="surface" data-state={swipe.state} data-offset={swipe.offset}>
       <div data-panel-scrollable="true" data-testid="fader-root">

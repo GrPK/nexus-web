@@ -16,7 +16,6 @@ import {
   readSafeAreaTopPx,
 } from '../engine/controlCenterGesture';
 import { usePanelControlCenterSwipe } from '../engine/usePanelControlCenterSwipe';
-import { LONG_PRESS_MOVE_THRESHOLD } from '../engine/useLongPress';
 import { useTouchViaPointer, type GestureContact } from '../engine/touchViaPointer';
 import { usePanelImmersiveOpen } from '../widgets/common/PanelImmersiveContext';
 import { PanelMixerSlider } from '../widgets/common/PanelMixerSlider';
@@ -31,6 +30,7 @@ import { controlActiveMedia, useMedia, type MediaSession } from '../../hooks/use
 import { systemPower } from '../../api/system';
 import { fetchRadios, setRadio, type RadioKind, type RadiosState } from '../../api/radios';
 import type { PanelSurface } from '../types';
+import { useVolumeFaderPress } from './useVolumeFaderPress';
 import { ControlCenterMixerView } from './ControlCenterMixerView';
 import styles from './PanelControlCenter.module.scss';
 
@@ -154,8 +154,15 @@ export function PanelControlCenter({
   const [bodyMounted, setBodyMounted] = useState(false);
   const visible = open || opening;
   useEffect(() => {
-    if (visible) setBodyMounted(true);
+    if (visible) { setBodyMounted(true); return; }
+    // Already fully above the panel (a pull released before it showed): no
+    // transition will run, so nothing would ever release the body.
+    const el = sheetRef.current;
+    if (el && el.getBoundingClientRect().bottom <= 0) setBodyMounted(false);
   }, [visible]);
+  const releaseBody = (e: React.TransitionEvent) => {
+    if (e.target === e.currentTarget && e.propertyName === 'transform' && !visible) setBodyMounted(false);
+  };
 
   const sheetStyle = opening
     // Follows the finger from fully hidden; --cc-zoom converts the pointer
@@ -185,9 +192,8 @@ export function PanelControlCenter({
         style={sheetStyle}
         aria-label={t('panel.controlCenter.label')}
         aria-hidden={!open && !opening ? true : undefined}
-        onTransitionEnd={(e) => {
-          if (e.target === e.currentTarget && e.propertyName === 'transform' && !visible) setBodyMounted(false);
-        }}
+        onTransitionEnd={releaseBody}
+        onTransitionCancel={releaseBody}
         onClick={(e) => {
           if (!open) return;
           const target = e.target instanceof Element ? e.target : null;
@@ -239,9 +245,11 @@ function ControlCenterBody({
   const { timeFormat } = useUnitPrefs();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
+    if (!active) return undefined;
+    setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [active]);
   const timeText = useMemo(
     () => new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit', hour12: resolveHour12(timeFormat) }).format(now),
     [now, language, timeFormat],
@@ -294,35 +302,16 @@ function ControlCenterBody({
   const media = useMedia(active);
   const session = activeMediaSession(media.sessions);
 
-  // Long-press on the volume fader opens the per-app mixer. The fader jumps to
-  // the touch point on press, so a press that turns into a hold restores the
-  // level it started from.
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdOrigin = useRef({ x: 0, y: 0, volume: 0 });
-  const clearHold = useCallback(() => {
-    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
-  }, []);
-  useEffect(() => clearHold, [clearHold]);
-  const volumeRef = useRef(volume);
-  useEffect(() => { volumeRef.current = volume; }, [volume]);
-  const onVolumeDown = (e: React.PointerEvent) => {
-    if (e.pointerType === 'mouse' && !touchViaPointer) return;
-    // A press on the mute button is a tap, not a hold.
-    if (e.target instanceof Element && e.target.closest('button')) return;
-    clearHold();
-    holdOrigin.current = { x: e.clientX, y: e.clientY, volume: volumeRef.current.state.volume };
-    holdTimer.current = setTimeout(() => {
-      holdTimer.current = null;
-      volumeRef.current.commitVolume(holdOrigin.current.volume, { flush: true });
-      setView('mixer');
-    }, MIXER_LONG_PRESS_MS);
-  };
-  const onVolumeMove = (e: React.PointerEvent) => {
-    if (!holdTimer.current) return;
-    const dx = e.clientX - holdOrigin.current.x;
-    const dy = e.clientY - holdOrigin.current.y;
-    if (dx * dx + dy * dy > LONG_PRESS_MOVE_THRESHOLD * LONG_PRESS_MOVE_THRESHOLD) clearHold();
-  };
+  // Long-press on the volume fader opens the per-app mixer; see useVolumeFaderPress.
+  const volumePress = useVolumeFaderPress({
+    level: volume.state.volume,
+    mouseAsTouch: touchViaPointer,
+    holdMs: MIXER_LONG_PRESS_MS,
+    onPreview: volume.previewVolume,
+    onLive: v => volume.commitVolume(v),
+    onCommit: v => volume.commitVolume(v, { flush: true }),
+    onLongPress: () => setView('mixer'),
+  });
 
   if (view === 'mixer') {
     return (
@@ -388,10 +377,7 @@ function ControlCenterBody({
             <div
               className={styles.holdWrap}
               // Capture phase: the fader stops its pointer events from bubbling.
-              onPointerDownCapture={onVolumeDown}
-              onPointerMoveCapture={onVolumeMove}
-              onPointerUpCapture={clearHold}
-              onPointerCancelCapture={clearHold}
+              {...volumePress.captureProps}
               title={t('panel.controlCenter.volume.hint')}
             >
               <PanelMixerSlider
@@ -410,8 +396,8 @@ function ControlCenterBody({
                   onClick: () => { void volume.setMuted(!volume.state.muted); },
                 }}
                 ariaLabel={t('panel.controlCenter.volume')}
-                onChange={v => volume.commitVolume(v / 100)}
-                onCommit={v => volume.commitVolume(v / 100, { flush: true })}
+                onChange={v => volumePress.change(v / 100)}
+                onCommit={v => volumePress.commit(v / 100)}
               />
             </div>
           )}

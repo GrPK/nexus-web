@@ -20,3 +20,16 @@ describe('useLatestWriter', () => {
     expect(send).toHaveBeenLastCalledWith(40);
   });
 });
+
+describe('useLatestWriter unmount', () => {
+  it('does not start another write from an in-flight request that settles after unmount', async () => {
+    let settle: () => void = () => {};
+    const send = vi.fn(() => new Promise<null>(r => { settle = () => r(null); }));
+    const { result, unmount } = renderHook(() => useLatestWriter(send, 100));
+    await act(async () => { result.current(1); });
+    await act(async () => { result.current(2); });
+    unmount();
+    await act(async () => { settle(); vi.advanceTimersByTime(500); });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+});

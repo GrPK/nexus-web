@@ -12,6 +12,7 @@ export function useLatestWriter(send: (value: number) => Promise<unknown>, inter
     inFlight: false, queued: null, lastAt: 0, timer: null,
   });
   const pumpRef = useRef<() => void>(() => {});
+  const unmounted = useRef(false);
 
   const pump = useCallback(() => {
     const s = w.current;
@@ -23,13 +24,18 @@ export function useLatestWriter(send: (value: number) => Promise<unknown>, inter
     s.queued = null;
     s.inFlight = true;
     s.lastAt = Date.now();
-    void sendRef.current(next).catch(() => null).finally(() => { s.inFlight = false; pumpRef.current(); });
+    void sendRef.current(next).catch(() => null).finally(() => { s.inFlight = false; if (!unmounted.current) pumpRef.current(); });
   }, [intervalMs]);
   useEffect(() => { pumpRef.current = pump; }, [pump]);
 
-  useEffect(() => () => {
-    if (w.current.timer) clearTimeout(w.current.timer);
-    w.current.timer = null;
+  useEffect(() => {
+    const state = w.current;
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+      if (state.timer) clearTimeout(state.timer);
+      state.timer = null;
+    };
   }, []);
 
   return useCallback((value: number, flush = false) => {
