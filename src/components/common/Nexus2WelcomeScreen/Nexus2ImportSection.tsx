@@ -10,7 +10,7 @@ import { applyNexus2Import, previewNexus2Import } from '../../../api/migration';
 import type { Nexus2ApplyResult, Nexus2PreviewResponse } from '../../../api/migration';
 import {
   allApplyResultsClean, applyDetailKey, applyStatusKey, issueCategoryLabelKey, defaultSelectedGroupIds,
-  groupDetailParts, groupResultSummaries, groupHasAvailable, selectedWireIds, unavailableGroupNote,
+  groupDetailParts, groupResultSummaries, hasKeptSetupSkip, groupHasAvailable, selectedWireIds, unavailableGroupNote,
   presetLabelKey, fanGroupLabelKey, visibleImportGroups, importHeaderKeys, formatList, fillTemplate, type CategoryDetail, type ImportGroupId,
 } from './nexus2WelcomeUtils';
 import styles from './Nexus2ImportSection.module.scss';
@@ -72,6 +72,8 @@ export function Nexus2ImportSection({
   const [selectedGroups, setSelectedGroups] = useState<Set<ImportGroupId>>(new Set());
   const [importPhase, setImportPhase] = useState<ImportPhase>('idle');
   const [importResults, setImportResults] = useState<Nexus2ApplyResult[] | null>(null);
+  // The preview the apply ran against: result labels follow it, not a refreshed preview.
+  const [appliedPreview, setAppliedPreview] = useState<Nexus2PreviewResponse | null>(null);
   const [importRequestError, setImportRequestError] = useState(false);
   // The preview object whose fan curve list entered the viewport. Comparing
   // identity ties "seen" to one load: a new preview is never seen already.
@@ -122,8 +124,18 @@ export function Nexus2ImportSection({
       onBusyChange?.(false);
       return 'failed';
     }
+    setAppliedPreview(preview);
     setImportResults(res.results);
     setImportPhase('results');
+    // A skipped fan group means the service state moved since the preview;
+    // refetch so the group shows its real state instead of staying armed.
+    if (res.results.some(r => r.id === 'fanCurves' && r.status === 'skipped')) {
+      void previewNexus2Import().then(fresh => {
+        if (!fresh) return;
+        setPreview(fresh);
+        setSelectedGroups(defaultSelectedGroupIds(fresh));
+      });
+    }
     onBusyChange?.(false);
     return allApplyResultsClean(res.results) ? 'clean' : 'failed';
   };
@@ -183,8 +195,8 @@ export function Nexus2ImportSection({
   };
   const groups = visibleImportGroups(preview);
   const { titleKey, descriptionKey } = importHeaderKeys(preview);
-  const summaries = groupResultSummaries(importResults);
-  const importSuccess = importPhase === 'results' && allApplyResultsClean(importResults);
+  const summaries = groupResultSummaries(importResults, appliedPreview);
+  const importSuccess = importPhase === 'results' && allApplyResultsClean(importResults) && !hasKeptSetupSkip(importResults);
 
   return (
     <SettingsSection

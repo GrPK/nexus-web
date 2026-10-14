@@ -19,6 +19,7 @@ import {
   importHeaderKeys,
   selectedWireIds,
   fanGroupLabelKey,
+  hasKeptSetupSkip,
   issueCategoryLabelKey,
   unavailableGroupNote,
   unavailableGroupNoteKey,
@@ -489,7 +490,8 @@ describe('Recommended mode preset follow-ups', () => {
   it('labels a preset-only group Cooling and leaves curve groups alone', () => {
     expect(fanGroupLabelKey(pv(OK), FAN_GROUP)).toBe('cooling.title');
     expect(fanGroupLabelKey(pv(MIXED_FAN_CURVES), FAN_GROUP)).toBe(FAN_GROUP.labelKey);
-    expect(groupResultSummaries([{ id: 'fanCurves', status: 'applied', detail: null, preset: 'silent' }])[0].labelKey).toBe('cooling.title');
+    expect(groupResultSummaries([{ id: 'fanCurves', status: 'applied', detail: null }], pv(OK))[0].labelKey).toBe('cooling.title');
+    expect(groupResultSummaries([{ id: 'fanCurves', status: 'applied', detail: null, preset: 'silent' }])[0].labelKey).toBe(FAN_GROUP.labelKey);
   });
 
   it('treats an unknown or missing preset as unmappable, never as curves', () => {
@@ -503,10 +505,17 @@ describe('Recommended mode preset follow-ups', () => {
     }
   });
 
-  it('maps the kept-setup hint; a kept-setup skip is not clean', () => {
+  it('maps the kept-setup hint; a kept-setup skip is informational', () => {
     expect(applyDetailKey('nexus3CoolingCustomized')).toBe('nexus2Welcome.import.result.detail.nexus3CoolingCustomized');
     const kept: Nexus2ApplyResult = { id: 'fanCurves', status: 'skipped', detail: 'nexus3CoolingCustomized' };
-    expect(allApplyResultsClean([kept])).toBe(false);
+    const off: Nexus2ApplyResult = { id: 'fanCurves', status: 'skipped', detail: 'coolingDisabled' };
+    expect(applyDetailKey('coolingDisabled')).toBe('nexus2Welcome.import.result.detail.coolingDisabled');
+    expect(allApplyResultsClean([kept])).toBe(true);
+    expect(allApplyResultsClean([off])).toBe(true);
+    expect(hasKeptSetupSkip([kept])).toBe(true);
+    expect(hasKeptSetupSkip([off])).toBe(true);
+    expect(hasKeptSetupSkip([{ id: 'fanCurves', status: 'skipped', detail: null }])).toBe(false);
+    expect(groupResultSummaries([off])[0].issues).toEqual([off]);
     expect(allApplyResultsClean([{ id: 'fanCurves', status: 'skipped', detail: null }])).toBe(true);
     expect(groupResultSummaries([kept])[0].issues).toEqual([kept]);
     expect(issueCategoryLabelKey(kept)).toBe('cooling.title');

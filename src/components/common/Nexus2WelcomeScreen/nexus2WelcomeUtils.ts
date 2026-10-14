@@ -193,7 +193,7 @@ export function applyStatusKey(status: string): string {
 const APPLY_DETAIL_KEYS: Record<string, string> = {
   'no-q60-record': 'nexus2Welcome.import.result.detail.noQ60Record',
   nexus3CoolingCustomized: 'nexus2Welcome.import.result.detail.nexus3CoolingCustomized',
-  'nexus3-cooling-customized': 'nexus2Welcome.import.result.detail.nexus3CoolingCustomized',
+  coolingDisabled: 'nexus2Welcome.import.result.detail.coolingDisabled',
 };
 
 /** Localizes a known apply-result machine hint; unknown hints fall back to a generic line. */
@@ -354,7 +354,7 @@ export interface GroupResultSummary {
  * (failed beats needsConfirm beats applied beats skipped), so a single stuck
  * category never reads as an overall success.
  */
-export function groupResultSummaries(results: Nexus2ApplyResult[] | null): GroupResultSummary[] {
+export function groupResultSummaries(results: Nexus2ApplyResult[] | null, preview: Nexus2PreviewResponse | null = null): GroupResultSummary[] {
   if (!results) return [];
   const summaries: GroupResultSummary[] = [];
   for (const group of IMPORT_GROUPS) {
@@ -368,19 +368,30 @@ export function groupResultSummaries(results: Nexus2ApplyResult[] | null): Group
     const count = members.find(r => typeof r.count === 'number')?.count;
     const preset = members.find(r => presetLabelKey(r.preset) !== null)?.preset;
     summaries.push({
-      groupId: group.id, labelKey: preset ? 'cooling.title' : group.labelKey, status, issues,
+      groupId: group.id, labelKey: fanGroupLabelKey(preview, group), status, issues,
       ...(count !== undefined ? { count } : {}), ...(preset ? { preset } : {}),
     });
   }
   return summaries;
 }
 
-/** A skip that carries the cooling-customized reason: the preset was not applied after the user changed cooling post-preview. */
+const INFORMATIONAL_SKIP_DETAILS = new Set(['nexus3CoolingCustomized', 'coolingDisabled']);
+
+/**
+ * A skip because Nexus 3 cooling changed or was turned off after the preview
+ * (the user or an automatic thermal-guard heal did it). Informational: clean
+ * for flow purposes, but its reason is shown and no success is claimed.
+ */
 function isKeptSetupSkip(r: Nexus2ApplyResult): boolean {
-  return r.status === 'skipped' && r.detail !== null && applyDetailKey(r.detail) === APPLY_DETAIL_KEYS.nexus3CoolingCustomized;
+  return r.status === 'skipped' && r.detail !== null && INFORMATIONAL_SKIP_DETAILS.has(r.detail);
 }
 
-/** True once every result applied cleanly (a plain skip counts as clean; failed, needsConfirm and a kept-setup skip do not). */
+/** True when any result is an informational kept-setup skip. */
+export function hasKeptSetupSkip(results: Nexus2ApplyResult[] | null): boolean {
+  return !!results && results.some(isKeptSetupSkip);
+}
+
+/** True once no result failed or needs confirmation (skips, including kept-setup ones, count as clean). */
 export function allApplyResultsClean(results: Nexus2ApplyResult[] | null): boolean {
-  return !!results && results.length > 0 && results.every(r => (r.status === 'applied' || r.status === 'skipped') && !isKeptSetupSkip(r));
+  return !!results && results.length > 0 && results.every(r => r.status === 'applied' || r.status === 'skipped');
 }
