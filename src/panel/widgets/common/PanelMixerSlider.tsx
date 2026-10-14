@@ -57,7 +57,7 @@ export function PanelMixerSlider({
   // Last value handed to onChange, seeded by the press. A cancel commits this so
   // a consumer's drag bookkeeping always closes, and never a value recomputed
   // from the cancel event, whose coordinates are not a finger position.
-  const lastEmittedRef = useRef<number | null>(null);
+  const lastEmittedRef = useRef(0);
   const clampedValue = clamp(value, min, max);
   const pct = max === min ? 0 : (clampedValue - min) / (max - min);
 
@@ -115,7 +115,7 @@ export function PanelMixerSlider({
       // The browser may release capture first when a touch is cancelled.
     }
     if (event.type === 'pointercancel') {
-      if (lastEmittedRef.current !== null) commitValue(lastEmittedRef.current);
+      commitValue(lastEmittedRef.current);
       return;
     }
     commitValue(valueFromY(event.clientY));

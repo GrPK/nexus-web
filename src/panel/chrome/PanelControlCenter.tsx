@@ -413,15 +413,14 @@ function ControlCenterBody({
             label={t('panel.controlCenter.screenSleep')}
             onPress={() => { onClose(); onScreenSleep(); }}
           />
-          {/* Last of the fixed tiles, so none of them moves when volume reads arrive. */}
-          {volume.state.supported && (
-            <IconLabelButton
-              className={styles.tile}
-              icon={<SlidersVertical />}
-              label={t('panel.controlCenter.mixer.title')}
-              onPress={() => setView('mixer')}
-            />
-          )}
+          {/* Always present, disabled until volume reads in, so no tile after it shifts. */}
+          <IconLabelButton
+            className={styles.tile}
+            icon={<SlidersVertical />}
+            label={t('panel.controlCenter.mixer.title')}
+            disabled={!volume.state.supported}
+            onPress={() => setView('mixer')}
+          />
           {/* After the fixed tiles: the radios arrive late and must not shift them. */}
           {radios?.wifi && (
             <IconLabelButton
