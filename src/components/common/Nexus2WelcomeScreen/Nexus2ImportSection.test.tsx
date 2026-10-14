@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Nexus2ImportSection, type Nexus2ImportHandle } from './Nexus2ImportSection';
 import { applyNexus2Import, previewNexus2Import } from '../../../api/migration';
