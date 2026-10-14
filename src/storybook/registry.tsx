@@ -7,6 +7,7 @@ import { ViewHeader } from '../components/common/ViewHeader/ViewHeader';
 import { Sparkline } from '../components/common/Sparkline/Sparkline';
 import { SensorCard } from '../components/common/SensorCard/SensorCard';
 import { Card } from '../components/common/Card/Card';
+import { Coachmark } from '../components/common/Coachmark/Coachmark';
 import { DomainGlyph } from '../components/common/DomainGlyph/DomainGlyph';
 import { InfoList, InfoRow } from '../components/common/InfoList/InfoList';
 import { SpecList } from '../components/common/SpecList/SpecList';
@@ -656,6 +657,30 @@ function PreviewChipGroupMulti() {
       return next;
     })}
   />;
+}
+
+const COACHMARK_PREVIEW_ID = 'storybook-coachmark';
+const COACHMARK_PREVIEW_SELECTOR = `[data-coachmark="${COACHMARK_PREVIEW_ID}"]`;
+
+function PreviewCoachmark() {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className={styles.previewStack} style={{ width: 320, height: 150 }}>
+      <Button size="sm" data-coachmark={COACHMARK_PREVIEW_ID} onClick={() => setShown(s => !s)}>
+        {shown ? 'Hide the hint' : 'Show the hint'}
+      </Button>
+      {shown && (
+        <Coachmark
+          hintId={COACHMARK_PREVIEW_ID}
+          target={COACHMARK_PREVIEW_SELECTOR}
+          title="Calibrate your fans"
+          body="Run it once so curves match their real speeds."
+          dismissLabel="Dismiss"
+          onDismiss={() => setShown(false)}
+        />
+      )}
+    </div>
+  );
 }
 
 function PreviewNotice() {
@@ -2950,6 +2975,11 @@ export const REGISTRY: StorybookEntry[] = [
     name: 'Notice', category: 'cards',
     filePath: 'src/components/common/Notice/Notice.tsx',
     description: 'The one inline notice block, in three levels that share one layout: a soft fill, a border and an icon in the level colour, primary text, an optional dimmer line (NoticeSecondary) and an actions slot on the right. info is neutral guidance (never the accent, so a red accent cannot read as an error), warning uses the warn colour, critical the bad colour. Pages use it for every notice instead of building their own banner. Use role alert for something that interrupts and status for something that merely appears. FirmwareRecoveryBanner, the thermal guard banners and errors, and the Diagnostics trip notice are built on it.', Preview: PreviewNotice,
+  },
+  {
+    name: 'Coachmark', category: 'cards',
+    filePath: 'src/components/common/Coachmark/Coachmark.tsx',
+    description: 'The standard way to show a one-time onboarding hint: a floating bubble with an arrow pointing at a real control, a ring around that control and an X. Give it a target (a selector, usually a data-coachmark attribute on the control, or a ref), a hintId, a title, an optional one-line body, a preferred placement and an optional boundary it must stay inside (it hides rather than overlap what lies outside). It floats, so it never shifts layout; follows the target on resize and scroll; flips to the opposite side when the preferred one has no room and stays inside the viewport; sits below menus, popovers and modals, and shows nothing while the target is missing, unsized, scrolled out of view or clipped, or a modal is open. Escape does nothing here; the X is the only control. Pair it with useOnboardingHint(hintId), which keeps the dismissed flag on the service: mount it only while dismissed is false, and call dismiss from onDismiss and from the target own action. Never build a banner or a one-off bubble for a hint. Used by the cooling page calibrate hint.', Preview: PreviewCoachmark,
   },
   {
     name: 'Checkbox', category: 'inputs',

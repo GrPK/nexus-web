@@ -1,4 +1,4 @@
-import { fetchService, postService } from './service';
+import { authFetchWithStatus, fetchService, postService } from './service';
 
 export interface OnboardingStatusResponse {
   completed: boolean;
@@ -6,6 +6,8 @@ export interface OnboardingStatusResponse {
   lightingCompleted?: boolean;
   /** Absent on services that predate the feature-pillars onboarding screen. */
   featuresCompleted?: boolean;
+  /** Ids of one-time hints the user has acted on or closed. Absent on a service that predates hints. */
+  dismissedHints?: string[];
 }
 
 export async function fetchOnboardingStatus() {
@@ -22,6 +24,19 @@ export async function completeLightingOnboarding() {
 
 export async function completeFeaturesOnboarding() {
   return postService<OnboardingStatusResponse>('/onboarding/features-complete', {});
+}
+
+/**
+ * Marks one onboarding hint as done for good; the service keeps it across
+ * restarts and /onboarding/reset. Resolves with the HTTP status (0 when the
+ * service was unreachable) and the full status body when there is one, so the
+ * caller can tell a refusal (400 bad id, 409 full list) from a transient failure.
+ */
+export async function dismissOnboardingHint(id: string): Promise<{ status: number; body: OnboardingStatusResponse | null }> {
+  const { response, status } = await authFetchWithStatus('/onboarding/hints/dismiss', { method: 'POST', body: { id } });
+  let body: OnboardingStatusResponse | null = null;
+  try { body = response ? (await response.json()) as OnboardingStatusResponse : null; } catch { /* no JSON body */ }
+  return { status, body };
 }
 
 export type ConflictStepAction = 'resolveAll' | 'skip' | 'skipOnboarding';
