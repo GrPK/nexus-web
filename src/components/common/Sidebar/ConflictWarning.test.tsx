@@ -28,6 +28,12 @@ vi.mock('../../../hooks/useConflictDevices', () => ({
   useConflictDevices: () => ({ devicesByApp: new Map(), setOwner: vi.fn() }),
 }));
 
+let mockOverlaps: (c: DetectedConflict) => boolean = () => true;
+vi.mock('../../../hooks/useConflictOverlap', async () => {
+  const actual = await vi.importActual<any>('../../../hooks/useConflictOverlap');
+  return { ...actual, useConflictOverlap: () => (c: DetectedConflict) => mockOverlaps(c) };
+});
+
 const conflicts: DetectedConflict[] = [
   { id: 'icue', displayName: 'iCUE', category: 'cooling', processName: 'iCUE.exe', pid: 42 },
   { id: 'lian-li-l-connect', displayName: 'L-Connect', category: 'lighting', processName: 'LConnect.exe', pid: 7 },
@@ -36,6 +42,7 @@ const conflicts: DetectedConflict[] = [
 describe('ConflictWarningModal', () => {
   beforeEach(() => {
     mockExclusions = [];
+    mockOverlaps = () => true;
   });
 
   it('renders one ConflictAppCard per detected conflict', () => {
@@ -129,5 +136,59 @@ describe('ConflictWarningModal', () => {
     );
 
     expect(screen.getByRole('button', { name: 'conflicts.badge.text' })).toBeInTheDocument();
+  });
+
+  it('hides the badge while no detected app shares a device with Nexus, but keeps listing it in an open modal', () => {
+    mockOverlaps = () => false;
+    render(
+      <ConflictWarningBadge
+        conflicts={conflicts}
+        ready
+        suppressed={false}
+        open
+        onOpenChange={vi.fn()}
+        onSuppressedChange={vi.fn()}
+        onManageApps={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'conflicts.badge.text' })).not.toBeInTheDocument();
+    expect(screen.getByText('iCUE')).toBeInTheDocument();
+  });
+
+  it('shows the badge when one non-whitelisted app overlaps and the others do not', () => {
+    mockExclusions = ['icue'];
+    mockOverlaps = c => c.id === 'lian-li-l-connect';
+    render(
+      <ConflictWarningBadge
+        conflicts={conflicts}
+        ready
+        suppressed={false}
+        open={false}
+        onOpenChange={vi.fn()}
+        onSuppressedChange={vi.fn()}
+        onManageApps={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'conflicts.badge.text' })).toBeInTheDocument();
+  });
+
+  it('hides the badge when the only overlapping app is whitelisted', () => {
+    mockExclusions = ['icue'];
+    mockOverlaps = c => c.id === 'icue';
+    render(
+      <ConflictWarningBadge
+        conflicts={conflicts}
+        ready
+        suppressed={false}
+        open={false}
+        onOpenChange={vi.fn()}
+        onSuppressedChange={vi.fn()}
+        onManageApps={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'conflicts.badge.text' })).not.toBeInTheDocument();
   });
 });
