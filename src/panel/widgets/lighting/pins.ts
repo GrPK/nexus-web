@@ -138,7 +138,7 @@ export const pinnedAmong = (pins: Pins, ids: readonly string[]): string[] => ids
 type Reach = { ledsOn?: boolean; controlled?: boolean; devicePageReason?: string };
 
 /** A card the engine drives: lit, controlled, and not set on its device page (no engine frame). */
-const engineReaches = (d: Reach): boolean => d.ledsOn !== false && d.controlled !== false && d.devicePageReason === undefined;
+export const engineReaches = (d: Reach): boolean => d.ledsOn !== false && d.controlled !== false && d.devicePageReason === undefined;
 
 /** Page Select all skips Nexus Control off cards and cards set on their device page. */
 export const selectAllEligible = (d: { controlled?: boolean; devicePageReason?: string }): boolean =>

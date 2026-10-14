@@ -45,7 +45,12 @@ export function zoneCardUnavailable(device: LightingDevice): boolean {
  *  the rows that turn those back on - but it is not a target for a colour, and
  *  a pick-only surface refuses it outright. */
 export function zoneCardSelectable(device: LightingDevice): boolean {
-  return !zoneCardUnavailable(device) && device.controlled !== false && device.ledsOn;
+  return !zoneCardUnavailable(device) && device.controlled !== false && device.ledsOn && device.devicePageReason === undefined;
+}
+
+/** Whether a card may stay in the selection: a dark or un-driven card may, but not one set on its device page, which has no engine frame to pin. */
+export function zoneCardSelectionHoldable(device: LightingDevice): boolean {
+  return !zoneCardUnavailable(device) && device.devicePageReason === undefined;
 }
 
 /** The selection a card's menu acts on when the card is part of one. Aggregate

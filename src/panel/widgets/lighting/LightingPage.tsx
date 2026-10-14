@@ -62,7 +62,7 @@ import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
 import { usePersistentState } from '../../../hooks/usePersistentState';
 import {
   staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex,
-  pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, pressReach, selectAllEligible, tabPressChangesNothing, clearLegacyLightingKeys,
+  pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, pressReach, engineReaches, selectAllEligible, tabPressChangesNothing, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
@@ -88,7 +88,7 @@ import { ModeControls } from './page/ModeControls';
 import { MediaCanvasNotice } from './page/MediaCanvasNotice';
 import { DevicePanel } from './page/DevicePanel';
 import { type DiscoveryState } from './page/DeviceDiscoveryCard';
-import { zoneCardSelectable, zoneCardUnavailable } from './page/ZoneCard';
+import { zoneCardSelectable, zoneCardSelectionHoldable, zoneCardUnavailable } from './page/ZoneCard';
 import { Button } from '../../../components/common/Button/Button';
 import { GAME_SYNC_GUIDE_URL } from '../../../lib/externalLinks';
 import { GameSyncLeftPane } from './page/GameSyncLeftPane';
@@ -1491,7 +1491,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Cards a SELECTION can hold, which is wider: a click lands on a dark or
   // un-driven card too, since selecting it is how its menu gets opened.
   const selectionKeepIds = useMemo(
-    () => orderedDevices.filter(d => !zoneCardUnavailable(d)).map(d => d.id),
+    () => orderedDevices.filter(zoneCardSelectionHoldable).map(d => d.id),
     [orderedDevices],
   );
   // Select all takes dark cards too, but skips Nexus Control off ones, which the
@@ -1964,7 +1964,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       if (d.controlled === false) handleSetControlled(d.id, true);
       if (!d.ledsOn) handleSetPower(d.id, true);
     }
-    return orderedDevices.filter(d => !zoneCardUnavailable(d)).map(d => d.id);
+    return orderedDevices.filter(zoneCardSelectionHoldable).map(d => d.id);
   }, [devices, orderedDevices, handleSetControlled, handleSetPower]);
   // Simple mode has no rail to show pins on, so a pick or Control all releases
   // every pin, the same way it claims; arriving and Off leave pins alone.
@@ -2345,7 +2345,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const kind = viewMode === 'screen' ? 'mirror' : 'media';
     const reach = pressReach(visibleDevices, pins, selectedDeviceIds);
     for (const d of visibleDevices) {
-      if (d.ledsOn === false || d.controlled === false) continue;
+      if (!engineReaches(d)) continue;
       const pin = pins[d.id];
       if (pin ? pin.kind === kind : effectiveMode === viewMode) reach.add(d.id);
     }

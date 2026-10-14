@@ -45,6 +45,15 @@ describe('StaticDeviceSelect', () => {
     expect([...onSetSelection.mock.calls[0][0]]).toEqual(['b']);
   });
 
+  it('shows device-page cards as hardware control and leaves them out of select all', () => {
+    const onSetSelection = vi.fn();
+    const list = [...devices, { ...device('t', 'Uni Fan TL'), devicePageReason: 'firmware' as const }];
+    render(<StaticDeviceSelect devices={list} selectedIds={new Set()} onSetSelection={onSetSelection} />);
+    expect(screen.getAllByText('lighting.devices.hardwareControlBadge')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.ledMap.selectAll' }));
+    expect([...onSetSelection.mock.calls[0][0]].sort()).toEqual(['a', 'b']);
+  });
+
   it('selects all and clears', () => {
     const onSetSelection = vi.fn();
     const { rerender } = render(

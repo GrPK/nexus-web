@@ -86,6 +86,7 @@ export function StaticDeviceSelect({ devices, selectedIds, onSetSelection, ledPi
       displayName={displayName}
       stacked={stacked}
       selectOnly
+      firmwareControlled={d.devicePageReason !== undefined}
       ledFullscreen
       ledPickOnly
       ledPick={ledPickFor?.(d.id)}
