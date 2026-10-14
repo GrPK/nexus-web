@@ -111,6 +111,28 @@
     }
   }
 
+  // A device lit by another mode than the canvas shows: the frame covers the
+  // canvas beneath it, so nothing on this canvas reads as its lighting.
+  &.foreign {
+    border-style: dashed;
+    border-color: var(--frame-line-dim);
+    box-shadow: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: var(--frame-scrim);
+      pointer-events: none;
+    }
+  }
+
+  // Under every frame of this canvas's mode, so an overlapping one keeps its outline and LED dots in view.
+  &.foreign:not(.dragging) {
+    z-index: 1;
+  }
+
   // De-collision can park a name away from its frame, so pointing at the name is
   // the only thing tying the two together. The label sits in its own layer, so
   // it no longer triggers the frame's :hover; this restores what that gave,
@@ -123,6 +145,22 @@
 
     .resizeHandle, .rotateHandle { opacity: 1; }
   }
+}
+
+// The mode a foreign frame's device wears, in its corner: the middle is where names of frames inside it land.
+.foreignCaption {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: var(--space-xs) var(--space-sm);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--type-mini);
+  color: var(--frame-line-dim);
+  pointer-events: none;
 }
 
 .labelLayer {

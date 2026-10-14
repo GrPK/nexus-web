@@ -5,6 +5,7 @@ import type { EffectState } from '../types/lighting';
 
 vi.mock('../api/lighting', () => ({
   fetchShaderSource: vi.fn(async () => ({ frag: 'void main() {}', params: [] })),
+  onShaderSourceInvalidated: () => () => {},
 }));
 
 function fakeGl() {

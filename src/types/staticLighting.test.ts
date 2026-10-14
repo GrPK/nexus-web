@@ -118,3 +118,11 @@ describe('sync classification edge cases', () => {
     for (const def of STATIC_EFFECTS) expect(normalizeSync(def.key), def.key).toBe('static');
   });
 });
+
+describe('normalizeSync with custom effect keys', () => {
+  it('runs a custom key as animate even when its random id contains a mode word', () => {
+    expect(normalizeSync('custom:fxgif2k')).toBe('animate');
+    expect(normalizeSync('custom:fxmedia1')).toBe('animate');
+    expect(normalizeSync('custom:fxmirror9')).toBe('animate');
+  });
+});

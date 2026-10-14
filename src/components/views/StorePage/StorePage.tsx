@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ChevronLeft, ChevronRight, Hand, HardDrive, LayoutGrid, Ruler, ShieldCheck, Sparkles, Tag,
 } from 'lucide-react';
@@ -7,7 +7,9 @@ import { Badge } from '../../common/Badge/Badge';
 import { Card } from '../../common/Card/Card';
 import { Notice, NoticeSecondary } from '../../common/Notice/Notice';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
+import { Tabs } from '../../common/Tabs/Tabs';
 import { useTranslation } from '../../../lib/i18n';
+import { LIGHTING_MODE_ICONS } from '../../../lib/lightingModeIcons';
 import { formatDateTime, hour12OptionFor, type DateFormat, type TimeFormat } from '../../../lib/units';
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import {
@@ -30,6 +32,15 @@ import { resolveHttp } from '../../../api/service';
 import { openExternalUrl } from '../../../sandbox/ui/openExternal';
 import { widgetLayoutSize, type PanelWidgetSize } from '../../../panel/types';
 import styles from './StorePage.module.scss';
+
+const AnimationIcon = LIGHTING_MODE_ICONS.animate;
+
+// Raw defines, not DEV_TOOLS: only the literal folds far enough to drop the import() from production.
+const EffectsMarket = (import.meta.env.DEV || __DEV_TOOLS__)
+  ? lazy(() => import('./EffectsMarket'))
+  : null;
+const EFFECTS_ROUTE = 'effects';
+const APPS_TAB = 'apps';
 
 type InstallState = 'idle' | 'working' | 'failed';
 
@@ -586,12 +597,14 @@ function AppDetail({ appId, onBack, installed, onNeedsSignIn, onInstalled }: {
  * version decides which releases it is offered - so the page renders what it is
  * given rather than filtering locally.
  */
-export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES }: {
+export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES, onOpenInLighting }: {
   /** Route segment: the open app's id, so a store page is linkable. */
   tab?: string | null;
   onTabChange?: (tab: string) => void;
   /** The app's shared account state: signing in from the store dialog signs the whole app in, so the top bar and account page have to hear about it. */
   accounts?: UseCloudAccountsResult;
+  /** Runs an installed lighting effect on the Lighting page. */
+  onOpenInLighting?: (effectKey: string) => void;
   /** The sidebar's device list: a fresh widget install offers every panel in it. */
   devices?: readonly UnifiedDevice[];
 }) {
@@ -604,7 +617,12 @@ export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES }: 
   // install, so signing in finishes what the user already asked for.
   const [pendingInstall, setPendingInstall] = useState<(() => void) | null>(null);
 
-  const openId = onTabChange ? (tab ?? null) : localOpenId;
+  const route = onTabChange ? (tab ?? null) : localOpenId;
+  // Below /store/effects: '' lists them, then an effect id or by/<username>.
+  const effectsPath = EffectsMarket && route !== null && (route === EFFECTS_ROUTE || route.startsWith(`${EFFECTS_ROUTE}/`))
+    ? route.slice(EFFECTS_ROUTE.length + 1)
+    : null;
+  const openId = effectsPath === null ? route : null;
   const open = useCallback((id: string | null) => {
     if (onTabChange) onTabChange(id ?? '');
     else setLocalOpenId(id);
@@ -667,7 +685,31 @@ export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES }: 
   return (
     <div className={styles.app} ref={rootRef}>
       <ViewHeader title={t('apps.tabs.store')} />
-      {openId ? (
+      {EffectsMarket && !openId && (
+        <Tabs
+          className={styles.sectionTabs}
+          ariaLabel={t('apps.tabs.store')}
+          tabs={[
+            { key: APPS_TAB, label: t('store.section.apps'), icon: <LayoutGrid size={14} /> },
+            { key: EFFECTS_ROUTE, label: t('store.effects.tab'), icon: <AnimationIcon size={14} /> },
+          ]}
+          activeKey={effectsPath === null ? APPS_TAB : EFFECTS_ROUTE}
+          onChange={key => open(key === EFFECTS_ROUTE ? EFFECTS_ROUTE : null)}
+        />
+      )}
+      {EffectsMarket && effectsPath !== null ? (
+        <div className={styles.body}>
+          <Suspense fallback={<div className={styles.notice}>{t('store.loading')}</div>}>
+            <EffectsMarket
+              path={effectsPath}
+              username={accounts?.activeAccount?.username ?? null}
+              onNavigate={sub => open(sub ? `${EFFECTS_ROUTE}/${sub}` : EFFECTS_ROUTE)}
+              onNeedsSignIn={handleNeedsSignIn}
+              onOpenInLighting={onOpenInLighting}
+            />
+          </Suspense>
+        </div>
+      ) : openId ? (
         <AppDetail
           appId={openId}
           onBack={() => open(null)}
@@ -719,7 +761,7 @@ export function StorePage({ tab, onTabChange, accounts, devices = NO_DEVICES }: 
         open={pendingInstall !== null}
         onClose={() => setPendingInstall(null)}
         onSignedIn={handleSignedIn}
-        title={t('store.signIn.title')}
+        title={effectsPath !== null ? t('store.effects.signInTitle') : t('store.signIn.title')}
         body={t('store.signIn.body')}
       />
       {placing && (

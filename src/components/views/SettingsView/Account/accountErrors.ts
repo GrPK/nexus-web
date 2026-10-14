@@ -10,6 +10,7 @@ const AUTH_ERROR_KEYS: Record<string, string> = {
   login_locked: 'account.error.loginLocked',
   email_unverified: 'account.error.emailUnverified',
   username_taken: 'account.error.usernameTaken',
+  username_not_allowed: 'account.error.usernameNotAllowed',
 };
 
 export function authErrorMessage(t: (key: string) => string, code: string | null | undefined): string {

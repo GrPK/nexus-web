@@ -103,6 +103,17 @@ describe('useRoute', () => {
     expect(result.current.subtab).toBe('com.hellonexus.aquarium');
   });
 
+  it('keeps every segment below /store for the lighting effects pages', () => {
+    window.history.replaceState(null, '', '/store/effects/by/alice');
+
+    const { result } = renderHook(() => useRoute());
+
+    expect(result.current.view).toBe('store');
+    expect(result.current.subtab).toBe('effects/by/alice');
+    act(() => result.current.navigate('system', 'store', 'effects/0b5c1a52-5f0e-4b8e-9d55-1a2b3c4d5e6f'));
+    expect(window.location.pathname).toBe('/store/effects/0b5c1a52-5f0e-4b8e-9d55-1a2b3c4d5e6f');
+  });
+
   it('round-trips a URL-encoded Build portal path through navigate and a reload', () => {
     // buildNav.requestOpenBuild encodes the whole "/upgrade?bench=..." path
     // into one segment before it ever reaches navigate() - a slash or query

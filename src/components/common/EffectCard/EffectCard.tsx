@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Music } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { CardDeleteButton } from '../CardDeleteButton/CardDeleteButton';
@@ -51,6 +51,8 @@ interface EffectCardBaseProps {
   /** Overlay mode only: suppress the on-thumbnail caption (the aria-label still
    *  carries the name). Used by the simple colour swatches, which need no text. */
   hideLabel?: boolean;
+  /** Subtitle in the body font instead of monospace, for prose such as a creator's name. */
+  metaSans?: boolean;
 }
 
 // Interactive cards require onClick; nonInteractive cards (plain div, no
@@ -65,9 +67,12 @@ type EffectCardProps = EffectCardBaseProps & (
 export function EffectCard({
   label, thumbUrl, active, onClick,
   audio, meta, onDelete, deleteAriaLabel,
-  asDiv, thumbOverlay, thumbStatic, cornerBadge, ariaLabel, dataEffectKey, overlay, thumbAspect, hideLabel, nonInteractive,
+  asDiv, thumbOverlay, thumbStatic, cornerBadge, ariaLabel, dataEffectKey, overlay, thumbAspect, hideLabel, metaSans, nonInteractive,
 }: EffectCardProps) {
   const { t } = useTranslation();
+  // An image that fails to load leaves the plain tile until a new one arrives, never a broken-image glyph.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showImg = !!thumbUrl && thumbUrl !== failedUrl;
   const className = `${styles.card} ${overlay ? styles.cardOverlay : ''} ${active ? styles.cardActive : ''} ${nonInteractive ? styles.cardStatic : ''}`;
   const thumbBoxStyle = thumbAspect !== undefined
     ? { aspectRatio: String(thumbAspect), maxHeight: '360px' }
@@ -81,13 +86,14 @@ export function EffectCard({
   const inner = (
     <>
       <div className={styles.thumbWrap} style={thumbBoxStyle}>
-        {thumbUrl
-          ? <img className={styles.thumbImg} src={thumbUrl} alt={label} style={thumbImgStyle} />
-          : <div className={thumbStatic ? styles.thumbStaticPlaceholder : styles.thumbSkeleton} aria-hidden="true" style={thumbSkeletonStyle} />}
+        {showImg
+          ? <img className={styles.thumbImg} src={thumbUrl} alt={label} style={thumbImgStyle} onError={() => setFailedUrl(thumbUrl)} />
+          : <div className={thumbStatic || thumbUrl ? styles.thumbStaticPlaceholder : styles.thumbSkeleton} aria-hidden="true" style={thumbSkeletonStyle} />}
+        {/* Before the badge: an overlay canvas fills the thumbnail and would hide it. */}
+        {thumbOverlay}
         {audio && (
           <Music className={styles.audioBadge} size={10} />
         )}
-        {thumbOverlay}
         {cornerBadge}
         {onDelete && (
           <CardDeleteButton
@@ -99,7 +105,7 @@ export function EffectCard({
         {overlay && !hideLabel && <span className={styles.labelOverlay}>{label}</span>}
       </div>
       {!overlay && <span className={styles.label}>{label}</span>}
-      {!overlay && meta !== undefined && <span className={styles.meta}>{meta}</span>}
+      {!overlay && meta !== undefined && <span className={`${styles.meta} ${metaSans ? styles.metaSans : ''}`}>{meta}</span>}
     </>
   );
 

@@ -39,6 +39,25 @@ describe('DeviceCanvas', () => {
     expect(onDragActiveChange).toHaveBeenLastCalledWith(false);
   });
 
+  it('dims a frame lit by another mode and draws no LED dots in it', () => {
+    const leds = { a: [{ index: 0, u: 0.5, v: 0.5 }], b: [{ index: 0, u: 0.5, v: 0.5 }] } as never;
+    const { container } = render(
+      <DeviceCanvas
+        devices={[dragDevice('a', 'A'), dragDevice('b', 'B')]}
+        selectedIds={new Set(['a', 'b'])}
+        foreignFrames={new Map([['b', 'Static']])}
+        selectedDeviceLeds={leds}
+        primaryDeviceId={null}
+        onSelectDevice={vi.fn()}
+        onSetSelection={vi.fn()}
+      />,
+    );
+    const frames = [...container.querySelectorAll<HTMLElement>(`.${styles.device}`)];
+    expect(frames.map(f => f.classList.contains(styles.foreign))).toEqual([false, true]);
+    expect(frames.map(f => f.querySelectorAll(`.${styles.ledDot}`).length)).toEqual([1, 0]);
+    expect(frames[1].querySelector(`.${styles.foreignCaption}`)?.textContent).toBe('Static');
+  });
+
   it('draws no frames or names when asked to hide them', () => {
     const drawn = (hideFrames: boolean) => {
       const { container, unmount } = render(

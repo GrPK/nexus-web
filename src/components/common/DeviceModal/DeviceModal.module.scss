@@ -55,6 +55,14 @@
   height: calc(100vh - 3rem - 8px);
 }
 
+// The Mac shell's native drag strip (MacAppWindow.TitlebarDragStripHeight)
+// covers the top bar's height and turns clicks there into window drags.
+:global(html.nexus-shell-mac-app) .modalFullscreen {
+  align-self: flex-start;
+  margin-top: calc(var(--topbar-height) - 2rem);
+  height: calc(100vh - 1rem - var(--topbar-height));
+}
+
 .bodyWide {
   flex-direction: row;
   gap: 1.5rem;

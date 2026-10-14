@@ -61,3 +61,18 @@ describe('ScreenControls monitor', () => {
     expect(vi.mocked(startScreenMirror).mock.calls[2][2]).toBe('m1');
   });
 });
+
+describe('ScreenControls with picks blocked', () => {
+  it('applies no screen or filter pick and reports each one instead', async () => {
+    vi.mocked(startScreenMirror).mockClear();
+    vi.mocked(fetchScreenMonitors).mockResolvedValue({ effects: [], monitors, selectedMonitor: 'm2' });
+    const blocked = vi.fn();
+    render(<ScreenControls screenPP={pp} onScreenPPChange={() => {}} onBlockedPick={blocked} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Main (1920x1080)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.filter.reactive' }));
+    await waitFor(() => expect(blocked).toHaveBeenCalledTimes(2));
+    expect(startScreenMirror).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Side (2560x1440)' }).getAttribute('aria-pressed')).toBe('true');
+  });
+});
+

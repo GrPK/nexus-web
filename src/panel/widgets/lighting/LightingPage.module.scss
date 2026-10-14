@@ -111,6 +111,16 @@
   display: flex;
 }
 
+// A pick that reached no card points at why: the chip asks for a selection.
+.scopeFlash {
+  border-radius: var(--radius-sm);
+  animation: scope-flash var(--ease-slow) ease-in-out 4;
+}
+
+@keyframes scope-flash {
+  50% { box-shadow: 0 0 0 2px var(--accent-glow); filter: brightness(1.6); }
+}
+
 .paneTitle {
   font-size: var(--type-body);
   font-weight: 600;
@@ -525,6 +535,21 @@
 .paletteDetailHint {
   font-size: var(--type-mini);
   color: var(--text-dim);
+}
+
+// Search + effect source switch, docked between the canvas and the effect grid.
+.effectToolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: 0.5rem;
+  padding: 0 0.3rem;
+}
+
+.effectSearch {
+  flex: 1;
+  min-width: 0;
 }
 
 // Effect browser shell.
@@ -1434,9 +1459,9 @@
   transition: color var(--ease-fast), opacity var(--ease-fast);
 }
 
-// Lit on a selected card, so the reason the whole stack lit up is in view.
-// The tuning mark stays dim.
-.deviceStackBadge {
+// Both marks light on a selected card, so the reason the whole stack lit up is in view.
+.deviceStackBadge,
+.deviceTuneBadge {
   .deviceCardSelected & { color: var(--text); opacity: 1; }
 }
 
@@ -2131,4 +2156,14 @@
 .staticFieldFill {
   height: 100%;
   width: 100%;
+}
+
+// The Media tab's still of the current media, between the canvas stream and the frames.
+.mediaBackdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchShaderSource } from '../api/lighting';
+import { fetchShaderSource, onShaderSourceInvalidated } from '../api/lighting';
 import { createDisplayDivider, createFramePacer, panelDisplayHz, streamFrameCap } from '../lib/framePacer';
 import { BASE_UNIFORM_NAMES, clampToSpec, resolveParamUniforms, type ShaderParamSpec } from '../lib/shaderParams';
 import type { EffectState } from '../types/lighting';
@@ -123,6 +123,14 @@ export function useShaderRenderer(
     };
   }, [canvasRef]);
 
+  // Bumped when this effect's source is replaced (a saved custom effect), forcing a recompile under the same key.
+  const [sourceRev, setSourceRev] = useState(0);
+  useEffect(() => onShaderSourceInvalidated(name => {
+    if (name !== effect) return;
+    compiledRef.current = null;
+    setSourceRev(r => r + 1);
+  }), [effect]);
+
   useEffect(() => {
     const gl = glRef.current;
     if (!gl || !effect) {
@@ -211,7 +219,9 @@ export function useShaderRenderer(
       let energy = 0;
       let pulse = 0;
       let lastDrawTs = 0;
-      const cap = options?.maxFps ?? streamFrameCap(window.location.search);
+      const streamCap = streamFrameCap(window.location.search);
+      // A caller's cap never runs faster than the stream's own.
+      const cap = options?.maxFps ? Math.min(options.maxFps, streamCap || Infinity) : streamCap;
       const shouldDraw = cap ? createFramePacer(cap) : createDisplayDivider(panelDisplayHz(window.location.search));
 
       const render = (ts: number) => {
@@ -350,7 +360,7 @@ export function useShaderRenderer(
       };
       rafRef.current = requestAnimationFrame(render);
     });
-  }, [effect, canvasRef, stateRef, options?.maxDevicePixelRatio, options?.maxFps, options?.screenSize, options?.visibleRef, options?.paletteRef, options?.audioTime, audioRef]);
+  }, [effect, sourceRev, canvasRef, stateRef, options?.maxDevicePixelRatio, options?.maxFps, options?.screenSize, options?.visibleRef, options?.paletteRef, options?.audioTime, audioRef]);
 
   return { ready, loading, error };
 }

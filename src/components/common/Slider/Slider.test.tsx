@@ -253,6 +253,31 @@ describe('Slider', () => {
       await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(1));
     });
   });
+
+  describe('stacked with a label action', () => {
+    const renderWithAction = (onAction: () => void) => render(
+      <Slider orientation="stacked" editable label="Angle" value={40} min={0} max={100} onChange={() => {}}
+        labelAction={<button type="button" onClick={onAction}>pin</button>} />,
+    );
+
+    it('opens the value for editing without pressing the action', () => {
+      const onAction = vi.fn();
+      renderWithAction(onAction);
+      // A browser forwards a click inside a label to the label's first labelable descendant (jsdom does not for this target).
+      expect(screen.getByRole('button', { name: '40' }).closest('label')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: '40' }));
+      expect(onAction).not.toHaveBeenCalled();
+      expect(screen.getByRole('spinbutton')).toBeInTheDocument();
+    });
+
+    it('does not press the action from a click on the name, which still names the range', () => {
+      const onAction = vi.fn();
+      renderWithAction(onAction);
+      fireEvent.click(screen.getByText('Angle'));
+      expect(onAction).not.toHaveBeenCalled();
+      expect(screen.getByRole('slider', { name: 'Angle' })).toBeInTheDocument();
+    });
+  });
 });
 
 describe('Slider mixed', () => {

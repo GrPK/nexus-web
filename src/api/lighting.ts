@@ -5,6 +5,7 @@ import { lianLiHubQuery } from './lianli';
 import { type DeviceGroup } from '../lib/deviceGroups';
 import { type DeviceStack } from '../lib/stackSlots';
 import { parseShaderParams, type ShaderParamSpec } from '../lib/shaderParams';
+import type { EffectState } from '../types/lighting';
 
 export async function lightingOutputUrl(): Promise<string> {
   return resolveAuthWs('/lighting/output');
@@ -46,6 +47,24 @@ const shaderCache = new Map<string, ShaderSource>();
  */
 export function primeShaderSource(name: string, frag: string): void {
   shaderCache.set(name, { frag, params: parseShaderParams(frag) });
+}
+
+/** Drops a primed entry; a later fetch for the name goes to the service. */
+export function forgetShaderSource(name: string): void {
+  shaderCache.delete(name);
+}
+
+const sourceListeners = new Set<(name: string) => void>();
+
+/** Drops the cached source and tells mounted renderers of `name` to refetch and recompile. */
+export function invalidateShaderSource(name: string): void {
+  shaderCache.delete(name);
+  sourceListeners.forEach(l => l(name));
+}
+
+export function onShaderSourceInvalidated(listener: (name: string) => void): () => void {
+  sourceListeners.add(listener);
+  return () => { sourceListeners.delete(listener); };
 }
 
 /** Synchronous cache read so a consumer can seed state without a load tick. */
@@ -195,6 +214,37 @@ export const startAnimate = (
     params: params ? Object.entries(params).map(([name, value]) => ({ name, value })) : [],
     persist,
   });
+
+export interface StudioLiveResponse {
+  error?: boolean;
+  msg?: string;
+  /** True while the session runs. */
+  active?: boolean;
+  /** How long the session lasts without another send. */
+  leaseMs?: number;
+  /** Identifies the session; renewals and the stop carry it. */
+  sessionId?: string;
+  /** No lighting mode is running, so the devices show nothing until one starts. */
+  lightingOff?: boolean;
+}
+
+/**
+ * Plays Shader Studio GLSL on every device, full canvas, over the running
+ * mode until stopStudioLive or a lapsed lease. Nothing is persisted, and
+ * ending the session restores what the devices showed before. Without
+ * `sessionId` it starts a session; with one it renews that session and is
+ * refused once it has ended. Null when the request failed or was refused.
+ */
+export const startStudioLive = (frag: string, s: EffectState, sessionId?: string | null) =>
+  postService<StudioLiveResponse>('/lighting/studio-live', {
+    frag, speed: s.speed, intensity: s.intensity, hue: s.hue, colorize: s.colorize,
+    saturation: s.saturation, contrast: s.contrast, params: s.params,
+    ...(sessionId ? { sessionId } : {}),
+  });
+
+/** Ends the session `sessionId` names; a stale id is a no-op. */
+export const stopStudioLive = (sessionId: string) =>
+  deleteService<unknown>(`/lighting/studio-live?sessionId=${encodeURIComponent(sessionId)}`);
 
 /** Runs a static fill or frozen pattern. No speed: the service pins it to 0. */
 export const startStatic = (
