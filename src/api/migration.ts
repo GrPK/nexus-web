@@ -27,7 +27,8 @@ export type Nexus2CategoryId =
   | 'wallpapers'
   | 'gallerySources'
   | 'rotation'
-  | 'language';
+  | 'language'
+  | 'fanCurves';
 
 interface Nexus2PreviewCategoryBase {
   available: boolean;
@@ -78,6 +79,39 @@ export interface Nexus2LanguageCategory extends Nexus2PreviewCategoryBase {
   value: string | null;
 }
 
+export type Nexus2FanCurveKind = 'graph' | 'linear' | 'flat' | 'mixed';
+export type Nexus2FanCurveStatus = 'import' | 'skip';
+
+export interface Nexus2FanCurveTargetDto {
+  /** A fan or channel name from Nexus 2: data, never translated. */
+  label: string;
+  status: Nexus2FanCurveStatus;
+  /** Machine reason code when skipped. Unknown codes must degrade to a generic line. */
+  reason?: string;
+}
+
+export interface Nexus2FanCurvePreviewDto {
+  /** The user's Nexus 2 curve name: data, never translated. */
+  name: string;
+  kind: Nexus2FanCurveKind;
+  status: Nexus2FanCurveStatus;
+  reason?: string;
+  minimumRaised: boolean;
+  targets: Nexus2FanCurveTargetDto[];
+}
+
+export type Nexus2FanCurvesNote = 'recommendedMode' | 'noUserCurves';
+
+export interface Nexus2FanCurvesCategory extends Nexus2PreviewCategoryBase {
+  id: 'fanCurves';
+  /** Importable curves. */
+  count: number;
+  fanCurves?: Nexus2FanCurvePreviewDto[];
+  fanCurvesNote?: Nexus2FanCurvesNote;
+  /** Inactive Nexus 2 profiles that are not imported. */
+  otherProfiles?: number;
+}
+
 export type Nexus2PreviewCategory =
   | Nexus2AppearanceCategory
   | Nexus2Y70LayoutCategory
@@ -85,7 +119,8 @@ export type Nexus2PreviewCategory =
   | Nexus2WallpapersCategory
   | Nexus2GallerySourcesCategory
   | Nexus2RotationCategory
-  | Nexus2LanguageCategory;
+  | Nexus2LanguageCategory
+  | Nexus2FanCurvesCategory;
 
 export interface Nexus2PreviewResponse {
   available: boolean;
@@ -99,6 +134,8 @@ export interface Nexus2ApplyResult {
   id: string;
   status: Nexus2ApplyStatus;
   detail: string | null;
+  /** fanCurves: curves applied. */
+  count?: number;
 }
 
 export interface Nexus2ApplyResponse {

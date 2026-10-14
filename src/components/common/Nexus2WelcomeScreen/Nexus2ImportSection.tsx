@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useState, type RefObject } from 'react';
-import { Fan, LayoutGrid } from 'lucide-react';
+import { Fan, LayoutGrid, LineChart } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { pluralKey } from '../../../lib/pluralKey';
 import { SettingsSection } from '../SettingsSection/SettingsSection';
@@ -10,7 +10,8 @@ import { applyNexus2Import, previewNexus2Import } from '../../../api/migration';
 import type { Nexus2ApplyResult, Nexus2PreviewResponse } from '../../../api/migration';
 import {
   allApplyResultsClean, applyDetailKey, applyStatusKey, categoryLabelKey, defaultSelectedGroupIds,
-  groupDetailParts, groupResultSummaries, selectedWireIds, visibleImportGroups, type ImportGroupId,
+  groupDetailParts, groupResultSummaries, groupHasAvailable, selectedWireIds, unavailableGroupNoteKey,
+  visibleImportGroups, type ImportGroupId,
 } from './nexus2WelcomeUtils';
 import styles from './Nexus2ImportSection.module.scss';
 
@@ -170,20 +171,21 @@ export function Nexus2ImportSection({
           {groups.map(group => {
             const label = t(group.labelKey);
             // A span list: SettingToggle renders the description inside a span.
-            const detail = (
+            const noteKey = unavailableGroupNoteKey(preview, group);
+            const detail = noteKey ? <span>{t(noteKey)}</span> : (
               <span className={styles.detailBullets} role="list">
-                {groupDetailParts(preview, group).map(d => {
+                {groupDetailParts(preview, group).map((d, i) => {
                   const params = { ...d.params };
                   for (const [name, key] of Object.entries(d.paramKeys ?? {})) params[name] = t(key);
                   return (
-                    <span key={d.key} className={styles.detailBullet} role="listitem">
+                    <span key={`${d.key}-${i}`} className={styles.detailBullet} role="listitem">
                       {t(d.plural ? pluralKey(d.key, language, Number(d.params.count)) : d.key, params)}
                     </span>
                   );
                 })}
               </span>
             );
-            const Icon = group.id === 'q60Panel' ? Fan : LayoutGrid;
+            const Icon = group.id === 'q60Panel' ? Fan : group.id === 'fanCurves' ? LineChart : LayoutGrid;
             return (
               <SettingToggle
                 key={group.id}
@@ -192,7 +194,7 @@ export function Nexus2ImportSection({
                 icon={<Icon />}
                 iconLeading
                 checked={selectedGroups.has(group.id)}
-                disabled={locked}
+                disabled={locked || !groupHasAvailable(preview, group)}
                 onChange={() => toggleGroup(group.id)}
               />
             );
@@ -203,7 +205,11 @@ export function Nexus2ImportSection({
               {summaries.map(s => (
                 <li key={s.groupId} className={styles.resultRow}>
                   <span className={styles.resultCategory}>{t(s.labelKey)}</span>
-                  <span className={styles[`resultStatus-${s.status}`]}>{t(applyStatusKey(s.status))}</span>
+                  <span className={styles[`resultStatus-${s.status}`]}>
+                    {s.groupId === 'fanCurves' && s.status === 'applied' && s.count !== undefined
+                      ? t(pluralKey('nexus2Welcome.import.result.fanCurvesApplied', language, s.count), { count: s.count })
+                      : t(applyStatusKey(s.status))}
+                  </span>
                   {s.issues.map(issue => (
                     <span key={issue.id} className={styles.resultDetail}>
                       {issue.detail

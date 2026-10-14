@@ -226,3 +226,63 @@ describe('Nexus2ImportSection - host wiring', () => {
     expect(screen.getByRole('button', { name: IMPORT_BUTTON_NAME })).toBeDisabled();
   });
 });
+
+describe('Nexus2ImportSection - fan curves', () => {
+  const FAN_NAME = 'nexus2Welcome.import.group.fanCurves.label';
+  const FAN = 'nexus2Welcome.import.category.fanCurves';
+  const FAN_CATEGORY = {
+    id: 'fanCurves' as const,
+    available: true,
+    count: 1,
+    otherProfiles: 2,
+    fanCurves: [{
+      name: 'Quiet', kind: 'graph' as const, status: 'import' as const, minimumRaised: false,
+      targets: [
+        { label: 'Front', status: 'import' as const },
+        { label: 'Pump', status: 'skip' as const, reason: 'pumpKept' },
+        { label: 'Odd', status: 'skip' as const, reason: 'futureCode' },
+      ],
+    }],
+  };
+
+  it('pre-checks the group and lists curves, skipped targets and the profile line', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [FAN_CATEGORY] });
+    renderSection();
+    const fan = await screen.findByRole('switch', { name: FAN_NAME });
+    expect(fan).toBeChecked();
+    expect(screen.getByText(`${FAN}.curve:Quiet,Front`)).toBeInTheDocument();
+    expect(screen.getByText(`${FAN}.reasonLine:Pump,${FAN}.reason.pumpKept`)).toBeInTheDocument();
+    expect(screen.getByText(`${FAN}.reasonLine:Odd,${FAN}.reason.unknown`)).toBeInTheDocument();
+    expect(screen.getByText(`${FAN}.otherProfiles:`)).toBeInTheDocument();
+  });
+
+  it('sends fanCurves in the apply call', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [FAN_CATEGORY] });
+    renderSection();
+    await screen.findByRole('switch', { name: FAN_NAME });
+    fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+    await waitFor(() => expect(applyNexus2Import).toHaveBeenCalledWith(['fanCurves'], true));
+  });
+
+  it('shows the note on an unchecked, disabled group when nothing is importable', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({
+      available: true, profileName: null,
+      categories: [{ id: 'fanCurves', available: false, count: 0, fanCurvesNote: 'noUserCurves' }],
+    });
+    renderSection();
+    const fan = await screen.findByRole('switch', { name: FAN_NAME });
+    expect(fan).not.toBeChecked();
+    expect(fan).toBeDisabled();
+    expect(screen.getByText(`${FAN}.note.noUserCurves`)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: IMPORT_BUTTON_NAME })).toBeDisabled();
+  });
+
+  it('reports the applied curve count in the result row', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [FAN_CATEGORY] });
+    vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'applied', detail: null, count: 3 }] });
+    renderSection();
+    await screen.findByRole('switch', { name: FAN_NAME });
+    fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+    expect(await screen.findByText('nexus2Welcome.import.result.fanCurvesApplied.other:3')).toBeInTheDocument();
+  });
+});
