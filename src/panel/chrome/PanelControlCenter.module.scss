@@ -246,10 +246,12 @@
   --icon-label-button-bg: var(--panel-control-translucent);
   // A tap leaves :hover set on a touch panel; hover must not repaint the tile.
   --icon-label-button-bg-hover: var(--panel-control-translucent);
-  // ON tiles: a visible accent fill over the tile's own fill, with an accent edge.
-  --icon-label-button-active-bg: var(--panel-accent-soft);
-  --icon-label-button-active-bg-hover: var(--panel-accent-soft);
-  --icon-label-button-active-border: var(--accent);
+  // ON tiles: the solid accent the faders fill with, and its own foreground, so ON reads
+  // at a glance on any accent and in either theme.
+  --icon-label-button-active-bg: var(--panel-accent);
+  --icon-label-button-active-bg-hover: var(--panel-accent);
+  --icon-label-button-active-border: var(--panel-accent);
+  --icon-label-button-active-text: var(--panel-accent-text, var(--accent-text));
   --icon-label-button-text: var(--text);
   --icon-label-button-text-hover: var(--text);
   --icon-label-icon-size: 26px;
@@ -359,10 +361,6 @@
 
 // Press feedback stands in for hover, which a touch panel cannot use. The
 // scale shows on ON tiles too.
-:global(.panel-root) .tile[data-active='true'] {
-  background-image: linear-gradient(var(--panel-control-translucent), var(--panel-control-translucent));
-}
-
 :global(.panel-root) .tile:active:not(:disabled):not([data-active='true']) {
   background: var(--surface-hover);
 }

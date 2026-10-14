@@ -94,10 +94,14 @@ export function PanelControlCenter({
     surface, deviceTouch, kioskBehavior, immersiveOpen, sheetOpen, trayOpen, offline, rearranging, dragArmed, asleep,
   });
 
-  // Anything that makes the gesture illegal also puts the sheet away.
+  // Anything that makes the gesture illegal also puts the sheet away, except screen
+  // sleep: the sheet stays open under the fade and is still there on wake.
+  const gateIgnoringSleep = controlCenterGestureEnabled({
+    surface, deviceTouch, kioskBehavior, immersiveOpen, sheetOpen, trayOpen, offline, rearranging, dragArmed, asleep: false,
+  });
   useEffect(() => {
-    if (open && !gate) onClose();
-  }, [open, gate, onClose]);
+    if (open && !gateIgnoringSleep) onClose();
+  }, [open, gateIgnoringSleep, onClose]);
 
   const pxPerMm = useMemo(() => cssPxPerMm(surface), [surface]);
   const [safeTop, setSafeTop] = useState(0);
@@ -439,7 +443,7 @@ function ControlCenterBody({
             className={styles.tile}
             icon={<MonitorOff />}
             label={t('panel.controlCenter.screenSleep')}
-            onPress={() => { onClose(); onScreenSleep(); }}
+            onPress={onScreenSleep}
           />
           {/* Always present, disabled until volume reads in, so no tile after it shifts. */}
           <IconLabelButton

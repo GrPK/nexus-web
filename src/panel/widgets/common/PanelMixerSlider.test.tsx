@@ -61,8 +61,8 @@ describe('PanelMixerSlider icon button', () => {
 
   it('acts on the pointer release, and ignores the click that follows it', () => {
     const { button, onClick } = withIconButton();
-    fireEvent.pointerDown(button, { pointerType: 'touch' });
-    fireEvent.pointerUp(button, { pointerType: 'touch' });
+    fireEvent.pointerDown(button, { pointerType: 'touch', pointerId: 1 });
+    fireEvent.pointerUp(button, { pointerType: 'touch', pointerId: 1 });
     expect(onClick).toHaveBeenCalledTimes(1);
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
@@ -70,8 +70,55 @@ describe('PanelMixerSlider icon button', () => {
 
   it('acts on a release even when no click ever follows', () => {
     const { button, onClick } = withIconButton();
-    fireEvent.pointerUp(button, { pointerType: 'touch' });
+    fireEvent.pointerDown(button, { pointerType: 'touch', pointerId: 2, clientX: 5, clientY: 5 });
+    fireEvent.pointerUp(button, { pointerType: 'touch', pointerId: 2, clientX: 7, clientY: 6 });
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('a drag released over the icon is not a tap', () => {
+    const { button, onClick } = withIconButton();
+    fireEvent.pointerDown(button, { pointerType: 'touch', pointerId: 3, clientX: 5, clientY: 5 });
+    fireEvent.pointerUp(button, { pointerType: 'touch', pointerId: 3, clientX: 90, clientY: 5 });
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('a press that began elsewhere and is released over the icon is not a tap', () => {
+    const { button, onClick } = withIconButton();
+    fireEvent.pointerUp(button, { pointerType: 'mouse', pointerId: 4, button: 0 });
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('a different pointer releasing over the icon is not a tap', () => {
+    const { button, onClick } = withIconButton();
+    fireEvent.pointerDown(button, { pointerType: 'touch', pointerId: 5 });
+    fireEvent.pointerUp(button, { pointerType: 'touch', pointerId: 6 });
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('a cancelled touch is not a tap', () => {
+    const { button, onClick } = withIconButton();
+    fireEvent.pointerDown(button, { pointerType: 'touch', pointerId: 7 });
+    fireEvent.pointerCancel(button, { pointerType: 'touch', pointerId: 7 });
+    fireEvent.pointerUp(button, { pointerType: 'touch', pointerId: 7 });
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('does nothing while disabled', () => {
+    const onClick = vi.fn();
+    render(
+      <PanelMixerSlider
+        value={40}
+        ariaLabel="Level"
+        disabled
+        icon={<span />}
+        iconButton={{ ariaLabel: 'Mute', onClick }}
+        onChange={vi.fn()}
+      />,
+    );
+    const button = screen.getByRole('button', { name: 'Mute' });
+    fireEvent.pointerDown(button, { pointerType: 'touch', pointerId: 8 });
+    fireEvent.pointerUp(button, { pointerType: 'touch', pointerId: 8 });
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   it('a keyboard activation (a click with no pointer release) still works, once', () => {

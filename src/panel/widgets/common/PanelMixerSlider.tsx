@@ -1,6 +1,9 @@
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef } from 'react';
+import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useRef } from 'react';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
 import styles from './PanelMixerSlider.module.scss';
+
+// How far a press on the icon may drift and still be a tap.
+const ICON_TAP_SLOP_PX = 12;
 
 export interface PanelMixerSliderProps {
   value: number;
@@ -55,6 +58,9 @@ export function PanelMixerSlider({
   const trackRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
   const iconTapHandledRef = useRef(false);
+  const iconTapTimerRef = useRef<number | null>(null);
+  const iconPressRef = useRef<{ id: number; x: number; y: number } | null>(null);
+  useEffect(() => () => { if (iconTapTimerRef.current) window.clearTimeout(iconTapTimerRef.current); }, []);
   // Last value handed to onChange, seeded by the press. A cancel commits this so
   // a consumer's drag bookkeeping always closes, and never a value recomputed
   // from the cancel event, whose coordinates are not a finger position.
@@ -168,14 +174,26 @@ export function PanelMixerSlider({
       disabled={disabled}
       onPointerDown={(event) => {
         event.stopPropagation();
+        // A new press ends the previous tap's click suppression.
+        iconTapHandledRef.current = false;
+        if (iconTapTimerRef.current) { window.clearTimeout(iconTapTimerRef.current); iconTapTimerRef.current = null; }
+        iconPressRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
       }}
-      // Acts on the release: a tap that follows a scroll fling loses its click.
-      // The click that follows a handled release is ignored.
+      // Acts on the release: a tap that follows a scroll fling loses its click. The release
+      // must belong to this button's own press: same pointer, barely moved. A drag released
+      // over the icon, a press that began elsewhere, or a cancelled touch is not a tap. The
+      // click that follows a handled release is ignored.
+      onPointerCancel={() => { iconPressRef.current = null; }}
       onPointerUp={(event) => {
+        const press = iconPressRef.current;
+        iconPressRef.current = null;
+        if (disabled || !press || press.id !== event.pointerId) return;
         if (event.pointerType === 'mouse' && event.button !== 0) return;
+        if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > ICON_TAP_SLOP_PX) return;
         event.stopPropagation();
         iconTapHandledRef.current = true;
-        window.setTimeout(() => { iconTapHandledRef.current = false; }, 400);
+        if (iconTapTimerRef.current) window.clearTimeout(iconTapTimerRef.current);
+        iconTapTimerRef.current = window.setTimeout(() => { iconTapHandledRef.current = false; }, 400);
         iconButton.onClick();
       }}
       onClick={(event) => {
