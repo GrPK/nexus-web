@@ -5,11 +5,14 @@
 // (the panel CSS floor).
 .sheet {
   --cc-time-size: 40px;
+  --cc-tile-height: 68px;
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   max-height: 100%;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
   padding:
     max(14px, env(safe-area-inset-top))
@@ -18,7 +21,6 @@
     max(16px, env(safe-area-inset-left));
   // Solid: a see-through panel backdrop would show the dashboard through the cards.
   background: var(--backdrop-base);
-  backdrop-filter: blur(var(--blur-backdrop)) saturate(0.95);
   border-bottom-left-radius: var(--radius);
   border-bottom-right-radius: var(--radius);
   color: var(--text);
@@ -30,7 +32,9 @@
   // Taps on the sheet must not become widget presses or text selection underneath.
   user-select: none;
   -webkit-user-select: none;
+  // No native panning anywhere in the sheet: a scroll fling would eat the next tap's click.
   touch-action: none;
+  overscroll-behavior: none;
 }
 
 .sheet[data-state='open'] {
@@ -74,8 +78,14 @@
 .content {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   @include vgap(12px);
   min-height: 0;
+}
+
+// Cards keep their size; only the faders card gives up height when the sheet is short.
+.content > * {
+  flex-shrink: 0;
 }
 
 .sheet[data-landscape='true'] .content {
@@ -94,16 +104,20 @@
   padding: 2px 0 4px;
 }
 
-.sheet[data-landscape='true'] .clock {
-  flex: 0 0 auto;
-  min-width: 130px;
+// Landscape: a wide, short panel. The sheet takes the whole height, like iOS
+// Control Center, so the faders get room, and the clock card is wide with a
+// large time that never wraps.
+.sheet[data-landscape='true'] {
+  --cc-time-size: 64px;
+  height: 100%;
 }
 
-.sheet[data-landscape='true'] {
-  --cc-time-size: 32px;
+.sheet[data-landscape='true'] .clock {
+  min-width: 300px;
 }
 
 .time {
+  white-space: nowrap;
   font-size: var(--cc-time-size);
   font-weight: var(--weight-heading);
   line-height: 1.2;
@@ -127,51 +141,62 @@
   box-sizing: border-box;
 }
 
-.sheet[data-landscape='true'] .card {
-  flex: 1 1 0;
-  justify-content: center;
-}
-
 .faders {
   display: flex;
   flex-direction: row;
   align-items: stretch;
   justify-content: center;
-  height: 230px;
+  // A base height that shrinks to a floor when the sheet is short.
+  flex: 0 1 230px;
+  min-height: 96px;
   @include hgap(10px);
 }
 
-.sheet[data-landscape='true'] .faders {
-  height: 240px;
+// Portrait: the faders card is the one that gives up height.
+.fadersCard {
+  flex-shrink: 1;
+  min-height: 0;
 }
 
-// Wide and short: the toggles get the most width, the faders get the height.
-.sheet[data-landscape='true'] .fadersCard {
-  flex: 1 1 0;
+// Landscape balance: the faders card is sized by its faders and never narrower,
+// the toggles take what is left, the media card keeps a readable minimum. The
+// faders fill the card, so they are as tall as the sheet allows.
+.sheet[data-landscape='true'] .card {
   justify-content: center;
+}
+
+.sheet[data-landscape='true'] .fadersCard {
+  flex: 0 0 auto;
+}
+
+.sheet[data-landscape='true'] .faders {
+  flex: 1 1 auto;
 }
 
 .sheet[data-landscape='true'] .gridCard {
   flex: 2 1 0;
+  min-width: 300px;
 }
 
 .sheet[data-landscape='true'] .mediaCard {
   flex: 1 1 0;
+  min-width: 240px;
 }
 
-// Short landscape panels (the Y70 is wide and short): faders get the height, so
-// the toggle grid goes four across to stay three rows.
 .sheet[data-landscape='true'] .faders .fader {
-  --mixer-track-max: 200px;
+  --mixer-track-max: none;
+  flex: 0 0 96px;
 }
 
-.sheet[data-landscape='true'] .grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.sheet[data-landscape='true'] .mixerRow {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
 }
 
 // Two classes beat the slider's own root vars whatever the emission order.
 .faders .fader {
-  --mixer-track-min: 110px;
+  --mixer-track-min: 70px;
   --mixer-track-max: 180px;
   --mixer-touch-width: 64px;
   --mixer-pill-width: 48px;
@@ -192,10 +217,18 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+  // Room for every tile in advance: the radios arrive after open and must not move the rest.
+  min-height: calc(4 * var(--cc-tile-height) + 3 * 10px);
+}
+
+// Landscape: as many tiles across as fit; labels may wrap rather than clip.
+.sheet[data-landscape='true'] .grid {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  min-height: 0;
 }
 
 :global(.panel-root) .tile {
-  --icon-label-button-height: 68px;
+  --icon-label-button-height: var(--cc-tile-height);
   --icon-label-button-min-width: 0;
   --icon-label-button-padding-x: 4px;
   --icon-label-button-padding-y: 10px;
@@ -217,7 +250,7 @@
   }
 
   > span:last-child {
-    overflow-wrap: normal;
+    overflow-wrap: break-word;
     font-weight: var(--weight-strong);
   }
 }
@@ -227,6 +260,16 @@
   flex-direction: row;
   align-items: center;
   @include hgap(10px);
+}
+
+.sheet[data-landscape='true'] .media {
+  flex-direction: column;
+  align-items: stretch;
+  > *:not(:last-child) { margin-right: 0; margin-bottom: 8px; }
+}
+
+.sheet[data-landscape='true'] .mediaButtons {
+  justify-content: center;
 }
 
 .mediaText {
@@ -282,7 +325,9 @@
   height: 210px;
   overflow-x: auto;
   overflow-y: hidden;
+  // Only the row's own scroll axis, so a vertical swipe is ours to dismiss with.
   touch-action: pan-x;
+  overscroll-behavior: contain;
 }
 
 .mixerCell {
@@ -290,9 +335,26 @@
   height: 100%;
 }
 
-// Press feedback stands in for hover, which a touch panel cannot use.
+// Press feedback stands in for hover, which a touch panel cannot use. The
+// scale shows on ON tiles too.
 :global(.panel-root) .tile:active:not(:disabled):not([data-active='true']) {
   background: var(--surface-hover);
+}
+
+:global(.panel-root) .tile:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+:global(.panel-root) .backTile {
+  --icon-label-button-height: 56px;
+  --icon-label-button-min-width: 88px;
+  --icon-label-button-bg-hover: var(--panel-control-translucent);
+  --icon-label-button-bg: var(--panel-control-translucent);
+  --icon-label-button-text: var(--text);
+  --icon-label-button-text-hover: var(--text);
+  --icon-label-icon-size: 20px;
+  --icon-label-label-size: var(--type-tiny);
+  align-self: flex-start;
 }
 
 :global(.panel-root) .sheet[data-landscape='true'] .tile {

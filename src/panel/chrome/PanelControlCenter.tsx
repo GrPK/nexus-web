@@ -15,6 +15,7 @@ import {
   oppositeThemeMode,
   readSafeAreaTopPx,
 } from '../engine/controlCenterGesture';
+import { swallowTapFollowUps } from '../engine/tapGuard';
 import { usePanelControlCenterSwipe } from '../engine/usePanelControlCenterSwipe';
 import { type GestureContact } from '../engine/touchViaPointer';
 import { usePanelImmersiveOpen } from '../widgets/common/PanelImmersiveContext';
@@ -299,6 +300,19 @@ function ControlCenterBody({
   const media = useMedia(active);
   const session = activeMediaSession(media.sessions);
 
+  // Fit rule: nothing is ever cut off. If the content does not fit, the media
+  // card goes first, then the clock card; the faders already give up height
+  // down to a floor before either.
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [fitLevel, setFitLevel] = useState(0);
+  useEffect(() => { if (!active) setFitLevel(0); }, [active]);
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el || view !== 'main' || fitLevel >= 2) return;
+    if (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1) setFitLevel(l => l + 1);
+    // Re-checked whenever something that changes the content's size arrives.
+  }, [view, fitLevel, radios, session, volume.state.supported, brightness.available, mic.state.supported, brightness.linkDown]);
+
   if (view === 'mixer') {
     return (
       <div className={styles.content} data-landscape-hint="mixer">
@@ -314,11 +328,13 @@ function ControlCenterBody({
   const dark = resolvedThemeMode === 'dark';
 
   return (
-    <div className={styles.content} data-open={open ? 'true' : undefined}>
+    <div ref={contentRef} className={styles.content} data-open={open ? 'true' : undefined}>
+      {fitLevel < 2 && (
       <div className={styles.clock}>
         <div className={styles.time}>{timeText}</div>
         <div className={styles.date}>{dateText}</div>
       </div>
+      )}
 
       <div className={`${styles.card} ${styles.fadersCard}`} data-cc-keep="true">
         <div className={styles.faders}>
@@ -389,7 +405,6 @@ function ControlCenterBody({
       <div className={`${styles.card} ${styles.gridCard}`} data-cc-keep="true">
         <div className={styles.grid}>
           <IconLabelButton
-              activateOnClick
             className={styles.tile}
             icon={dark ? <Moon /> : <Sun />}
             label={t('panel.controlCenter.darkMode')}
@@ -397,21 +412,18 @@ function ControlCenterBody({
             onPress={() => onSetThemeMode(oppositeThemeMode(resolvedThemeMode))}
           />
           <IconLabelButton
-              activateOnClick
             className={styles.tile}
             icon={<Lock />}
             label={t('panel.controlCenter.lockPc')}
             onPress={() => { void systemPower('lock'); onClose(); }}
           />
           <IconLabelButton
-              activateOnClick
             className={styles.tile}
             icon={<Power />}
             label={t('panel.controlCenter.sleepPc')}
             onPress={() => { void systemPower('sleep'); onClose(); }}
           />
           <IconLabelButton
-              activateOnClick
             className={styles.tile}
             icon={<MonitorOff />}
             label={t('panel.controlCenter.screenSleep')}
@@ -419,17 +431,15 @@ function ControlCenterBody({
           />
           {/* Always present, disabled until volume reads in, so no tile after it shifts. */}
           <IconLabelButton
-              activateOnClick
             className={styles.tile}
             icon={<SlidersVertical />}
             label={t('panel.controlCenter.mixer.title')}
             disabled={!volume.state.supported}
-            onPress={() => setView('mixer')}
+            onPress={() => { swallowTapFollowUps(); setView('mixer'); }}
           />
           {/* After the fixed tiles: the radios arrive late and must not shift them. */}
           {radios?.wifi && (
             <IconLabelButton
-              activateOnClick
               className={styles.tile}
               icon={<Wifi />}
               label={t('panel.controlCenter.wifi')}
@@ -439,7 +449,6 @@ function ControlCenterBody({
           )}
           {radios?.bluetooth && (
             <IconLabelButton
-              activateOnClick
               className={styles.tile}
               icon={<Bluetooth />}
               label={t('panel.controlCenter.bluetooth')}
@@ -449,7 +458,6 @@ function ControlCenterBody({
           )}
           {radios?.airplane && (
             <IconLabelButton
-              activateOnClick
               className={styles.tile}
               icon={<Plane />}
               label={t('panel.controlCenter.airplane')}
@@ -460,7 +468,7 @@ function ControlCenterBody({
         </div>
       </div>
 
-      {session && (
+      {session && fitLevel < 1 && (
         <div className={`${styles.card} ${styles.mediaCard}`} data-cc-keep="true">
           <div className={styles.media}>
             <div className={styles.mediaText}>
@@ -469,7 +477,6 @@ function ControlCenterBody({
             </div>
             <div className={styles.mediaButtons}>
               <IconLabelButton
-              activateOnClick
                 className={styles.mediaButton}
                 variant="bare"
                 icon={<SkipBack />}
@@ -477,7 +484,6 @@ function ControlCenterBody({
                 onPress={() => { void controlActiveMedia('previous'); }}
               />
               <IconLabelButton
-              activateOnClick
                 className={styles.mediaButton}
                 variant="bare"
                 icon={session.playback.playing ? <Pause /> : <Play />}
@@ -485,7 +491,6 @@ function ControlCenterBody({
                 onPress={() => { void controlActiveMedia('playpause'); }}
               />
               <IconLabelButton
-              activateOnClick
                 className={styles.mediaButton}
                 variant="bare"
                 icon={<SkipForward />}

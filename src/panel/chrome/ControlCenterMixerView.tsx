@@ -1,7 +1,8 @@
 import { ArrowLeft } from 'lucide-react';
-import { Button } from '../../components/common/Button/Button';
+import { IconLabelButton } from '../../components/common/IconLabelButton/IconLabelButton';
 import { useAudioMixer } from '../../hooks/useAudioMixer';
 import { useTranslation } from '../../lib/i18n';
+import { swallowTapFollowUps } from '../engine/tapGuard';
 import { MixerStrip } from '../widgets/mixer/MixerStrip';
 import styles from './PanelControlCenter.module.scss';
 
@@ -15,14 +16,17 @@ export function ControlCenterMixerView({ onBack, active }: { onBack: () => void;
   const sessions = mixer.supported ? mixer.sessions : [];
   return (
     <div className={styles.card} data-cc-keep="true">
-      <Button tone="ghost" icon={<ArrowLeft size={18} strokeWidth={2.2} />} onClick={onBack}>
-        {t('panel.controlCenter.back')}
-      </Button>
+      <IconLabelButton
+        className={styles.backTile}
+        icon={<ArrowLeft />}
+        label={t('panel.controlCenter.back')}
+        onPress={() => { swallowTapFollowUps(); onBack(); }}
+      />
       <div className={styles.mixerTitle}>{t('panel.controlCenter.mixer.title')}</div>
       {sessions.length === 0 ? (
         <div className={styles.mixerEmpty}>{t('panel.controlCenter.mixer.empty')}</div>
       ) : (
-        <div className={styles.mixerRow} data-panel-horizontal-control="true">
+        <div className={styles.mixerRow}>
           {sessions.map(s => (
             <div key={s.id} className={styles.mixerCell}>
               <MixerStrip
