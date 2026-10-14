@@ -13,6 +13,10 @@ export interface DetectedConflict {
   category: string;
   processName: string;
   pid: number;
+  /** True when the service can map the app to devices (RGB claim, vendor or curated handler). Absent or false: the overlap with Nexus-controlled devices is unknowable, so callers treat it as overlapping. */
+  deviceOverlapKnown?: boolean;
+  /** True for a universal RGB app (SignalRGB, OpenRGB), which competes for every RGB device Nexus controls whatever its vendor. */
+  claimsAllRgb?: boolean;
 }
 
 // Catalog id of the HYTE Nexus 2 conflict; must match the Id in
