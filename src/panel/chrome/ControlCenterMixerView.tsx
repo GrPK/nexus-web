@@ -15,7 +15,7 @@ export function ControlCenterMixerView({ onBack, active }: { onBack: () => void;
   const mixer = useAudioMixer(active);
   const sessions = mixer.supported ? mixer.sessions : [];
   return (
-    <div className={styles.card} data-cc-keep="true">
+    <div className={`${styles.card} ${styles.mixerCard}`} data-cc-keep="true">
       <IconLabelButton
         className={styles.backTile}
         icon={<ArrowLeft />}

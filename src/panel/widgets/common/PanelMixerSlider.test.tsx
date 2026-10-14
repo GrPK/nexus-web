@@ -43,3 +43,40 @@ describe('PanelMixerSlider pointer end', () => {
     expect(onCommit).toHaveBeenCalledWith(70);
   });
 });
+
+describe('PanelMixerSlider icon button', () => {
+  function withIconButton() {
+    const onClick = vi.fn();
+    render(
+      <PanelMixerSlider
+        value={40}
+        ariaLabel="Level"
+        icon={<span />}
+        iconButton={{ ariaLabel: 'Mute', onClick }}
+        onChange={vi.fn()}
+      />,
+    );
+    return { button: screen.getByRole('button', { name: 'Mute' }), onClick };
+  }
+
+  it('acts on the pointer release, and ignores the click that follows it', () => {
+    const { button, onClick } = withIconButton();
+    fireEvent.pointerDown(button, { pointerType: 'touch' });
+    fireEvent.pointerUp(button, { pointerType: 'touch' });
+    expect(onClick).toHaveBeenCalledTimes(1);
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('acts on a release even when no click ever follows', () => {
+    const { button, onClick } = withIconButton();
+    fireEvent.pointerUp(button, { pointerType: 'touch' });
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('a keyboard activation (a click with no pointer release) still works, once', () => {
+    const { button, onClick } = withIconButton();
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+});

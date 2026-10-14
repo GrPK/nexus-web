@@ -4,6 +4,11 @@ import { swallowTapFollowUps } from './tapGuard';
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
 
+// A pointer release just before the activation, as in a real tap.
+function pointerRelease() {
+  window.dispatchEvent(new Event('pointerup'));
+}
+
 function fire(type: string): { reached: boolean } {
   const target = document.createElement('button');
   document.body.appendChild(target);
@@ -16,6 +21,7 @@ function fire(type: string): { reached: boolean } {
 
 describe('swallowTapFollowUps', () => {
   it('swallows the compat mousedown, mouseup and click of the activating touch, then lets go', () => {
+    pointerRelease();
     swallowTapFollowUps();
     expect(fire('mousedown').reached).toBe(false);
     expect(fire('mouseup').reached).toBe(false);
@@ -25,6 +31,7 @@ describe('swallowTapFollowUps', () => {
   });
 
   it('lets go after the timeout when no click ever arrives', () => {
+    pointerRelease();
     swallowTapFollowUps(300);
     expect(fire('mousedown').reached).toBe(false);
     vi.advanceTimersByTime(350);
@@ -32,8 +39,15 @@ describe('swallowTapFollowUps', () => {
   });
 
   it('lets go as soon as a new press begins', () => {
+    pointerRelease();
     swallowTapFollowUps();
     document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    expect(fire('click').reached).toBe(true);
+  });
+
+  it('does not arm for a keyboard or programmatic activation with no pointer release before it', () => {
+    vi.advanceTimersByTime(1000);
+    swallowTapFollowUps();
     expect(fire('click').reached).toBe(true);
   });
 });

@@ -54,6 +54,7 @@ export function PanelMixerSlider({
 }: PanelMixerSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+  const iconTapHandledRef = useRef(false);
   // Last value handed to onChange, seeded by the press. A cancel commits this so
   // a consumer's drag bookkeeping always closes, and never a value recomputed
   // from the cancel event, whose coordinates are not a finger position.
@@ -168,8 +169,18 @@ export function PanelMixerSlider({
       onPointerDown={(event) => {
         event.stopPropagation();
       }}
+      // Acts on the release: a tap that follows a scroll fling loses its click.
+      // The click that follows a handled release is ignored.
+      onPointerUp={(event) => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        event.stopPropagation();
+        iconTapHandledRef.current = true;
+        window.setTimeout(() => { iconTapHandledRef.current = false; }, 400);
+        iconButton.onClick();
+      }}
       onClick={(event) => {
         event.stopPropagation();
+        if (iconTapHandledRef.current) { iconTapHandledRef.current = false; return; }
         iconButton.onClick();
       }}
     >

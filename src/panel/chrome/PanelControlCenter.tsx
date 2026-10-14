@@ -202,6 +202,7 @@ export function PanelControlCenter({
         {bodyMounted ? (
           <ControlCenterBody
             open={open}
+            isLandscape={isLandscape}
             active={visible}
             view={view}
             setView={setView}
@@ -221,6 +222,7 @@ export function PanelControlCenter({
 
 interface BodyProps {
   open: boolean;
+  isLandscape: boolean;
   // Open or being pulled: the body reads and polls only then.
   active: boolean;
   view: 'main' | 'mixer';
@@ -235,7 +237,7 @@ interface BodyProps {
 }
 
 function ControlCenterBody({
-  open, active, view, setView, language, surface, displayId, resolvedThemeMode, onSetThemeMode, onClose, onScreenSleep,
+  open, active, isLandscape, view, setView, language, surface, displayId, resolvedThemeMode, onSetThemeMode, onClose, onScreenSleep,
 }: BodyProps) {
   const { t } = useTranslation();
 
@@ -300,18 +302,28 @@ function ControlCenterBody({
   const media = useMedia(active);
   const session = activeMediaSession(media.sessions);
 
-  // Fit rule: nothing is ever cut off. If the content does not fit, the media
-  // card goes first, then the clock card; the faders already give up height
-  // down to a floor before either.
+  // Fit rule: nothing is cut off. The faders give up height first; if the content
+  // still overflows, the media card is hidden, then the clock card. A resize, an
+  // orientation change or the fonts loading shows every card again and measures
+  // afresh in the same layout pass, so cards come back when space returns and
+  // nothing flickers. Content changes (the clock text, readings arriving) can only
+  // hide more, never show again, which keeps the rule from oscillating.
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [fitLevel, setFitLevel] = useState(0);
-  useEffect(() => { if (!active) setFitLevel(0); }, [active]);
+  const refit = useCallback(() => setFitLevel(0), []);
+  useEffect(() => { if (!active) refit(); }, [active, refit]);
+  useEffect(() => { refit(); }, [isLandscape, refit]);
+  useEffect(() => {
+    let cancelled = false;
+    window.addEventListener('resize', refit);
+    void document.fonts?.ready.then(() => { if (!cancelled) refit(); });
+    return () => { cancelled = true; window.removeEventListener('resize', refit); };
+  }, [refit]);
   useLayoutEffect(() => {
     const el = contentRef.current;
     if (!el || view !== 'main' || fitLevel >= 2) return;
     if (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1) setFitLevel(l => l + 1);
-    // Re-checked whenever something that changes the content's size arrives.
-  }, [view, fitLevel, radios, session, volume.state.supported, brightness.available, mic.state.supported, brightness.linkDown]);
+  }, [view, fitLevel, isLandscape, timeText, radios, session, volume.state.supported, brightness.available, mic.state.supported, brightness.linkDown]);
 
   if (view === 'mixer') {
     return (

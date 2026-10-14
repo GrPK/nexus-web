@@ -6,6 +6,7 @@
 .sheet {
   --cc-time-size: 40px;
   --cc-tile-height: 68px;
+  --cc-grid-gap: 10px;
   position: absolute;
   top: 0;
   left: 0;
@@ -32,7 +33,8 @@
   // Taps on the sheet must not become widget presses or text selection underneath.
   user-select: none;
   -webkit-user-select: none;
-  // No native panning anywhere in the sheet: a scroll fling would eat the next tap's click.
+  // No native panning, except the mixer row's own horizontal pan. A tap that follows a
+  // scroll fling loses its click, so every button in the sheet acts on the pointer release.
   touch-action: none;
   overscroll-behavior: none;
 }
@@ -109,6 +111,7 @@
 // large time that never wraps.
 .sheet[data-landscape='true'] {
   --cc-time-size: 64px;
+  --cc-tile-height: 60px;
   height: 100%;
 }
 
@@ -175,7 +178,7 @@
 
 .sheet[data-landscape='true'] .gridCard {
   flex: 2 1 0;
-  min-width: 300px;
+  min-width: 380px;
 }
 
 .sheet[data-landscape='true'] .mediaCard {
@@ -216,15 +219,20 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  // Room for every tile in advance: the radios arrive after open and must not move the rest.
-  min-height: calc(4 * var(--cc-tile-height) + 3 * 10px);
+  gap: var(--cc-grid-gap);
+  // Room for every tile in advance (three rows, the most the full set needs): the
+  // radios arrive after open and must not move the rest.
+  min-height: calc(3 * var(--cc-tile-height) + 2 * var(--cc-grid-gap));
 }
 
-// Landscape: as many tiles across as fit; labels may wrap rather than clip.
+// Landscape: a fixed column count and two reserved rows, enough for the full set of
+// tiles, so nothing is re-divided or re-centered when the radios arrive.
 .sheet[data-landscape='true'] .grid {
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  min-height: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  // The grid fills its card; the rows split it, so tile sizes do not depend on how many tiles there are.
+  flex: 1 1 auto;
+  min-height: calc(2 * var(--cc-tile-height) + var(--cc-grid-gap));
 }
 
 :global(.panel-root) .tile {
@@ -238,7 +246,10 @@
   --icon-label-button-bg: var(--panel-control-translucent);
   // A tap leaves :hover set on a touch panel; hover must not repaint the tile.
   --icon-label-button-bg-hover: var(--panel-control-translucent);
-  --icon-label-button-active-bg-hover: var(--accent-soft);
+  // ON tiles: a visible accent fill over the tile's own fill, with an accent edge.
+  --icon-label-button-active-bg: var(--panel-accent-soft);
+  --icon-label-button-active-bg-hover: var(--panel-accent-soft);
+  --icon-label-button-active-border: var(--accent);
   --icon-label-button-text: var(--text);
   --icon-label-button-text-hover: var(--text);
   --icon-label-icon-size: 26px;
@@ -250,6 +261,7 @@
   }
 
   > span:last-child {
+    hyphens: auto;
     overflow-wrap: break-word;
     font-weight: var(--weight-strong);
   }
@@ -313,6 +325,16 @@
   font-weight: var(--weight-heading);
 }
 
+.mixerCard {
+  min-width: 0;
+}
+
+// The mixer card fills the sheet, in landscape too, and its row scrolls when the strips overflow.
+.content > .mixerCard {
+  flex: 1 1 0;
+  flex-shrink: 1;
+}
+
 .mixerEmpty {
   padding: 24px 0;
   text-align: center;
@@ -337,6 +359,10 @@
 
 // Press feedback stands in for hover, which a touch panel cannot use. The
 // scale shows on ON tiles too.
+:global(.panel-root) .tile[data-active='true'] {
+  background-image: linear-gradient(var(--panel-control-translucent), var(--panel-control-translucent));
+}
+
 :global(.panel-root) .tile:active:not(:disabled):not([data-active='true']) {
   background: var(--surface-hover);
 }
@@ -358,8 +384,8 @@
 }
 
 :global(.panel-root) .sheet[data-landscape='true'] .tile {
-  --icon-label-button-height: 60px;
   --icon-label-button-padding-y: 6px;
-  --icon-label-button-gap: 4px;
-  --icon-label-icon-size: 22px;
+  --icon-label-button-gap: 8px;
+  --icon-label-icon-size: 30px;
+  --icon-label-label-size: var(--type-small);
 }
