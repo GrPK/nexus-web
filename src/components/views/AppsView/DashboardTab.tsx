@@ -10,7 +10,6 @@ import { useSearchSignal } from '../../../search/signals';
 import { ServiceRequired } from '../ServiceRequired';
 import { OverlayWidgetsModal } from './OverlayWidgetsModal';
 import { DashboardPresetToolbar } from './DashboardPresetToolbar';
-import { DashboardBanner } from './DashboardBanner';
 import { listOverlayWidgets } from '../../../api/overlay';
 import type { DashboardSectionNavigate } from '../../../panel/engine/panelLayoutHelpers';
 import styles from './AppsView.module.scss';
@@ -92,7 +91,6 @@ function DashboardOnline({ onSectionNavigate }: { onSectionNavigate?: DashboardS
             <DashboardPresetToolbar layoutState={layoutState} />
           </div>
         </div>
-        <DashboardBanner gridHostRef={panelHostRef} onOpen={() => onSectionNavigate?.('store')} />
         <div ref={panelHostRef} className={styles.panelHost}>
           <PanelEmbeddedContent layoutState={layoutState} openCatalogSignal={addWidgetSignal} appAccentColor={settings.accentColor} onSectionNavigate={onSectionNavigate} />
         </div>
