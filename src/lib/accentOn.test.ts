@@ -24,7 +24,7 @@ describe('accent on-state fill', () => {
     expect(v['--accent-on-text']).toBe('#ffffff');
   });
 
-  it('a mid-grey accent takes the fallback in both themes', () => {
+  it('a mid-gray accent takes the fallback in both themes', () => {
     expect(deriveAccentOnVars('#777777', 'dark')['--accent-on']).toBe('#f5f5f5');
     expect(deriveAccentOnVars('#777777', 'light')['--accent-on']).toBe('#1a1a2e');
   });

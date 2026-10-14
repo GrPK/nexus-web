@@ -489,21 +489,7 @@ function hslCss(h: number, s: number, l: number, a?: number): string {
     : `hsl(${hh.toFixed(1)}, ${s.toFixed(1)}%, ${l.toFixed(1)}%)`;
 }
 
-/**
- * True when the accent should carry a black label instead of white.
- *
- * Deliberately not a pure contrast comparison: by WCAG alone 18 of the 20
- * preset accents would take black, which reads wrong on the blue/violet/pink
- * family. Black is reserved for the warm-to-green band, where a light fill
- * genuinely washes white out, and luminance alone cannot express that - orange
- * (0.33) sits below teal (0.40) and cyan (0.38), so any cutoff catching orange
- * catches those too. The hue window separates them; the floor keeps the muted
- * siblings (soft amber, soft green) on white.
- *
- * The luminance escape above the window is a readability floor: a near-white
- * custom accent of any hue takes black regardless.
- */
-// Relative luminance (0-1) of an HSL colour.
+// Relative luminance of an HSL colour.
 function relativeLuminanceHsl(h: number, s: number, l: number): number {
   const sN = s / 100;
   const lN = l / 100;
@@ -525,6 +511,20 @@ function relativeLuminanceHsl(h: number, s: number, l: number): number {
   return 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b);
 }
 
+/**
+ * True when the accent should carry a black label instead of white.
+ *
+ * Deliberately not a pure contrast comparison: by WCAG alone 18 of the 20
+ * preset accents would take black, which reads wrong on the blue/violet/pink
+ * family. Black is reserved for the warm-to-green band, where a light fill
+ * genuinely washes white out, and luminance alone cannot express that - orange
+ * (0.33) sits below teal (0.40) and cyan (0.38), so any cutoff catching orange
+ * catches those too. The hue window separates them; the floor keeps the muted
+ * siblings (soft amber, soft green) on white.
+ *
+ * The luminance escape above the window is a readability floor: a near-white
+ * custom accent of any hue takes black regardless.
+ */
 function needsDarkTextOnHsl(h: number, s: number, l: number): boolean {
   const L = relativeLuminanceHsl(h, s, l);
   const hue = ((h % 360) + 360) % 360;
@@ -568,16 +568,18 @@ function accentTextFor(h: number, s: number, pickL: number, l: number): string {
 
 // The "on" state of a toggle or selected control must stand out from the theme's
 // control surface whatever accent is picked. The accent fill is used when it
-// contrasts enough with that surface; a near-black accent in dark theme (or a
+// contrasts enough with that surface. A near-black accent in dark theme (or a
 // near-white one in light) would vanish, so the fill falls back to the theme's
-// foreground with the theme's background as its label, the way iOS paints an
-// active control. A saturated accent keeps its colour on a smaller contrast. Control surfaces: a mid grey in dark, a light grey in light.
+// foreground with the theme's background as its label.
+//
+// The surface luminances below are those of a control tile as painted in the
+// sheet: the card fill plus the tile's own tint, over the sheet backdrop.
 const ON_SURFACE_LUMINANCE = { dark: 0.076, light: 0.5 } as const;
 const ON_MIN_CONTRAST = 3;
-// A clearly coloured accent stands out from a grey surface by its colour alone, so it
-// needs far less luminance contrast than a grey one.
-const ON_COLOURFUL_SATURATION = 35;
-const ON_COLOURFUL_MIN_CONTRAST = 1.3;
+// A clearly colored accent stands out from a gray surface by its color alone, so it
+// needs far less luminance contrast than a gray one.
+const ON_COLORFUL_SATURATION = 35;
+const ON_COLORFUL_MIN_CONTRAST = 1.3;
 const ON_FALLBACK = {
   dark: { bg: '#f5f5f5', text: '#111111' },
   light: { bg: '#1a1a2e', text: '#ffffff' },
@@ -587,8 +589,8 @@ export function accentOnVars(h: number, s: number, l: number, accentText: string
   const lum = relativeLuminanceHsl(h, s, l);
   const surface = ON_SURFACE_LUMINANCE[mode];
   const contrast = (Math.max(lum, surface) + 0.05) / (Math.min(lum, surface) + 0.05);
-  const colourful = s >= ON_COLOURFUL_SATURATION && contrast >= ON_COLOURFUL_MIN_CONTRAST;
-  if (contrast >= ON_MIN_CONTRAST || colourful) return { fill: hslCss(h, s, l), text: accentText };
+  const colorful = s >= ON_COLORFUL_SATURATION && contrast >= ON_COLORFUL_MIN_CONTRAST;
+  if (contrast >= ON_MIN_CONTRAST || colorful) return { fill: hslCss(h, s, l), text: accentText };
   return { fill: ON_FALLBACK[mode].bg, text: ON_FALLBACK[mode].text };
 }
 

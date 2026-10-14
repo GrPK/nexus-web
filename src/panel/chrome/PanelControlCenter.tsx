@@ -208,7 +208,7 @@ export function PanelControlCenter({
           <ControlCenterBody
             open={open}
             isLandscape={isLandscape}
-            active={visible}
+            active={visible && !asleep}
             view={view}
             setView={setView}
             language={language}
@@ -330,7 +330,7 @@ function ControlCenterBody({
     const el = contentRef.current;
     if (!el || view !== 'main' || fitLevel >= 2) return;
     if (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1) setFitLevel(l => l + 1);
-  }, [view, fitLevel, fitEpoch, isLandscape, timeText, radios, session, volume.state.supported, brightness.available, mic.state.supported, brightness.linkDown]);
+  }, [view, fitLevel, fitEpoch, timeText, radios, session, volume.state.supported, brightness.available, mic.state.supported, brightness.linkDown]);
 
   if (view === 'mixer') {
     return (

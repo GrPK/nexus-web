@@ -82,6 +82,14 @@ describe('PanelMixerSlider icon button', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
+  it('the click synthesized after a rejected drag-release does not act either', () => {
+    const { button, onClick } = withIconButton();
+    fireEvent.pointerDown(button, { pointerType: 'touch', pointerId: 9, clientX: 5, clientY: 5 });
+    fireEvent.pointerUp(button, { pointerType: 'touch', pointerId: 9, clientX: 90, clientY: 5 });
+    fireEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   it('a press that began elsewhere and is released over the icon is not a tap', () => {
     const { button, onClick } = withIconButton();
     fireEvent.pointerUp(button, { pointerType: 'mouse', pointerId: 4, button: 0 });

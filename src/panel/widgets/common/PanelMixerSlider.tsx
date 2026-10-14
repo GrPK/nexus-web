@@ -182,18 +182,20 @@ export function PanelMixerSlider({
       // Acts on the release: a tap that follows a scroll fling loses its click. The release
       // must belong to this button's own press: same pointer, barely moved. A drag released
       // over the icon, a press that began elsewhere, or a cancelled touch is not a tap. The
-      // click that follows a handled release is ignored.
+      // click that follows any matched release is ignored.
       onPointerCancel={() => { iconPressRef.current = null; }}
       onPointerUp={(event) => {
         const press = iconPressRef.current;
         iconPressRef.current = null;
         if (disabled || !press || press.id !== event.pointerId) return;
-        if (event.pointerType === 'mouse' && event.button !== 0) return;
-        if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > ICON_TAP_SLOP_PX) return;
-        event.stopPropagation();
+        // A release that matched its press owns the click the browser synthesizes from it,
+        // whether it was accepted as a tap or rejected as a drag: that click must not act.
         iconTapHandledRef.current = true;
         if (iconTapTimerRef.current) window.clearTimeout(iconTapTimerRef.current);
         iconTapTimerRef.current = window.setTimeout(() => { iconTapHandledRef.current = false; }, 400);
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > ICON_TAP_SLOP_PX) return;
+        event.stopPropagation();
         iconButton.onClick();
       }}
       onClick={(event) => {
