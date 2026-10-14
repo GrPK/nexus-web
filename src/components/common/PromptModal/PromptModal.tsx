@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from '../../../lib/i18n';
 import { Overlay } from '../Overlay/Overlay';
 import { Button } from '../Button/Button';
@@ -28,8 +28,16 @@ interface PromptModalProps {
    */
   onConfirm: (value: string) => void | string | null | undefined | Promise<void | string | null | undefined>;
   onCancel: () => void;
-  /** Rendered after the title from the current input, e.g. a chip saying what submitting will do. */
-  titleAdornment?: (value: string) => ReactNode;
+  /**
+   * Extra button between Cancel and the primary. Shares `validate` and the
+   * error slot with the primary; `disabled` adds its own rule over the current
+   * value. Enter never triggers it.
+   */
+  secondary?: {
+    label: string;
+    onClick: (value: string) => void | string | null | undefined | Promise<void | string | null | undefined>;
+    disabled?: (value: string) => boolean;
+  };
 }
 
 /**
@@ -51,7 +59,7 @@ export function PromptModal({
   validate,
   onConfirm,
   onCancel,
-  titleAdornment,
+  secondary,
 }: PromptModalProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -84,7 +92,7 @@ export function PromptModal({
 
   if (!open) return null;
 
-  const submit = () => {
+  const submit = (commit: typeof onConfirm = onConfirm) => {
     if (submitting) return;
     const trimmed = value;
     if (validate) {
@@ -100,7 +108,7 @@ export function PromptModal({
       onCancel();
       return;
     }
-    const result = onConfirm(trimmed);
+    const result = commit(trimmed);
     if (result instanceof Promise) {
       const attempt = attemptRef.current;
       setSubmitting(true);
@@ -128,16 +136,9 @@ export function PromptModal({
   const submitDisabled = isInvalid || !value.trim() || submitting;
 
   return (
-    <Overlay open={open} onClose={onCancel} variant="alert" onEnter={submit}
+    <Overlay open={open} onClose={onCancel} variant="alert" onEnter={() => submit()}
       className={styles.modal} ariaLabel={title}>
-      {titleAdornment ? (
-        <div className={styles.titleRow}>
-          <h2 id={inputId + '-title'} className={styles.title}>{title}</h2>
-          {titleAdornment(value)}
-        </div>
-      ) : (
-        <h2 id={inputId + '-title'} className={styles.title}>{title}</h2>
-      )}
+      <h2 id={inputId + '-title'} className={styles.title}>{title}</h2>
       <div className={styles.fieldWrap}>
         {message && <label htmlFor={inputId} className={styles.message}>{message}</label>}
         <input
@@ -160,7 +161,13 @@ export function PromptModal({
         <Button tone="neutral" size="md" onClick={onCancel}>
           {cancelLabel ?? t('confirm.cancel')}
         </Button>
-        <Button tone="accent" size="md" onClick={submit} disabled={submitDisabled}>
+        {secondary && (
+          <Button tone="neutral" size="md" onClick={() => submit(secondary.onClick)}
+            disabled={submitDisabled || !!secondary.disabled?.(value)}>
+            {secondary.label}
+          </Button>
+        )}
+        <Button tone="accent" size="md" onClick={() => submit()} disabled={submitDisabled}>
           {confirmLabel ?? t('confirm.ok')}
         </Button>
       </div>

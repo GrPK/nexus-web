@@ -118,4 +118,33 @@ describe('PromptModal', () => {
     fireEvent.change(screen.getByLabelText('Enter a name'), { target: { value: 'Work' } });
     expect(screen.getByRole('button', { name: 'confirm.ok' })).not.toBeDisabled();
   });
+
+  describe('secondary action', () => {
+    it('commits through its own handler, and Enter still runs the primary', () => {
+      const onClick = vi.fn();
+      const { onConfirm } = renderModal({ secondary: { label: 'Alt', onClick } });
+      const field = screen.getByLabelText('Enter a name');
+      fireEvent.change(field, { target: { value: 'Streaming' } });
+      fireEvent.keyDown(field, { key: 'Enter' });
+      expect(onConfirm).toHaveBeenCalledWith('Streaming');
+      expect(onClick).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'Alt' }));
+      expect(onClick).toHaveBeenCalledWith('Streaming');
+    });
+
+    it('honors its disabled predicate and the shared validate', () => {
+      const { onConfirm } = renderModal({
+        secondary: { label: 'Alt', onClick: vi.fn(), disabled: v => v === 'same' },
+        validate: v => (v === 'bad' ? 'Nope' : null),
+      });
+      const field = screen.getByLabelText('Enter a name');
+      fireEvent.change(field, { target: { value: 'same' } });
+      expect(screen.getByRole('button', { name: 'Alt' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'confirm.ok' })).toBeEnabled();
+      fireEvent.change(field, { target: { value: 'bad' } });
+      expect(screen.getByRole('button', { name: 'Alt' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'confirm.ok' })).toBeDisabled();
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+  });
 });
