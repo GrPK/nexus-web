@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Dices, Dna, Link2, Redo2, Save, Undo2, SprayCan, Upload } from 'lucide-react';
 import { DeviceModal } from '../../../../components/common/DeviceModal/DeviceModal';
 import { Button } from '../../../../components/common/Button/Button';
@@ -32,7 +32,6 @@ import { STUDIO_STARTERS, mutateRecipe, randomRecipe } from './studioRecipes';
 import { EFFECT_NAME_MAX, getSavedEffects, isDownloaded, lastCreatedEffect, newEffectId, saveEffect, useSavedEffects, type MarketLink, type SavedEffect } from './studioLibrary';
 import { marketEffectUrl } from '../../../../lib/marketLinks';
 import { copyText } from '../../../../lib/clipboard';
-import { PublishEffectModal } from './PublishEffectModal';
 import { StudioBlockCard } from './StudioBlockCard';
 import { StudioPreview } from './StudioPreview';
 import { useStudioAudio } from './syntheticAudio';
@@ -86,6 +85,11 @@ function VariationTile({ recipe, label, onPick }: { recipe: StudioRecipe; label:
     </button>
   );
 }
+
+// Publishing and listing links: raw defines, not DEV_TOOLS, so the literal folds far enough to drop the import() from production.
+const PublishEffectModal = (import.meta.env.DEV || __DEV_TOOLS__)
+  ? lazy(() => import('./PublishEffectModal').then(m => ({ default: m.PublishEffectModal })))
+  : null;
 
 /** `effectId` opens that saved effect; null opens the most recently created one, or a new one when there is none. */
 export function ShaderStudio({ open, effectId, username, gpuAvailable = true, onSaved, onViewListing, onClose }: {
@@ -462,7 +466,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
           <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} aria-label={t('lighting.studio.undo')} disabled={varying || !past.length} onClick={undo} />
           <Button size="sm" tone="ghost" icon={<Redo2 size={14} />} aria-label={t('lighting.studio.redo')} disabled={varying || !future.length} onClick={redo} />
         </div>
-      {sharedId && (
+      {PublishEffectModal && sharedId && (
         <>
           <Badge label={t('lighting.studio.published')} color="var(--accent)" compact />
           <Button size="sm" tone="ghost" icon={<Link2 size={14} />} disabled={varying} onClick={() => copyLink(sharedId)}>
@@ -470,9 +474,11 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
           </Button>
         </>
       )}
-      <Button size="sm" icon={<Upload size={14} />} disabled={varying} onClick={() => { publishIdRef.current = null; setPublishing(true); }}>
-        {t('lighting.studio.publish.button')}
-      </Button>
+      {PublishEffectModal && (
+        <Button size="sm" icon={<Upload size={14} />} disabled={varying} onClick={() => { publishIdRef.current = null; setPublishing(true); }}>
+          {t('lighting.studio.publish.button')}
+        </Button>
+      )}
       <Button size="sm" tone="accent" icon={<Save size={14} />} disabled={varying} onClick={() => setSaving(true)}>
         {t('lighting.studio.save')}
       </Button>
@@ -651,15 +657,19 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
         onConfirm={saveCurrent}
         onCancel={() => setSaving(false)}
       />
-      <PublishEffectModal
-        open={publishing}
-        initialName={currentName ?? ''}
-        recipe={recipe}
-        link={currentLink}
-        save={savePublished}
-        onViewListing={onViewListing}
-        onClose={() => setPublishing(false)}
-      />
+      {PublishEffectModal && (
+        <Suspense fallback={null}>
+          <PublishEffectModal
+            open={publishing}
+            initialName={currentName ?? ''}
+            recipe={recipe}
+            link={currentLink}
+            save={savePublished}
+            onViewListing={onViewListing}
+            onClose={() => setPublishing(false)}
+          />
+        </Suspense>
+      )}
     </DeviceModal>
   );
 }

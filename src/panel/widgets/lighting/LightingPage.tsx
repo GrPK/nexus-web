@@ -209,13 +209,8 @@ function loadDeviceOrder(): string[] {
 
 // three.js loads only when someone turns the 3D view on.
 const LightingScene3D = lazy(() => import('./scene/LightingScene3D'));
-// Raw defines, not DEV_TOOLS: only the literal folds far enough to drop the import() from production.
-const ShaderStudio = (import.meta.env.DEV || __DEV_TOOLS__)
-  ? lazy(() => import('./studio/ShaderStudio').then(m => ({ default: m.ShaderStudio })))
-  : null;
-const SavedEffectSections = (import.meta.env.DEV || __DEV_TOOLS__)
-  ? lazy(() => import('./studio/CustomEffectsGrid').then(m => ({ default: m.SavedEffectSections })))
-  : null;
+const ShaderStudio = lazy(() => import('./studio/ShaderStudio').then(m => ({ default: m.ShaderStudio })));
+const SavedEffectSections = lazy(() => import('./studio/CustomEffectsGrid').then(m => ({ default: m.SavedEffectSections })));
 const VIEW_2D = '2d';
 const VIEW_3D = '3d';
 export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate, accountUsername = null }: LightingViewProps) {
@@ -1227,7 +1222,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     (isCustomEffectKey(key) ? customEffects.find(e => e.id === customEffectId(key)) : undefined);
   const activeCustom = customEntryFor(activeEffect);
   // A saved effect matching the search keeps the browser's no-matches hint away.
-  const savedMatch = !!SavedEffectSections && viewMode === 'animate' && effectQuery.trim() !== ''
+  const savedMatch = viewMode === 'animate' && effectQuery.trim() !== ''
     && customEffects.some(e => matchesAllWords(effectQuery, [e.name]));
   const dockCustom = customEntryFor(dockEffect);
   const dockCustomDef = useMemo(() => (dockCustom ? customEffectDef(dockCustom, t) : undefined), [dockCustom, t]);
@@ -2900,7 +2895,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     placeholder={t('lighting.effects.search')}
                     ariaLabel={t('lighting.effects.search')}
                   />
-                  {ShaderStudio && viewMode === 'animate' && (
+                  {viewMode === 'animate' && (
                     <Button size="sm" icon={<SprayCan size={14} />} onClick={() => setStudioTarget({ id: activeCustom?.id ?? null })}>
                       {t('lighting.studio.title')}
                     </Button>
@@ -2919,7 +2914,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   pinnedDevices={pinnedDevices}
                   gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
                   leadingMatches={savedMatch}
-                  leading={viewMode === 'animate' ? (SavedEffectSections && (
+                  leading={viewMode === 'animate' ? (
                     <Suspense fallback={null}>
                       <SavedEffectSections
                         effect={gridEffect}
@@ -2929,7 +2924,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                         onSelect={handleEffectPick}
                       />
                     </Suspense>
-                  )) : viewMode === 'static' ? (
+                  ) : viewMode === 'static' ? (
                     <CollapsibleSection
                       compact
                       title={t('lighting.static.pickerGroup')}
@@ -3038,7 +3033,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           paused={paused}
         />
       )}
-      {ShaderStudio && studioTarget && (
+      {studioTarget && (
         <Suspense fallback={null}>
           <ShaderStudio
             open

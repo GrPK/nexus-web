@@ -67,6 +67,8 @@ describe('ShaderStudio publishing', () => {
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => now++);
     render(<ShaderStudio open effectId={null} onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.publish.button' }));
+    // The dialog loads on demand.
+    await waitFor(() => expect(save).not.toBeNull());
     await act(async () => { await save!('Spin'); });
     await act(async () => { await save!('Spin', { marketId: 'L1', marketAuthor: 'alice' }); });
     expect(put).toHaveBeenCalledTimes(2);

@@ -15,6 +15,8 @@ import pageStyles from '../LightingPage.module.scss';
 import styles from './ShaderStudio.module.scss';
 
 const STILL_DEBOUNCE_MS = 150;
+// Raw defines, not DEV_TOOLS: the Marketplace badges are left out of production with the rest of the Marketplace.
+const MARKETPLACE = import.meta.env.DEV || __DEV_TOOLS__;
 const SECTION_CUSTOM = 'custom';
 type Section = typeof SECTION_CUSTOM;
 
@@ -147,8 +149,8 @@ export function SavedEffectSections({ effect, query, username, gpuAvailable = tr
           key={item.id}
           effect={item}
           active={effect === customEffectKey(item.id)}
-          published={!!item.marketId && !downloaded(item)}
-          copiedFrom={isMarketCopy(item, username) ? item.marketAuthor : null}
+          published={MARKETPLACE && !!item.marketId && !downloaded(item)}
+          copiedFrom={MARKETPLACE && isMarketCopy(item, username) ? item.marketAuthor : null}
           draft={draft?.id === item.id ? draft.recipe : null}
           gpuAvailable={gpuAvailable}
           onSelect={() => onSelect(customEffectKey(item.id))}
