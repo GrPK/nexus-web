@@ -3411,6 +3411,7 @@
   "nexus2Welcome.import.title.both": "Import your Nexus 2 setup",
   "nexus2Welcome.import.title.fanCurves": "Import your fan curves",
   "nexus2Welcome.settingsEntry.openButton": "Open",
+  "nexus2Welcome.settingsEntry.rowDescription": "Bring over your Nexus 2 panel personalization and fan curves.",
   "nexus2Welcome.settingsEntry.rowLabel": "Import from Nexus 2",
   "onboarding.finish": "Finish",
   "onboarding.skip": "Skip onboarding",

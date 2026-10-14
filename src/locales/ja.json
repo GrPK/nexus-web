@@ -3411,6 +3411,7 @@
   "nexus2Welcome.import.title.both": "Nexus 2 の設定をインポート",
   "nexus2Welcome.import.title.fanCurves": "ファンカーブをインポート",
   "nexus2Welcome.settingsEntry.openButton": "開く",
+  "nexus2Welcome.settingsEntry.rowDescription": "Nexus 2 のパネルのパーソナライズとファンカーブを引き継ぎます。",
   "nexus2Welcome.settingsEntry.rowLabel": "Nexus 2 からインポート",
   "onboarding.finish": "完了",
   "onboarding.skip": "セットアップをスキップ",

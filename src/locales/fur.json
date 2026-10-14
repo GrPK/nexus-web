@@ -3411,6 +3411,7 @@
   "nexus2Welcome.import.title.both": "Impuarte la tô configurazion di Nexus 2",
   "nexus2Welcome.import.title.fanCurves": "Impuarte lis tôs curvis dai ventilatôrs",
   "nexus2Welcome.settingsEntry.openButton": "Vierç",
+  "nexus2Welcome.settingsEntry.rowDescription": "Puarte la personalizazion dal panel e lis curvis dai ventilatôrs di Nexus 2.",
   "nexus2Welcome.settingsEntry.rowLabel": "Impuarte di Nexus 2",
   "onboarding.finish": "Finìs",
   "onboarding.skip": "Salte la configurazion",

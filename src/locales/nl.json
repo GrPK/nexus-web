@@ -3411,6 +3411,7 @@
   "nexus2Welcome.import.title.both": "Importeer je Nexus 2-configuratie",
   "nexus2Welcome.import.title.fanCurves": "Importeer je ventilatorcurves",
   "nexus2Welcome.settingsEntry.openButton": "Openen",
+  "nexus2Welcome.settingsEntry.rowDescription": "Neem je Nexus 2-paneelpersonalisatie en ventilatorcurves over.",
   "nexus2Welcome.settingsEntry.rowLabel": "Importeren vanuit Nexus 2",
   "onboarding.finish": "Voltooien",
   "onboarding.skip": "Configuratie overslaan",

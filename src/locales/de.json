@@ -3411,6 +3411,7 @@
   "nexus2Welcome.import.title.both": "Nexus 2-Einrichtung importieren",
   "nexus2Welcome.import.title.fanCurves": "Lüfterkurven importieren",
   "nexus2Welcome.settingsEntry.openButton": "Öffnen",
+  "nexus2Welcome.settingsEntry.rowDescription": "Übernehmen Sie Ihre Nexus 2-Panel-Personalisierung und Lüfterkurven.",
   "nexus2Welcome.settingsEntry.rowLabel": "Von Nexus 2 importieren",
   "onboarding.finish": "Fertig",
   "onboarding.skip": "Einrichtung überspringen",

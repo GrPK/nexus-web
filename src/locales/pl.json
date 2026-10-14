@@ -3455,6 +3455,7 @@
   "nexus2Welcome.import.title.both": "Importuj konfigurację Nexus 2",
   "nexus2Welcome.import.title.fanCurves": "Importuj krzywe wentylatorów",
   "nexus2Welcome.settingsEntry.openButton": "Otwórz",
+  "nexus2Welcome.settingsEntry.rowDescription": "Przenieś personalizację panelu i krzywe wentylatorów z Nexus 2.",
   "nexus2Welcome.settingsEntry.rowLabel": "Importuj z Nexus 2",
   "onboarding.finish": "Zakończ",
   "onboarding.skip": "Pomiń konfigurację",

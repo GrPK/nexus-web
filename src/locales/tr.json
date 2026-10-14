@@ -3411,6 +3411,7 @@
   "nexus2Welcome.import.title.both": "Nexus 2 kurulumunuzu içe aktarın",
   "nexus2Welcome.import.title.fanCurves": "Fan eğrilerinizi içe aktarın",
   "nexus2Welcome.settingsEntry.openButton": "Aç",
+  "nexus2Welcome.settingsEntry.rowDescription": "Nexus 2 panel kişiselleştirmenizi ve fan eğrilerinizi aktarın.",
   "nexus2Welcome.settingsEntry.rowLabel": "Nexus 2'den içe aktar",
   "onboarding.finish": "Bitir",
   "onboarding.skip": "Kurulumu atla",

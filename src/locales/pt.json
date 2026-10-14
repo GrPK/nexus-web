@@ -3411,6 +3411,7 @@
   "nexus2Welcome.import.title.both": "Importe a sua configuração do Nexus 2",
   "nexus2Welcome.import.title.fanCurves": "Importe as suas curvas de ventoinha",
   "nexus2Welcome.settingsEntry.openButton": "Abrir",
+  "nexus2Welcome.settingsEntry.rowDescription": "Traga a sua personalização do painel e as suas curvas de ventoinha do Nexus 2.",
   "nexus2Welcome.settingsEntry.rowLabel": "Importar do Nexus 2",
   "onboarding.finish": "Concluir",
   "onboarding.skip": "Ignorar configuração",

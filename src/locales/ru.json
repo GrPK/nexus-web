@@ -3455,6 +3455,7 @@
   "nexus2Welcome.import.title.both": "Импорт настроек Nexus 2",
   "nexus2Welcome.import.title.fanCurves": "Импорт кривых вентиляторов",
   "nexus2Welcome.settingsEntry.openButton": "Открыть",
+  "nexus2Welcome.settingsEntry.rowDescription": "Перенесите персонализацию панели и кривые вентиляторов из Nexus 2.",
   "nexus2Welcome.settingsEntry.rowLabel": "Импорт из Nexus 2",
   "onboarding.finish": "Готово",
   "onboarding.skip": "Пропустить настройку",
