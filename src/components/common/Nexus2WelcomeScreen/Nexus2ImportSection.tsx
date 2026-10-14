@@ -11,7 +11,7 @@ import type { Nexus2ApplyResult, Nexus2PreviewResponse } from '../../../api/migr
 import {
   allApplyResultsClean, applyDetailKey, applyStatusKey, categoryLabelKey, defaultSelectedGroupIds,
   groupDetailParts, groupResultSummaries, groupHasAvailable, selectedWireIds, unavailableGroupNoteKey,
-  visibleImportGroups, importHeaderKeys, type ImportGroupId,
+  visibleImportGroups, importHeaderKeys, formatList, type ImportGroupId,
 } from './nexus2WelcomeUtils';
 import styles from './Nexus2ImportSection.module.scss';
 
@@ -21,9 +21,14 @@ type ImportPhase = 'idle' | 'busy' | 'results';
 /** Apply outcome for a host-driven import. */
 export type Nexus2ImportOutcome = 'clean' | 'failed';
 
+export interface Nexus2RunOptions {
+  /** Leaves fan curves out of this run: the host acted before the curve list was on screen. */
+  skipFanCurves?: boolean;
+}
+
 /** Lets a host drive the apply from its own button. */
 export interface Nexus2ImportHandle {
-  runImport: () => Promise<Nexus2ImportOutcome>;
+  runImport: (options?: Nexus2RunOptions) => Promise<Nexus2ImportOutcome>;
 }
 
 export interface Nexus2ImportSectionProps {
@@ -45,8 +50,8 @@ export interface Nexus2ImportSectionProps {
 }
 
 /**
- * Grouped Nexus 2 import flow: preview fetch, two grouped switches (Y70
- * panel personalization, Q-Series panel personalization), apply, and per-group
+ * Grouped Nexus 2 import flow: preview fetch, three grouped switches (Y70
+ * panel personalization, Q-Series panel personalization, fan curves), apply, and per-group
  * results. Hosted by Nexus2WelcomeScreen and by ImportCenter, which is what
  * the Settings entry opens - one place owns the markup so both stay in sync.
  */
@@ -85,9 +90,12 @@ export function Nexus2ImportSection({
   // Guards on its own in-flight phase only, never the host's `disabled`: a
   // host driving this from its own button sets that flag in the same tick,
   // and consulting it here would make the call a silent no-op.
-  const runImport = async (): Promise<Nexus2ImportOutcome> => {
-    const ids = selectedWireIds(preview, selectedGroups);
-    if (importPhase === 'busy' || ids.length === 0) return 'failed';
+  const runImport = async (options?: Nexus2RunOptions): Promise<Nexus2ImportOutcome> => {
+    const selected = selectedWireIds(preview, selectedGroups);
+    const ids = options?.skipFanCurves ? selected.filter(id => id !== 'fanCurves') : selected;
+    if (importPhase === 'busy' || selected.length === 0) return 'failed';
+    // Only fan curves were ticked and they were held back: nothing to apply, nothing wrong.
+    if (ids.length === 0) return 'clean';
     setImportPhase('busy');
     onBusyChange?.(true);
     setImportRequestError(false);
@@ -134,7 +142,7 @@ export function Nexus2ImportSection({
   };
 
   const groups = visibleImportGroups(preview);
-  const { titleKey, descriptionKey } = importHeaderKeys(groups);
+  const { titleKey, descriptionKey } = importHeaderKeys(preview);
   const summaries = groupResultSummaries(importResults);
   const importSuccess = importPhase === 'results' && allApplyResultsClean(importResults);
 
@@ -180,7 +188,11 @@ export function Nexus2ImportSection({
                   for (const [name, key] of Object.entries(d.paramKeys ?? {})) params[name] = t(key);
                   return (
                     <span key={`${d.key}-${i}`} className={styles.detailBullet} role="listitem">
-                      {t(d.plural ? pluralKey(d.key, language, Number(d.params.count)) : d.key, params)}
+                      {d.user?.list
+                        ? <span>{d.user.name} → {formatList(d.user.list, language)}</span>
+                        : d.user
+                          ? <span>{d.user.name}: {t(d.key)}</span>
+                          : t(d.plural ? pluralKey(d.key, language, Number(d.params.count)) : d.key, params)}
                     </span>
                   );
                 })}
@@ -239,7 +251,7 @@ export function Nexus2ImportSection({
                   loading={importPhase === 'busy'}
                   loadingHidesLabel
                   disabled={selectionEmpty || locked}
-                  onClick={runImport}
+                  onClick={() => runImport()}
                 >
                   {t('nexus2Welcome.import.action')}
                 </Button>

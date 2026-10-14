@@ -197,6 +197,29 @@ describe('ImportOnboardingScreen', () => {
     expect(applyNexus2Import).toHaveBeenCalledTimes(1);
   });
 
+  it('an Enter before the preview resolves never imports fan curves it could not show', async () => {
+    let resolvePreview: (v: Awaited<ReturnType<typeof previewNexus2Import>>) => void = () => {};
+    vi.mocked(previewNexus2Import).mockImplementation(() => new Promise(r => { resolvePreview = r; }));
+    const onComplete = vi.fn();
+    renderScreen({ onComplete });
+    await screen.findByRole('button', { name: 'importOnboarding.continue' });
+
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    await act(async () => {
+      resolvePreview({
+        available: true, profileName: 'Default',
+        categories: [
+          { id: 'appearance', available: true, accentColor: '#fff', background: null },
+          { id: 'fanCurves', available: true, count: 1, fanCurves: [{ name: 'Quiet', kind: 'graph', status: 'import', minimumRaised: false, targets: [{ label: 'Front', status: 'import' }] }] },
+        ],
+      });
+    });
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    expect(applyNexus2Import).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(applyNexus2Import).mock.calls[0][0]).not.toContain('fanCurves');
+  });
+
   it('reads Continue with nothing ticked, live, and offers no Skip import', async () => {
     const onComplete = vi.fn();
     renderScreen({

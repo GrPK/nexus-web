@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Nexus2ImportSection } from './Nexus2ImportSection';
+import { Nexus2ImportSection, type Nexus2ImportHandle } from './Nexus2ImportSection';
 import { applyNexus2Import, previewNexus2Import } from '../../../api/migration';
 import type { Nexus2ApplyResponse, Nexus2PreviewResponse } from '../../../api/migration';
 import styles from './Nexus2ImportSection.module.scss';
@@ -250,9 +250,9 @@ describe('Nexus2ImportSection - fan curves', () => {
     renderSection();
     const fan = await screen.findByRole('switch', { name: FAN_NAME });
     expect(fan).toBeChecked();
-    expect(screen.getByText(`${FAN}.curve:Quiet,Front`)).toBeInTheDocument();
-    expect(screen.getByText(`${FAN}.reasonLine:Pump,${FAN}.reason.pumpKept`)).toBeInTheDocument();
-    expect(screen.getByText(`${FAN}.reasonLine:Odd,${FAN}.reason.unknown`)).toBeInTheDocument();
+    expect(screen.getByText('Quiet → Front')).toBeInTheDocument();
+    expect(screen.getByText(`Pump: ${FAN}.reason.pumpKept`)).toBeInTheDocument();
+    expect(screen.getByText(`Odd: ${FAN}.reason.unknown`)).toBeInTheDocument();
     expect(screen.getByText(`${FAN}.otherProfiles:`)).toBeInTheDocument();
   });
 
@@ -266,6 +266,46 @@ describe('Nexus2ImportSection - fan curves', () => {
     renderSection();
     await screen.findByRole('switch', { name: FAN_NAME });
     expect(screen.getByText('nexus2Welcome.import.description.both')).toBeInTheDocument();
+  });
+
+  it('renders curve and fan names verbatim, even when they look like placeholders', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({
+      available: true, profileName: null,
+      categories: [{
+        ...FAN_CATEGORY,
+        fanCurves: [{ name: '{fans} $&', kind: 'graph' as const, status: 'import' as const, minimumRaised: false, targets: [{ label: '{name} $1', status: 'import' as const }] }],
+      }],
+    });
+    renderSection();
+    await screen.findByRole('switch', { name: FAN_NAME });
+    expect(screen.getByText('{fans} $& → {name} $1')).toBeInTheDocument();
+  });
+
+  it('shows an all-skipped group disabled, with each curve reason and no import', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({
+      available: true, profileName: null,
+      categories: [{
+        id: 'fanCurves', available: false, count: 0,
+        fanCurves: [{ name: 'Turbo', kind: 'linear', status: 'skip', reason: 'unsafeCurve', minimumRaised: false, targets: [] }],
+      }],
+    });
+    renderSection();
+    const fan = await screen.findByRole('switch', { name: FAN_NAME });
+    expect(fan).toBeDisabled();
+    expect(fan).not.toBeChecked();
+    expect(screen.getByText(`Turbo: ${FAN}.reason.unsafeCurve`)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: IMPORT_BUTTON_NAME })).toBeDisabled();
+  });
+
+  it('leaves fan curves out when the host asks for a run before the list was shown', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [Y70_LAYOUT, FAN_CATEGORY] });
+    const handleRef = { current: null as Nexus2ImportHandle | null };
+    renderSection({ handleRef, showAction: false });
+    await screen.findByRole('switch', { name: FAN_NAME });
+    await act(async () => { await handleRef.current?.runImport({ skipFanCurves: true }); });
+    expect(applyNexus2Import).toHaveBeenCalledWith(['y70Layout'], true);
+    await act(async () => { await handleRef.current?.runImport(); });
+    expect(applyNexus2Import).toHaveBeenLastCalledWith(['y70Layout', 'fanCurves'], true);
   });
 
   it('sends fanCurves in the apply call', async () => {

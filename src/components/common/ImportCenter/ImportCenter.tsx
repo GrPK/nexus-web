@@ -8,7 +8,7 @@ import { Spinner } from '../Spinner/Spinner';
 import { SectionHeader } from '../SectionHeader/SectionHeader';
 import { Toggle } from '../Toggle/Toggle';
 import { FanControlImportSection, type FanControlImportHandle } from '../FanControlImport/FanControlImportSection';
-import { Nexus2ImportSection, type Nexus2ImportHandle } from '../Nexus2WelcomeScreen/Nexus2ImportSection';
+import { Nexus2ImportSection, type Nexus2ImportHandle, type Nexus2RunOptions } from '../Nexus2WelcomeScreen/Nexus2ImportSection';
 import { useFanControlStatus } from '../../../hooks/useFanControlStatus';
 import { useNexus2WelcomeStatus } from '../../../hooks/useNexus2WelcomeStatus';
 import styles from './ImportCenter.module.scss';
@@ -21,7 +21,7 @@ export type ImportOutcome = 'clean' | 'failed';
 /** Lets a host drive the import from its own footer (both onboarding screens do). */
 export interface ImportCenterHandle {
   /** Runs every included source in list order. 'clean' only when they all succeeded. */
-  runImport: () => Promise<ImportOutcome>;
+  runImport: (options?: Nexus2RunOptions) => Promise<ImportOutcome>;
 }
 
 /** One app's row in the left column, and what it shows on the right. */
@@ -169,7 +169,7 @@ export function ImportCenter({
   // Guards on its own in-flight state only, never the host's `disabled`: a host
   // driving this from its own button sets that flag in the same tick, and
   // consulting it here would make the call a silent no-op.
-  const runImport = async (): Promise<ImportOutcome> => {
+  const runImport = async (options?: Nexus2RunOptions): Promise<ImportOutcome> => {
     if (busy) return 'failed';
     const targets = sources.filter(runnable);
     if (targets.length === 0) return 'failed';
@@ -179,8 +179,9 @@ export function ImportCenter({
     // Sequential, not concurrent: list order decides who writes last where two
     // sources touch the same setting.
     for (const id of targets) {
-      const handle = id === 'fancontrol' ? fanControlHandle.current : nexus2Handle.current;
-      const outcome = handle ? await handle.runImport() : 'failed';
+      const outcome = id === 'fancontrol'
+        ? await fanControlHandle.current?.runImport() ?? 'failed'
+        : await nexus2Handle.current?.runImport(options) ?? 'failed';
       if (outcome !== 'clean') allClean = false;
     }
     setBusy(false);
@@ -338,7 +339,7 @@ export function ImportCenter({
               loading={busy}
               loadingHidesLabel
               disabled={!anyRunnable || locked}
-              onClick={runImport}
+              onClick={() => runImport()}
             >
               {t('importCenter.action')}
             </Button>

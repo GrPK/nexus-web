@@ -27,6 +27,19 @@ export interface CategoryDetail {
   plural?: boolean;
   /** Params filled with a translated string: param name to its i18n key. */
   paramKeys?: Record<string, string>;
+  /**
+   * Nexus 2 free text (a curve or fan name). Never passed through t() params,
+   * whose substitution mangles `{x}` and `$&`: the renderer composes it
+   * around the translated fragment instead. With `list`, the line is
+   * "name, arrow, list" and `key` is unused; without it, "name: fragment".
+   */
+  user?: { name: string; list?: string[] };
+}
+
+/** Locale-aware "A, B, and C"; plain comma join where Intl.ListFormat is missing. */
+export function formatList(items: string[], language: string): string {
+  if (typeof Intl === 'undefined' || typeof Intl.ListFormat !== 'function') return items.join(', ');
+  return new Intl.ListFormat(language, { style: 'long', type: 'conjunction' }).format(items);
 }
 
 /** The positive-framing count/value lines for one available category, one bullet each. */
@@ -82,11 +95,14 @@ export function fanCurveReasonKey(reason: string | undefined): string {
 
 function fanCurveDetails(cat: Nexus2FanCurvesCategory): CategoryDetail[] {
   const base = 'nexus2Welcome.import.category.fanCurves';
-  const lines: CategoryDetail[] = [{ key: `${base}.detail`, params: { count: cat.count }, plural: true }];
+  // An all-skipped group has no count to announce, only reasons.
+  const lines: CategoryDetail[] = cat.available
+    ? [{ key: `${base}.detail`, params: { count: cat.count }, plural: true }]
+    : [];
   const skipLine = (name: string, reason: string | undefined): CategoryDetail => ({
-    key: `${base}.reasonLine`,
-    params: { name, reason: '' },
-    paramKeys: { reason: fanCurveReasonKey(reason) },
+    key: fanCurveReasonKey(reason),
+    params: {},
+    user: { name },
   });
   for (const curve of cat.fanCurves ?? []) {
     const driven = curve.targets.filter(tg => tg.status === 'import');
@@ -94,8 +110,8 @@ function fanCurveDetails(cat: Nexus2FanCurvesCategory): CategoryDetail[] {
       lines.push(skipLine(curve.name, curve.status === 'import' ? 'noTargets' : curve.reason));
       continue;
     }
-    lines.push({ key: `${base}.curve`, params: { name: curve.name, fans: driven.map(tg => tg.label).join(', ') } });
-    if (curve.minimumRaised) lines.push({ key: `${base}.curveRaised`, params: { name: curve.name } });
+    lines.push({ key: '', params: {}, user: { name: curve.name, list: driven.map(tg => tg.label) } });
+    if (curve.minimumRaised) lines.push({ key: `${base}.curveRaised`, params: {}, user: { name: curve.name } });
     for (const tg of curve.targets) if (tg.status !== 'import') lines.push(skipLine(tg.label, tg.reason));
   }
   if ((cat.otherProfiles ?? 0) > 0) lines.push({ key: `${base}.otherProfiles`, params: {} });
@@ -127,9 +143,9 @@ export function availableCategories(preview: Nexus2PreviewResponse | null): Nexu
   return preview?.categories.filter(c => c.available) ?? [];
 }
 
-// The three wire categories the welcome screen used to list one by one are
-// consolidated into two user-facing groups; a group's own checkbox toggles
-// every wire id it carries. `language` is deliberately not a member of any
+// The wire categories are consolidated into three user-facing groups (Y70
+// panel, Q-Series panel, fan curves); a group's own checkbox toggles every
+// wire id it carries. `language` is deliberately not a member of any
 // group - the web never shows or sends it.
 export type ImportGroupId = 'y70Panel' | 'q60Panel' | 'fanCurves';
 
@@ -157,6 +173,12 @@ export const IMPORT_GROUPS: ImportGroupDef[] = [
   },
 ];
 
+/** The all-skipped fan curves category (nothing importable, but a list of why), or null. */
+function skippedOnlyFanCurves(preview: Nexus2PreviewResponse | null): Nexus2FanCurvesCategory | null {
+  const cat = preview?.categories.find((c): c is Nexus2FanCurvesCategory => c.id === 'fanCurves');
+  return cat && !cat.available && (cat.fanCurves?.length ?? 0) > 0 ? cat : null;
+}
+
 /** The explanation shown for a fan curves group with nothing to import, or null. */
 export function unavailableGroupNoteKey(preview: Nexus2PreviewResponse | null, group: ImportGroupDef): string | null {
   if (group.id !== 'fanCurves') return null;
@@ -167,10 +189,12 @@ export function unavailableGroupNoteKey(preview: Nexus2PreviewResponse | null, g
 
 /**
  * Title and description keys for the import section, so the header only
- * claims what the visible groups do: personalization replaces the panel setup,
+ * claims what the importable groups do (a note-only or all-skipped group does
+ * not count): personalization replaces the panel setup,
  * fan curves touch only the fans they list.
  */
-export function importHeaderKeys(groups: ImportGroupDef[]): { titleKey: string; descriptionKey: string } {
+export function importHeaderKeys(preview: Nexus2PreviewResponse | null): { titleKey: string; descriptionKey: string } {
+  const groups = IMPORT_GROUPS.filter(g => groupHasAvailable(preview, g));
   const fan = groups.some(g => g.id === 'fanCurves');
   const personalization = groups.some(g => g.id !== 'fanCurves');
   const suffix = fan ? (personalization ? '.both' : '.fanCurves') : '';
@@ -186,14 +210,17 @@ export function groupHasAvailable(preview: Nexus2PreviewResponse | null, group: 
   return group.wireIds.some(id => available.has(id));
 }
 
-/** Groups with at least one available wire category, or an unavailable-note to show, in display order. */
+/** Groups with an available wire category, an unavailable-note, or a list of skipped curves to show, in display order. */
 export function visibleImportGroups(preview: Nexus2PreviewResponse | null): ImportGroupDef[] {
-  return IMPORT_GROUPS.filter(g => groupHasAvailable(preview, g) || unavailableGroupNoteKey(preview, g) !== null);
+  return IMPORT_GROUPS.filter(g => groupHasAvailable(preview, g)
+    || unavailableGroupNoteKey(preview, g) !== null
+    || (g.id === 'fanCurves' && skippedOnlyFanCurves(preview) !== null));
 }
 
 /** The positive detail bullets for a group, in member-category order. */
 export function groupDetailParts(preview: Nexus2PreviewResponse | null, group: ImportGroupDef): CategoryDetail[] {
-  return availableCategories(preview)
+  const skipped = skippedOnlyFanCurves(preview);
+  return [...availableCategories(preview), ...(skipped ? [skipped] : [])]
     .filter(c => group.wireIds.includes(c.id))
     .flatMap(categoryDetails);
 }

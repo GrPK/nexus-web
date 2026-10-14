@@ -117,7 +117,10 @@ export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, o
 
     setApplyPhase('applying');
 
-    if (runImport && !selectionRef.current.settled) {
+    // A press that had to wait for the preview acted before the user could see
+    // the fan curve list, so fan curves sit this run out.
+    const actedBeforeListShown = runImport && !selectionRef.current.settled;
+    if (actedBeforeListShown) {
       await new Promise<void>(resolve => {
         settledWaiters.current.push(resolve);
         setTimeout(resolve, SELECTION_SETTLE_TIMEOUT_MS);
@@ -125,7 +128,7 @@ export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, o
     }
     let importFailed = false;
     if (runImport && selectionRef.current.has && importHandle.current) {
-      importFailed = await importHandle.current.runImport() === 'failed';
+      importFailed = await importHandle.current.runImport({ skipFanCurves: actedBeforeListShown }) === 'failed';
     }
 
     if (importFailed) {
