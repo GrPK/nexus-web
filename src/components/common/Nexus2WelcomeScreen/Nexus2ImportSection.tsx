@@ -9,9 +9,9 @@ import { Spinner } from '../Spinner/Spinner';
 import { applyNexus2Import, previewNexus2Import } from '../../../api/migration';
 import type { Nexus2ApplyResult, Nexus2PreviewResponse } from '../../../api/migration';
 import {
-  allApplyResultsClean, applyDetailKey, applyStatusKey, categoryLabelKey, defaultSelectedGroupIds,
-  groupDetailParts, groupResultSummaries, groupHasAvailable, selectedWireIds, unavailableGroupNoteKey,
-  visibleImportGroups, importHeaderKeys, formatList, fillTemplate, type ImportGroupId,
+  allApplyResultsClean, applyDetailKey, applyStatusKey, issueCategoryLabelKey, defaultSelectedGroupIds,
+  groupDetailParts, groupResultSummaries, hasKeptSetupSkip, groupHasAvailable, selectedWireIds, unavailableGroupNote,
+  presetLabelKey, fanGroupLabelKey, visibleImportGroups, importHeaderKeys, formatList, fillTemplate, type CategoryDetail, type ImportGroupId,
 } from './nexus2WelcomeUtils';
 import styles from './Nexus2ImportSection.module.scss';
 
@@ -72,14 +72,20 @@ export function Nexus2ImportSection({
   const [selectedGroups, setSelectedGroups] = useState<Set<ImportGroupId>>(new Set());
   const [importPhase, setImportPhase] = useState<ImportPhase>('idle');
   const [importResults, setImportResults] = useState<Nexus2ApplyResult[] | null>(null);
+  // The preview the apply ran against: result labels follow it, not a refreshed preview.
+  const [appliedPreview, setAppliedPreview] = useState<Nexus2PreviewResponse | null>(null);
   const [importRequestError, setImportRequestError] = useState(false);
   // The preview object whose fan curve list entered the viewport. Comparing
   // identity ties "seen" to one load: a new preview is never seen already.
   const seenPreviewRef = useRef<Nexus2PreviewResponse | null>(null);
   const fanGroupRef = useRef<HTMLDivElement | null>(null);
+  // Bumped on every (re)open and on unmount so a late refetch response is dropped.
+  const loadEpochRef = useRef(0);
+  useEffect(() => () => { loadEpochRef.current += 1; }, []);
 
   useEffect(() => {
     if (!open) return;
+    loadEpochRef.current += 1;
     let cancelled = false;
     setPreviewStatus('loading');
     setPreview(null);
@@ -122,15 +128,34 @@ export function Nexus2ImportSection({
       onBusyChange?.(false);
       return 'failed';
     }
+    setAppliedPreview(preview);
     setImportResults(res.results);
     setImportPhase('results');
+    // A skipped fan group means the service state moved since the preview;
+    // refetch so the group shows its real state instead of staying armed.
+    if (res.results.some(r => r.id === 'fanCurves' && r.status === 'skipped')) {
+      const epoch = loadEpochRef.current;
+      void previewNexus2Import().then(fresh => {
+        // A newer open or an unmount owns the state now.
+        if (!fresh || epoch !== loadEpochRef.current) return;
+        setPreview(fresh);
+        // Only the fan entry follows the fresh preview; every other toggle
+        // stays as the user left it, including ones changed since the apply.
+        setSelectedGroups(prev => {
+          if (!prev.has('fanCurves') || defaultSelectedGroupIds(fresh).has('fanCurves')) return prev;
+          const next = new Set(prev);
+          next.delete('fanCurves');
+          return next;
+        });
+      });
+    }
     onBusyChange?.(false);
     return allApplyResultsClean(res.results) ? 'clean' : 'failed';
   };
 
   const selectionEmpty = selectedWireIds(preview, selectedGroups).length === 0;
 
-  // The importable fan curve list counts as seen only once its group has
+  // The importable fan group (curve list or preset line) counts as seen only once it has
   // entered the viewport while the host shows this panel. Without
   // IntersectionObserver (a test DOM) rendering is the best signal there is.
   const fanListRenders = previewStatus === 'loaded'
@@ -176,10 +201,15 @@ export function Nexus2ImportSection({
     });
   };
 
+  const translatedParams = (d: CategoryDetail) => {
+    const params = { ...d.params };
+    for (const [name, key] of Object.entries(d.paramKeys ?? {})) params[name] = t(key);
+    return params;
+  };
   const groups = visibleImportGroups(preview);
   const { titleKey, descriptionKey } = importHeaderKeys(preview);
-  const summaries = groupResultSummaries(importResults);
-  const importSuccess = importPhase === 'results' && allApplyResultsClean(importResults);
+  const summaries = groupResultSummaries(importResults, appliedPreview);
+  const importSuccess = importPhase === 'results' && allApplyResultsClean(importResults) && !hasKeptSetupSkip(importResults);
 
   return (
     <SettingsSection
@@ -213,14 +243,13 @@ export function Nexus2ImportSection({
           )}
 
           {groups.map(group => {
-            const label = t(group.labelKey);
+            const label = t(fanGroupLabelKey(preview, group));
             // A span list: SettingToggle renders the description inside a span.
-            const noteKey = unavailableGroupNoteKey(preview, group);
-            const detail = noteKey ? <span>{t(noteKey)}</span> : (
+            const note = unavailableGroupNote(preview, group);
+            const detail = note ? <span>{t(note.key, Object.keys(note.params).length > 0 ? translatedParams(note) : undefined)}</span> : (
               <span className={styles.detailBullets} role="list">
                 {groupDetailParts(preview, group).map((d, i) => {
-                  const params = { ...d.params };
-                  for (const [name, key] of Object.entries(d.paramKeys ?? {})) params[name] = t(key);
+                  const params = translatedParams(d);
                   return (
                     <span key={`${d.key}-${i}`} className={styles.detailBullet} role="listitem">
                       {d.user?.list
@@ -259,7 +288,9 @@ export function Nexus2ImportSection({
                 <li key={s.groupId} className={styles.resultRow}>
                   <span className={styles.resultCategory}>{t(s.labelKey)}</span>
                   <span className={styles[`resultStatus-${s.status}`]}>
-                    {s.groupId === 'fanCurves' && s.status === 'applied' && s.count !== undefined
+                    {s.groupId === 'fanCurves' && s.status === 'applied' && presetLabelKey(s.preset)
+                      ? t('nexus2Welcome.import.result.presetApplied', { preset: t(presetLabelKey(s.preset)!) })
+                      : s.groupId === 'fanCurves' && s.status === 'applied' && s.count !== undefined
                       ? t(pluralKey('nexus2Welcome.import.result.fanCurvesApplied', language, s.count), { count: s.count })
                       : t(applyStatusKey(s.status))}
                   </span>
@@ -267,10 +298,10 @@ export function Nexus2ImportSection({
                     <span key={issue.id} className={styles.resultDetail}>
                       {issue.detail
                         ? t('nexus2Welcome.import.result.subDetail', {
-                          category: t(categoryLabelKey(issue.id), { id: issue.id }),
+                          category: t(issueCategoryLabelKey(issue, appliedPreview), { id: issue.id }),
                           detail: t(applyDetailKey(issue.detail), { detail: issue.detail }),
                         })
-                        : t(categoryLabelKey(issue.id), { id: issue.id })}
+                        : t(issueCategoryLabelKey(issue, appliedPreview), { id: issue.id })}
                     </span>
                   ))}
                 </li>

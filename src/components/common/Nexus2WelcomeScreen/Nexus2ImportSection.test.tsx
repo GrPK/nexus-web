@@ -404,4 +404,166 @@ describe('Nexus2ImportSection - fan curves', () => {
     fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
     expect(await screen.findByText('nexus2Welcome.import.result.fanCurvesApplied.other:3')).toBeInTheDocument();
   });
+
+  describe('Recommended mode preset', () => {
+    const PRESET_CATEGORY = {
+      id: 'fanCurves' as const, available: true, count: 0,
+      fanCurvesNote: 'recommendedMode' as const, recommendedFrom: 'balanced' as const, recommendedPreset: 'balanced' as const,
+    };
+    const CURVE_CATEGORY = {
+      id: 'fanCurves' as const, available: true, count: 1,
+      fanCurves: [{ name: 'Quiet', kind: 'graph' as const, status: 'import' as const, minimumRaised: false, targets: [{ label: 'Front', status: 'import' as const }] }],
+    };
+    const load = (cat: object) => vi.mocked(previewNexus2Import).mockResolvedValue(
+      { available: true, profileName: null, categories: [cat] } as Nexus2PreviewResponse,
+    );
+
+    it('available: checked, one preset line, preset header, applies', async () => {
+      load(PRESET_CATEGORY);
+      renderSection();
+      expect(await screen.findByRole('switch', { name: 'cooling.title' })).toBeChecked();
+      expect(screen.getByText(`${FAN}.presetDetail:cooling.mode.balanced,cooling.mode.balanced`)).toBeInTheDocument();
+      expect(screen.getAllByText('nexus2Welcome.import.title.fanPreset').length).toBeGreaterThan(0);
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      await waitFor(() => expect(applyNexus2Import).toHaveBeenCalledWith(['fanCurves'], true));
+    });
+
+    it('customized: disabled and unchecked with the kept-setup note', async () => {
+      load({ ...PRESET_CATEGORY, available: false, fanCurvesNote: 'nexus3CoolingCustomized' });
+      renderSection();
+      const fan = await screen.findByRole('switch', { name: FAN_NAME });
+      expect(fan).toBeDisabled();
+      expect(fan).not.toBeChecked();
+      expect(screen.getByText(`${FAN}.note.nexus3CoolingCustomized:cooling.mode.balanced`)).toBeInTheDocument();
+    });
+
+    it('unmappable: keeps the existing note', async () => {
+      load({ id: 'fanCurves', available: false, count: 0, fanCurvesNote: 'recommendedMode' });
+      renderSection();
+      const fan = await screen.findByRole('switch', { name: FAN_NAME });
+      expect(fan).toBeDisabled();
+      expect(screen.getByText(`${FAN}.note.recommendedMode`)).toBeInTheDocument();
+    });
+
+    it('result row names the applied preset', async () => {
+      load(PRESET_CATEGORY);
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'applied', detail: null, preset: 'balanced' }] });
+      renderSection();
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      expect(await screen.findByText('nexus2Welcome.import.result.presetApplied:cooling.mode.balanced')).toBeInTheDocument();
+    });
+
+    it('a preset-only group still needs to be seen before it applies', async () => {
+      load(PRESET_CATEGORY);
+      const handleRef = { current: null as Nexus2ImportHandle | null };
+      const view = renderSection({ handleRef, showAction: false, visible: false });
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      expect(handleRef.current?.fanCurvesNeedReview()).toBe(true);
+      expect(handleRef.current?.fanCurvesNeedReview(true)).toBe(true);
+      view.rerender(<Nexus2ImportSection open showAction={false} handleRef={handleRef} visible />);
+      expect(handleRef.current?.fanCurvesNeedReview()).toBe(false);
+    });
+
+    it('result row is labeled Cooling when the preset applied', async () => {
+      load(PRESET_CATEGORY);
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'applied', detail: null, preset: 'balanced' }] });
+      renderSection();
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      await screen.findByText('nexus2Welcome.import.result.presetApplied:cooling.mode.balanced');
+      expect(screen.queryByText(FAN_NAME)).not.toBeInTheDocument();
+    });
+
+    it('a post-preview skip shows the reason under a Cooling row, no success summary, and refreshes the group', async () => {
+      const customized = { ...PRESET_CATEGORY, available: false, fanCurvesNote: 'nexus3CoolingCustomized' as const };
+      vi.mocked(previewNexus2Import)
+        .mockResolvedValueOnce({ available: true, profileName: null, categories: [PRESET_CATEGORY] } as Nexus2PreviewResponse)
+        .mockResolvedValue({ available: true, profileName: null, categories: [customized] } as Nexus2PreviewResponse);
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'skipped', detail: 'nexus3CoolingCustomized' }] });
+      renderSection();
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      expect(await screen.findByText(/nexus2Welcome.import.result.detail.nexus3CoolingCustomized/)).toBeInTheDocument();
+      expect(screen.queryByText('nexus2Welcome.import.successSummary')).not.toBeInTheDocument();
+      // The result row keeps the Cooling label even after the preview refresh flips the toggle to curves wording.
+      await waitFor(() => expect(screen.getByRole('switch', { name: FAN_NAME })).toBeDisabled());
+      expect(screen.getByRole('switch', { name: FAN_NAME })).not.toBeChecked();
+      expect(previewNexus2Import).toHaveBeenCalledTimes(2);
+      const row = screen.getByText('nexus2Welcome.import.result.status.skipped').closest('li')!;
+      expect(within(row).getByText('cooling.title', { selector: `.${styles.resultCategory}` })).toBeInTheDocument();
+    });
+
+    it('the post-skip refetch keeps the other toggles and drops a late response after unmount', async () => {
+      const customized = { ...PRESET_CATEGORY, available: false, fanCurvesNote: 'nexus3CoolingCustomized' as const };
+      let resolveFresh: (v: Nexus2PreviewResponse) => void = () => {};
+      vi.mocked(previewNexus2Import)
+        .mockResolvedValueOnce({ available: true, profileName: null, categories: [Q60_FACE, PRESET_CATEGORY] } as Nexus2PreviewResponse)
+        .mockImplementationOnce(() => new Promise<Nexus2PreviewResponse>(r => { resolveFresh = r; }));
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'skipped', detail: 'nexus3CoolingCustomized' }] });
+      renderSection();
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      fireEvent.click(screen.getByRole('switch', { name: Q60_GROUP_NAME }));
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      await waitFor(() => expect(previewNexus2Import).toHaveBeenCalledTimes(2));
+      // The user re-ticks Q-Series while the refetch is in flight; the late response must not undo it.
+      fireEvent.click(screen.getByRole('switch', { name: Q60_GROUP_NAME }));
+      await act(async () => { resolveFresh({ available: true, profileName: null, categories: [Q60_FACE, customized] } as Nexus2PreviewResponse); });
+      expect(screen.getByRole('switch', { name: Q60_GROUP_NAME })).toBeChecked();
+      expect(screen.getByRole('switch', { name: FAN_NAME })).not.toBeChecked();
+    });
+
+    it('a stale refetch after a reopen is ignored', async () => {
+      const customized = { ...PRESET_CATEGORY, available: false, fanCurvesNote: 'nexus3CoolingCustomized' as const };
+      let resolveFresh: (v: Nexus2PreviewResponse) => void = () => {};
+      vi.mocked(previewNexus2Import)
+        .mockResolvedValueOnce({ available: true, profileName: null, categories: [PRESET_CATEGORY] } as Nexus2PreviewResponse)
+        .mockImplementationOnce(() => new Promise<Nexus2PreviewResponse>(r => { resolveFresh = r; }))
+        .mockResolvedValue({ available: true, profileName: null, categories: [PRESET_CATEGORY] } as Nexus2PreviewResponse);
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'skipped', detail: 'coolingDisabled' }] });
+      const view = render(<Nexus2ImportSection open />);
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      await waitFor(() => expect(previewNexus2Import).toHaveBeenCalledTimes(2));
+      view.rerender(<Nexus2ImportSection open={false} />);
+      view.rerender(<Nexus2ImportSection open />);
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      await act(async () => { resolveFresh({ available: true, profileName: null, categories: [customized] } as Nexus2PreviewResponse); });
+      expect(screen.getByRole('switch', { name: 'cooling.title' })).toBeChecked();
+    });
+
+    it('a coolingDisabled skip on the curve path labels the line like its row', async () => {
+      vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [CURVE_CATEGORY] } as Nexus2PreviewResponse);
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'skipped', detail: 'coolingDisabled' }] });
+      renderSection();
+      await screen.findByRole('switch', { name: FAN_NAME });
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      const row = (await screen.findByText('nexus2Welcome.import.result.status.skipped')).closest('li')!;
+      expect(within(row).getByText(FAN_NAME)).toBeInTheDocument();
+      expect(within(row).getByText(/^nexus2Welcome.import.result.subDetail:nexus2Welcome.import.group.fanCurves.label/)).toBeInTheDocument();
+    });
+
+    it('a coolingDisabled skip is informational: clean outcome, reason shown, no success', async () => {
+      load(PRESET_CATEGORY);
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'skipped', detail: 'coolingDisabled' }] });
+      const handleRef = { current: null as Nexus2ImportHandle | null };
+      renderSection({ handleRef, showAction: false });
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      let outcome: string | undefined;
+      await act(async () => { outcome = await handleRef.current?.runImport(); });
+      expect(outcome).toBe('clean');
+      expect(await screen.findByText(/nexus2Welcome.import.result.detail.coolingDisabled/)).toBeInTheDocument();
+      expect(screen.queryByText('nexus2Welcome.import.successSummary')).not.toBeInTheDocument();
+    });
+
+    it('an unknown preset is unmappable: note shown, group disabled, never curves', async () => {
+      load({ ...PRESET_CATEGORY, recommendedPreset: 'future' });
+      renderSection();
+      const fan = await screen.findByRole('switch', { name: FAN_NAME });
+      expect(fan).toBeDisabled();
+      expect(fan).not.toBeChecked();
+      expect(screen.getByText(`${FAN}.note.recommendedMode`)).toBeInTheDocument();
+      expect(screen.queryByText(/fanCurves.detail/)).not.toBeInTheDocument();
+    });
+  });
 });

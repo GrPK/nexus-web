@@ -2,7 +2,7 @@
 // direct testing (see elgatoImportUtils.ts for the pattern this follows).
 import type {
   Nexus2ApplyResult, Nexus2ApplyStatus, Nexus2CategoryId, Nexus2FanCurvesCategory, Nexus2PreviewCategory,
-  Nexus2PreviewResponse,
+  Nexus2PreviewResponse, Nexus3CoolingPreset,
 } from '../../../api/migration';
 
 const CATEGORY_LABEL_KEYS: Partial<Record<Nexus2CategoryId, string>> = {
@@ -109,8 +109,52 @@ export function fanCurveReasonKey(reason: string | undefined): string {
     : 'nexus2Welcome.import.category.fanCurves.reason.unknown';
 }
 
+const PRESET_LABEL_KEYS: Record<Nexus3CoolingPreset, string> = {
+  silent: 'cooling.mode.silent',
+  balanced: 'cooling.mode.balanced',
+  turbo: 'cooling.mode.turbo',
+};
+
+// Nexus 2's silent and balanced read like the Nexus 3 cooling page labels.
+const N2_MODE_LABEL_KEYS: Record<string, string> = {
+  silent: 'cooling.mode.silent',
+  balanced: 'cooling.mode.balanced',
+  performance: 'nexus2Welcome.import.category.fanCurves.mode.performance',
+};
+
+/** The i18n key naming a Nexus 3 preset, or null for a value this build does not know. */
+export function presetLabelKey(preset: string | undefined): string | null {
+  return (preset && (PRESET_LABEL_KEYS as Record<string, string>)[preset]) || null;
+}
+
+function n2ModeLabelKey(mode: string | undefined): string | null {
+  return (mode && N2_MODE_LABEL_KEYS[mode]) || null;
+}
+
+/** True when the fan group carries only a Recommended-mode preset, with no curves. */
+export function isPresetOnlyFan(cat: Nexus2FanCurvesCategory): boolean {
+  return cat.available && cat.fanCurvesNote === 'recommendedMode' && presetLabelKey(cat.recommendedPreset) !== null;
+}
+
+/** Label for a fan group row: a preset-only group is about cooling, not curves. */
+export function fanGroupLabelKey(preview: Nexus2PreviewResponse | null, group: ImportGroupDef): string {
+  const cat = preview?.categories.find((c): c is Nexus2FanCurvesCategory => c.id === 'fanCurves');
+  return group.id === 'fanCurves' && cat && isPresetOnlyFan(cat) ? 'cooling.title' : group.labelKey;
+}
+
+function fanPresetDetail(cat: Nexus2FanCurvesCategory): CategoryDetail {
+  const base = 'nexus2Welcome.import.category.fanCurves';
+  const modeKey = n2ModeLabelKey(cat.recommendedFrom);
+  return {
+    key: modeKey ? `${base}.presetDetail` : `${base}.presetDetailNoMode`,
+    params: { preset: '-', ...(modeKey ? { mode: '-' } : {}) },
+    paramKeys: { preset: presetLabelKey(cat.recommendedPreset)!, ...(modeKey ? { mode: modeKey } : {}) },
+  };
+}
+
 function fanCurveDetails(cat: Nexus2FanCurvesCategory): CategoryDetail[] {
   const base = 'nexus2Welcome.import.category.fanCurves';
+  if (isPresetOnlyFan(cat)) return [fanPresetDetail(cat)];
   // An all-skipped group has no count to announce, only reasons.
   const lines: CategoryDetail[] = cat.available
     ? [{ key: `${base}.detail`, params: { count: cat.count }, plural: true }]
@@ -148,6 +192,8 @@ export function applyStatusKey(status: string): string {
 
 const APPLY_DETAIL_KEYS: Record<string, string> = {
   'no-q60-record': 'nexus2Welcome.import.result.detail.noQ60Record',
+  nexus3CoolingCustomized: 'nexus2Welcome.import.result.detail.nexus3CoolingCustomized',
+  coolingDisabled: 'nexus2Welcome.import.result.detail.coolingDisabled',
 };
 
 /** Localizes a known apply-result machine hint; unknown hints fall back to a generic line. */
@@ -155,8 +201,19 @@ export function applyDetailKey(detail: string): string {
   return APPLY_DETAIL_KEYS[detail] ?? 'nexus2Welcome.import.result.detail.generic';
 }
 
+/** A Recommended-mode group whose preset this build does not know is treated as unmappable, never as curves. */
+function isUnknownPresetFan(c: Nexus2PreviewCategory): boolean {
+  return c.id === 'fanCurves' && c.fanCurvesNote === 'recommendedMode' && presetLabelKey(c.recommendedPreset) === null;
+}
+
+/** Label for an apply-result issue line: the fan group's own row label, so the line matches its row. */
+export function issueCategoryLabelKey(issue: Nexus2ApplyResult, preview: Nexus2PreviewResponse | null = null): string {
+  const fan = IMPORT_GROUPS.find(g => g.id === 'fanCurves')!;
+  return issue.id === 'fanCurves' ? fanGroupLabelKey(preview, fan) : categoryLabelKey(issue.id);
+}
+
 export function availableCategories(preview: Nexus2PreviewResponse | null): Nexus2PreviewCategory[] {
-  return preview?.categories.filter(c => c.available) ?? [];
+  return preview?.categories.filter(c => c.available && !isUnknownPresetFan(c)) ?? [];
 }
 
 // The wire categories are consolidated into three user-facing groups (Y70
@@ -199,8 +256,22 @@ function skippedOnlyFanCurves(preview: Nexus2PreviewResponse | null): Nexus2FanC
 export function unavailableGroupNoteKey(preview: Nexus2PreviewResponse | null, group: ImportGroupDef): string | null {
   if (group.id !== 'fanCurves') return null;
   const cat = preview?.categories.find((c): c is Nexus2FanCurvesCategory => c.id === 'fanCurves');
-  if (!cat || cat.available || !cat.fanCurvesNote) return null;
+  if (!cat || !cat.fanCurvesNote || (cat.available && !isUnknownPresetFan(cat))) return null;
   return `nexus2Welcome.import.category.fanCurves.note.${cat.fanCurvesNote}`;
+}
+
+/** The note line for an unavailable fan group, with the Nexus 2 mode filled in when the service sent a known one. */
+export function unavailableGroupNote(preview: Nexus2PreviewResponse | null, group: ImportGroupDef): CategoryDetail | null {
+  const key = unavailableGroupNoteKey(preview, group);
+  if (!key) return null;
+  const cat = preview?.categories.find((c): c is Nexus2FanCurvesCategory => c.id === 'fanCurves');
+  const modeKey = cat?.fanCurvesNote === 'nexus3CoolingCustomized' ? n2ModeLabelKey(cat.recommendedFrom) : null;
+  if (cat?.fanCurvesNote === 'nexus3CoolingCustomized') {
+    return modeKey
+      ? { key, params: { mode: '-' }, paramKeys: { mode: modeKey } }
+      : { key: `${key}NoMode`, params: {} };
+  }
+  return { key, params: {} };
 }
 
 /**
@@ -213,10 +284,15 @@ export function importHeaderKeys(preview: Nexus2PreviewResponse | null): { title
   const groups = IMPORT_GROUPS.filter(g => groupHasAvailable(preview, g));
   const fan = groups.some(g => g.id === 'fanCurves');
   const personalization = groups.some(g => g.id !== 'fanCurves');
+  const fanCat = preview?.categories.find((c): c is Nexus2FanCurvesCategory => c.id === 'fanCurves');
+  // A preset-only fan group switches a cooling preset; it lists no fans.
+  const preset = fan && !!fanCat && isPresetOnlyFan(fanCat);
   // Nothing importable: a neutral header that promises no replacement.
-  const suffix = fan ? (personalization ? '.both' : '.fanCurves') : (personalization ? '' : '.none');
+  const suffix = fan
+    ? (preset ? (personalization ? '.bothPreset' : '.fanPreset') : (personalization ? '.both' : '.fanCurves'))
+    : (personalization ? '' : '.none');
   return {
-    titleKey: `nexus2Welcome.import.title${suffix}`,
+    titleKey: `nexus2Welcome.import.title${suffix === '.bothPreset' ? '.both' : suffix}`,
     descriptionKey: `nexus2Welcome.import.description${suffix}`,
   };
 }
@@ -268,6 +344,8 @@ export interface GroupResultSummary {
   status: Nexus2ApplyStatus;
   /** Items applied, when the service reports a count (fan curves). */
   count?: number;
+  /** The Nexus 3 cooling preset applied (fan curves). */
+  preset?: Nexus3CoolingPreset;
   /** The failed/needsConfirm members, for the detail line(s) under the group row. */
   issues: Nexus2ApplyResult[];
 }
@@ -277,7 +355,7 @@ export interface GroupResultSummary {
  * (failed beats needsConfirm beats applied beats skipped), so a single stuck
  * category never reads as an overall success.
  */
-export function groupResultSummaries(results: Nexus2ApplyResult[] | null): GroupResultSummary[] {
+export function groupResultSummaries(results: Nexus2ApplyResult[] | null, preview: Nexus2PreviewResponse | null = null): GroupResultSummary[] {
   if (!results) return [];
   const summaries: GroupResultSummary[] = [];
   for (const group of IMPORT_GROUPS) {
@@ -287,14 +365,34 @@ export function groupResultSummaries(results: Nexus2ApplyResult[] | null): Group
       (worst, r) => (STATUS_SEVERITY[r.status] > STATUS_SEVERITY[worst] ? r.status : worst),
       members[0].status,
     );
-    const issues = members.filter(r => r.status === 'failed' || r.status === 'needsConfirm');
+    const issues = members.filter(r => r.status === 'failed' || r.status === 'needsConfirm' || isKeptSetupSkip(r));
     const count = members.find(r => typeof r.count === 'number')?.count;
-    summaries.push({ groupId: group.id, labelKey: group.labelKey, status, issues, ...(count !== undefined ? { count } : {}) });
+    const preset = members.find(r => presetLabelKey(r.preset) !== null)?.preset;
+    summaries.push({
+      groupId: group.id, labelKey: fanGroupLabelKey(preview, group), status, issues,
+      ...(count !== undefined ? { count } : {}), ...(preset ? { preset } : {}),
+    });
   }
   return summaries;
 }
 
-/** True once every result applied cleanly (skipped counts as clean; failed/needsConfirm do not). */
+const INFORMATIONAL_SKIP_DETAILS = new Set(['nexus3CoolingCustomized', 'coolingDisabled']);
+
+/**
+ * A skip because Nexus 3 cooling changed or was turned off after the preview
+ * (the user or an automatic thermal-guard heal did it). Informational: clean
+ * for flow purposes, but its reason is shown and no success is claimed.
+ */
+function isKeptSetupSkip(r: Nexus2ApplyResult): boolean {
+  return r.status === 'skipped' && r.detail !== null && INFORMATIONAL_SKIP_DETAILS.has(r.detail);
+}
+
+/** True when any result is an informational kept-setup skip. */
+export function hasKeptSetupSkip(results: Nexus2ApplyResult[] | null): boolean {
+  return !!results && results.some(isKeptSetupSkip);
+}
+
+/** True once no result failed or needs confirmation (skips, including kept-setup ones, count as clean). */
 export function allApplyResultsClean(results: Nexus2ApplyResult[] | null): boolean {
   return !!results && results.length > 0 && results.every(r => r.status === 'applied' || r.status === 'skipped');
 }
