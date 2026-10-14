@@ -100,7 +100,7 @@ export interface Nexus2FanCurvePreviewDto {
   targets: Nexus2FanCurveTargetDto[];
 }
 
-export type Nexus2FanCurvesNote = 'recommendedMode' | 'noUserCurves';
+export type Nexus2FanCurvesNote = 'recommendedMode' | 'noUserCurves' | 'coolingDisabled';
 
 export interface Nexus2FanCurvesCategory extends Nexus2PreviewCategoryBase {
   id: 'fanCurves';

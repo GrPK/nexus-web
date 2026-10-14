@@ -83,7 +83,7 @@ export function categoryDetails(cat: Nexus2PreviewCategory): CategoryDetail[] {
 const FAN_CURVE_REASONS = new Set([
   'mixedCurve', 'nonTemperatureInput', 'sensorNotFound', 'sensorAmbiguous', 'sensorImplausible', 'badPoints',
   'unsafeCurve', 'noTargets', 'pumpKept', 'targetNotFound', 'targetAmbiguous', 'uncontrolledChannel',
-  'unsupportedTarget', 'gpuFlat',
+  'unsupportedTarget', 'gpuFlat', 'followedChannel', 'guardHealed',
 ]);
 
 /** Plain-language key for a curve or target skip reason; an unknown or missing code degrades to a generic line. */

@@ -315,6 +315,8 @@ describe('importHeaderKeys', () => {
 describe('fan curves', () => {
   it('maps known reasons and degrades unknown or missing ones to the generic line', () => {
     expect(fanCurveReasonKey('pumpKept')).toBe(`${FAN}.reason.pumpKept`);
+    expect(fanCurveReasonKey('followedChannel')).toBe(`${FAN}.reason.followedChannel`);
+    expect(fanCurveReasonKey('guardHealed')).toBe(`${FAN}.reason.guardHealed`);
     expect(fanCurveReasonKey('futureCode')).toBe(`${FAN}.reason.unknown`);
     expect(fanCurveReasonKey(undefined)).toBe(`${FAN}.reason.unknown`);
   });
@@ -350,6 +352,10 @@ describe('fan curves', () => {
     expect(defaultSelectedGroupIds(noted).size).toBe(0);
     expect(unavailableGroupNoteKey(noted, FAN_GROUP)).toBe(`${FAN}.note.recommendedMode`);
     expect(selectedWireIds(noted, new Set(['fanCurves']))).toEqual([]);
+
+    const off = { available: true, profileName: null, categories: [{ id: 'fanCurves' as const, available: false, count: 0, fanCurvesNote: 'coolingDisabled' as const }] };
+    expect(unavailableGroupNoteKey(off, FAN_GROUP)).toBe(`${FAN}.note.coolingDisabled`);
+    expect(visibleImportGroups(off)).toEqual([FAN_GROUP]);
 
     const bare = { available: true, profileName: null, categories: [{ id: 'fanCurves' as const, available: false, count: 0 }] };
     expect(visibleImportGroups(bare)).toEqual([]);
