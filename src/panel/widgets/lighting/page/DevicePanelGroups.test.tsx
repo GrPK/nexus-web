@@ -795,9 +795,9 @@ describe('DevicePanel pins', () => {
 });
 
 describe('DevicePanel firmware-played devices', () => {
-  const strimer = device('lianli-wireless:64F271E566E1:z0', 'Strimer 24-Pin', { deviceId: 'lianli-wireless:64F271E566E1' });
+  const strimer = device('lianli-wireless:64F271E566E1:z0', 'Strimer 24-Pin', { deviceId: 'lianli-wireless:64F271E566E1', parentDeviceId: 'lianli-wireless' });
 
-  function renderFirmware(onFirmwareTakeControl = vi.fn()) {
+  function renderFirmware(onFirmwareTakeControl = vi.fn(), onOpenDevicePage = vi.fn()) {
     render(
       <DevicePanel
         devices={[strimer, devices[0]]}
@@ -811,14 +811,23 @@ describe('DevicePanel firmware-played devices', () => {
         onOpenSettings={() => {}}
         firmwareDeviceIds={new Set(['lianli-wireless:64F271E566E1'])}
         onFirmwareTakeControl={onFirmwareTakeControl}
+        onOpenDevicePage={onOpenDevicePage}
       />,
     );
     return onFirmwareTakeControl;
   }
 
+  it('opens the device page of the handler that plays the animation', () => {
+    const onOpenDevicePage = vi.fn();
+    renderFirmware(vi.fn(), onOpenDevicePage);
+    fireEvent.click(screen.getAllByRole('button', { name: 'lighting.devices.moreActions' })[0]);
+    fireEvent.click(screen.getByText('lighting.devices.menuOpenDevicePage'));
+    expect(onOpenDevicePage).toHaveBeenCalledWith('curated-lianli-wireless');
+  });
+
   it('badges only the card whose device plays a stored animation', () => {
     renderFirmware();
-    expect(screen.getAllByText('lighting.devices.smarthub.firmwareBadge')).toHaveLength(1);
+    expect(screen.getAllByText('lighting.devices.hardwareControlBadge')).toHaveLength(1);
   });
 
   it('hands that device back to the engine from its menu', () => {
@@ -832,7 +841,7 @@ describe('DevicePanel firmware-played devices', () => {
 describe('DevicePanel wired hubs in firmware mode', () => {
   const port = (hub: string, n: number) => device(`${hub}:port${n}`, `${hub} Port ${n}`, { parentDeviceId: hub, deviceId: `${hub}:port${n}`, zoneIndex: n });
 
-  function renderHubs(onLianLiTakeControl = vi.fn()) {
+  function renderHubs(onLianLiTakeControl = vi.fn(), onOpenDevicePage = vi.fn()) {
     render(
       <DevicePanel
         devices={[port('lianli', 0), port('lianli2', 0)]}
@@ -846,15 +855,32 @@ describe('DevicePanel wired hubs in firmware mode', () => {
         onOpenSettings={() => {}}
         lianLiFirmwareHubs={new Set(['lianli2'])}
         onLianLiTakeControl={onLianLiTakeControl}
+        onOpenDevicePage={onOpenDevicePage}
       />,
     );
     return onLianLiTakeControl;
   }
 
+  it('opens that hub\'s device page from its card menu', () => {
+    const onOpenDevicePage = vi.fn();
+    renderHubs(vi.fn(), onOpenDevicePage);
+    const card = document.querySelector('[data-search-anchor="lighting-device:lianli2:port0"]') as HTMLElement;
+    fireEvent.click(within(card).getByRole('button', { name: 'lighting.devices.moreActions' }));
+    fireEvent.click(screen.getByText('lighting.devices.menuOpenDevicePage'));
+    expect(onOpenDevicePage).toHaveBeenCalledWith('curated-lianli2');
+  });
+
+  it('keeps the device page row off a card the engine drives', () => {
+    renderHubs();
+    const card = document.querySelector('[data-search-anchor="lighting-device:lianli:port0"]') as HTMLElement;
+    fireEvent.click(within(card).getByRole('button', { name: 'lighting.devices.moreActions' }));
+    expect(screen.queryByText('lighting.devices.menuOpenDevicePage')).toBeNull();
+  });
+
   it('badges only the cards of the hub playing a firmware mode', () => {
     renderHubs();
-    expect(screen.getAllByText('lighting.devices.smarthub.firmwareBadge')).toHaveLength(1);
-    const badged = screen.getByText('lighting.devices.smarthub.firmwareBadge').closest('[data-search-anchor]');
+    expect(screen.getAllByText('lighting.devices.hardwareControlBadge')).toHaveLength(1);
+    const badged = screen.getByText('lighting.devices.hardwareControlBadge').closest('[data-search-anchor]');
     expect(badged?.getAttribute('data-search-anchor')).toBe('lighting-device:lianli2:port0');
   });
 
@@ -888,5 +914,67 @@ describe('DevicePanel deep-link anchors', () => {
     );
     expect(document.querySelector('[data-search-anchor="lighting-group:mb:lianli"]')).not.toBeNull();
     expect(document.querySelector('[data-search-anchor="lighting-device:lianli:port1"]')).not.toBeNull();
+  });
+});
+
+describe('DevicePanel cards of devices controlled on their device page', () => {
+  const umbra = device('umbra:z0', 'Asiahorse Umbra V2', { parentDeviceId: 'asiahorse-umbra', devicePageReason: 'firmware' });
+  const strimer = device('strimer:atx:z0', 'Lian Li Strimer', {
+    deviceId: 'strimer:atx', parentDeviceId: 'strimer', devicePageReason: 'argbInput',
+  });
+
+  function renderPage(onOpenDevicePage = vi.fn()) {
+    render(
+      <DevicePanel
+        devices={[umbra, strimer, devices[0]]}
+        selectedIds={new Set()}
+        onSetSelection={() => {}}
+        onTogglePower={() => {}}
+        onSetPower={() => {}}
+        onToggleControlled={() => {}}
+        onSetControlled={() => {}}
+        lightingOff={false}
+        onOpenSettings={() => {}}
+        firmwareDeviceIds={new Set(['strimer:atx'])}
+        onFirmwareTakeControl={() => {}}
+        onOpenDevicePage={onOpenDevicePage}
+        onRenameDevice={() => {}}
+        onGroupsChange={() => {}}
+      />,
+    );
+    return onOpenDevicePage;
+  }
+
+  it('badges them as hardware control in the normal list', () => {
+    renderPage();
+    expect(screen.getAllByText('lighting.devices.hardwareControlBadge')).toHaveLength(2);
+    expect(screen.getByText('Strip one')).toBeTruthy();
+  });
+
+  it.each([
+    ['Asiahorse Umbra V2', 'lighting.devices.devicePageFirmwareTooltip'],
+    ['Lian Li Strimer', 'lighting.devices.devicePageArgbTooltip'],
+  ])('picks the badge tooltip by reason for %s', async (name, tooltip) => {
+    renderPage();
+    const card = screen.getByText(name).closest('[data-search-anchor]') as HTMLElement;
+    const badge = card.querySelector('span[class*="deviceMetaBadge"]') as HTMLElement;
+    expect(badge).not.toBeNull();
+    fireEvent.focus(badge);
+    expect(await screen.findByText(tooltip)).toBeTruthy();
+  });
+
+  it('keeps the rename and move-to-group rows on the card menu', () => {
+    renderPage();
+    fireEvent.contextMenu(screen.getByText('Asiahorse Umbra V2'));
+    expect(screen.getByText('lighting.devices.rename')).toBeTruthy();
+    expect(screen.getByText('lighting.devices.moveToNewGroup')).toBeTruthy();
+  });
+
+  it('offers Open device page but no Take control, even when the own-effect table matches', () => {
+    const onOpenDevicePage = renderPage();
+    fireEvent.contextMenu(screen.getByText('Lian Li Strimer'));
+    expect(screen.queryByText('lighting.devices.menuTakeControl')).toBeNull();
+    fireEvent.click(screen.getByText('lighting.devices.menuOpenDevicePage'));
+    expect(onOpenDevicePage).toHaveBeenCalledWith('curated-strimer');
   });
 });

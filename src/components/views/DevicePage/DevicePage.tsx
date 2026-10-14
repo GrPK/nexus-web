@@ -17,6 +17,7 @@ import { typeForMarketplace } from '../../../widgets/marketplaceRegistry';
 import { LianLiTlDevicePage } from './LianLiTlDevicePage';
 import { LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
 import { Galahad2DevicePage } from './Galahad2DevicePage';
+import { AsiahorseUmbraDevicePage } from './AsiahorseUmbraDevicePage';
 import { KrakenDevicePage } from './KrakenDevicePage';
 import { StrimerDevicePage } from './StrimerDevicePage';
 import { NollieDevicePage } from './NollieDevicePage';
@@ -259,6 +260,10 @@ function DeviceBody({ device, controlDevice, onOpenFirmware, onSectionNavigate }
 
   if (device.curatedId === 'lianli-aio') {
     return <Galahad2DevicePage key={device.key} onSectionNavigate={onSectionNavigate} />;
+  }
+
+  if (device.curatedId === 'asiahorse-umbra') {
+    return <AsiahorseUmbraDevicePage key={device.key} onSectionNavigate={onSectionNavigate} />;
   }
 
   if (device.curatedId === 'nzxt-kraken') {

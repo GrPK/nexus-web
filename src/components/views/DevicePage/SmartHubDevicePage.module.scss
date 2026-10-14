@@ -23,12 +23,6 @@
   scrollbar-gutter: stable;
 }
 
-.savingBadge {
-  @include text-label;
-  font-family: var(--font-mono);
-  color: var(--accent);
-}
-
 // Header + box come from the shared SettingsSection (header-above-box).
 .sectionBox {
   gap: 0.75rem;

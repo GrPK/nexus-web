@@ -1,0 +1,26 @@
+@use '../../../styles/interactions' as *;
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.swatch {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  padding: 0;
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}

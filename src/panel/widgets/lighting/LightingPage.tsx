@@ -24,6 +24,9 @@ import { useLayoutPresets, devicesToLayouts, devicesToPower } from './page/useLa
 import { mediaIdle, playCurrentOrFirstMedia } from '../../../api/mediaLibrary';
 import { getLianLiLighting, isLianLiHubId, setLianLiLighting } from '../../../api/lianli';
 import { getLianLiWirelessLighting, setLianLiWirelessChainLighting } from '../../../api/lianli-wireless';
+import { getHydroShift2Lighting, setHydroShift2Lighting } from '../../../api/hydroshift2';
+import { getGalahad2Lighting, setGalahad2Lighting } from '../../../api/lianli-aio';
+import { getStrimerLighting, setStrimerLighting } from '../../../api/strimer';
 import { useLightingFrames } from '../../../hooks/useLightingFrames';
 import { useLightingSync, normalizeSync } from '../../../hooks/useLightingSync';
 import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
@@ -61,7 +64,7 @@ import { SearchInput } from '../../../components/common/SearchInput/SearchInput'
 import { usePersistentState } from '../../../hooks/usePersistentState';
 import {
   staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, pinGridKey, pinHex, pinSignature, type Pins,
-  pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, pressReach, tabPressChangesNothing, clearLegacyLightingKeys,
+  pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, pressReach, engineReaches, selectAllEligible, tabPressChangesNothing, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
@@ -91,7 +94,7 @@ import { MediaCanvasNotice } from './page/MediaCanvasNotice';
 import { MediaBackdrop } from './page/MediaBackdrop';
 import { DevicePanel } from './page/DevicePanel';
 import { type DiscoveryState } from './page/DeviceDiscoveryCard';
-import { zoneCardSelectable, zoneCardUnavailable } from './page/ZoneCard';
+import { zoneCardSelectable, zoneCardSelectionHoldable, zoneCardUnavailable } from './page/ZoneCard';
 import { Button } from '../../../components/common/Button/Button';
 import { GAME_SYNC_GUIDE_URL } from '../../../lib/externalLinks';
 import { GameSyncLeftPane } from './page/GameSyncLeftPane';
@@ -167,6 +170,33 @@ const layoutHistoryStore = {
 // How long the rail keeps saying a scan is running when none was ever reported.
 const DISCOVERY_GRACE_MS = 4000;
 const DEVICE_ORDER_KEY = 'lighting.deviceOrder';
+
+/** Devices that play their own effect unless set to `lightingPageMode`, keyed by their cards' deviceIds. */
+const OWN_EFFECT_DEVICES: readonly {
+  deviceIds: readonly string[];
+  lightingPageMode: string;
+  getMode: () => Promise<string | null>;
+  setMode: (mode: string) => Promise<unknown>;
+}[] = [
+  {
+    deviceIds: ['lianli-hydroshift2'],
+    lightingPageMode: 'canvas',
+    getMode: () => getHydroShift2Lighting().then(l => l?.mode ?? null),
+    setMode: mode => setHydroShift2Lighting({ mode }),
+  },
+  {
+    deviceIds: ['lianli-aio'],
+    lightingPageMode: 'canvas',
+    getMode: () => getGalahad2Lighting().then(l => l?.mode ?? null),
+    setMode: mode => setGalahad2Lighting({ mode }),
+  },
+  {
+    deviceIds: ['strimer:atx', 'strimer:gpu'],
+    lightingPageMode: 'custom',
+    getMode: () => getStrimerLighting().then(l => l?.mode ?? null),
+    setMode: mode => setStrimerLighting({ mode }),
+  },
+];
 function loadDeviceOrder(): string[] {
   try {
     const raw = localStorage.getItem(DEVICE_ORDER_KEY);
@@ -326,6 +356,44 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (!await setLianLiWirelessChainLighting(mac, { mode: 'custom' })) void refreshWirelessPresets();
   }, [refreshWirelessPresets]);
 
+  // Device ids of OWN_EFFECT_DEVICES not following the Lighting page; only present devices are read.
+  const [ownEffectIds, setOwnEffectIds] = useState<ReadonlySet<string>>(() => new Set());
+  const ownEffectPresent = useMemo(
+    () => OWN_EFFECT_DEVICES.map(e => e.deviceIds.some(id => devices.some(d => d.deviceId === id)) ? '1' : '0').join(''),
+    [devices],
+  );
+  // Only the newest read applies, so one started before a Take control cannot restore the old state.
+  const ownEffectSeq = useRef(0);
+  // A device whose read fails keeps its last known state.
+  const refreshOwnEffects = useCallback(async () => {
+    const seq = ++ownEffectSeq.current;
+    const modes = await Promise.all(OWN_EFFECT_DEVICES.map((e, i) =>
+      ownEffectPresent[i] === '1' ? e.getMode().catch(() => null) : Promise.resolve(null)));
+    if (seq !== ownEffectSeq.current) return;
+    setOwnEffectIds(prev => {
+      const next = new Set<string>();
+      OWN_EFFECT_DEVICES.forEach((e, i) => {
+        if (ownEffectPresent[i] !== '1') return;
+        const mode = modes[i];
+        if (mode === null ? e.deviceIds.some(id => prev.has(id)) : mode !== e.lightingPageMode) {
+          e.deviceIds.forEach(id => next.add(id));
+        }
+      });
+      return next;
+    });
+  }, [ownEffectPresent]);
+  const handleOwnEffectTakeControl = useCallback(async (deviceId: string) => {
+    const entry = OWN_EFFECT_DEVICES.find(e => e.deviceIds.includes(deviceId));
+    if (!entry) return;
+    ownEffectSeq.current++;
+    setOwnEffectIds(prev => new Set([...prev].filter(id => !entry.deviceIds.includes(id))));
+    if (!await entry.setMode(entry.lightingPageMode)) void refreshOwnEffects();
+  }, [refreshOwnEffects]);
+  const firmwareDeviceIds = useMemo(
+    () => new Set([...wirelessPresetIds, ...ownEffectIds]),
+    [wirelessPresetIds, ownEffectIds],
+  );
+
   // Pinned devices, keyed by device id. The service owns them; this is its
   // copy plus the optimistic edits made here, re-read on every lighting frame.
   const { pins, refresh: refreshPins, applyPins, recordPins } = usePins();
@@ -397,7 +465,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // Nexus Control off joins lights off: both mean the hardware is not wearing
     // what the engine renders, and such a card can now be selected onto the
     // canvas.
-    for (const d of visibleDevices) if (!d.ledsOn || d.controlled === false) set.add(d.id);
+    for (const d of visibleDevices) if (!d.ledsOn || d.controlled === false || d.devicePageReason !== undefined) set.add(d.id);
     return set;
   }, [visibleDevices]);
 
@@ -787,6 +855,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
      
     void refreshDevices();
     void refreshWirelessPresets();
+    void refreshOwnEffects();
     // A preset (picked here, on another client, or by app focus) can carry its own 3D view.
     if (SCENE_3D) void sceneApi.refreshView();
     // A pin set from another client arrives on this frame; ids with a write
@@ -1530,7 +1599,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Cards a SELECTION can hold, which is wider: a click lands on a dark or
   // un-driven card too, since selecting it is how its menu gets opened.
   const selectionKeepIds = useMemo(
-    () => orderedDevices.filter(d => !zoneCardUnavailable(d)).map(d => d.id),
+    () => orderedDevices.filter(zoneCardSelectionHoldable).map(d => d.id),
     [orderedDevices],
   );
   // Select all takes dark cards too, but skips Nexus Control off ones, which the
@@ -1538,7 +1607,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // narrows it to the matches for the same reason.
   const selectAllIds = useMemo(
     () => (railSearch.active ? railDevices : orderedDevices)
-      .filter(d => !zoneCardUnavailable(d) && d.controlled !== false).map(d => d.id),
+      .filter(d => !zoneCardUnavailable(d) && selectAllEligible(d)).map(d => d.id),
     [orderedDevices, railDevices, railSearch.active],
   );
 
@@ -1678,17 +1747,19 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (!serviceOnline) return;
     void refreshLianLiModes();
     void refreshWirelessPresets();
-  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets]);
+    void refreshOwnEffects();
+  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets, refreshOwnEffects]);
 
   useEffect(() => {
     const onFocus = () => {
       if (!serviceOnline) return;
       void refreshLianLiModes();
       void refreshWirelessPresets();
+      void refreshOwnEffects();
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets]);
+  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets, refreshOwnEffects]);
 
   useTopicCallback('devices', serviceOnline, () => {
     void refreshDevices();
@@ -2007,11 +2078,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Claimed when the user asks for something, not on arrival: switching the
   // view is not a decision about which devices Nexus drives.
   const claimAllDevices = useCallback((): string[] => {
-    for (const d of devices) {
+    for (const d of devices.filter(d => d.devicePageReason === undefined)) {
       if (d.controlled === false) handleSetControlled(d.id, true);
       if (!d.ledsOn) handleSetPower(d.id, true);
     }
-    return orderedDevices.filter(d => !zoneCardUnavailable(d)).map(d => d.id);
+    return orderedDevices.filter(zoneCardSelectionHoldable).map(d => d.id);
   }, [devices, orderedDevices, handleSetControlled, handleSetPower]);
   // Simple mode has no rail to show pins on, so a pick or Control all releases
   // every pin, the same way it claims; arriving and Off leave pins alone.
@@ -2021,10 +2092,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   }, [applyPins, pins]);
 
   // Counted over the devices the claim can actually reach. A zone with no LEDs
-  // cannot be lit, so including it would leave the ratio permanently short of
-  // its total and pin the claim button on screen with nothing left to do.
+  // cannot be lit, and a device-page card is set on its own page, so including
+  // either would leave the ratio permanently short of its total and pin the
+  // claim button on screen with nothing left to do.
   const claimableDevices = useMemo(
-    () => orderedDevices.filter(d => !zoneCardUnavailable(d)),
+    () => orderedDevices.filter(zoneCardSelectionHoldable),
     [orderedDevices],
   );
   // Matches zoneCardSelectable: a device Nexus drives AND that is lit. Counting
@@ -2416,7 +2488,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const kind = viewMode === 'screen' ? 'mirror' : 'media';
     const reach = pressReach(visibleDevices, pins, selectedDeviceIds);
     for (const d of visibleDevices) {
-      if (d.ledsOn === false || d.controlled === false) continue;
+      if (!engineReaches(d)) continue;
       const pin = pins[d.id];
       if (pin ? pin.kind === kind : effectiveMode === viewMode) reach.add(d.id);
     }
@@ -2711,8 +2783,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             onOpenCommunity={handleOpenCommunity}
             lianLiFirmwareHubs={lianLiFirmwareHubs}
             onLianLiTakeControl={hubId => { void handleLianLiTakeControl(hubId); }}
-            firmwareDeviceIds={wirelessPresetIds}
-            onFirmwareTakeControl={id => { void handleWirelessTakeControl(id); }}
+            firmwareDeviceIds={firmwareDeviceIds}
+            onFirmwareTakeControl={id => {
+              void (ownEffectIds.has(id) ? handleOwnEffectTakeControl(id) : handleWirelessTakeControl(id));
+            }}
+            onOpenDevicePage={deviceKey => onSectionNavigate?.('device', { deviceKey })}
             onOpenSmartLights={() => onSectionNavigate?.('smart-lights')}
             discovery={discovery}
             rgbRunning={rgb.running}

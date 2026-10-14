@@ -11,19 +11,9 @@
   margin-inline: auto;
 }
 
-// Row holding the page's right-aligned action widget(s). The page title that
-// used to sit on its left now lives in the top bar, so this row only renders
-// when a page passes `actions`.
-.titleRow {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.4rem;
-  margin: 0 0 0.5rem;
-}
-
-.actions {
-  flex-shrink: 0;
+// In the tab rail: zero height, so the item can be taller or absent without
+// resizing the row. align-items centers it on the tab labels' midline.
+.actionsInline {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -31,14 +21,16 @@
   // shell's drag region so they receive hover/click directly.
   -webkit-app-region: no-drag;
   app-region: no-drag;
+  flex-shrink: 0;
+  height: 0;
+  overflow: visible;
+  white-space: nowrap;
 }
 
-// Row wrapping the Tabs bar. Anchors the absolutely-positioned tabActions
-// overlay on the right (page-level right-aligned widget that sits at the
-// same vertical level as the tab buttons without compressing the bar).
-// One row: the tab bar takes what it needs and the actions keep a fixed rail
-// beside it. Overlaying the actions instead would cover the last tabs at the
-// window's minimum width, where they stop being clickable.
+// Row wrapping the Tabs bar. One row: the tab bar takes what it needs and the
+// right rail (.tabActions) keeps its own width beside it. Overlaying the rail
+// instead would cover the last tabs at the window's minimum width, where they
+// stop being clickable.
 .tabsRow {
   display: flex;
   align-items: center;
@@ -56,12 +48,8 @@
   flex: 0 0 auto;
 }
 
-// Right-aligned overlay container at tabs-row level. Spans the full row
-// height (top: 0, bottom matches .viewHeaderTabs margin-bottom) and centers
-// its children vertically so they line up with the tab labels. The overlay
-// is pointer-transparent except on its children so a click that lands in
-// empty space between the slot and the rightmost tab still falls through
-// to the page underneath.
+// Right rail of the tab row (tabActions, then actions): an in-flow flex item
+// pushed right by its auto margin, centering its children on the tab labels.
 .tabActions {
   display: flex;
   align-items: center;

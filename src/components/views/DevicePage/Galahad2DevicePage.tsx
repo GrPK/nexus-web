@@ -42,7 +42,6 @@ export function Galahad2DevicePage({ onSectionNavigate }: Galahad2DevicePageProp
   useReportDeviceWaiting(connection !== 'connected');
   const [aioState, setAioState] = useState<Galahad2State | null>(null);
   const [lighting, setLighting] = useState<Galahad2Lighting | null>(null);
-  const [saving, setSaving] = useState(false);
   const aliveRef = useRef(true);
   const connectedRef = useRef(false);
 
@@ -93,12 +92,7 @@ export function Galahad2DevicePage({ onSectionNavigate }: Galahad2DevicePageProp
   }, [refresh, refreshRpm]);
 
   const commitLighting = useCallback(async (patch: Galahad2LightingPatch) => {
-    setSaving(true);
-    try {
-      await setGalahad2Lighting(patch);
-    } finally {
-      if (aliveRef.current) setSaving(false);
-    }
+    await setGalahad2Lighting(patch);
   }, []);
 
   if (connection === 'disconnected') {
@@ -138,7 +132,6 @@ export function Galahad2DevicePage({ onSectionNavigate }: Galahad2DevicePageProp
       <ViewHeader
         // eslint-disable-next-line i18next/no-literal-string -- brand + model name
         title="Lian Li Galahad II"
-        actions={saving ? <span className={styles.savingBadge}>{t('devices.saving')}</span> : null}
         tabs={tabs}
         activeTab={tab}
         onTabChange={key => setActiveTab(key as 'lighting' | 'cooling')}

@@ -39,9 +39,9 @@
   padding-right: 0.25rem;
 }
 
-.savingBadge {
+.uploadingBadge {
   @include text-label;
-  color: var(--accent);
+  color: var(--text-dim);
   font-family: var(--font-mono);
 }
 

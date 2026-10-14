@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   animatePin, colorPin, MIRROR_PIN, paletteColorPin, pickerMarks, pinGridKey, pinHex, pinnedNamesByEffect,
-  clearLegacyLightingKeys, pinModeTargetLabel, pinSignature, pinStripPick, pinTargetLabel, pressReach, selectionPin, staticLookPin,
+  clearLegacyLightingKeys, pinModeTargetLabel, pinSignature, pinStripPick, pinTargetLabel, pressReach, isPickTarget, selectAllEligible, selectionPin, staticLookPin,
   tabPressChangesNothing, withPins,
 } from './pins';
 import { defaultStateFor } from '../../../types/lighting';
@@ -181,6 +181,16 @@ describe('pressReach', () => {
     expect([...pressReach(devices, pins, new Set())]).toEqual(['b']);
     expect([...pressReach(devices, pins, new Set(['a', 'c']))]).toEqual(['a']);
     expect([...pressReach(devices, pins, new Set(['a']), true)]).toEqual(['a', 'b']);
+  });
+
+  it('skips cards set on their device page', () => {
+    const list = [{ id: 'a' }, { id: 'p', devicePageReason: 'firmware' }];
+    expect([...pressReach(list, {}, new Set())]).toEqual(['a']);
+    expect([...pressReach(list, {}, new Set(['p']))]).toEqual([]);
+    expect([...pressReach(list, {}, new Set(), true)]).toEqual(['a']);
+    expect(isPickTarget(list[1], {}, new Set())).toBe(false);
+    expect(selectAllEligible(list[1])).toBe(false);
+    expect(selectAllEligible(list[0])).toBe(true);
   });
 
   it('knows when a press on the tab already showing changes nothing', () => {

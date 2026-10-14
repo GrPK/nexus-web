@@ -30,7 +30,6 @@ export function NollieDevicePage({ onSectionNavigate }: NollieDevicePageProps) {
   const { t } = useTranslation();
   const { numberFormat } = useUnitPrefs();
   const [boards, setBoards] = useState<NollieBoard[] | null>(null);
-  const [saving, setSaving] = useState(false);
   const aliveRef = useRef(true);
 
   const refresh = useCallback(async () => {
@@ -51,12 +50,7 @@ export function NollieDevicePage({ onSectionNavigate }: NollieDevicePageProps) {
   }, [refresh]);
 
   const commit = useCallback(async (id: string, patch: NollieStandalonePatch) => {
-    setSaving(true);
-    try {
-      await setNollieStandalone(id, patch);
-    } finally {
-      if (aliveRef.current) setSaving(false);
-    }
+    await setNollieStandalone(id, patch);
   }, []);
 
   const patchBoard = (id: string, patch: NollieStandalonePatch) => {
@@ -70,7 +64,6 @@ export function NollieDevicePage({ onSectionNavigate }: NollieDevicePageProps) {
       <ViewHeader
         // eslint-disable-next-line i18next/no-literal-string -- brand name
         title="Nollie"
-        actions={saving ? <span className={styles.savingBadge}>{t('devices.saving')}</span> : null}
       />
       <div className={`${styles.pageBody} pageBody`}>
         {boards !== null && boards.length === 0 && (

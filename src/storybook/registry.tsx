@@ -43,6 +43,7 @@ import { PairedPcsContent } from '../components/common/PairedPcs/PairedPcsConten
 import { EffectControls } from '../panel/widgets/lighting/page/EffectControls';
 import { Tabs } from '../components/common/Tabs/Tabs';
 import { ChipGroup } from '../components/common/ChipGroup/ChipGroup';
+import { ColorSlots } from '../components/common/ColorSlots/ColorSlots';
 import { ConfirmModal } from '../components/common/ConfirmModal/ConfirmModal';
 import { PromptModal } from '../components/common/PromptModal/PromptModal';
 import { KlipyPicker } from '../components/common/KlipyPicker/KlipyPicker';
@@ -2370,6 +2371,18 @@ function PreviewStepper() {
   return <StorybookStepper value={v} min={0} max={59} onChange={setV} />;
 }
 
+function PreviewColorSlots() {
+  const [active, setActive] = useState(0);
+  return (
+    <ColorSlots
+      colors={['#000000', '#ff0000', '#00ff00', '#0000ff']}
+      activeIndex={active}
+      onSelect={setActive}
+      slotLabel={i => `Color ${i + 1}`}
+    />
+  );
+}
+
 function PreviewGradientStopsEditor() {
   const [stops, setStops] = useState<GaugeGradientStop[]>([...DEFAULT_GAUGE_GRADIENT]);
   return (
@@ -2508,6 +2521,12 @@ export const REGISTRY: StorybookEntry[] = [
     Preview: PreviewBrand,
   },
   // ── Inputs ────────────────────────────────────────────────────────────
+  {
+    name: 'ColorSlots', category: 'inputs',
+    filePath: 'src/components/common/ColorSlots/ColorSlots.tsx',
+    description: 'Row of filled color swatches that picks which slot of a multi-color effect an editor is working on. The active swatch carries a ring; arrow keys move between slots.',
+    Preview: PreviewColorSlots,
+  },
   {
     name: 'Stepper', category: 'inputs',
     filePath: 'src/components/common/Stepper/Stepper.tsx',

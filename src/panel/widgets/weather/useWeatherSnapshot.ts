@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchWeather, weatherLocationQuery, type WeatherLocation, type WeatherSnapshot } from '../../../api/weather';
 
 export const WEATHER_REFRESH_MS = 15 * 60 * 1000;
+export const WEATHER_RETRY_MS = 30 * 1000;
 
 interface CacheEntry {
   snap: WeatherSnapshot;
@@ -19,7 +20,7 @@ function fetchCached(key: string, location: WeatherLocation | null): Promise<Wea
   if (pending) return pending;
   const p = fetchWeather(location)
     .then(snap => {
-      if (snap) cache.set(key, { snap, at: Date.now() });
+      if (snap?.asOf) cache.set(key, { snap, at: Date.now() });
       return snap;
     })
     .catch(() => null)
@@ -58,16 +59,33 @@ export function useWeatherSnapshot(location: WeatherLocation | null | undefined)
     // cache hit renders immediately.
     setState(hit ? { snap: hit.snap, loaded: true, fetchedAt: hit.at } : { snap: null, loaded: false, fetchedAt: 0 });
 
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0;
+
     async function load(force: boolean) {
       const cached = cache.get(key);
       if (!force && cached && Date.now() - cached.at < WEATHER_REFRESH_MS) return;
       const snap = await fetchCached(key, location ?? null);
       if (cancelled) return;
-      setState(prev => ({ snap: snap ?? prev.snap, loaded: true, fetchedAt: snap ? Date.now() : prev.fetchedAt }));
+      // An empty asOf is the service's "upstream unreachable" marker, not a reading.
+      const reading = snap?.asOf ? snap : null;
+      setState(prev => ({
+        snap: reading ?? prev.snap ?? snap,
+        loaded: true,
+        fetchedAt: reading ? Date.now() : prev.fetchedAt,
+      }));
+      clearTimeout(retry);
+      if (reading) {
+        failures = 0;
+        return;
+      }
+      retry = setTimeout(() => { void load(true); }, Math.min(WEATHER_RETRY_MS * 2 ** failures, WEATHER_REFRESH_MS));
+      failures += 1;
     }
     void load(false);
-    const timer = setInterval(() => { void load(true); }, WEATHER_REFRESH_MS);
-    return () => { cancelled = true; clearInterval(timer); };
+    // While retrying, the backoff chain owns refreshes.
+    const timer = setInterval(() => { if (failures === 0) void load(true); }, WEATHER_REFRESH_MS);
+    return () => { cancelled = true; clearInterval(timer); clearTimeout(retry); };
     // `location` is fully described by `key`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);

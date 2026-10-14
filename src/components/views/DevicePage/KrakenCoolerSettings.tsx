@@ -164,7 +164,6 @@ export function KrakenCoolerSettings({ onSectionNavigate, screenStreamed = false
       <SettingsSection
         title={t('devices.nzxt-kraken.statusSection')}
         boxClassName={styles.sectionBox}
-        action={saving ? <span className={styles.savingBadge}>{t('devices.saving')}</span> : undefined}
       >
         <div className={`${styles.row} ${!loaded ? styles.rowDisabled : ''}`}>
           <span className={styles.rowLabel}>{t('devices.nzxt-kraken.liquid')}</span>

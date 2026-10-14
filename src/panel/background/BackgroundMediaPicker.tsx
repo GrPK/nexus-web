@@ -181,9 +181,10 @@ export function BackgroundMediaPicker({
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files;
     const files = importCandidates(picked);
+    const pickedCount = picked?.length ?? 0;
     e.target.value = '';
     if (files.length === 0) {
-      setImportError((picked?.length ?? 0) > 0 ? t('lighting.controls.importFolderEmpty') : null);
+      setImportError(pickedCount > 0 ? t('lighting.controls.importFolderEmpty') : null);
       return;
     }
     setImportError(null);

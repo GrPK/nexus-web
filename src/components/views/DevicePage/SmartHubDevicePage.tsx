@@ -24,6 +24,8 @@ import { localizeNumbers } from '../../../lib/units';
 import styles from './SmartHubDevicePage.module.scss';
 import { useReportDeviceWaiting } from './deviceDetecting';
 
+const RECONNECT_POLL_MS = 2000;
+
 /**
  * Routed page for the HYTE SmartHub. Exposes the single flash-persisted
  * standalone setting - fallback fan duty + firmware-side LED animation -
@@ -45,8 +47,9 @@ export function SmartHubDevicePage() {
   const [connection, setConnection] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
   useReportDeviceWaiting(connection !== 'connected');
   const [setting, setSetting] = useState<SmartHubFwSetting | null>(null);
-  const [saving, setSaving] = useState(false);
   const aliveRef = useRef(true);
+  const connectionRef = useRef(connection);
+  connectionRef.current = connection;
 
   const refresh = useCallback(async () => {
     // 1. Ask the service whether the hub is actually plugged in.
@@ -78,9 +81,15 @@ export function SmartHubDevicePage() {
     // while the page was hidden.
     const onFocus = () => { void refresh(); };
     window.addEventListener('focus', onFocus);
+    // The hub reconnects after the page mounts (Nexus Control toggled on), so
+    // poll until connected. Stops once connected so it never clobbers an edit.
+    const id = window.setInterval(() => {
+      if (connectionRef.current !== 'connected') void refresh();
+    }, RECONNECT_POLL_MS);
     return () => {
       aliveRef.current = false;
       window.removeEventListener('focus', onFocus);
+      window.clearInterval(id);
     };
   }, [refresh]);
 
@@ -88,12 +97,7 @@ export function SmartHubDevicePage() {
   // one combined endpoint, so every field patch sends all six fields.
   const commitSetting = useCallback(async (next: SmartHubFwSetting) => {
     setSetting(next);
-    setSaving(true);
-    try {
-      await setSmartHubFwSetting(next);
-    } finally {
-      if (aliveRef.current) setSaving(false);
-    }
+    await setSmartHubFwSetting(next);
   }, []);
 
   // The empty state only renders when the service explicitly says the hub is
@@ -127,7 +131,6 @@ export function SmartHubDevicePage() {
       <ViewHeader
         // eslint-disable-next-line i18next/no-literal-string -- brand + model name
         title="HYTE SmartHub"
-        actions={saving ? <span className={styles.savingBadge}>{t('devices.saving')}</span> : null}
       />
       <div className={`${styles.pageBody} pageBody`}>
         <SettingsSection

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ZoneCard, zoneCardSelectable, type BulkSelection } from './ZoneCard';
+import { ZoneCard, zoneCardSelectable, zoneCardSelectionHoldable, type BulkSelection } from './ZoneCard';
 import type { LightingDevice } from '../../../../api/lighting';
 import type { SortableRowArgs } from '../../../../components/common/SortableList/SortableList';
 import styles from '../LightingPage.module.scss';
@@ -469,6 +469,13 @@ describe('ZoneCard selection gate', () => {
     expect(zoneCardSelectable({ ...baseDevice, controlled: false })).toBe(false);
     expect(zoneCardSelectable({ ...baseDevice, ledsOn: false })).toBe(false);
     expect(zoneCardSelectable({ ...baseDevice, ledCount: 0 })).toBe(false);
+    expect(zoneCardSelectable({ ...baseDevice, devicePageReason: 'firmware' })).toBe(false);
+  });
+
+  it('zoneCardSelectionHoldable keeps dark cards but drops device-page cards', () => {
+    expect(zoneCardSelectionHoldable({ ...baseDevice, ledsOn: false })).toBe(true);
+    expect(zoneCardSelectionHoldable({ ...baseDevice, devicePageReason: 'argbInput' })).toBe(false);
+    expect(zoneCardSelectionHoldable({ ...baseDevice, ledCount: 0 })).toBe(false);
   });
 
   it('drops the checkbox but still takes a card-click with the lights off', () => {
@@ -985,5 +992,51 @@ describe('ZoneCard key reactions row', () => {
     openMenu({ onOpenKeyReactions, bulk });
     fireEvent.click(screen.getByText('lighting.keyReactions.menu'));
     expect(onOpenKeyReactions).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ZoneCard firmware-owned menu', () => {
+  function renderFirmwareCard(props: { onTakeControl?: () => void; onOpenDevicePage?: () => void; onRename?: (name: string) => void }) {
+    return render(
+      <ZoneCard
+        device={baseDevice}
+        selected={false}
+        indent={false}
+        onSelect={() => {}}
+        onTogglePower={() => {}}
+        onToggleControlled={() => {}}
+        onOpenSettings={() => {}}
+        firmwareControlled
+        {...props}
+      />,
+    );
+  }
+
+  it('offers the device page and take control on right-click, and nothing that cannot act', () => {
+    const onOpenDevicePage = vi.fn();
+    const onTakeControl = vi.fn();
+    renderFirmwareCard({ onOpenDevicePage, onTakeControl });
+    fireEvent.contextMenu(document.querySelector(`.${styles.deviceCard}`)!);
+    expect(screen.getByRole('button', { name: /menuTakeControl/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /ledMap.settings/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /menuOpenDevicePage/ }));
+    expect(onOpenDevicePage).toHaveBeenCalledTimes(1);
+    expect(onTakeControl).not.toHaveBeenCalled();
+  });
+
+  it('keeps renaming, and drops the engine-only power and control rows', () => {
+    renderFirmwareCard({ onOpenDevicePage: () => {}, onRename: () => {} });
+    fireEvent.contextMenu(document.querySelector(`.${styles.deviceCard}`)!);
+    expect(screen.getByRole('button', { name: /lighting.devices.rename/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /menuLightsOff/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /menuControlOff/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /lighting.devices.identify/ })).toBeNull();
+  });
+
+  it('opens a menu for the device page alone when control cannot be taken', () => {
+    renderFirmwareCard({ onOpenDevicePage: () => {} });
+    fireEvent.contextMenu(document.querySelector(`.${styles.deviceCard}`)!);
+    expect(screen.getByRole('button', { name: /menuOpenDevicePage/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /menuTakeControl/ })).toBeNull();
   });
 });

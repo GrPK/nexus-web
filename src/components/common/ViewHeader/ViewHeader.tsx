@@ -11,6 +11,9 @@ interface ViewHeaderProps {
   onTabChange?: (key: string, origin?: HTMLButtonElement) => void;
   onTabHover?: (key: string | null) => void;
   tabsDisabled?: boolean;
+  /** Right-aligned status in the tab rail at label height; it never adds a row,
+   *  so it renders only when the header has a tab row (tabs, tabsAdjacent or
+   *  tabActions). */
   actions?: ReactNode;
   /** Widget sitting immediately beside the tab bar, sharing the row's gap.
    *  Unlike `tabActions` it stays next to the tabs instead of pinning right. */
@@ -26,14 +29,10 @@ interface ViewHeaderProps {
 
 export function ViewHeader({ title, tabs, activeTab, onTabChange, onTabHover, tabsDisabled, actions, tabActions, tabsAdjacent }: ViewHeaderProps) {
   const hasTabs = !!tabs && tabs.length > 0;
+  const hasTabRow = hasTabs || !!tabActions || !!tabsAdjacent;
   return (
     <header className={styles.header}>
-      {actions && (
-        <div className={styles.titleRow}>
-          <div className={styles.actions}>{actions}</div>
-        </div>
-      )}
-      {(hasTabs || tabActions || tabsAdjacent) && (
+      {hasTabRow && (
         <div className={styles.tabsRow}>
           {hasTabs && (
             <Tabs
@@ -49,8 +48,11 @@ export function ViewHeader({ title, tabs, activeTab, onTabChange, onTabHover, ta
           {tabsAdjacent && (
             <div className={styles.tabsAdjacent}>{tabsAdjacent}</div>
           )}
-          {tabActions && (
-            <div className={styles.tabActions}>{tabActions}</div>
+          {(tabActions || actions) && (
+            <div className={styles.tabActions}>
+              {tabActions}
+              {actions && <div className={styles.actionsInline}>{actions}</div>}
+            </div>
           )}
         </div>
       )}

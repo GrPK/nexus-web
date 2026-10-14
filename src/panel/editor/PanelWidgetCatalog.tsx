@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { restrictToParentElement } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
 import { Notice } from '../../components/common/Notice/Notice';
 import { ChipGroup } from '../../components/common/ChipGroup/ChipGroup';
@@ -428,6 +429,7 @@ export function PanelWidgetCatalog({
             <DndContext
               sensors={sortSensors}
               collisionDetection={closestCenter}
+              modifiers={[restrictToParentElement]}
               onDragStart={() => { suppressClickRef.current = true; }}
               onDragEnd={onPlaylistDragEnd}
               onDragCancel={() => { suppressClickRef.current = false; }}

@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PanelWidget } from '../../types';
 import { WeatherWidget } from './WeatherWidget';
-import { resetWeatherSnapshotCache } from './useWeatherSnapshot';
+import { resetWeatherSnapshotCache, WEATHER_RETRY_MS } from './useWeatherSnapshot';
+import { fetchService } from '../../../api/service';
 
 // Hourly forecast times are relative to Date.now() so the widget's
 // stale-hour filter (WeatherWidget's 1-hour lookback) never drops them
@@ -48,6 +49,7 @@ vi.mock('../../../lib/i18n', () => {
     'panel.widget.weather.hiLo': 'H:{hi}° L:{lo}°',
     'panel.widget.weather.noForecast': 'No forecast',
     'panel.widget.weather.cond.partlyCloudy': 'Partly cloudy',
+    'panel.widget.offline': 'No connection',
   };
   const t = (key: string, params?: Record<string, string | number>) => {
     let text = dict[key] ?? key;
@@ -122,6 +124,21 @@ describe('WeatherWidget', () => {
     expect(container.querySelector('canvas')).toBe(canvas);
     expect(await screen.findByText('72°')).toBeInTheDocument();
     expect(container.querySelector('canvas')).toBe(canvas);
+  });
+
+  it('retries an unreachable feed well before the refresh interval', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      // The service's empty snapshot: upstream unreachable, no cached reading.
+      vi.mocked(fetchService).mockResolvedValueOnce({ asOf: '' } as never);
+      render(<WeatherWidget widget={weatherWidget('2x2')} />);
+      expect(await screen.findByText('No connection')).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(WEATHER_RETRY_MS); });
+      expect(await screen.findByText('72°')).toBeInTheDocument();
+      expect(fetchService).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps themed text when the sky cannot draw', async () => {

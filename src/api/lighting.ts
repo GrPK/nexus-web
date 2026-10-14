@@ -429,6 +429,8 @@ export interface LightingDevice {
   /** Whether Nexus pushes lighting frames to this device. Undefined on older
    *  services; the UI treats that as true (controlled). */
   controlled?: boolean;
+  /** Set when the device's lighting is set on its device page, so the card has no engine frame: its firmware plays an effect, or it follows a motherboard ARGB header. */
+  devicePageReason?: 'firmware' | 'argbInput';
   brightness?: number;
   /** Current hue, 0..1. Set only for color-capable smart lights. */
   hue?: number;

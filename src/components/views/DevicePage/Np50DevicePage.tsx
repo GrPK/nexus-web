@@ -54,7 +54,6 @@ export function Np50DevicePage() {
   useReportDeviceWaiting(connection !== 'connected');
   const [defaults, setDefaults] = useState<Np50FirmwareDefaults | null>(null);
   const [animation, setAnimation] = useState<Np50FirmwareAnimation | null>(null);
-  const [saving, setSaving] = useState(false);
   const aliveRef = useRef(true);
   const connectionRef = useRef(connection);
   connectionRef.current = connection;
@@ -114,22 +113,12 @@ export function Np50DevicePage() {
 
   const commitDefaults = useCallback(async (next: Np50FirmwareDefaults) => {
     setDefaults(next);
-    setSaving(true);
-    try {
-      await setNp50FirmwareDefaults(next.defaultMode, next.staticFanPercent);
-    } finally {
-      if (aliveRef.current) setSaving(false);
-    }
+    await setNp50FirmwareDefaults(next.defaultMode, next.staticFanPercent);
   }, []);
 
   const commitAnimation = useCallback(async (next: Np50FirmwareAnimation) => {
     setAnimation(next);
-    setSaving(true);
-    try {
-      await setNp50FirmwareAnimation(next);
-    } finally {
-      if (aliveRef.current) setSaving(false);
-    }
+    await setNp50FirmwareAnimation(next);
   }, []);
 
   // The empty state only renders when the service explicitly says the hub
@@ -165,7 +154,6 @@ export function Np50DevicePage() {
       <ViewHeader
         // eslint-disable-next-line i18next/no-literal-string -- brand + model name
         title="HYTE NP50"
-        actions={saving ? <span className={styles.savingBadge}>{t('devices.saving')}</span> : null}
       />
       <div className={`${styles.pageBody} pageBody`}>
         <SettingsSection
