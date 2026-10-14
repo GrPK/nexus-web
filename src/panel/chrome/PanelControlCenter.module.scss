@@ -115,7 +115,6 @@
 }
 
 .card {
-  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -163,11 +162,6 @@
   text-align: center;
 }
 
-.mixerButton {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-}
 
 .grid {
   display: grid;

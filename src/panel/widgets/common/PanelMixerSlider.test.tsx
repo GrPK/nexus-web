@@ -25,11 +25,13 @@ describe('PanelMixerSlider pointer end', () => {
     expect(onCommit).toHaveBeenCalledWith(80);
   });
 
-  it('a cancel with no moves commits nothing, whatever coordinates it carries', () => {
-    const { hitbox, onCommit } = setup();
+  it('a cancel with no moves commits the pointerdown value, not max', () => {
+    const { hitbox, onChange, onCommit } = setup();
     fireEvent.pointerDown(hitbox, { clientY: 150, pointerId: 1 });
     fireEvent.pointerCancel(hitbox, { clientY: 0, pointerId: 1 });
-    expect(onCommit).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenCalledWith(50);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(50);
   });
 
   it('a cancel after moves commits the last tracked move, not the cancel position', () => {

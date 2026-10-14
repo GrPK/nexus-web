@@ -19,7 +19,6 @@ import { usePanelControlCenterSwipe } from '../engine/usePanelControlCenterSwipe
 import { type GestureContact } from '../engine/touchViaPointer';
 import { usePanelImmersiveOpen } from '../widgets/common/PanelImmersiveContext';
 import { PanelMixerSlider } from '../widgets/common/PanelMixerSlider';
-import { Button } from '../../components/common/Button/Button';
 import { IconLabelButton } from '../../components/common/IconLabelButton/IconLabelButton';
 import { useTranslation } from '../../lib/i18n';
 import { useUnitPrefs } from '../../hooks/useUiSettings';
@@ -34,7 +33,6 @@ import type { PanelSurface } from '../types';
 import { ControlCenterMixerView } from './ControlCenterMixerView';
 import styles from './PanelControlCenter.module.scss';
 
-// Hold on the volume fader this long, without moving, for the per-app mixer.
 const RADIOS_POLL_MS = 2000;
 
 interface PanelControlCenterProps {
@@ -386,15 +384,6 @@ function ControlCenterBody({
         {showBrightness && brightness.linkDown && (
           <div className={styles.notice} role="status">{t('panel.controlCenter.brightness.usbDown')}</div>
         )}
-        {/* Pinned to the card corner and always present: no height change as readings arrive. */}
-        <Button
-          className={styles.mixerButton}
-          tone="ghost"
-          size="sm"
-          icon={<SlidersVertical size={18} strokeWidth={2} />}
-          aria-label={t('panel.controlCenter.mixer.title')}
-          onClick={() => setView('mixer')}
-        />
       </div>
 
       <div className={styles.card} data-cc-keep="true">
@@ -424,6 +413,15 @@ function ControlCenterBody({
             label={t('panel.controlCenter.screenSleep')}
             onPress={() => { onClose(); onScreenSleep(); }}
           />
+          {/* Last of the fixed tiles, so none of them moves when volume reads arrive. */}
+          {volume.state.supported && (
+            <IconLabelButton
+              className={styles.tile}
+              icon={<SlidersVertical />}
+              label={t('panel.controlCenter.mixer.title')}
+              onPress={() => setView('mixer')}
+            />
+          )}
           {/* After the fixed tiles: the radios arrive late and must not shift them. */}
           {radios?.wifi && (
             <IconLabelButton
