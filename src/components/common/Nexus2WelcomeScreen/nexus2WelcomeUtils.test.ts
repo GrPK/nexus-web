@@ -13,6 +13,7 @@ import {
   fanCurveReasonKey,
   groupDetailParts,
   groupResultSummaries,
+  importHeaderKeys,
   selectedWireIds,
   unavailableGroupNoteKey,
   visibleImportGroups,
@@ -286,6 +287,19 @@ const MIXED_FAN_CURVES: Nexus2PreviewCategory = {
     { name: 'Hot', kind: 'linear', status: 'skip', reason: 'unsafeCurve', minimumRaised: false, targets: [] },
   ],
 };
+
+describe('importHeaderKeys', () => {
+  const y70 = IMPORT_GROUPS[0];
+  it('keeps the personalization header when no fan curves group is shown', () => {
+    expect(importHeaderKeys([y70])).toEqual({ titleKey: 'nexus2Welcome.import.title', descriptionKey: 'nexus2Welcome.import.description' });
+  });
+  it('uses the fan curves header when only fan curves is shown', () => {
+    expect(importHeaderKeys([FAN_GROUP])).toEqual({ titleKey: 'nexus2Welcome.import.title.fanCurves', descriptionKey: 'nexus2Welcome.import.description.fanCurves' });
+  });
+  it('uses the combined header when both are shown', () => {
+    expect(importHeaderKeys([y70, FAN_GROUP])).toEqual({ titleKey: 'nexus2Welcome.import.title.both', descriptionKey: 'nexus2Welcome.import.description.both' });
+  });
+});
 
 describe('fan curves', () => {
   it('maps known reasons and degrades unknown or missing ones to the generic line', () => {

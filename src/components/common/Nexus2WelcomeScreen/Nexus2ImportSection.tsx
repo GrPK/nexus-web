@@ -11,7 +11,7 @@ import type { Nexus2ApplyResult, Nexus2PreviewResponse } from '../../../api/migr
 import {
   allApplyResultsClean, applyDetailKey, applyStatusKey, categoryLabelKey, defaultSelectedGroupIds,
   groupDetailParts, groupResultSummaries, groupHasAvailable, selectedWireIds, unavailableGroupNoteKey,
-  visibleImportGroups, type ImportGroupId,
+  visibleImportGroups, importHeaderKeys, type ImportGroupId,
 } from './nexus2WelcomeUtils';
 import styles from './Nexus2ImportSection.module.scss';
 
@@ -134,6 +134,7 @@ export function Nexus2ImportSection({
   };
 
   const groups = visibleImportGroups(preview);
+  const { titleKey, descriptionKey } = importHeaderKeys(groups);
   const summaries = groupResultSummaries(importResults);
   const importSuccess = importPhase === 'results' && allApplyResultsClean(importResults);
 
@@ -143,12 +144,12 @@ export function Nexus2ImportSection({
       boxClassName={styles.box}
       // In the two-column import surface the column already carries a title,
       // so the section repeating one just says it twice.
-      title={wide ? undefined : t('nexus2Welcome.import.title')}
-      ariaLabel={t('nexus2Welcome.import.title')}
-      description={wide ? undefined : <p>{t('nexus2Welcome.import.description')}</p>}
+      title={wide ? undefined : t(titleKey)}
+      ariaLabel={t(titleKey)}
+      description={wide ? undefined : <p>{t(descriptionKey)}</p>}
     >
       {wide && (
-        <p className={styles.replaceNotice} data-settings-aside>{t('nexus2Welcome.import.description')}</p>
+        <p className={styles.replaceNotice} data-settings-aside>{t(descriptionKey)}</p>
       )}
       {previewStatus === 'loading' && (
         <div className={styles.previewLoading} data-settings-aside>

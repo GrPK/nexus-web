@@ -256,6 +256,18 @@ describe('Nexus2ImportSection - fan curves', () => {
     expect(screen.getByText(`${FAN}.otherProfiles:`)).toBeInTheDocument();
   });
 
+  it('titles the section for fan curves only, and for both groups', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [FAN_CATEGORY] });
+    const first = renderSection();
+    await screen.findByRole('switch', { name: FAN_NAME });
+    expect(screen.getByText('nexus2Welcome.import.description.fanCurves')).toBeInTheDocument();
+    first.unmount();
+    vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [Y70_LAYOUT, FAN_CATEGORY] });
+    renderSection();
+    await screen.findByRole('switch', { name: FAN_NAME });
+    expect(screen.getByText('nexus2Welcome.import.description.both')).toBeInTheDocument();
+  });
+
   it('sends fanCurves in the apply call', async () => {
     vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [FAN_CATEGORY] });
     renderSection();

@@ -165,6 +165,21 @@ export function unavailableGroupNoteKey(preview: Nexus2PreviewResponse | null, g
   return `nexus2Welcome.import.category.fanCurves.note.${cat.fanCurvesNote}`;
 }
 
+/**
+ * Title and description keys for the import section, so the header only
+ * claims what the visible groups do: personalization replaces the panel setup,
+ * fan curves touch only the fans they list.
+ */
+export function importHeaderKeys(groups: ImportGroupDef[]): { titleKey: string; descriptionKey: string } {
+  const fan = groups.some(g => g.id === 'fanCurves');
+  const personalization = groups.some(g => g.id !== 'fanCurves');
+  const suffix = fan ? (personalization ? '.both' : '.fanCurves') : '';
+  return {
+    titleKey: `nexus2Welcome.import.title${suffix}`,
+    descriptionKey: `nexus2Welcome.import.description${suffix}`,
+  };
+}
+
 /** True when the group has at least one available wire category (it can be checked and applied). */
 export function groupHasAvailable(preview: Nexus2PreviewResponse | null, group: ImportGroupDef): boolean {
   const available = new Set(availableCategories(preview).map(c => c.id));
