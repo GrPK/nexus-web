@@ -1,0 +1,283 @@
+@use '../styles/flexGap' as *;
+
+// Top-anchored control sheet. Hidden above the panel; pulled down from the top
+// edge or opened by the gesture hook. Spacing goes through the flexGap mixins
+// (Chromium 83 floor).
+.sheet {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-height: 100%;
+  box-sizing: border-box;
+  padding:
+    max(14px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    18px
+    max(16px, env(safe-area-inset-left));
+  background: rgb(0 0 0 / var(--alpha-medium));
+  backdrop-filter: blur(var(--blur-backdrop)) saturate(0.95);
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+  color: var(--text);
+  overflow: hidden;
+  transform: translateY(-100%);
+  transition: transform var(--ease-slow) cubic-bezier(0.32, 0.72, 0, 1);
+  z-index: 71;
+  pointer-events: none;
+  // Taps on the sheet must not become widget presses or text selection underneath.
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+:global(.panel-root)[data-theme='light'] .sheet {
+  background: rgb(255 255 255 / var(--alpha-strong));
+}
+
+.sheet[data-state='open'] {
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.sheet[data-state='dragging'] {
+  transition: none;
+  pointer-events: auto;
+}
+
+// Same zoom rule as the actions tray: the chrome scales with the panel.
+:global(.panel-root):not([data-surface='phone']):not([data-surface='desktop']) .sheet {
+  zoom: var(--panel-scale, 1);
+  --cc-zoom: var(--panel-scale, 1);
+}
+
+.scrim {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgb(0 0 0 / var(--alpha-medium));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--ease) ease;
+  z-index: 70;
+}
+
+.scrim[data-visible='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.scrim[data-dragging='true'] {
+  transition: none;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  @include vgap(12px);
+  min-height: 0;
+}
+
+.sheet[data-landscape='true'] .content {
+  flex-direction: row;
+  align-items: stretch;
+  @include vgap(0);
+  > *:not(:last-child) { margin-right: 12px; margin-bottom: 0; }
+}
+
+.clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2px 0 4px;
+}
+
+.sheet[data-landscape='true'] .clock {
+  flex: 0 0 auto;
+  min-width: 150px;
+}
+
+.time {
+  font-size: 40px;
+  font-weight: var(--weight-heading);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.date {
+  font-size: var(--type-small);
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius);
+  background: var(--panel-control-translucent);
+  box-sizing: border-box;
+}
+
+.sheet[data-landscape='true'] .card {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+.faders {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  height: 170px;
+  @include hgap(10px);
+}
+
+.sheet[data-landscape='true'] .faders {
+  height: 130px;
+}
+
+.holdWrap {
+  display: flex;
+  min-width: 0;
+}
+
+// Two classes beat the slider's own root vars whatever the emission order.
+.faders .fader {
+  --mixer-track-min: 70px;
+  --mixer-track-max: 120px;
+  --mixer-touch-width: 64px;
+  --mixer-pill-width: 48px;
+  --mixer-icon-size: 28px;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 96px;
+}
+
+.notice {
+  margin-top: 8px;
+  font-size: var(--type-tiny);
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+:global(.panel-root) .tile {
+  --icon-label-button-height: 76px;
+  --icon-label-button-min-width: 0;
+  --icon-label-button-padding-x: 4px;
+  --icon-label-button-padding-y: 10px;
+  --icon-label-button-gap: 8px;
+  --icon-label-button-radius: var(--radius);
+  --icon-label-button-border: var(--separator);
+  --icon-label-button-bg: var(--panel-control-translucent);
+  --icon-label-button-text: var(--text);
+  --icon-label-button-text-hover: var(--text);
+  --icon-label-icon-size: 26px;
+  --icon-label-label-size: var(--type-tiny);
+  width: 100%;
+
+  svg {
+    stroke-width: 1.75;
+  }
+
+  > span:last-child {
+    overflow-wrap: normal;
+    font-weight: var(--weight-strong);
+  }
+}
+
+.media {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  @include hgap(10px);
+}
+
+.mediaText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mediaTitle,
+.mediaArtist {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mediaTitle {
+  font-weight: var(--weight-heading);
+}
+
+.mediaArtist {
+  font-size: var(--type-small);
+  color: var(--text-dim);
+}
+
+.mediaButtons {
+  display: flex;
+  flex-direction: row;
+  flex: 0 0 auto;
+}
+
+:global(.panel-root) .mediaButton {
+  --icon-label-button-height: 48px;
+  --icon-label-button-min-width: 48px;
+  --icon-label-icon-size: 24px;
+  --icon-label-button-text: var(--text);
+  --icon-label-button-text-hover: var(--text);
+}
+
+.backRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  align-self: flex-start;
+  padding: 6px 8px 6px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+  touch-action: manipulation;
+
+  > *:not(:last-child) { margin-right: 4px; }
+}
+
+.mixerTitle {
+  margin: 2px 0 8px;
+  font-weight: var(--weight-heading);
+}
+
+.mixerEmpty {
+  padding: 24px 0;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.mixerRow {
+  display: flex;
+  flex-direction: row;
+  height: 210px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x;
+}
+
+.mixerCell {
+  flex: 0 0 86px;
+  height: 100%;
+}

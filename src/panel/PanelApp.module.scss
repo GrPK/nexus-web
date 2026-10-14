@@ -2136,3 +2136,9 @@
     -webkit-user-drag: none;
   }
 }
+
+// Screen sleep: the black layer covers the display; hiding the panel stops it
+// painting (the layer lives outside this root).
+.panelRoot[data-screen-sleep='true'] {
+  visibility: hidden;
+}
