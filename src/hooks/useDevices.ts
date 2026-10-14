@@ -38,16 +38,23 @@ export interface DeviceListItem {
 
 export function useDevices(enabled: boolean) {
   const [devices, setDevices] = useState<DeviceListItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const mountedRef = useRef(true);
 
   const refresh = useCallback(async () => {
     const data = await fetchService<DeviceListItem[]>('/devices/all');
-    if (data && mountedRef.current) setDevices(data);
+    if (data && mountedRef.current) {
+      setDevices(data);
+      setLoaded(true);
+    }
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
-    if (!enabled) return;
+    if (!enabled) {
+      setLoaded(false);
+      return;
+    }
     // Initial REST seed for the device list; subsequent updates arrive
     // via the `devices` topic below.
     void refresh();
@@ -73,5 +80,5 @@ export function useDevices(enabled: boolean) {
     return result !== null;
   }, [refresh]);
 
-  return { devices, controlDevice };
+  return { devices, loaded, controlDevice };
 }
