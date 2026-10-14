@@ -333,18 +333,15 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
     openVariations(v);
   };
 
-  // A name already in My effects (ignoring case) saves over that effect, the
-  // open one first; any other name saves a new one.
-  const replacedBy = (name: string) => {
-    const key = name.trim().toLocaleLowerCase();
-    if (currentId && currentName?.toLocaleLowerCase() === key) return currentId;
-    return saved.find(s => s.name.toLocaleLowerCase() === key)?.id ?? null;
-  };
+  const nameKey = (name: string) => name.trim().toLocaleLowerCase();
+  // The open effect's own name stays savable even when another effect already shares it.
+  const otherEffectNamed = (name: string) =>
+    !(currentName && nameKey(currentName) === nameKey(name)) && saved.some(s => s.id !== currentId && nameKey(s.name) === nameKey(name));
+  const nameUsed = (name: string) => saved.some(s => nameKey(s.name) === nameKey(name));
 
   // A returned string is shown in the prompt (the service refused the shader).
-  const saveCurrent = async (name: string): Promise<string | undefined> => {
+  const saveCurrent = async (name: string, id: string): Promise<string | undefined> => {
     const trimmed = name.trim();
-    const id = replacedBy(trimmed) ?? newEffectId();
     const snapshot = recipe;
     const previous = getSavedEffects().find(e => e.id === id)?.recipe;
     const error = await saveEffect(id, trimmed, snapshot);
@@ -650,11 +647,16 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
         initialValue={currentName ?? ''}
         maxLength={EFFECT_NAME_MAX}
         confirmLabel={t('lighting.studio.save')}
-        validate={v => (v.trim() ? null : t('lighting.studio.nameRequired'))}
-        titleAdornment={v => (v.trim() && replacedBy(v)
-          ? <Badge label={t('lighting.studio.saveReplaces')} color="var(--warn)" compact />
-          : <Badge label={t('lighting.studio.saveNew')} color="var(--accent)" compact />)}
-        onConfirm={saveCurrent}
+        validate={v => {
+          if (!v.trim()) return t('lighting.studio.nameRequired');
+          return otherEffectNamed(v) ? t('lighting.studio.nameTaken') : null;
+        }}
+        onConfirm={name => saveCurrent(name, currentId ?? newEffectId())}
+        secondary={currentId ? {
+          label: t('lighting.studio.saveAsNew'),
+          onClick: name => saveCurrent(name, newEffectId()),
+          disabled: nameUsed,
+        } : undefined}
         onCancel={() => setSaving(false)}
       />
       {PublishEffectModal && (

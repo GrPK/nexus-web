@@ -343,20 +343,83 @@ describe('ShaderStudio opening', () => {
 });
 
 describe('ShaderStudio save prompt', () => {
-  it('says whether the name saves a new effect or replaces one, and saves to match', async () => {
-    const recipe = { v: 1, blocks: [{ uid: 'a1', type: 'rings', params: {} }, { uid: 'b2', type: 'palette', params: {} }], speed: 50, hue: 0, saturation: 1, contrast: 1 };
-    savedEntries = [{ id: 'fx1', name: 'Glow', recipe: JSON.stringify(recipe), updatedAt: 1, audio: false }];
-    put.mockReset().mockResolvedValue({ entry: {} });
-    render(<ShaderStudio open effectId={null} onClose={() => {}} />);
+  const body = JSON.stringify({ v: 1, blocks: [{ uid: 'a1', type: 'rings', params: {} }, { uid: 'b2', type: 'palette', params: {} }], speed: 50, hue: 0, saturation: 1, contrast: 1 });
+  const entry = (id: string, name: string) => ({ id, name, recipe: body, updatedAt: 1, audio: false });
+  const openPrompt = (effectId: string | null) => {
+    render(<ShaderStudio open effectId={effectId} onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: 'lighting.studio.save' }));
-    const field = screen.getByPlaceholderText('lighting.studio.namePlaceholder');
-    fireEvent.change(field, { target: { value: 'Fresh' } });
-    expect(screen.getByText('lighting.studio.saveNew')).toBeInTheDocument();
-    fireEvent.change(field, { target: { value: ' glow ' } });
-    expect(screen.getByText('lighting.studio.saveReplaces')).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: 'lighting.studio.save' }).at(-1)!);
-    await waitFor(() => expect(put).toHaveBeenCalled());
+    return screen.getByPlaceholderText('lighting.studio.namePlaceholder');
+  };
+  const dialogButton = (name: string) => screen.getAllByRole('button', { name }).at(-1)!;
+
+  beforeEach(() => {
+    put.mockReset().mockResolvedValue({ entry: {} });
+    savedEntries = [entry('fx1', 'Glow'), entry('fx2', 'Pulse')];
+  });
+  afterEach(() => { savedEntries = []; });
+
+  it('Save renames the open effect in place', async () => {
+    const field = openPrompt('fx1');
+    fireEvent.change(field, { target: { value: ' Glow 2 ' } });
+    fireEvent.click(dialogButton('lighting.studio.save'));
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
     expect(put.mock.calls[0][0]).toBe('fx1');
+    expect(put.mock.calls[0][1]).toMatchObject({ name: 'Glow 2' });
+  });
+
+  it('Enter saves over the open effect, never as new', async () => {
+    const field = openPrompt('fx1');
+    fireEvent.change(field, { target: { value: 'Glow 2' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+    expect(put.mock.calls[0][0]).toBe('fx1');
+  });
+
+  it('Save as new creates another id and leaves the open effect alone', async () => {
+    const field = openPrompt('fx1');
+    fireEvent.change(field, { target: { value: 'Glow copy' } });
+    fireEvent.click(dialogButton('lighting.studio.saveAsNew'));
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+    expect(put.mock.calls[0][0]).not.toBe('fx1');
+    expect(put.mock.calls[0][0]).not.toBe('fx2');
+    expect(put.mock.calls[0][1]).toMatchObject({ name: 'Glow copy' });
+  });
+
+  it('disables Save as new for the open or any saved effect name, ignoring case', () => {
+    const field = openPrompt('fx1');
+    expect(dialogButton('lighting.studio.saveAsNew')).toBeDisabled();
+    fireEvent.change(field, { target: { value: 'glow' } });
+    expect(dialogButton('lighting.studio.saveAsNew')).toBeDisabled();
+    fireEvent.change(field, { target: { value: 'Fresh' } });
+    expect(dialogButton('lighting.studio.saveAsNew')).toBeEnabled();
+  });
+
+  it('blocks both buttons when a different effect owns the name', () => {
+    const field = openPrompt('fx1');
+    fireEvent.change(field, { target: { value: ' pulse ' } });
+    expect(screen.getByText('lighting.studio.nameTaken')).toBeInTheDocument();
+    expect(dialogButton('lighting.studio.save')).toBeDisabled();
+    expect(dialogButton('lighting.studio.saveAsNew')).toBeDisabled();
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it('keeps Save available on the open effect name even when another effect shares it', async () => {
+    savedEntries = [entry('fx1', 'Glow'), entry('fx2', 'glow')];
+    openPrompt('fx1');
+    expect(screen.queryByText('lighting.studio.nameTaken')).toBeNull();
+    fireEvent.click(dialogButton('lighting.studio.save'));
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+    expect(put.mock.calls[0][0]).toBe('fx1');
+  });
+
+  it('offers only Cancel and Save for a never-saved draft', async () => {
     savedEntries = [];
+    const field = openPrompt(null);
+    expect(screen.queryByRole('button', { name: 'lighting.studio.saveAsNew' })).toBeNull();
+    fireEvent.change(field, { target: { value: 'Fresh' } });
+    fireEvent.click(dialogButton('lighting.studio.save'));
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+    expect(put.mock.calls[0][0]).not.toBe('fx1');
   });
 });
