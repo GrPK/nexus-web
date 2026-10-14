@@ -115,7 +115,6 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   onFirmwareTakeControl?: (deviceId: string) => void;
   /** Opens a device page by its sidebar key. */
   onOpenDevicePage?: (deviceKey: string) => void;
-  /** Devices with no cards because their lighting is set on their device page; listed in their own section at the bottom. */
   /** Renders a dashed "add smart lights" entry at the bottom of the list. */
   onOpenSmartLights?: () => void;
   /** Tail card explaining a short list; absent once a mode is running. */

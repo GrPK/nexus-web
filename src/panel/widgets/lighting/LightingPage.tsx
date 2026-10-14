@@ -62,7 +62,7 @@ import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
 import { usePersistentState } from '../../../hooks/usePersistentState';
 import {
   staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex,
-  pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, pressReach, tabPressChangesNothing, clearLegacyLightingKeys,
+  pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, pressReach, selectAllEligible, tabPressChangesNothing, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
@@ -1499,7 +1499,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // narrows it to the matches for the same reason.
   const selectAllIds = useMemo(
     () => (railSearch.active ? railDevices : orderedDevices)
-      .filter(d => !zoneCardUnavailable(d) && d.controlled !== false).map(d => d.id),
+      .filter(d => !zoneCardUnavailable(d) && selectAllEligible(d)).map(d => d.id),
     [orderedDevices, railDevices, railSearch.active],
   );
 

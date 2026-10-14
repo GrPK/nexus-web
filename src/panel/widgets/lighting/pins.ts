@@ -135,21 +135,30 @@ export function pinStripPick(pin: Pin): { key: string; slot: number; hex: string
 /** Ids of `ids` that wear a pin. */
 export const pinnedAmong = (pins: Pins, ids: readonly string[]): string[] => ids.filter(id => id in pins);
 
+type Reach = { ledsOn?: boolean; controlled?: boolean; devicePageReason?: string };
+
+/** A card the engine drives: lit, controlled, and not set on its device page (no engine frame). */
+const engineReaches = (d: Reach): boolean => d.ledsOn !== false && d.controlled !== false && d.devicePageReason === undefined;
+
+/** Page Select all skips Nexus Control off cards and cards set on their device page. */
+export const selectAllEligible = (d: { controlled?: boolean; devicePageReason?: string }): boolean =>
+  d.controlled !== false && d.devicePageReason === undefined;
+
 /** With nothing selected, a pick lands on every unpinned lit and controlled device; a selection marks its own target. */
-export const isPickTarget = (d: { id: string; ledsOn?: boolean; controlled?: boolean }, pins: Pins, selectedIds: ReadonlySet<string>): boolean =>
-  selectedIds.size === 0 && !(d.id in pins) && d.ledsOn !== false && d.controlled !== false;
+export const isPickTarget = (d: { id: string } & Reach, pins: Pins, selectedIds: ReadonlySet<string>): boolean =>
+  selectedIds.size === 0 && !(d.id in pins) && engineReaches(d);
 
 /**
  * The lit, controlled cards a press or pick changes: the selection, or with none
  * every unpinned one. Game Sync and Off override pins, so they reach them all.
  */
 export function pressReach(
-  devices: readonly { id: string; ledsOn?: boolean; controlled?: boolean }[],
+  devices: readonly ({ id: string } & Reach)[],
   pins: Pins,
   selectedIds: ReadonlySet<string>,
   overridesPins = false,
 ): Set<string> {
-  const lit = devices.filter(d => d.ledsOn !== false && d.controlled !== false);
+  const lit = devices.filter(engineReaches);
   if (overridesPins) return new Set(lit.map(d => d.id));
   if (selectedIds.size > 0) return new Set(lit.filter(d => selectedIds.has(d.id)).map(d => d.id));
   return new Set(lit.filter(d => !(d.id in pins)).map(d => d.id));
@@ -165,14 +174,14 @@ export const tabPressChangesNothing = (key: string, activeKey: string | undefine
  * with none, every lit and controlled device. Pinned ones are flagged.
  */
 export function pickerMarks(
-  devices: readonly { id: string; name: string; originalName?: string; ledsOn?: boolean; controlled?: boolean }[],
+  devices: readonly { id: string; name: string; originalName?: string; ledsOn?: boolean; controlled?: boolean; devicePageReason?: string }[],
   pins: Pins,
   selectedIds: ReadonlySet<string>,
   globalColor: string,
 ): { id: string; name: string; hex: string; pinned: boolean }[] {
   const none = selectedIds.size === 0;
   return devices
-    .filter(d => (none ? d.ledsOn !== false && d.controlled !== false : selectedIds.has(d.id)))
+    .filter(d => (none ? engineReaches(d) : selectedIds.has(d.id)))
     .map(d => {
       const pin = pins[d.id];
       return { id: d.id, name: canvasLabelName(d), hex: !pin ? globalColor : pin.kind === 'static' ? pinHex(pin) : '', pinned: !!pin };

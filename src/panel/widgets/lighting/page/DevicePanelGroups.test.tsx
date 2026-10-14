@@ -938,6 +938,8 @@ describe('DevicePanel cards of devices controlled on their device page', () => {
         firmwareDeviceIds={new Set(['strimer:atx'])}
         onFirmwareTakeControl={() => {}}
         onOpenDevicePage={onOpenDevicePage}
+        onRenameDevice={() => {}}
+        onGroupsChange={() => {}}
       />,
     );
     return onOpenDevicePage;
@@ -949,11 +951,23 @@ describe('DevicePanel cards of devices controlled on their device page', () => {
     expect(screen.getByText('Strip one')).toBeTruthy();
   });
 
-  it('picks the badge tooltip by reason', async () => {
+  it.each([
+    ['Asiahorse Umbra V2', 'lighting.devices.devicePageFirmwareTooltip'],
+    ['Lian Li Strimer', 'lighting.devices.devicePageArgbTooltip'],
+  ])('picks the badge tooltip by reason for %s', async (name, tooltip) => {
     renderPage();
-    const badges = screen.getAllByText('lighting.devices.hardwareControlBadge');
-    fireEvent.focus(badges[0].closest('span[class*="deviceMetaBadge"]') ?? badges[0]);
-    expect(await screen.findByText('lighting.devices.devicePageFirmwareTooltip')).toBeTruthy();
+    const card = screen.getByText(name).closest('[data-search-anchor]') as HTMLElement;
+    const badge = card.querySelector('span[class*="deviceMetaBadge"]') as HTMLElement;
+    expect(badge).not.toBeNull();
+    fireEvent.focus(badge);
+    expect(await screen.findByText(tooltip)).toBeTruthy();
+  });
+
+  it('keeps the rename and move-to-group rows on the card menu', () => {
+    renderPage();
+    fireEvent.contextMenu(screen.getByText('Asiahorse Umbra V2'));
+    expect(screen.getByText('lighting.devices.rename')).toBeTruthy();
+    expect(screen.getByText('lighting.devices.moveToNewGroup')).toBeTruthy();
   });
 
   it('offers Open device page but no Take control, even when the own-effect table matches', () => {
