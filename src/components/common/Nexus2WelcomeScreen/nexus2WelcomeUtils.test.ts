@@ -11,6 +11,7 @@ import {
   categoryLabelKey,
   defaultSelectedGroupIds,
   fanCurveReasonKey,
+  fillTemplate,
   formatList,
   groupDetailParts,
   groupResultSummaries,
@@ -305,6 +306,12 @@ describe('importHeaderKeys', () => {
   it('uses the combined header when both are importable', () => {
     expect(importHeaderKeys(preview(y70, MIXED_FAN_CURVES))).toEqual({ titleKey: 'nexus2Welcome.import.title.both', descriptionKey: 'nexus2Welcome.import.description.both' });
   });
+  it('uses a neutral header when nothing is importable', () => {
+    const noted: Nexus2PreviewCategory = { id: 'fanCurves', available: false, count: 0, fanCurvesNote: 'noUserCurves' };
+    expect(importHeaderKeys(preview(noted))).toEqual({ titleKey: 'nexus2Welcome.import.title.none', descriptionKey: 'nexus2Welcome.import.description.none' });
+    expect(importHeaderKeys(preview(skippedFan)).titleKey).toBe('nexus2Welcome.import.title.none');
+    expect(importHeaderKeys(null).titleKey).toBe('nexus2Welcome.import.title.none');
+  });
   it('ignores a note-only or all-skipped fan group', () => {
     const noted: Nexus2PreviewCategory = { id: 'fanCurves', available: false, count: 0, fanCurvesNote: 'noUserCurves' };
     expect(importHeaderKeys(preview(y70, noted)).titleKey).toBe('nexus2Welcome.import.title');
@@ -382,6 +389,12 @@ describe('fan curves', () => {
     });
     for (const line of lines) expect(JSON.stringify(line.params)).not.toMatch(/\$&|\{fans\}|\{name\}/);
     expect(lines[1].user).toEqual({ name: '{fans} $&', list: ['{name}'] });
+  });
+
+  it('fills templates in one pass and keeps locale punctuation', () => {
+    expect(fillTemplate('{name} : {reason}', { name: '{reason} $&', reason: 'ok' })).toBe('{reason} $& : ok');
+    expect(fillTemplate('{name}\uFF1A{reason}', { name: 'A', reason: 'B' })).toBe('A\uFF1AB');
+    expect(fillTemplate('{unknown} {name}', { name: 'N' })).toBe('{unknown} N');
   });
 
   it('formats lists with the locale conjunction', () => {

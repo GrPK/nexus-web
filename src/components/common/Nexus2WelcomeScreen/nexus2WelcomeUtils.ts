@@ -30,10 +30,26 @@ export interface CategoryDetail {
   /**
    * Nexus 2 free text (a curve or fan name). Never passed through t() params,
    * whose substitution mangles `{x}` and `$&`: the renderer composes it
-   * around the translated fragment instead. With `list`, the line is
-   * "name, arrow, list" and `key` is unused; without it, "name: fragment".
+   * through fillTemplate around the translated fragment instead. With `list`
+   * the line is the curve template (name, list) and `key` is unused; without
+   * it, the reason-line template (name, translated `key`).
    */
   user?: { name: string; list?: string[] };
+}
+
+/**
+ * Fills `{token}` placeholders in a single pass over the template, so a value
+ * that itself looks like a token or a replacement pattern (`{fans}`, `$&`) is
+ * emitted verbatim. Used for lines that carry Nexus 2 free text.
+ */
+export function fillTemplate(template: string, values: Record<string, string>): string {
+  return template
+    .split(/(\{[a-zA-Z]+\})/)
+    .map(part => {
+      const m = /^\{([a-zA-Z]+)\}$/.exec(part);
+      return m && m[1] in values ? values[m[1]] : part;
+    })
+    .join('');
 }
 
 /** Locale-aware "A, B, and C"; plain comma join where Intl.ListFormat is missing. */
@@ -197,7 +213,8 @@ export function importHeaderKeys(preview: Nexus2PreviewResponse | null): { title
   const groups = IMPORT_GROUPS.filter(g => groupHasAvailable(preview, g));
   const fan = groups.some(g => g.id === 'fanCurves');
   const personalization = groups.some(g => g.id !== 'fanCurves');
-  const suffix = fan ? (personalization ? '.both' : '.fanCurves') : '';
+  // Nothing importable: a neutral header that promises no replacement.
+  const suffix = fan ? (personalization ? '.both' : '.fanCurves') : (personalization ? '' : '.none');
   return {
     titleKey: `nexus2Welcome.import.title${suffix}`,
     descriptionKey: `nexus2Welcome.import.description${suffix}`,

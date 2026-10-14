@@ -8,7 +8,7 @@ import { Spinner } from '../Spinner/Spinner';
 import { SectionHeader } from '../SectionHeader/SectionHeader';
 import { Toggle } from '../Toggle/Toggle';
 import { FanControlImportSection, type FanControlImportHandle } from '../FanControlImport/FanControlImportSection';
-import { Nexus2ImportSection, type Nexus2ImportHandle, type Nexus2RunOptions } from '../Nexus2WelcomeScreen/Nexus2ImportSection';
+import { Nexus2ImportSection, type Nexus2ImportHandle } from '../Nexus2WelcomeScreen/Nexus2ImportSection';
 import { useFanControlStatus } from '../../../hooks/useFanControlStatus';
 import { useNexus2WelcomeStatus } from '../../../hooks/useNexus2WelcomeStatus';
 import styles from './ImportCenter.module.scss';
@@ -16,12 +16,18 @@ import styles from './ImportCenter.module.scss';
 /** Apps Nexus can take a setup over from. Grow this by adding a case in `rowFor`. */
 export type ImportSourceId = 'fancontrol' | 'nexus2';
 
-export type ImportOutcome = 'clean' | 'failed';
+/** 'needsReview': nothing ran; a fan curve list the user has not seen was about to import, so its panel was revealed instead. */
+export type ImportOutcome = 'clean' | 'failed' | 'needsReview';
+
+export interface ImportRunOptions {
+  /** The press came before every included preview had settled. */
+  pressedBeforeSettled?: boolean;
+}
 
 /** Lets a host drive the import from its own footer (both onboarding screens do). */
 export interface ImportCenterHandle {
   /** Runs every included source in list order. 'clean' only when they all succeeded. */
-  runImport: (options?: Nexus2RunOptions) => Promise<ImportOutcome>;
+  runImport: (options?: ImportRunOptions) => Promise<ImportOutcome>;
 }
 
 /** One app's row in the left column, and what it shows on the right. */
@@ -169,10 +175,16 @@ export function ImportCenter({
   // Guards on its own in-flight state only, never the host's `disabled`: a host
   // driving this from its own button sets that flag in the same tick, and
   // consulting it here would make the call a silent no-op.
-  const runImport = async (options?: Nexus2RunOptions): Promise<ImportOutcome> => {
+  const runImport = async (options?: ImportRunOptions): Promise<ImportOutcome> => {
     if (busy) return 'failed';
     const targets = sources.filter(runnable);
     if (targets.length === 0) return 'failed';
+    // Fan curves are only imported once their list has been on screen; until
+    // then a press brings it up instead of acting.
+    if (targets.includes('nexus2') && nexus2Handle.current?.fanCurvesNeedReview(options?.pressedBeforeSettled)) {
+      setHighlightOverride('nexus2');
+      return 'needsReview';
+    }
     setBusy(true);
     onBusyChange?.(true);
     let allClean = true;
@@ -181,7 +193,7 @@ export function ImportCenter({
     for (const id of targets) {
       const outcome = id === 'fancontrol'
         ? await fanControlHandle.current?.runImport() ?? 'failed'
-        : await nexus2Handle.current?.runImport(options) ?? 'failed';
+        : await nexus2Handle.current?.runImport() ?? 'failed';
       if (outcome !== 'clean') allClean = false;
     }
     setBusy(false);
@@ -204,6 +216,12 @@ export function ImportCenter({
       hint={t(`importCenter.notFound.hint.${id}`)}
     />
   );
+
+  // Same pick as `current` below, known early so each panel can be told
+  // whether it is the one on screen.
+  const currentId = sources.find(id => id === highlightOverride)
+    ?? sources.find(id => available[id] || !resolved[id])
+    ?? sources[0];
 
   const rowFor = (id: ImportSourceId): SourceRow => {
     if (id === 'fancontrol') {
@@ -253,6 +271,7 @@ export function ImportCenter({
             showAction={false}
             onSelectionChange={noteNexus2Selection}
             handleRef={nexus2Handle}
+            visible={currentId === 'nexus2'}
             wide
           />
         )

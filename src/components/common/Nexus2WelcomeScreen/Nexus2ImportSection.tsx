@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useState, type RefObject } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type RefObject } from 'react';
 import { Fan, LayoutGrid, LineChart } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { pluralKey } from '../../../lib/pluralKey';
@@ -11,7 +11,7 @@ import type { Nexus2ApplyResult, Nexus2PreviewResponse } from '../../../api/migr
 import {
   allApplyResultsClean, applyDetailKey, applyStatusKey, categoryLabelKey, defaultSelectedGroupIds,
   groupDetailParts, groupResultSummaries, groupHasAvailable, selectedWireIds, unavailableGroupNoteKey,
-  visibleImportGroups, importHeaderKeys, formatList, type ImportGroupId,
+  visibleImportGroups, importHeaderKeys, formatList, fillTemplate, type ImportGroupId,
 } from './nexus2WelcomeUtils';
 import styles from './Nexus2ImportSection.module.scss';
 
@@ -21,14 +21,15 @@ type ImportPhase = 'idle' | 'busy' | 'results';
 /** Apply outcome for a host-driven import. */
 export type Nexus2ImportOutcome = 'clean' | 'failed';
 
-export interface Nexus2RunOptions {
-  /** Leaves fan curves out of this run: the host acted before the curve list was on screen. */
-  skipFanCurves?: boolean;
-}
-
 /** Lets a host drive the apply from its own button. */
 export interface Nexus2ImportHandle {
-  runImport: (options?: Nexus2RunOptions) => Promise<Nexus2ImportOutcome>;
+  runImport: () => Promise<Nexus2ImportOutcome>;
+  /**
+   * True when a run now would include fan curves the user has not been shown:
+   * the list has not been on screen, or the press came before the preview
+   * settled. The host then reveals this panel instead of importing.
+   */
+  fanCurvesNeedReview: (pressedBeforeSettled?: boolean) => boolean;
 }
 
 export interface Nexus2ImportSectionProps {
@@ -44,6 +45,8 @@ export interface Nexus2ImportSectionProps {
   onSelectionChange?: (hasSelection: boolean) => void;
   /** Receives the apply runner for hosts with showAction=false. */
   handleRef?: RefObject<Nexus2ImportHandle | null>;
+  /** False while the host hides this panel; the fan curve list only counts as shown while visible. */
+  visible?: boolean;
   /** True in a dialog, where the section gets the whole surface rather than
    *  the narrower onboarding column. */
   wide?: boolean;
@@ -56,7 +59,7 @@ export interface Nexus2ImportSectionProps {
  * the Settings entry opens - one place owns the markup so both stay in sync.
  */
 export function Nexus2ImportSection({
-  open, disabled, onBusyChange, showAction = true, onSelectionChange, handleRef, wide,
+  open, disabled, onBusyChange, showAction = true, onSelectionChange, handleRef, wide, visible = true,
 }: Nexus2ImportSectionProps) {
   const { t, language } = useTranslation();
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>('idle');
@@ -65,6 +68,7 @@ export function Nexus2ImportSection({
   const [importPhase, setImportPhase] = useState<ImportPhase>('idle');
   const [importResults, setImportResults] = useState<Nexus2ApplyResult[] | null>(null);
   const [importRequestError, setImportRequestError] = useState(false);
+  const fanListShownRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -75,6 +79,7 @@ export function Nexus2ImportSection({
     setImportResults(null);
     setImportRequestError(false);
     setImportPhase('idle');
+    fanListShownRef.current = false;
     void previewNexus2Import().then(res => {
       if (cancelled) return;
       if (!res) { setPreviewStatus('error'); return; }
@@ -90,12 +95,9 @@ export function Nexus2ImportSection({
   // Guards on its own in-flight phase only, never the host's `disabled`: a
   // host driving this from its own button sets that flag in the same tick,
   // and consulting it here would make the call a silent no-op.
-  const runImport = async (options?: Nexus2RunOptions): Promise<Nexus2ImportOutcome> => {
-    const selected = selectedWireIds(preview, selectedGroups);
-    const ids = options?.skipFanCurves ? selected.filter(id => id !== 'fanCurves') : selected;
-    if (importPhase === 'busy' || selected.length === 0) return 'failed';
-    // Only fan curves were ticked and they were held back: nothing to apply, nothing wrong.
-    if (ids.length === 0) return 'clean';
+  const runImport = async (): Promise<Nexus2ImportOutcome> => {
+    const ids = selectedWireIds(preview, selectedGroups);
+    if (importPhase === 'busy' || ids.length === 0) return 'failed';
     setImportPhase('busy');
     onBusyChange?.(true);
     setImportRequestError(false);
@@ -121,6 +123,14 @@ export function Nexus2ImportSection({
 
   const selectionEmpty = selectedWireIds(preview, selectedGroups).length === 0;
 
+  // Whether the importable fan curve list has actually been on screen: the
+  // preview is loaded, the group renders, and the host is showing this panel.
+  const fanListRenders = previewStatus === 'loaded'
+    && (preview?.categories.some(c => c.id === 'fanCurves' && c.available) ?? false);
+  useEffect(() => {
+    if (open && visible && fanListRenders) fanListShownRef.current = true;
+  }, [open, visible, fanListRenders]);
+
   // Both hooks sit above the closed-early-return so hook order stays stable
   // across open toggles (the component stays mounted, per Dashboard gating).
   const previewSettled = previewStatus === 'loaded' || previewStatus === 'error';
@@ -129,7 +139,9 @@ export function Nexus2ImportSection({
   }, [previewSettled, selectionEmpty, onSelectionChange]);
 
   // No dep list: the handle must always close over the latest selection state.
-  useImperativeHandle(handleRef, () => ({ runImport }));
+  const fanCurvesNeedReview = (pressedBeforeSettled?: boolean) =>
+    selectedWireIds(preview, selectedGroups).includes('fanCurves') && (!!pressedBeforeSettled || !fanListShownRef.current);
+  useImperativeHandle(handleRef, () => ({ runImport, fanCurvesNeedReview }));
 
   if (!open) return null;
 
@@ -189,9 +201,13 @@ export function Nexus2ImportSection({
                   return (
                     <span key={`${d.key}-${i}`} className={styles.detailBullet} role="listitem">
                       {d.user?.list
-                        ? <span>{d.user.name} → {formatList(d.user.list, language)}</span>
+                        ? fillTemplate(t('nexus2Welcome.import.category.fanCurves.curve'), {
+                          name: d.user.name, fans: formatList(d.user.list, language),
+                        })
                         : d.user
-                          ? <span>{d.user.name}: {t(d.key)}</span>
+                          ? fillTemplate(t('nexus2Welcome.import.category.fanCurves.reasonLine'), {
+                            name: d.user.name, reason: t(d.key),
+                          })
                           : t(d.plural ? pluralKey(d.key, language, Number(d.params.count)) : d.key, params)}
                     </span>
                   );

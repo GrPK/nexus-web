@@ -14,6 +14,8 @@ vi.mock('../../../lib/i18n', () => ({
   useTranslation: () => ({
     language: 'en',
     t: (key: string, params?: Record<string, string | number>) => {
+      if (key.endsWith('.fanCurves.curve')) return '{name} → {fans}';
+      if (key.endsWith('.fanCurves.reasonLine')) return '{name}: {reason}';
       if (!params) return key;
       return `${key}:${Object.values(params).join(',')}`;
     },
@@ -297,15 +299,35 @@ describe('Nexus2ImportSection - fan curves', () => {
     expect(screen.getByRole('button', { name: IMPORT_BUTTON_NAME })).toBeDisabled();
   });
 
-  it('leaves fan curves out when the host asks for a run before the list was shown', async () => {
+  it('asks for a review until the fan curve list has been on screen', async () => {
     vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [Y70_LAYOUT, FAN_CATEGORY] });
     const handleRef = { current: null as Nexus2ImportHandle | null };
     renderSection({ handleRef, showAction: false });
+    expect(handleRef.current?.fanCurvesNeedReview()).toBe(false);
     await screen.findByRole('switch', { name: FAN_NAME });
-    await act(async () => { await handleRef.current?.runImport({ skipFanCurves: true }); });
-    expect(applyNexus2Import).toHaveBeenCalledWith(['y70Layout'], true);
-    await act(async () => { await handleRef.current?.runImport(); });
-    expect(applyNexus2Import).toHaveBeenLastCalledWith(['y70Layout', 'fanCurves'], true);
+    expect(handleRef.current?.fanCurvesNeedReview()).toBe(false);
+    // A press that preceded the preview never counts, even though the list shows now.
+    expect(handleRef.current?.fanCurvesNeedReview(true)).toBe(true);
+    // Unticked fan curves need no review.
+    fireEvent.click(screen.getByRole('switch', { name: FAN_NAME }));
+    expect(handleRef.current?.fanCurvesNeedReview(true)).toBe(false);
+  });
+
+  it('does not count the list as shown while the host hides the panel', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [FAN_CATEGORY] });
+    const handleRef = { current: null as Nexus2ImportHandle | null };
+    const view = renderSection({ handleRef, showAction: false, visible: false });
+    await screen.findByRole('switch', { name: FAN_NAME });
+    expect(handleRef.current?.fanCurvesNeedReview()).toBe(true);
+    view.rerender(<Nexus2ImportSection open showAction={false} handleRef={handleRef} visible />);
+    expect(handleRef.current?.fanCurvesNeedReview()).toBe(false);
+  });
+
+  it('keeps locale punctuation from the template around user text', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [FAN_CATEGORY] });
+    renderSection();
+    await screen.findByRole('switch', { name: FAN_NAME });
+    expect(screen.getByText(`Pump: ${FAN}.reason.pumpKept`)).toBeInTheDocument();
   });
 
   it('sends fanCurves in the apply call', async () => {
