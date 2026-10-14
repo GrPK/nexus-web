@@ -193,6 +193,7 @@ export function PanelControlCenter({
         data-state={open ? (dismissing ? 'dragging' : 'open') : (opening ? 'dragging' : 'closed')}
         data-landscape={isLandscape ? 'true' : undefined}
         style={sheetStyle}
+        lang={language}
         aria-label={t('panel.controlCenter.label')}
         aria-hidden={!open && !opening ? true : undefined}
         onTransitionEnd={releaseBody}
@@ -314,9 +315,11 @@ function ControlCenterBody({
   // hide more, never show again, which keeps the rule from oscillating.
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [fitLevel, setFitLevel] = useState(0);
-  const refit = useCallback(() => setFitLevel(0), []);
+  // Bumped by every refit, so the measure runs even when the level is already 0.
+  const [fitEpoch, setFitEpoch] = useState(0);
+  const refit = useCallback(() => { setFitLevel(0); setFitEpoch(e => e + 1); }, []);
   useEffect(() => { if (!active) refit(); }, [active, refit]);
-  useEffect(() => { refit(); }, [isLandscape, refit]);
+  useLayoutEffect(() => { refit(); }, [isLandscape, refit]);
   useEffect(() => {
     let cancelled = false;
     window.addEventListener('resize', refit);
@@ -327,7 +330,7 @@ function ControlCenterBody({
     const el = contentRef.current;
     if (!el || view !== 'main' || fitLevel >= 2) return;
     if (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1) setFitLevel(l => l + 1);
-  }, [view, fitLevel, isLandscape, timeText, radios, session, volume.state.supported, brightness.available, mic.state.supported, brightness.linkDown]);
+  }, [view, fitLevel, fitEpoch, isLandscape, timeText, radios, session, volume.state.supported, brightness.available, mic.state.supported, brightness.linkDown]);
 
   if (view === 'mixer') {
     return (

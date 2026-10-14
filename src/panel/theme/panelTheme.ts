@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import { useTopicCallback } from '../../hooks/useMultiplexSocket';
 import { useTranslation } from '../../lib/i18n';
 import {
-  DEFAULT_ACCENT, LANGUAGES, THEME_MODES, deriveAccentVars, resolveTheme,
+  DEFAULT_ACCENT, LANGUAGES, THEME_MODES, deriveAccentOnVars, deriveAccentVars, resolveTheme,
   type Language, type ThemeMode,
 } from '../../lib/settings';
 import { fetchPreferences, type Preferences } from '../../api/profiles';
@@ -95,6 +95,7 @@ export function useDocumentResolvedThemeMode(enabled: boolean): ResolvedPanelThe
 
 export function buildEmbeddedPanelThemeVars(appAccentColor: string | undefined, resolvedThemeMode: ResolvedPanelThemeMode): CSSProperties {
   const accentVars = deriveAccentVars(appAccentColor || DEFAULT_ACCENT, resolvedThemeMode);
+  const onVars = deriveAccentOnVars(appAccentColor || DEFAULT_ACCENT, resolvedThemeMode);
   return {
     ...accentVars,
     '--panel-card-bg': 'var(--surface)',
@@ -104,6 +105,8 @@ export function buildEmbeddedPanelThemeVars(appAccentColor: string | undefined, 
     '--panel-accent-soft': accentVars['--accent-soft'],
     '--panel-accent-shadow': accentVars['--accent-glow-shadow'],
     '--panel-accent-text': accentVars['--accent-text'],
+    '--panel-accent-on': onVars['--accent-on'],
+    '--panel-accent-on-text': onVars['--accent-on-text'],
   } as CSSProperties;
 }
 
@@ -117,6 +120,7 @@ export function panelAccentColor(theme: PanelThemeState): string {
 
 export function buildPanelThemeVars(theme: PanelThemeState, resolvedThemeMode: ResolvedPanelThemeMode): CSSProperties {
   const accentVars = deriveAccentVars(panelAccentColor(theme), resolvedThemeMode);
+  const onVars = deriveAccentOnVars(panelAccentColor(theme), resolvedThemeMode);
   // Widget surface alpha (user-controlled). .panel-card in tokens.scss applies
   // it via color-mix so only the background fades, not the contents. Live panels
   // fill from the OPAQUE surface variant (not the translucent --surface embedded
@@ -133,6 +137,8 @@ export function buildPanelThemeVars(theme: PanelThemeState, resolvedThemeMode: R
     '--panel-accent-soft': accentVars['--accent-soft'],
     '--panel-accent-shadow': accentVars['--accent-glow-shadow'],
     '--panel-accent-text': accentVars['--accent-text'],
+    '--panel-accent-on': onVars['--accent-on'],
+    '--panel-accent-on-text': onVars['--accent-on-text'],
   };
   return { ...vars, ...panelFontVars(theme.font) } as CSSProperties;
 }
