@@ -3505,7 +3505,6 @@
   "panel.controlCenter.screenSleep.wake": "屏幕已休眠。触摸即可唤醒。",
   "panel.controlCenter.sleepPc": "电脑睡眠",
   "panel.controlCenter.volume": "音量",
-  "panel.controlCenter.volume.hint": "长按可查看各应用音量",
   "panel.controlCenter.volume.mute": "音量静音",
   "panel.controlCenter.volume.unmute": "取消音量静音",
   "panel.controlCenter.wifi": "Wi-Fi",

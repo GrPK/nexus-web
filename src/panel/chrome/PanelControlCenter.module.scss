@@ -115,6 +115,7 @@
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -143,11 +144,6 @@
   height: 130px;
 }
 
-.holdWrap {
-  display: flex;
-  min-width: 0;
-}
-
 // Two classes beat the slider's own root vars whatever the emission order.
 .faders .fader {
   --mixer-track-min: 70px;
@@ -165,6 +161,12 @@
   font-size: var(--type-tiny);
   color: var(--text-dim);
   text-align: center;
+}
+
+.mixerButton {
+  position: absolute;
+  top: 6px;
+  right: 6px;
 }
 
 .grid {

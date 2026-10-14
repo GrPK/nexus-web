@@ -8,8 +8,8 @@ import { useCallback, useEffect, useRef } from 'react';
 export function useLatestWriter(send: (value: number) => Promise<unknown>, intervalMs: number) {
   const sendRef = useRef(send);
   useEffect(() => { sendRef.current = send; }, [send]);
-  const w = useRef<{ inFlight: boolean; queued: number | null; lastAt: number; timer: ReturnType<typeof setTimeout> | null }>({
-    inFlight: false, queued: null, lastAt: 0, timer: null,
+  const w = useRef<{ inFlight: boolean; queued: number | null; lastAt: number; timer: ReturnType<typeof setTimeout> | null; request: Promise<unknown> | null }>({
+    inFlight: false, queued: null, lastAt: 0, timer: null, request: null,
   });
   const pumpRef = useRef<() => void>(() => {});
   const unmounted = useRef(false);
@@ -24,7 +24,9 @@ export function useLatestWriter(send: (value: number) => Promise<unknown>, inter
     s.queued = null;
     s.inFlight = true;
     s.lastAt = Date.now();
-    void sendRef.current(next).catch(() => null).finally(() => { s.inFlight = false; if (!unmounted.current) pumpRef.current(); });
+    const request = sendRef.current(next).catch(() => null);
+    s.request = request;
+    void request.finally(() => { s.inFlight = false; s.request = null; if (!unmounted.current) pumpRef.current(); });
   }, [intervalMs]);
   useEffect(() => { pumpRef.current = pump; }, [pump]);
 
@@ -39,7 +41,9 @@ export function useLatestWriter(send: (value: number) => Promise<unknown>, inter
       if (state.queued != null) {
         const last = state.queued;
         state.queued = null;
-        void sendRef.current(last).catch(() => null);
+        // Behind a write still in flight, so the older value cannot land last.
+        const send = () => sendRef.current(last).catch(() => null);
+        if (state.request) void state.request.then(send); else void send();
       }
     };
   }, []);

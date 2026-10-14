@@ -3550,7 +3550,6 @@
   "panel.controlCenter.screenSleep.wake": "Ekran uśpiony. Dotknij, aby go wybudzić.",
   "panel.controlCenter.sleepPc": "Uśpij komputer",
   "panel.controlCenter.volume": "Głośność",
-  "panel.controlCenter.volume.hint": "Przytrzymaj, aby zobaczyć głośność aplikacji",
   "panel.controlCenter.volume.mute": "Wycisz dźwięk",
   "panel.controlCenter.volume.unmute": "Wyłącz wyciszenie dźwięku",
   "panel.controlCenter.wifi": "Wi-Fi",

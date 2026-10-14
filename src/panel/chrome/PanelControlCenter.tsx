@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  Bluetooth, Lock, Mic, MicOff, MonitorOff, Moon, Pause, Plane, Play, Power, SkipBack, SkipForward, Sun, Volume2, VolumeX, Wifi,
+  Bluetooth, Lock, Mic, MicOff, MonitorOff, Moon, Pause, Plane, Play, Power, SkipBack, SlidersVertical, SkipForward, Sun, Volume2, VolumeX, Wifi,
 } from 'lucide-react';
 import { cssPxPerMm } from '../engine/panelGrid';
 import {
@@ -16,9 +16,10 @@ import {
   readSafeAreaTopPx,
 } from '../engine/controlCenterGesture';
 import { usePanelControlCenterSwipe } from '../engine/usePanelControlCenterSwipe';
-import { useTouchViaPointer, type GestureContact } from '../engine/touchViaPointer';
+import { type GestureContact } from '../engine/touchViaPointer';
 import { usePanelImmersiveOpen } from '../widgets/common/PanelImmersiveContext';
 import { PanelMixerSlider } from '../widgets/common/PanelMixerSlider';
+import { Button } from '../../components/common/Button/Button';
 import { IconLabelButton } from '../../components/common/IconLabelButton/IconLabelButton';
 import { useTranslation } from '../../lib/i18n';
 import { useUnitPrefs } from '../../hooks/useUiSettings';
@@ -30,12 +31,10 @@ import { controlActiveMedia, useMedia, type MediaSession } from '../../hooks/use
 import { systemPower } from '../../api/system';
 import { fetchRadios, setRadio, type RadioKind, type RadiosState } from '../../api/radios';
 import type { PanelSurface } from '../types';
-import { useVolumeFaderPress } from './useVolumeFaderPress';
 import { ControlCenterMixerView } from './ControlCenterMixerView';
 import styles from './PanelControlCenter.module.scss';
 
 // Hold on the volume fader this long, without moving, for the per-app mixer.
-const MIXER_LONG_PRESS_MS = 600;
 const RADIOS_POLL_MS = 2000;
 
 interface PanelControlCenterProps {
@@ -149,7 +148,7 @@ export function PanelControlCenter({
   const visible = open || opening;
   const [view, setView] = useState<'main' | 'mixer'>('main');
   // Fresh on every open, whatever the last session left on screen.
-  useEffect(() => { if (visible) setView('main'); }, [visible]);
+  useLayoutEffect(() => { if (visible) setView('main'); }, [visible]);
 
   // The body stays mounted through the close slide so the content does not
   // vanish mid-motion; the sheet's transitionend lets go of it.
@@ -240,7 +239,6 @@ function ControlCenterBody({
   open, active, view, setView, language, surface, displayId, resolvedThemeMode, onSetThemeMode, onClose, onScreenSleep,
 }: BodyProps) {
   const { t } = useTranslation();
-  const touchViaPointer = useTouchViaPointer();
 
   // Clock header: follows the app's time-format setting.
   const { timeFormat } = useUnitPrefs();
@@ -303,20 +301,6 @@ function ControlCenterBody({
   const media = useMedia(active);
   const session = activeMediaSession(media.sessions);
 
-  // Long-press on the volume fader opens the per-app mixer; see useVolumeFaderPress.
-  const volumePress = useVolumeFaderPress({
-    level: volume.state.volume,
-    mouseAsTouch: touchViaPointer,
-    holdMs: MIXER_LONG_PRESS_MS,
-    onPreview: volume.previewVolume,
-    onLive: v => volume.commitVolume(v),
-    onCommit: v => volume.commitVolume(v, { flush: true }),
-    onLongPress: () => setView('mixer'),
-  });
-  // A fader held while the sheet closes must not leave a hold armed.
-  const { reset: resetVolumePress } = volumePress;
-  useEffect(() => { if (!active) resetVolumePress(); }, [active, resetVolumePress]);
-
   if (view === 'mixer') {
     return (
       <div className={styles.content} data-landscape-hint="mixer">
@@ -378,37 +362,39 @@ function ControlCenterBody({
             />
           )}
           {volume.state.supported && (
-            <div
-              className={styles.holdWrap}
-              // Capture phase: the fader stops its pointer events from bubbling.
-              {...volumePress.captureProps}
-              title={t('panel.controlCenter.volume.hint')}
-            >
-              <PanelMixerSlider
-                className={styles.fader}
-                min={0}
-                max={100}
-                value={volPct}
-                showValue
-                valueLabel={`${volPct}`}
-                topLabel={t('panel.controlCenter.volume')}
-                icon={volume.state.muted ? <VolumeX strokeWidth={1.7} /> : <Volume2 strokeWidth={1.7} />}
-                iconButton={{
-                  ariaLabel: volume.state.muted ? t('panel.controlCenter.volume.unmute') : t('panel.controlCenter.volume.mute'),
-                  ariaPressed: volume.state.muted,
-                  active: volume.state.muted,
-                  onClick: () => { void volume.setMuted(!volume.state.muted); },
-                }}
-                ariaLabel={t('panel.controlCenter.volume')}
-                onChange={v => volumePress.change(v / 100)}
-                onCommit={v => volumePress.commit(v / 100)}
-              />
-            </div>
+            <PanelMixerSlider
+              className={styles.fader}
+              min={0}
+              max={100}
+              value={volPct}
+              showValue
+              valueLabel={`${volPct}`}
+              topLabel={t('panel.controlCenter.volume')}
+              icon={volume.state.muted ? <VolumeX strokeWidth={1.7} /> : <Volume2 strokeWidth={1.7} />}
+              iconButton={{
+                ariaLabel: volume.state.muted ? t('panel.controlCenter.volume.unmute') : t('panel.controlCenter.volume.mute'),
+                ariaPressed: volume.state.muted,
+                active: volume.state.muted,
+                onClick: () => { void volume.setMuted(!volume.state.muted); },
+              }}
+              ariaLabel={t('panel.controlCenter.volume')}
+              onChange={v => volume.commitVolume(v / 100)}
+              onCommit={v => volume.commitVolume(v / 100, { flush: true })}
+            />
           )}
         </div>
         {showBrightness && brightness.linkDown && (
           <div className={styles.notice} role="status">{t('panel.controlCenter.brightness.usbDown')}</div>
         )}
+        {/* Pinned to the card corner and always present: no height change as readings arrive. */}
+        <Button
+          className={styles.mixerButton}
+          tone="ghost"
+          size="sm"
+          icon={<SlidersVertical size={18} strokeWidth={2} />}
+          aria-label={t('panel.controlCenter.mixer.title')}
+          onClick={() => setView('mixer')}
+        />
       </div>
 
       <div className={styles.card} data-cc-keep="true">

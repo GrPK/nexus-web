@@ -3505,7 +3505,6 @@
   "panel.controlCenter.screenSleep.wake": "画面はスリープ中です。タッチして復帰します。",
   "panel.controlCenter.sleepPc": "PC をスリープ",
   "panel.controlCenter.volume": "音量",
-  "panel.controlCenter.volume.hint": "長押しでアプリごとの音量",
   "panel.controlCenter.volume.mute": "音量をミュート",
   "panel.controlCenter.volume.unmute": "音量のミュートを解除",
   "panel.controlCenter.wifi": "Wi-Fi",

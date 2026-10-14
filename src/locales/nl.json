@@ -3505,7 +3505,6 @@
   "panel.controlCenter.screenSleep.wake": "Scherm slaapt. Raak aan om te ontwaken.",
   "panel.controlCenter.sleepPc": "Pc in slaapstand",
   "panel.controlCenter.volume": "Volume",
-  "panel.controlCenter.volume.hint": "Houd ingedrukt voor app-volumes",
   "panel.controlCenter.volume.mute": "Volume dempen",
   "panel.controlCenter.volume.unmute": "Demping van volume opheffen",
   "panel.controlCenter.wifi": "Wi-Fi",

@@ -3505,7 +3505,6 @@
   "panel.controlCenter.screenSleep.wake": "Screen asleep. Touch to wake.",
   "panel.controlCenter.sleepPc": "Sleep PC",
   "panel.controlCenter.volume": "Volume",
-  "panel.controlCenter.volume.hint": "Press and hold for app volumes",
   "panel.controlCenter.volume.mute": "Mute volume",
   "panel.controlCenter.volume.unmute": "Unmute volume",
   "panel.controlCenter.wifi": "Wi-Fi",

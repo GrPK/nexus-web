@@ -3505,7 +3505,6 @@
   "panel.controlCenter.screenSleep.wake": "Bildschirm im Ruhezustand. Zum Aufwecken berühren.",
   "panel.controlCenter.sleepPc": "PC-Ruhezustand",
   "panel.controlCenter.volume": "Lautstärke",
-  "panel.controlCenter.volume.hint": "Gedrückt halten für App-Lautstärken",
   "panel.controlCenter.volume.mute": "Lautstärke stummschalten",
   "panel.controlCenter.volume.unmute": "Stummschaltung der Lautstärke aufheben",
   "panel.controlCenter.wifi": "Wi-Fi",

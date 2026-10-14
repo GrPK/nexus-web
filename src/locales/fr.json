@@ -3505,7 +3505,6 @@
   "panel.controlCenter.screenSleep.wake": "Écran en veille. Touchez pour le réactiver.",
   "panel.controlCenter.sleepPc": "Mettre le PC en veille",
   "panel.controlCenter.volume": "Volume",
-  "panel.controlCenter.volume.hint": "Maintenez appuyé pour les volumes des applications",
   "panel.controlCenter.volume.mute": "Couper le volume",
   "panel.controlCenter.volume.unmute": "Rétablir le volume",
   "panel.controlCenter.wifi": "Wi-Fi",

@@ -29,10 +29,24 @@ describe('useLatestWriter unmount', () => {
     await act(async () => { result.current(1); });
     await act(async () => { result.current(2); });
     unmount();
+    // Chained behind the write in flight, not fired alongside it.
+    expect(send).toHaveBeenCalledTimes(1);
+    await act(async () => { settle(); });
     expect(send).toHaveBeenCalledTimes(2);
     expect(send).toHaveBeenLastCalledWith(2);
     await act(async () => { settle(); vi.advanceTimersByTime(500); });
     expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends the pending value at once when nothing is in flight', async () => {
+    const send = vi.fn(() => Promise.resolve(null));
+    const { result, unmount } = renderHook(() => useLatestWriter(send, 100));
+    await act(async () => { result.current(1); });
+    await act(async () => { result.current(2); });
+    unmount();
+    // The first write has settled; only the throttle was holding the second back.
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenLastCalledWith(2);
   });
 
   it('sends nothing at unmount when nothing is pending', async () => {

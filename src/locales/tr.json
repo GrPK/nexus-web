@@ -3505,7 +3505,6 @@
   "panel.controlCenter.screenSleep.wake": "Ekran uyuyor. Uyandırmak için dokunun.",
   "panel.controlCenter.sleepPc": "Bilgisayarı uyut",
   "panel.controlCenter.volume": "Ses",
-  "panel.controlCenter.volume.hint": "Uygulama sesleri için basılı tutun",
   "panel.controlCenter.volume.mute": "Sesi kapat",
   "panel.controlCenter.volume.unmute": "Sesi aç",
   "panel.controlCenter.wifi": "Wi-Fi",

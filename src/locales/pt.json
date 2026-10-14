@@ -3505,7 +3505,6 @@
   "panel.controlCenter.screenSleep.wake": "Ecrã em repouso. Toque para ativar.",
   "panel.controlCenter.sleepPc": "Suspender o PC",
   "panel.controlCenter.volume": "Volume",
-  "panel.controlCenter.volume.hint": "Mantenha premido para ver o volume das aplicações",
   "panel.controlCenter.volume.mute": "Silenciar o volume",
   "panel.controlCenter.volume.unmute": "Reativar o volume",
   "panel.controlCenter.wifi": "Wi-Fi",

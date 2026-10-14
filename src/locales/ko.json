@@ -3505,7 +3505,6 @@
   "panel.controlCenter.screenSleep.wake": "화면이 절전 상태입니다. 터치하면 깨어납니다.",
   "panel.controlCenter.sleepPc": "PC 절전",
   "panel.controlCenter.volume": "볼륨",
-  "panel.controlCenter.volume.hint": "길게 눌러 앱별 볼륨 보기",
   "panel.controlCenter.volume.mute": "볼륨 음소거",
   "panel.controlCenter.volume.unmute": "볼륨 음소거 해제",
   "panel.controlCenter.wifi": "Wi-Fi",

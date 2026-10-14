@@ -3550,7 +3550,6 @@
   "panel.controlCenter.screenSleep.wake": "Экран спит. Коснитесь, чтобы разбудить.",
   "panel.controlCenter.sleepPc": "Перевести ПК в сон",
   "panel.controlCenter.volume": "Громкость",
-  "panel.controlCenter.volume.hint": "Удерживайте для громкости приложений",
   "panel.controlCenter.volume.mute": "Отключить звук",
   "panel.controlCenter.volume.unmute": "Включить звук",
   "panel.controlCenter.wifi": "Wi-Fi",

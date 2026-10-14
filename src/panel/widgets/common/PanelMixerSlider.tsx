@@ -54,6 +54,9 @@ export function PanelMixerSlider({
 }: PanelMixerSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+  // Last value a pointer move produced; a cancel commits this, never a value
+  // recomputed from the cancel event, whose coordinates are not a finger position.
+  const lastMoveValueRef = useRef<number | null>(null);
   const clampedValue = clamp(value, min, max);
   const pct = max === min ? 0 : (clampedValue - min) / (max - min);
 
@@ -85,6 +88,7 @@ export function PanelMixerSlider({
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     draggingRef.current = true;
+    lastMoveValueRef.current = null;
     startInteraction();
     updateValue(valueFromY(event.clientY));
   };
@@ -93,7 +97,9 @@ export function PanelMixerSlider({
     if (!draggingRef.current || disabled) return;
     event.preventDefault();
     event.stopPropagation();
-    updateValue(valueFromY(event.clientY));
+    const next = valueFromY(event.clientY);
+    lastMoveValueRef.current = next;
+    updateValue(next);
   };
 
   const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
@@ -105,6 +111,10 @@ export function PanelMixerSlider({
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {
       // The browser may release capture first when a touch is cancelled.
+    }
+    if (event.type === 'pointercancel') {
+      if (lastMoveValueRef.current !== null) commitValue(lastMoveValueRef.current);
+      return;
     }
     commitValue(valueFromY(event.clientY));
   };
