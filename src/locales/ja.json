@@ -3217,7 +3217,7 @@
   "lighting.studio.mod.triangle": "三角波",
   "lighting.studio.namePlaceholder": "エフェクト名",
   "lighting.studio.nameRequired": "名前を入力してください。",
-  "lighting.studio.nameTaken": "この名前は別のエフェクトで既に使われています",
+  "lighting.studio.nameTaken": "この名前は別のエフェクトで既に使われています。",
   "lighting.studio.palette.candy": "キャンディ",
   "lighting.studio.palette.fire": "ファイア",
   "lighting.studio.palette.ice": "アイス",

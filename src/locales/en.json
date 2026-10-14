@@ -3217,7 +3217,7 @@
   "lighting.studio.mod.triangle": "Triangle wave",
   "lighting.studio.namePlaceholder": "Effect name",
   "lighting.studio.nameRequired": "Enter a name.",
-  "lighting.studio.nameTaken": "Another effect already uses this name",
+  "lighting.studio.nameTaken": "Another effect already uses this name.",
   "lighting.studio.palette.candy": "Candy",
   "lighting.studio.palette.fire": "Fire",
   "lighting.studio.palette.ice": "Ice",
