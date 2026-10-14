@@ -379,6 +379,8 @@ export interface LightingDevice {
   /** Whether Nexus pushes lighting frames to this device. Undefined on older
    *  services; the UI treats that as true (controlled). */
   controlled?: boolean;
+  /** Set when the device's lighting is set on its device page, so the card has no engine frame: its firmware plays an effect, or it follows a motherboard ARGB header. */
+  devicePageReason?: 'firmware' | 'argbInput';
   brightness?: number;
   /** Current hue, 0..1. Set only for color-capable smart lights. */
   hue?: number;
@@ -425,16 +427,6 @@ export interface LightingDevicesResponse {
   groups?: DeviceGroup[];
   /** Cards stacked to one canvas frame and one selection, each with how the frame is shared. Absent on older services. */
   stacks?: DeviceStack[];
-  /** Connected devices whose lighting is set on their device page, so they have no cards. Absent on older services. */
-  devicePageDevices?: DevicePageLightingDevice[];
-}
-
-export interface DevicePageLightingDevice {
-  /** Device handler id; the device page's sidebar key is `curated-<handlerId>`. */
-  handlerId: string;
-  name: string;
-  /** An effect the device plays itself, or a motherboard ARGB header it follows. */
-  reason: 'firmware' | 'argbInput';
 }
 
 /** Whole-list replace; the page owns group order and membership. */

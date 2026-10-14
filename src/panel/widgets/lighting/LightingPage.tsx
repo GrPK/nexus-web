@@ -12,7 +12,7 @@ import {
   steamArtworkUrl, resolveActiveGame, setLightingPaused,
   resetDeviceLayouts, applyDeviceLayouts, setActiveLayoutPreset, updateLayoutPreset, identifyLightingDevice,
   fetchLightingColorAdjust,
-  type LightingDevice, type DevicePageLightingDevice, type LightingColorAdjust, type LedMapEntry, type Pin, type PostProcessSettings, type GameSyncDevice,
+  type LightingDevice, type LightingColorAdjust, type LedMapEntry, type Pin, type PostProcessSettings, type GameSyncDevice,
   type GameSyncGame, type DeviceLayoutDto, type PresetApp,
 } from '../../../api/lighting';
 import { groupNamesOf, type DeviceGroup } from '../../../lib/deviceGroups';
@@ -234,7 +234,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     scanning: serviceState.lighting?.scanning ?? false,
   };
   const [devices, setDevices] = useState<LightingDevice[]>([]);
-  const [devicePageDevices, setDevicePageDevices] = useState<DevicePageLightingDevice[]>([]);
   // User-made rail groups. The service owns them (they ride the device list),
   // so a write is optimistic and the lighting topic reconciles.
   const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[]>([]);
@@ -440,7 +439,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // Nexus Control off joins lights off: both mean the hardware is not wearing
     // what the engine renders, and such a card can now be selected onto the
     // canvas.
-    for (const d of visibleDevices) if (!d.ledsOn || d.controlled === false) set.add(d.id);
+    for (const d of visibleDevices) if (!d.ledsOn || d.controlled === false || d.devicePageReason !== undefined) set.add(d.id);
     return set;
   }, [visibleDevices]);
 
@@ -485,7 +484,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (!data) return;
     setDeviceGroups(data.groups ?? []);
     setDeviceStacks(data.stacks ?? []);
-    setDevicePageDevices(data.devicePageDevices ?? []);
     const next = (data.devices ?? []).map(d => ({
       ...d,
       canvasW: Math.max(60, d.canvasW),
@@ -1485,10 +1483,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       && matchesAllWords(railSearch.query, railSearchFields.get(d.id) ?? [d.name])),
     [orderedDevices, hideUncontrolled, railSearch.query, railSearchFields],
   );
-  const railDevicePageDevices = useMemo(
-    () => devicePageDevices.filter(d => matchesAllWords(railSearch.query, [d.name])),
-    [devicePageDevices, railSearch.query],
-  );
 
   const selectableIds = useMemo(
     () => orderedDevices.filter(zoneCardSelectable).map(d => d.id),
@@ -1631,7 +1625,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     setDevices(devices);
     setDeviceGroups(data.groups ?? []);
     setDeviceStacks(data.stacks ?? []);
-    setDevicePageDevices(data.devicePageDevices ?? []);
     void refreshKeyReactive();
     void refreshColorAdjust();
   }, [refreshKeyReactive, refreshColorAdjust]);
@@ -2652,7 +2645,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               void (ownEffectIds.has(id) ? handleOwnEffectTakeControl(id) : handleWirelessTakeControl(id));
             }}
             onOpenDevicePage={deviceKey => onSectionNavigate?.('device', { deviceKey })}
-            devicePageDevices={railDevicePageDevices}
             onOpenSmartLights={() => onSectionNavigate?.('smart-lights')}
             discovery={discovery}
             rgbRunning={rgb.running}

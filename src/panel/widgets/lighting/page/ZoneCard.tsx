@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type ReactNode } from 'react';
-import { Power, PowerOff, Ban, Blend, Cable, Eye, Keyboard, Lightbulb, Users, Cpu, Check, Link2Off, Link2, Layers, MousePointerClick, Paintbrush, Pencil, Pin, PinOff, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { Power, PowerOff, Ban, Blend, Eye, Keyboard, Lightbulb, Users, Cpu, Check, Link2Off, Link2, Layers, MousePointerClick, Paintbrush, Pencil, Pin, PinOff, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import {
   identifyLightingDevice,
   type LightingDevice,
@@ -254,24 +254,6 @@ export function ZoneCardStack({ name, anchorId, selected, drag, onSelect, menu, 
         />
       )}
     </>
-  );
-}
-
-/** The meta-row badge of a card whose LEDs the device's firmware or a motherboard ARGB header drives. */
-export function DeviceSourceBadge({ argb = false, tooltip }: { argb?: boolean; tooltip: string }) {
-  const { t } = useTranslation();
-  return (
-    <HoverTooltip body={tooltip} side="top">
-      <span className={styles.deviceMetaBadge}>
-        <Badge
-          label={t(argb ? 'lighting.devices.argbInputBadge' : 'lighting.devices.smarthub.firmwareBadge')}
-          icon={argb ? <Cable size={11} /> : <Cpu size={11} />}
-          compact
-          uppercase
-          color="var(--text-dim)"
-        />
-      </span>
-    </HoverTooltip>
   );
 }
 
@@ -706,7 +688,14 @@ export function ZoneCard({
       </div>
       <div className={styles.deviceMetaRow}>
         {firmwareControlled ? (
-          <DeviceSourceBadge tooltip={t('lighting.devices.firmwareTooltip')} />
+          <HoverTooltip
+            body={t(device.devicePageReason === 'argbInput' ? 'lighting.devices.devicePageArgbTooltip' : device.devicePageReason === 'firmware' ? 'lighting.devices.devicePageFirmwareTooltip' : 'lighting.devices.firmwareTooltip')}
+            side="top"
+          >
+            <span className={styles.deviceMetaBadge}>
+              <Badge label={t('lighting.devices.hardwareControlBadge')} icon={<Cpu size={11} />} compact uppercase color="var(--text-dim)" />
+            </span>
+          </HoverTooltip>
         ) : unavailable ? (
           <span className={styles.deviceMetaUnavailable}>
             {t('lighting.devices.detectionFailed')}

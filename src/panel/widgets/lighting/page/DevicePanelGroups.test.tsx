@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DevicePanel } from './DevicePanel';
-import type { DevicePageLightingDevice, LightingDevice } from '../../../../api/lighting';
+import type { LightingDevice } from '../../../../api/lighting';
 import { MAX_DEVICE_GROUPS, type DeviceGroup } from '../../../../lib/deviceGroups';
 import styles from '../LightingPage.module.scss';
 
@@ -827,7 +827,7 @@ describe('DevicePanel firmware-played devices', () => {
 
   it('badges only the card whose device plays a stored animation', () => {
     renderFirmware();
-    expect(screen.getAllByText('lighting.devices.smarthub.firmwareBadge')).toHaveLength(1);
+    expect(screen.getAllByText('lighting.devices.hardwareControlBadge')).toHaveLength(1);
   });
 
   it('hands that device back to the engine from its menu', () => {
@@ -879,8 +879,8 @@ describe('DevicePanel wired hubs in firmware mode', () => {
 
   it('badges only the cards of the hub playing a firmware mode', () => {
     renderHubs();
-    expect(screen.getAllByText('lighting.devices.smarthub.firmwareBadge')).toHaveLength(1);
-    const badged = screen.getByText('lighting.devices.smarthub.firmwareBadge').closest('[data-search-anchor]');
+    expect(screen.getAllByText('lighting.devices.hardwareControlBadge')).toHaveLength(1);
+    const badged = screen.getByText('lighting.devices.hardwareControlBadge').closest('[data-search-anchor]');
     expect(badged?.getAttribute('data-search-anchor')).toBe('lighting-device:lianli2:port0');
   });
 
@@ -917,18 +917,16 @@ describe('DevicePanel deep-link anchors', () => {
   });
 });
 
-describe('DevicePanel devices controlled on their device page', () => {
-  const pageDevices: DevicePageLightingDevice[] = [
-    { handlerId: 'asiahorse-umbra', name: 'Asiahorse Umbra V2', reason: 'firmware' },
-    { handlerId: 'strimer', name: 'Lian Li Strimer', reason: 'argbInput' },
-  ];
+describe('DevicePanel cards of devices controlled on their device page', () => {
+  const umbra = device('umbra:z0', 'Asiahorse Umbra V2', { parentDeviceId: 'asiahorse-umbra', devicePageReason: 'firmware' });
+  const strimer = device('strimer:atx:z0', 'Lian Li Strimer', {
+    deviceId: 'strimer:atx', parentDeviceId: 'strimer', devicePageReason: 'argbInput',
+  });
 
-  beforeEach(() => localStorage.clear());
-
-  function renderPage(onOpenDevicePage = vi.fn(), list = devices) {
+  function renderPage(onOpenDevicePage = vi.fn()) {
     render(
       <DevicePanel
-        devices={list}
+        devices={[umbra, strimer, devices[0]]}
         selectedIds={new Set()}
         onSetSelection={() => {}}
         onTogglePower={() => {}}
@@ -937,54 +935,32 @@ describe('DevicePanel devices controlled on their device page', () => {
         onSetControlled={() => {}}
         lightingOff={false}
         onOpenSettings={() => {}}
+        firmwareDeviceIds={new Set(['strimer:atx'])}
+        onFirmwareTakeControl={() => {}}
         onOpenDevicePage={onOpenDevicePage}
-        devicePageDevices={pageDevices}
-        onGroupsChange={() => {}}
-        onOpenSmartLights={() => {}}
       />,
     );
     return onOpenDevicePage;
   }
 
-  it('lists them in their own section between the cards and the add buttons, badged with the reason', () => {
+  it('badges them as hardware control in the normal list', () => {
     renderPage();
-    const header = screen.getByText('lighting.devices.devicePageGroup');
-    expect(screen.getByText('Strip three').compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(header.compareDocumentPosition(screen.getByText('lighting.devices.groupAdd')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(header.compareDocumentPosition(screen.getByText('smartLights.title')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText('lighting.devices.smarthub.firmwareBadge')).toBeTruthy();
-    expect(screen.getByText('lighting.devices.argbInputBadge')).toBeTruthy();
+    expect(screen.getAllByText('lighting.devices.hardwareControlBadge')).toHaveLength(2);
+    expect(screen.getByText('Strip one')).toBeTruthy();
   });
 
-  it('opens the device page from a click on the card', () => {
-    const onOpenDevicePage = renderPage();
-    fireEvent.click(screen.getByText('Asiahorse Umbra V2'));
-    expect(onOpenDevicePage).toHaveBeenCalledWith('curated-asiahorse-umbra');
+  it('picks the badge tooltip by reason', async () => {
+    renderPage();
+    const badges = screen.getAllByText('lighting.devices.hardwareControlBadge');
+    fireEvent.focus(badges[0].closest('span[class*="deviceMetaBadge"]') ?? badges[0]);
+    expect(await screen.findByText('lighting.devices.devicePageFirmwareTooltip')).toBeTruthy();
   });
 
-  it('opens the device page from the keyboard', () => {
-    const onOpenDevicePage = renderPage();
-    const card = screen.getByText('Lian Li Strimer').closest('[role="button"]') as HTMLElement;
-    fireEvent.keyDown(card, { key: 'Enter' });
-    expect(onOpenDevicePage).toHaveBeenCalledWith('curated-strimer');
-  });
-
-  it('opens the device page from the card menu', () => {
+  it('offers Open device page but no Take control, even when the own-effect table matches', () => {
     const onOpenDevicePage = renderPage();
     fireEvent.contextMenu(screen.getByText('Lian Li Strimer'));
+    expect(screen.queryByText('lighting.devices.menuTakeControl')).toBeNull();
     fireEvent.click(screen.getByText('lighting.devices.menuOpenDevicePage'));
     expect(onOpenDevicePage).toHaveBeenCalledWith('curated-strimer');
-  });
-
-  it('shows no empty-list message while only those devices exist', () => {
-    renderPage(vi.fn(), []);
-    expect(screen.queryByText('lighting.devices.empty')).toBeNull();
-    expect(screen.getByText('Asiahorse Umbra V2')).toBeTruthy();
-  });
-
-  it('folds the section from its header', () => {
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'lighting.devices.devicePageGroup' }));
-    expect(screen.queryByText('Asiahorse Umbra V2')).toBeNull();
   });
 });

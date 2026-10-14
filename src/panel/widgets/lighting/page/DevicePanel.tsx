@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { FolderPlus, Plus } from 'lucide-react';
-import { identifyLightingDevice, type DevicePageLightingDevice, type LightingDevice } from '../../../../api/lighting';
+import { identifyLightingDevice, type LightingDevice } from '../../../../api/lighting';
 import { useTranslation } from '../../../../lib/i18n';
 import { usePersistentState } from '../../../../hooks/usePersistentState';
 import { ZoneCard, ZoneCardStack, zoneCardSelectable, zoneCardUnavailable, type BulkSelection, type DevicePin, type StackPosition } from './ZoneCard';
@@ -8,8 +8,6 @@ import { pinStripPick } from '../pins';
 import type { Pin } from '../../../../api/lighting';
 import { type LedPick } from './DeviceLedStrip';
 import { DeviceDiscoveryCard, type DiscoveryState } from './DeviceDiscoveryCard';
-import { DevicePageCard } from './DevicePageCard';
-import { CollapsibleSection } from '../../../../components/common/CollapsibleSection/CollapsibleSection';
 import { startIdentify } from '../../../../lib/identifyFlash';
 import { IDENTIFY_MS } from './zoneUtils';
 import { MotherboardGroup } from './MotherboardGroup';
@@ -37,7 +35,7 @@ import styles from '../LightingPage.module.scss';
  * using the same component/styling as a motherboard group: a chevron, the brand
  * name, a group power switch, and its lights as indented child cards.
  */
-export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, colorTunedIds, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenDevicePage, devicePageDevices = [], onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
+export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, colorTunedIds, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenDevicePage, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
   devices: LightingDevice[];
   /** Optional control rendered at the top of the scrolling list (master brightness). */
   /** Every device before the Nexus-Control-off filter, so a group header can
@@ -118,7 +116,6 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   /** Opens a device page by its sidebar key. */
   onOpenDevicePage?: (deviceKey: string) => void;
   /** Devices with no cards because their lighting is set on their device page; listed in their own section at the bottom. */
-  devicePageDevices?: readonly DevicePageLightingDevice[];
   /** Renders a dashed "add smart lights" entry at the bottom of the list. */
   onOpenSmartLights?: () => void;
   /** Tail card explaining a short list; absent once a mode is running. */
@@ -363,10 +360,11 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   const lianLiHubOf = (d: LightingDevice) =>
     d.parentDeviceId !== undefined && lianLiFirmwareHubs?.has(d.parentDeviceId) ? d.parentDeviceId : undefined;
   const fwOf = (d: LightingDevice) =>
-    lianLiHubOf(d) !== undefined
+    d.devicePageReason !== undefined
+    || lianLiHubOf(d) !== undefined
     || (d.deviceId !== undefined && !!firmwareDeviceIds?.has(d.deviceId));
   const takeControlFor = (d: LightingDevice) => {
-    if (!fwOf(d)) return undefined;
+    if (!fwOf(d) || d.devicePageReason !== undefined) return undefined;
     const hub = lianLiHubOf(d);
     if (hub !== undefined) return onLianLiTakeControl ? () => onLianLiTakeControl(hub) : undefined;
     const deviceId = d.deviceId;
@@ -616,13 +614,12 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   const allByBlockId = new Map<string, LightingDevice[]>(allBlocks.map(b => [blockKey(b), devicesOfBlock(b)]));
 
   const canAddGroup = onGroupsChange !== undefined && groups.length < MAX_DEVICE_GROUPS;
-  const pageDevices = onOpenDevicePage ? devicePageDevices : [];
 
   return (
     <aside className={styles.devicePanel}>
       <div className={styles.deviceList}>
         {header}
-        {devices.length === 0 && pageDevices.length === 0 && (
+        {devices.length === 0 && (
           <p className={styles.deviceEmpty}>{t(filtering ? 'lighting.devices.noMatches' : lightingOff ? 'lighting.devices.selectModeHint' : 'lighting.devices.empty')}</p>
         )}
         <GroupedSortableList
@@ -682,23 +679,6 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
             );
           }}
         />
-        {pageDevices.length > 0 && onOpenDevicePage && (
-          <CollapsibleSection
-            compact
-            className={styles.motherboardGroup}
-            title={t('lighting.devices.devicePageGroup')}
-            ariaLabel={t('lighting.devices.devicePageGroup')}
-            open={!isCollapsed('devicePage')}
-            onToggle={() => toggleCollapsed('devicePage')}
-            right={<span className={styles.deviceGroupCount}>{pageDevices.length}</span>}
-          >
-            <div className={styles.motherboardGroupChildren}>
-              {pageDevices.map(d => (
-                <DevicePageCard key={d.handlerId} device={d} onOpen={() => onOpenDevicePage(`curated-${d.handlerId}`)} />
-              ))}
-            </div>
-          </CollapsibleSection>
-        )}
         {discovery && <DeviceDiscoveryCard state={discovery} rgbRunning={rgbRunning} />}
         {canAddGroup && !filtering && (
           <button
