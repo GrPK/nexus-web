@@ -3634,7 +3634,7 @@
   "nexus2Welcome.import.group.q60Panel.label": "Q-Series 面板個人化",
   "nexus2Welcome.import.group.y70Panel.label": "Y70 面板個人化",
   "nexus2Welcome.import.profileName": "來自你正在使用的 Nexus 2 設定檔：{name}",
-  "nexus2Welcome.import.result.detail.coolingDisabled": "散熱已被關閉，因此未套用預設。",
+  "nexus2Welcome.import.result.detail.coolingDisabled": "Nexus 3 中的風扇控制已關閉，因此未套用風扇設定。",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
   "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "Nexus 3 的散熱設定已變更，因此未套用預設，現有設定予以保留。",
   "nexus2Welcome.import.result.detail.noQ60Record": "尚未設定任何 Q-Series 裝置。",

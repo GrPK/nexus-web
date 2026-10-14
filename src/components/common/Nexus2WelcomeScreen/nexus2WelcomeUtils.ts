@@ -206,9 +206,10 @@ function isUnknownPresetFan(c: Nexus2PreviewCategory): boolean {
   return c.id === 'fanCurves' && c.fanCurvesNote === 'recommendedMode' && presetLabelKey(c.recommendedPreset) === null;
 }
 
-/** Label for an apply-result issue line: the kept-setup hint is about cooling, not curves. */
-export function issueCategoryLabelKey(issue: Nexus2ApplyResult): string {
-  return issue.id === 'fanCurves' && isKeptSetupSkip(issue) ? 'cooling.title' : categoryLabelKey(issue.id);
+/** Label for an apply-result issue line: the fan group's own row label, so the line matches its row. */
+export function issueCategoryLabelKey(issue: Nexus2ApplyResult, preview: Nexus2PreviewResponse | null = null): string {
+  const fan = IMPORT_GROUPS.find(g => g.id === 'fanCurves')!;
+  return issue.id === 'fanCurves' ? fanGroupLabelKey(preview, fan) : categoryLabelKey(issue.id);
 }
 
 export function availableCategories(preview: Nexus2PreviewResponse | null): Nexus2PreviewCategory[] {

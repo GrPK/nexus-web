@@ -3634,7 +3634,7 @@
   "nexus2Welcome.import.group.q60Panel.label": "Q-Series 패널 개인 설정",
   "nexus2Welcome.import.group.y70Panel.label": "Y70 패널 개인 설정",
   "nexus2Welcome.import.profileName": "활성 Nexus 2 프로필: {name}",
-  "nexus2Welcome.import.result.detail.coolingDisabled": "냉각이 꺼져 있어 프리셋을 적용하지 않았습니다.",
+  "nexus2Welcome.import.result.detail.coolingDisabled": "Nexus 3에서 팬 제어가 꺼져 있어 팬 설정을 적용하지 않았습니다.",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
   "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "Nexus 3 냉각 설정이 변경되어 프리셋을 적용하지 않고 기존 설정을 유지했습니다.",
   "nexus2Welcome.import.result.detail.noQ60Record": "아직 설정된 Q-Series 기기가 없습니다.",

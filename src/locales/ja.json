@@ -3634,7 +3634,7 @@
   "nexus2Welcome.import.group.q60Panel.label": "Q-Series パネルのパーソナライズ",
   "nexus2Welcome.import.group.y70Panel.label": "Y70 パネルのパーソナライズ",
   "nexus2Welcome.import.profileName": "使用中の Nexus 2 プロファイル: {name}",
-  "nexus2Welcome.import.result.detail.coolingDisabled": "冷却がオフにされたため、プリセットは適用されませんでした。",
+  "nexus2Welcome.import.result.detail.coolingDisabled": "Nexus 3 でファン制御がオフのため、ファン設定は適用されませんでした。",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
   "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "Nexus 3 の冷却設定が変更されていたため、プリセットは適用されず、設定はそのまま維持されました。",
   "nexus2Welcome.import.result.detail.noQ60Record": "Q-Series デバイスがまだ設定されていません。",

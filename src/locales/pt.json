@@ -3634,7 +3634,7 @@
   "nexus2Welcome.import.group.q60Panel.label": "Personalização do painel Q-Series",
   "nexus2Welcome.import.group.y70Panel.label": "Personalização do painel Y70",
   "nexus2Welcome.import.profileName": "Do seu perfil ativo do Nexus 2: {name}",
-  "nexus2Welcome.import.result.detail.coolingDisabled": "O arrefecimento foi desativado, por isso a predefinição não foi aplicada.",
+  "nexus2Welcome.import.result.detail.coolingDisabled": "O controlo das ventoinhas está desativado no Nexus 3, por isso as definições das ventoinhas não foram aplicadas.",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
   "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "O arrefecimento do Nexus 3 tinha mudado, por isso a predefinição não foi aplicada e a configuração foi mantida.",
   "nexus2Welcome.import.result.detail.noQ60Record": "Ainda não há nenhum dispositivo Q-Series configurado.",

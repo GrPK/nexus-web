@@ -3634,7 +3634,7 @@
   "nexus2Welcome.import.group.q60Panel.label": "Q-Series-paneelpersonalisatie",
   "nexus2Welcome.import.group.y70Panel.label": "Y70-paneelpersonalisatie",
   "nexus2Welcome.import.profileName": "Uit je actieve Nexus 2-profiel: {name}",
-  "nexus2Welcome.import.result.detail.coolingDisabled": "De koeling is uitgeschakeld, dus de preset is niet toegepast.",
+  "nexus2Welcome.import.result.detail.coolingDisabled": "Ventilatorbesturing staat uit in Nexus 3, dus de ventilatorinstellingen zijn niet toegepast.",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
   "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "De koeling van Nexus 3 was gewijzigd, dus de preset is niet toegepast en de instellingen zijn behouden.",
   "nexus2Welcome.import.result.detail.noQ60Record": "Er is nog geen Q-Series-apparaat ingesteld.",

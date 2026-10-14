@@ -79,9 +79,13 @@ export function Nexus2ImportSection({
   // identity ties "seen" to one load: a new preview is never seen already.
   const seenPreviewRef = useRef<Nexus2PreviewResponse | null>(null);
   const fanGroupRef = useRef<HTMLDivElement | null>(null);
+  // Bumped on every (re)open and on unmount so a late refetch response is dropped.
+  const loadEpochRef = useRef(0);
+  useEffect(() => () => { loadEpochRef.current += 1; }, []);
 
   useEffect(() => {
     if (!open) return;
+    loadEpochRef.current += 1;
     let cancelled = false;
     setPreviewStatus('loading');
     setPreview(null);
@@ -130,10 +134,19 @@ export function Nexus2ImportSection({
     // A skipped fan group means the service state moved since the preview;
     // refetch so the group shows its real state instead of staying armed.
     if (res.results.some(r => r.id === 'fanCurves' && r.status === 'skipped')) {
+      const epoch = loadEpochRef.current;
       void previewNexus2Import().then(fresh => {
-        if (!fresh) return;
+        // A newer open or an unmount owns the state now.
+        if (!fresh || epoch !== loadEpochRef.current) return;
         setPreview(fresh);
-        setSelectedGroups(defaultSelectedGroupIds(fresh));
+        // Only the fan entry follows the fresh preview; every other toggle
+        // stays as the user left it, including ones changed since the apply.
+        setSelectedGroups(prev => {
+          if (!prev.has('fanCurves') || defaultSelectedGroupIds(fresh).has('fanCurves')) return prev;
+          const next = new Set(prev);
+          next.delete('fanCurves');
+          return next;
+        });
       });
     }
     onBusyChange?.(false);
@@ -285,10 +298,10 @@ export function Nexus2ImportSection({
                     <span key={issue.id} className={styles.resultDetail}>
                       {issue.detail
                         ? t('nexus2Welcome.import.result.subDetail', {
-                          category: t(issueCategoryLabelKey(issue), { id: issue.id }),
+                          category: t(issueCategoryLabelKey(issue, appliedPreview), { id: issue.id }),
                           detail: t(applyDetailKey(issue.detail), { detail: issue.detail }),
                         })
-                        : t(issueCategoryLabelKey(issue), { id: issue.id })}
+                        : t(issueCategoryLabelKey(issue, appliedPreview), { id: issue.id })}
                     </span>
                   ))}
                 </li>

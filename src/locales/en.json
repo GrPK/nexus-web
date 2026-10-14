@@ -3634,7 +3634,7 @@
   "nexus2Welcome.import.group.q60Panel.label": "Q-Series panel personalization",
   "nexus2Welcome.import.group.y70Panel.label": "Y70 panel personalization",
   "nexus2Welcome.import.profileName": "From your active Nexus 2 profile: {name}",
-  "nexus2Welcome.import.result.detail.coolingDisabled": "Cooling was turned off, so the preset was not applied.",
+  "nexus2Welcome.import.result.detail.coolingDisabled": "Fan control is off in Nexus 3, so fan settings weren't applied.",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
   "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "Nexus 3 cooling had changed, so the preset was not applied and your setup was kept.",
   "nexus2Welcome.import.result.detail.noQ60Record": "No Q-Series device is set up yet.",

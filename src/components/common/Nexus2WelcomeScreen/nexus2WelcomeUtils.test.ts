@@ -518,7 +518,10 @@ describe('Recommended mode preset follow-ups', () => {
     expect(groupResultSummaries([off])[0].issues).toEqual([off]);
     expect(allApplyResultsClean([{ id: 'fanCurves', status: 'skipped', detail: null }])).toBe(true);
     expect(groupResultSummaries([kept])[0].issues).toEqual([kept]);
-    expect(issueCategoryLabelKey(kept)).toBe('cooling.title');
-    expect(issueCategoryLabelKey({ id: 'fanCurves', status: 'failed', detail: 'other' })).toBe(categoryLabelKey('fanCurves'));
+    expect(issueCategoryLabelKey(kept, pv(OK))).toBe('cooling.title');
+    // The line follows its row: a curve-path group keeps the curves label.
+    expect(issueCategoryLabelKey(off, pv(MIXED_FAN_CURVES))).toBe(FAN_GROUP.labelKey);
+    expect(issueCategoryLabelKey(off)).toBe(FAN_GROUP.labelKey);
+    expect(issueCategoryLabelKey({ id: 'fanCurves', status: 'failed', detail: 'other' })).toBe(FAN_GROUP.labelKey);
   });
 });

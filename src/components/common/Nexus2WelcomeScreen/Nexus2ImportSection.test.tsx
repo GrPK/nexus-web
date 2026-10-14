@@ -410,6 +410,10 @@ describe('Nexus2ImportSection - fan curves', () => {
       id: 'fanCurves' as const, available: true, count: 0,
       fanCurvesNote: 'recommendedMode' as const, recommendedFrom: 'balanced' as const, recommendedPreset: 'balanced' as const,
     };
+    const CURVE_CATEGORY = {
+      id: 'fanCurves' as const, available: true, count: 1,
+      fanCurves: [{ name: 'Quiet', kind: 'graph' as const, status: 'import' as const, minimumRaised: false, targets: [{ label: 'Front', status: 'import' as const }] }],
+    };
     const load = (cat: object) => vi.mocked(previewNexus2Import).mockResolvedValue(
       { available: true, profileName: null, categories: [cat] } as Nexus2PreviewResponse,
     );
@@ -488,6 +492,55 @@ describe('Nexus2ImportSection - fan curves', () => {
       expect(previewNexus2Import).toHaveBeenCalledTimes(2);
       const row = screen.getByText('nexus2Welcome.import.result.status.skipped').closest('li')!;
       expect(within(row).getByText('cooling.title', { selector: `.${styles.resultCategory}` })).toBeInTheDocument();
+    });
+
+    it('the post-skip refetch keeps the other toggles and drops a late response after unmount', async () => {
+      const customized = { ...PRESET_CATEGORY, available: false, fanCurvesNote: 'nexus3CoolingCustomized' as const };
+      let resolveFresh: (v: Nexus2PreviewResponse) => void = () => {};
+      vi.mocked(previewNexus2Import)
+        .mockResolvedValueOnce({ available: true, profileName: null, categories: [Q60_FACE, PRESET_CATEGORY] } as Nexus2PreviewResponse)
+        .mockImplementationOnce(() => new Promise<Nexus2PreviewResponse>(r => { resolveFresh = r; }));
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'skipped', detail: 'nexus3CoolingCustomized' }] });
+      renderSection();
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      fireEvent.click(screen.getByRole('switch', { name: Q60_GROUP_NAME }));
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      await waitFor(() => expect(previewNexus2Import).toHaveBeenCalledTimes(2));
+      // The user re-ticks Q-Series while the refetch is in flight; the late response must not undo it.
+      fireEvent.click(screen.getByRole('switch', { name: Q60_GROUP_NAME }));
+      await act(async () => { resolveFresh({ available: true, profileName: null, categories: [Q60_FACE, customized] } as Nexus2PreviewResponse); });
+      expect(screen.getByRole('switch', { name: Q60_GROUP_NAME })).toBeChecked();
+      expect(screen.getByRole('switch', { name: FAN_NAME })).not.toBeChecked();
+    });
+
+    it('a stale refetch after a reopen is ignored', async () => {
+      const customized = { ...PRESET_CATEGORY, available: false, fanCurvesNote: 'nexus3CoolingCustomized' as const };
+      let resolveFresh: (v: Nexus2PreviewResponse) => void = () => {};
+      vi.mocked(previewNexus2Import)
+        .mockResolvedValueOnce({ available: true, profileName: null, categories: [PRESET_CATEGORY] } as Nexus2PreviewResponse)
+        .mockImplementationOnce(() => new Promise<Nexus2PreviewResponse>(r => { resolveFresh = r; }))
+        .mockResolvedValue({ available: true, profileName: null, categories: [PRESET_CATEGORY] } as Nexus2PreviewResponse);
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'skipped', detail: 'coolingDisabled' }] });
+      const view = render(<Nexus2ImportSection open />);
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      await waitFor(() => expect(previewNexus2Import).toHaveBeenCalledTimes(2));
+      view.rerender(<Nexus2ImportSection open={false} />);
+      view.rerender(<Nexus2ImportSection open />);
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      await act(async () => { resolveFresh({ available: true, profileName: null, categories: [customized] } as Nexus2PreviewResponse); });
+      expect(screen.getByRole('switch', { name: 'cooling.title' })).toBeChecked();
+    });
+
+    it('a coolingDisabled skip on the curve path labels the line like its row', async () => {
+      vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [CURVE_CATEGORY] } as Nexus2PreviewResponse);
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'skipped', detail: 'coolingDisabled' }] });
+      renderSection();
+      await screen.findByRole('switch', { name: FAN_NAME });
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      const row = (await screen.findByText('nexus2Welcome.import.result.status.skipped')).closest('li')!;
+      expect(within(row).getByText(FAN_NAME)).toBeInTheDocument();
+      expect(within(row).getByText(/^nexus2Welcome.import.result.subDetail:nexus2Welcome.import.group.fanCurves.label/)).toBeInTheDocument();
     });
 
     it('a coolingDisabled skip is informational: clean outcome, reason shown, no success', async () => {

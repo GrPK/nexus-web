@@ -3677,7 +3677,7 @@
   "nexus2Welcome.import.group.q60Panel.label": "Персонализация панели Q-Series",
   "nexus2Welcome.import.group.y70Panel.label": "Персонализация панели Y70",
   "nexus2Welcome.import.profileName": "Из активного профиля Nexus 2: {name}",
-  "nexus2Welcome.import.result.detail.coolingDisabled": "Охлаждение было отключено, поэтому пресет не применён.",
+  "nexus2Welcome.import.result.detail.coolingDisabled": "Управление вентиляторами в Nexus 3 отключено, поэтому настройки вентиляторов не применены.",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
   "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "Охлаждение в Nexus 3 изменилось, поэтому пресет не применён, а настройка сохранена.",
   "nexus2Welcome.import.result.detail.noQ60Record": "Устройство Q-Series ещё не настроено.",
