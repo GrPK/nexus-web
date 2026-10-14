@@ -24,6 +24,8 @@ import { localizeNumbers } from '../../../lib/units';
 import styles from './SmartHubDevicePage.module.scss';
 import { useReportDeviceWaiting } from './deviceDetecting';
 
+const RECONNECT_POLL_MS = 2000;
+
 /**
  * Routed page for the HYTE SmartHub. Exposes the single flash-persisted
  * standalone setting - fallback fan duty + firmware-side LED animation -
@@ -46,6 +48,8 @@ export function SmartHubDevicePage() {
   useReportDeviceWaiting(connection !== 'connected');
   const [setting, setSetting] = useState<SmartHubFwSetting | null>(null);
   const aliveRef = useRef(true);
+  const connectionRef = useRef(connection);
+  connectionRef.current = connection;
 
   const refresh = useCallback(async () => {
     // 1. Ask the service whether the hub is actually plugged in.
@@ -77,9 +81,15 @@ export function SmartHubDevicePage() {
     // while the page was hidden.
     const onFocus = () => { void refresh(); };
     window.addEventListener('focus', onFocus);
+    // The hub reconnects after the page mounts (Nexus Control toggled on), so
+    // poll until connected. Stops once connected so it never clobbers an edit.
+    const id = window.setInterval(() => {
+      if (connectionRef.current !== 'connected') void refresh();
+    }, RECONNECT_POLL_MS);
     return () => {
       aliveRef.current = false;
       window.removeEventListener('focus', onFocus);
+      window.clearInterval(id);
     };
   }, [refresh]);
 
