@@ -2,7 +2,7 @@
 // direct testing (see elgatoImportUtils.ts for the pattern this follows).
 import type {
   Nexus2ApplyResult, Nexus2ApplyStatus, Nexus2CategoryId, Nexus2FanCurvesCategory, Nexus2PreviewCategory,
-  Nexus2PreviewResponse,
+  Nexus2PreviewResponse, Nexus3CoolingPreset,
 } from '../../../api/migration';
 
 const CATEGORY_LABEL_KEYS: Partial<Record<Nexus2CategoryId, string>> = {
@@ -109,8 +109,46 @@ export function fanCurveReasonKey(reason: string | undefined): string {
     : 'nexus2Welcome.import.category.fanCurves.reason.unknown';
 }
 
+const PRESET_LABEL_KEYS: Record<Nexus3CoolingPreset, string> = {
+  silent: 'cooling.mode.silent',
+  balanced: 'cooling.mode.balanced',
+  turbo: 'cooling.mode.turbo',
+};
+
+// Nexus 2's silent and balanced read like the Nexus 3 cooling page labels.
+const N2_MODE_LABEL_KEYS: Record<string, string> = {
+  silent: 'cooling.mode.silent',
+  balanced: 'cooling.mode.balanced',
+  performance: 'nexus2Welcome.import.category.fanCurves.mode.performance',
+};
+
+/** The i18n key naming a Nexus 3 preset, or null for a value this build does not know. */
+export function presetLabelKey(preset: string | undefined): string | null {
+  return (preset && (PRESET_LABEL_KEYS as Record<string, string>)[preset]) || null;
+}
+
+function n2ModeLabelKey(mode: string | undefined): string | null {
+  return (mode && N2_MODE_LABEL_KEYS[mode]) || null;
+}
+
+/** True when the fan group carries only a Recommended-mode preset, with no curves. */
+export function isPresetOnlyFan(cat: Nexus2FanCurvesCategory): boolean {
+  return cat.available && cat.fanCurvesNote === 'recommendedMode' && presetLabelKey(cat.recommendedPreset) !== null;
+}
+
+function fanPresetDetail(cat: Nexus2FanCurvesCategory): CategoryDetail {
+  const base = 'nexus2Welcome.import.category.fanCurves';
+  const modeKey = n2ModeLabelKey(cat.recommendedFrom);
+  return {
+    key: modeKey ? `${base}.presetDetail` : `${base}.presetDetailNoMode`,
+    params: { preset: '-', ...(modeKey ? { mode: '-' } : {}) },
+    paramKeys: { preset: presetLabelKey(cat.recommendedPreset)!, ...(modeKey ? { mode: modeKey } : {}) },
+  };
+}
+
 function fanCurveDetails(cat: Nexus2FanCurvesCategory): CategoryDetail[] {
   const base = 'nexus2Welcome.import.category.fanCurves';
+  if (isPresetOnlyFan(cat)) return [fanPresetDetail(cat)];
   // An all-skipped group has no count to announce, only reasons.
   const lines: CategoryDetail[] = cat.available
     ? [{ key: `${base}.detail`, params: { count: cat.count }, plural: true }]
@@ -203,6 +241,20 @@ export function unavailableGroupNoteKey(preview: Nexus2PreviewResponse | null, g
   return `nexus2Welcome.import.category.fanCurves.note.${cat.fanCurvesNote}`;
 }
 
+/** The note line for an unavailable fan group, with the Nexus 2 mode filled in when the service sent a known one. */
+export function unavailableGroupNote(preview: Nexus2PreviewResponse | null, group: ImportGroupDef): CategoryDetail | null {
+  const key = unavailableGroupNoteKey(preview, group);
+  if (!key) return null;
+  const cat = preview?.categories.find((c): c is Nexus2FanCurvesCategory => c.id === 'fanCurves');
+  const modeKey = cat?.fanCurvesNote === 'nexus3CoolingCustomized' ? n2ModeLabelKey(cat.recommendedFrom) : null;
+  if (cat?.fanCurvesNote === 'nexus3CoolingCustomized') {
+    return modeKey
+      ? { key, params: { mode: '-' }, paramKeys: { mode: modeKey } }
+      : { key: `${key}NoMode`, params: {} };
+  }
+  return { key, params: {} };
+}
+
 /**
  * Title and description keys for the import section, so the header only
  * claims what the importable groups do (a note-only or all-skipped group does
@@ -213,10 +265,15 @@ export function importHeaderKeys(preview: Nexus2PreviewResponse | null): { title
   const groups = IMPORT_GROUPS.filter(g => groupHasAvailable(preview, g));
   const fan = groups.some(g => g.id === 'fanCurves');
   const personalization = groups.some(g => g.id !== 'fanCurves');
+  const fanCat = preview?.categories.find((c): c is Nexus2FanCurvesCategory => c.id === 'fanCurves');
+  // A preset-only fan group switches a cooling preset; it lists no fans.
+  const preset = fan && !!fanCat && isPresetOnlyFan(fanCat);
   // Nothing importable: a neutral header that promises no replacement.
-  const suffix = fan ? (personalization ? '.both' : '.fanCurves') : (personalization ? '' : '.none');
+  const suffix = fan
+    ? (preset ? (personalization ? '.bothPreset' : '.fanPreset') : (personalization ? '.both' : '.fanCurves'))
+    : (personalization ? '' : '.none');
   return {
-    titleKey: `nexus2Welcome.import.title${suffix}`,
+    titleKey: `nexus2Welcome.import.title${suffix === '.bothPreset' ? '.both' : suffix}`,
     descriptionKey: `nexus2Welcome.import.description${suffix}`,
   };
 }
@@ -268,6 +325,8 @@ export interface GroupResultSummary {
   status: Nexus2ApplyStatus;
   /** Items applied, when the service reports a count (fan curves). */
   count?: number;
+  /** The Nexus 3 cooling preset applied (fan curves). */
+  preset?: Nexus3CoolingPreset;
   /** The failed/needsConfirm members, for the detail line(s) under the group row. */
   issues: Nexus2ApplyResult[];
 }
@@ -289,7 +348,11 @@ export function groupResultSummaries(results: Nexus2ApplyResult[] | null): Group
     );
     const issues = members.filter(r => r.status === 'failed' || r.status === 'needsConfirm');
     const count = members.find(r => typeof r.count === 'number')?.count;
-    summaries.push({ groupId: group.id, labelKey: group.labelKey, status, issues, ...(count !== undefined ? { count } : {}) });
+    const preset = members.find(r => presetLabelKey(r.preset) !== null)?.preset;
+    summaries.push({
+      groupId: group.id, labelKey: group.labelKey, status, issues,
+      ...(count !== undefined ? { count } : {}), ...(preset ? { preset } : {}),
+    });
   }
   return summaries;
 }

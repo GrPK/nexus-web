@@ -100,7 +100,11 @@ export interface Nexus2FanCurvePreviewDto {
   targets: Nexus2FanCurveTargetDto[];
 }
 
-export type Nexus2FanCurvesNote = 'recommendedMode' | 'noUserCurves' | 'coolingDisabled';
+export type Nexus2FanCurvesNote = 'recommendedMode' | 'noUserCurves' | 'coolingDisabled' | 'nexus3CoolingCustomized';
+/** Nexus 2's Recommended mode value. */
+export type Nexus2RecommendedMode = 'silent' | 'balanced' | 'performance';
+/** The Nexus 3 cooling preset it maps to. */
+export type Nexus3CoolingPreset = 'silent' | 'balanced' | 'turbo';
 
 export interface Nexus2FanCurvesCategory extends Nexus2PreviewCategoryBase {
   id: 'fanCurves';
@@ -108,6 +112,10 @@ export interface Nexus2FanCurvesCategory extends Nexus2PreviewCategoryBase {
   count: number;
   fanCurves?: Nexus2FanCurvePreviewDto[];
   fanCurvesNote?: Nexus2FanCurvesNote;
+  /** With the recommendedMode and nexus3CoolingCustomized notes. Unknown values degrade to the mode-less line. */
+  recommendedFrom?: Nexus2RecommendedMode;
+  /** Present when the Recommended mode maps to a Nexus 3 preset; `available` is then true only if it will be applied. */
+  recommendedPreset?: Nexus3CoolingPreset;
   /** Inactive Nexus 2 profiles that are not imported. */
   otherProfiles?: number;
 }
@@ -136,6 +144,8 @@ export interface Nexus2ApplyResult {
   detail: string | null;
   /** fanCurves: curves applied. */
   count?: number;
+  /** fanCurves: the Nexus 3 cooling preset applied. */
+  preset?: Nexus3CoolingPreset;
 }
 
 export interface Nexus2ApplyResponse {

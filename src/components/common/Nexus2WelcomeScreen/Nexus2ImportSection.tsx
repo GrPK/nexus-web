@@ -10,8 +10,8 @@ import { applyNexus2Import, previewNexus2Import } from '../../../api/migration';
 import type { Nexus2ApplyResult, Nexus2PreviewResponse } from '../../../api/migration';
 import {
   allApplyResultsClean, applyDetailKey, applyStatusKey, categoryLabelKey, defaultSelectedGroupIds,
-  groupDetailParts, groupResultSummaries, groupHasAvailable, selectedWireIds, unavailableGroupNoteKey,
-  visibleImportGroups, importHeaderKeys, formatList, fillTemplate, type ImportGroupId,
+  groupDetailParts, groupResultSummaries, groupHasAvailable, selectedWireIds, unavailableGroupNote,
+  presetLabelKey, visibleImportGroups, importHeaderKeys, formatList, fillTemplate, type CategoryDetail, type ImportGroupId,
 } from './nexus2WelcomeUtils';
 import styles from './Nexus2ImportSection.module.scss';
 
@@ -130,7 +130,7 @@ export function Nexus2ImportSection({
 
   const selectionEmpty = selectedWireIds(preview, selectedGroups).length === 0;
 
-  // The importable fan curve list counts as seen only once its group has
+  // The importable fan group (curve list or preset line) counts as seen only once it has
   // entered the viewport while the host shows this panel. Without
   // IntersectionObserver (a test DOM) rendering is the best signal there is.
   const fanListRenders = previewStatus === 'loaded'
@@ -176,6 +176,11 @@ export function Nexus2ImportSection({
     });
   };
 
+  const translatedParams = (d: CategoryDetail) => {
+    const params = { ...d.params };
+    for (const [name, key] of Object.entries(d.paramKeys ?? {})) params[name] = t(key);
+    return params;
+  };
   const groups = visibleImportGroups(preview);
   const { titleKey, descriptionKey } = importHeaderKeys(preview);
   const summaries = groupResultSummaries(importResults);
@@ -215,12 +220,11 @@ export function Nexus2ImportSection({
           {groups.map(group => {
             const label = t(group.labelKey);
             // A span list: SettingToggle renders the description inside a span.
-            const noteKey = unavailableGroupNoteKey(preview, group);
-            const detail = noteKey ? <span>{t(noteKey)}</span> : (
+            const note = unavailableGroupNote(preview, group);
+            const detail = note ? <span>{t(note.key, Object.keys(note.params).length > 0 ? translatedParams(note) : undefined)}</span> : (
               <span className={styles.detailBullets} role="list">
                 {groupDetailParts(preview, group).map((d, i) => {
-                  const params = { ...d.params };
-                  for (const [name, key] of Object.entries(d.paramKeys ?? {})) params[name] = t(key);
+                  const params = translatedParams(d);
                   return (
                     <span key={`${d.key}-${i}`} className={styles.detailBullet} role="listitem">
                       {d.user?.list
@@ -259,7 +263,9 @@ export function Nexus2ImportSection({
                 <li key={s.groupId} className={styles.resultRow}>
                   <span className={styles.resultCategory}>{t(s.labelKey)}</span>
                   <span className={styles[`resultStatus-${s.status}`]}>
-                    {s.groupId === 'fanCurves' && s.status === 'applied' && s.count !== undefined
+                    {s.groupId === 'fanCurves' && s.status === 'applied' && presetLabelKey(s.preset)
+                      ? t('nexus2Welcome.import.result.presetApplied', { preset: t(presetLabelKey(s.preset)!) })
+                      : s.groupId === 'fanCurves' && s.status === 'applied' && s.count !== undefined
                       ? t(pluralKey('nexus2Welcome.import.result.fanCurvesApplied', language, s.count), { count: s.count })
                       : t(applyStatusKey(s.status))}
                   </span>

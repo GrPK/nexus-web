@@ -17,6 +17,7 @@ import {
   groupResultSummaries,
   importHeaderKeys,
   selectedWireIds,
+  unavailableGroupNote,
   unavailableGroupNoteKey,
   visibleImportGroups,
 } from './nexus2WelcomeUtils';
@@ -407,3 +408,74 @@ describe('fan curves', () => {
     expect(summaries).toEqual([expect.objectContaining({ groupId: 'fanCurves', status: 'applied', count: 3 })]);
   });
 });
+
+describe('Recommended mode preset', () => {
+  const pv = (cat: Nexus2PreviewCategory): Nexus2PreviewResponse => ({ available: true, profileName: null, categories: [cat] });
+  const AVAILABLE: Nexus2PreviewCategory = {
+    id: 'fanCurves', available: true, count: 0,
+    fanCurvesNote: 'recommendedMode', recommendedFrom: 'balanced', recommendedPreset: 'balanced',
+  };
+  const CUSTOMIZED: Nexus2PreviewCategory = {
+    id: 'fanCurves', available: false, count: 0,
+    fanCurvesNote: 'nexus3CoolingCustomized', recommendedFrom: 'performance', recommendedPreset: 'turbo',
+  };
+  const UNMAPPABLE: Nexus2PreviewCategory = { id: 'fanCurves', available: false, count: 0, fanCurvesNote: 'recommendedMode' };
+
+  it('available: checked by default, sends fanCurves, one preset line with translated names', () => {
+    expect(defaultSelectedGroupIds(pv(AVAILABLE)).has('fanCurves')).toBe(true);
+    expect(selectedWireIds(pv(AVAILABLE), new Set(['fanCurves']))).toEqual(['fanCurves']);
+    expect(groupDetailParts(pv(AVAILABLE), FAN_GROUP)).toEqual([{
+      key: `${FAN}.presetDetail`,
+      params: { preset: '-', mode: '-' },
+      paramKeys: { preset: 'cooling.mode.balanced', mode: 'cooling.mode.balanced' },
+    }]);
+    expect(unavailableGroupNoteKey(pv(AVAILABLE), FAN_GROUP)).toBeNull();
+  });
+
+  it('names Performance with its own key and turbo with the cooling page key', () => {
+    const [d] = groupDetailParts(pv({ ...AVAILABLE, recommendedFrom: 'performance', recommendedPreset: 'turbo' } as Nexus2PreviewCategory), FAN_GROUP);
+    expect(d.paramKeys).toEqual({ preset: 'cooling.mode.turbo', mode: `${FAN}.mode.performance` });
+  });
+
+  it('drops the mode from the line when the Nexus 2 value is missing or unknown', () => {
+    for (const recommendedFrom of [undefined, 'future']) {
+      const [d] = groupDetailParts(pv({ ...AVAILABLE, recommendedFrom } as Nexus2PreviewCategory), FAN_GROUP);
+      expect(d.key).toBe(`${FAN}.presetDetailNoMode`);
+      expect(d.paramKeys).toEqual({ preset: 'cooling.mode.balanced' });
+    }
+  });
+
+  it('customized: disabled note with the mode, unchecked, nothing sent', () => {
+    expect(unavailableGroupNote(pv(CUSTOMIZED), FAN_GROUP)).toEqual({
+      key: `${FAN}.note.nexus3CoolingCustomized`, params: { mode: '-' }, paramKeys: { mode: `${FAN}.mode.performance` },
+    });
+    expect(unavailableGroupNote(pv({ ...CUSTOMIZED, recommendedFrom: undefined } as Nexus2PreviewCategory), FAN_GROUP))
+      .toEqual({ key: `${FAN}.note.nexus3CoolingCustomizedNoMode`, params: {} });
+    expect(defaultSelectedGroupIds(pv(CUSTOMIZED)).has('fanCurves')).toBe(false);
+    expect(selectedWireIds(pv(CUSTOMIZED), new Set(['fanCurves']))).toEqual([]);
+    expect(visibleImportGroups(pv(CUSTOMIZED)).map(g => g.id)).toEqual(['fanCurves']);
+  });
+
+  it('unmappable: keeps the existing note text key', () => {
+    expect(unavailableGroupNote(pv(UNMAPPABLE), FAN_GROUP)).toEqual({ key: `${FAN}.note.recommendedMode`, params: {} });
+    expect(selectedWireIds(pv(UNMAPPABLE), new Set(['fanCurves']))).toEqual([]);
+  });
+
+  it('headers claim a preset, not fan curves, when the preset is the only fan item', () => {
+    expect(importHeaderKeys(pv(AVAILABLE))).toEqual({
+      titleKey: 'nexus2Welcome.import.title.fanPreset', descriptionKey: 'nexus2Welcome.import.description.fanPreset',
+    });
+    expect(importHeaderKeys({ available: true, profileName: null, categories: [AVAILABLE, { id: 'rotation', available: true, value: '90' }] })).toEqual({
+      titleKey: 'nexus2Welcome.import.title.both', descriptionKey: 'nexus2Welcome.import.description.bothPreset',
+    });
+    expect(importHeaderKeys(pv(CUSTOMIZED)).titleKey).toBe('nexus2Welcome.import.title.none');
+  });
+
+  it('carries the applied preset into the group summary and ignores unknown presets', () => {
+    expect(groupResultSummaries([{ id: 'fanCurves', status: 'applied', detail: null, preset: 'turbo' }]))
+      .toEqual([expect.objectContaining({ groupId: 'fanCurves', preset: 'turbo' })]);
+    const [s] = groupResultSummaries([{ id: 'fanCurves', status: 'applied', detail: null, preset: 'future' } as unknown as Nexus2ApplyResult]);
+    expect(s.preset).toBeUndefined();
+  });
+});
+
