@@ -145,9 +145,20 @@ export async function importDeckPreset(file: File, allowPrivileged: boolean): Pr
 /** `grid` sizes a widget instance's first-time preset (no-op once one exists). */
 export async function getDeckInstance(id: string, grid?: { cols: number; rows: number }): Promise<DeckInstance | null> {
   const qs = grid ? `?cols=${grid.cols}&rows=${grid.rows}` : '';
-  const res = await fetchService<DeckInstanceResponse>(`/deck/instances/${encodeURIComponent(id)}${qs}`);
-  return res?.instance ?? null;
+  // 503 means the service's listed-apps cache is still cold right after boot
+  // and it refuses to bind a preset yet; retry with backoff instead of
+  // reporting a load failure.
+  for (let attempt = 0; ; attempt++) {
+    const { response, status } = await authFetchWithStatus(`/deck/instances/${encodeURIComponent(id)}${qs}`, { cache: 'no-store' });
+    if (response) return ((await response.json()) as DeckInstanceResponse).instance ?? null;
+    if (status !== 503 || attempt >= INSTANCE_503_RETRIES) return null;
+    await new Promise<void>(r => setTimeout(r, Math.min(INSTANCE_503_BASE_MS * 2 ** attempt, INSTANCE_503_MAX_MS)));
+  }
 }
+
+const INSTANCE_503_RETRIES = 8;
+const INSTANCE_503_BASE_MS = 1000;
+const INSTANCE_503_MAX_MS = 8000;
 
 export interface UpdateDeckInstanceBody {
   mode?: DeckInstanceMode;

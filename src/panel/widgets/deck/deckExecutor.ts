@@ -90,9 +90,13 @@ export async function executeDeckAction(action: DeckAction, location?: DeckDispa
     case 'launchApp': {
       // No deviceId (the desktop dashboard deck): no route reaches
       // DeckActionExecutor, so an unlisted direct target uses the desktop-token
-      // routes openUrl and openFile already use. steam:// has no such route.
+      // routes openUrl and openFile already use; steam:// goes to launch-uri.
       const id = action.appId.trim();
       if (isDirectLaunchTarget(id) && !getListedAppIds()?.has(action.appId)) {
+        if (/^steam:\/\//i.test(id)) {
+          await postService('/system/launch-uri', { url: id });
+          return;
+        }
         if (/^https?:\/\//i.test(id)) {
           await postService('/system/open-url', { url: id });
           return;

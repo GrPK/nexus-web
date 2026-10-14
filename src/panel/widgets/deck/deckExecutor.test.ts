@@ -310,6 +310,8 @@ describe('executeDeckAction → /panel/deck/dispatch', () => {
     expect(postService).toHaveBeenLastCalledWith('/system/open-path', { path: 'C:\\Games\\a.exe' });
     await executeDeckAction({ type: 'launchApp', appId: 'https://example.com/x' });
     expect(postService).toHaveBeenLastCalledWith('/system/open-url', { url: 'https://example.com/x' });
+    await executeDeckAction({ type: 'launchApp', appId: 'steam://rungameid/1' });
+    expect(postService).toHaveBeenLastCalledWith('/system/launch-uri', { url: 'steam://rungameid/1' });
     setListedAppIds(['C:\\Games\\a.exe']);
     await executeDeckAction({ type: 'launchApp', appId: 'C:\\Games\\a.exe' });
     expect(postService.mock.calls.at(-1)![0]).toMatch(/^\/shortcuts\/launch/);

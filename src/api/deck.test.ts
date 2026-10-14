@@ -8,13 +8,14 @@ vi.mock('./service', () => ({
   deleteService: vi.fn(),
   fetchServiceBlob: vi.fn(),
   postServiceBytesWithStatus: vi.fn(),
+  authFetchWithStatus: vi.fn(),
 }));
 
 vi.mock('../lib/saveFile', () => ({
   saveBlobToFile: vi.fn(),
 }));
 
-import { fetchService, postService, putService, deleteService, fetchServiceBlob, postServiceBytesWithStatus } from './service';
+import { fetchService, postService, putService, deleteService, fetchServiceBlob, postServiceBytesWithStatus, authFetchWithStatus } from './service';
 import { saveBlobToFile } from '../lib/saveFile';
 import {
   getDeckPresets, getDeckPreset, createDeckPreset, updateDeckPreset, deleteDeckPreset,
@@ -93,16 +94,42 @@ describe('deleteDeckPreset', () => {
 });
 
 describe('getDeckInstance', () => {
+  const ok = (instance: unknown) => ({ response: { json: async () => ({ instance }) } as unknown as Response, status: 200 });
+
   it('fetches one instance by id, URL-encoded', async () => {
-    vi.mocked(fetchService).mockResolvedValue({ instance: { mode: 'custom', activePresetId: 'p1' } });
+    vi.mocked(authFetchWithStatus).mockResolvedValue(ok({ mode: 'custom', activePresetId: 'p1' }));
     const result = await getDeckInstance('widget:my id');
-    expect(fetchService).toHaveBeenCalledWith('/deck/instances/widget%3Amy%20id');
+    expect(authFetchWithStatus).toHaveBeenCalledWith('/deck/instances/widget%3Amy%20id', { cache: 'no-store' });
     expect(result).toEqual({ mode: 'custom', activePresetId: 'p1' });
   });
 
-  it('returns null when the fetch fails', async () => {
-    vi.mocked(fetchService).mockResolvedValue(null);
+  it('returns null without retrying when the fetch fails for a non-503 reason', async () => {
+    vi.mocked(authFetchWithStatus).mockResolvedValue({ response: null, status: 500 });
     expect(await getDeckInstance('streamdeck:SN1')).toBeNull();
+    expect(authFetchWithStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a 503 (listed apps still loading) with backoff until the instance arrives', async () => {
+    vi.useFakeTimers();
+    vi.mocked(authFetchWithStatus)
+      .mockResolvedValueOnce({ response: null, status: 503 })
+      .mockResolvedValueOnce({ response: null, status: 503 })
+      .mockResolvedValueOnce(ok({ mode: 'custom', activePresetId: 'p1' }));
+    const p = getDeckInstance('widget:w1');
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(await p).toEqual({ mode: 'custom', activePresetId: 'p1' });
+    expect(authFetchWithStatus).toHaveBeenCalledTimes(3);
+    vi.useRealTimers();
+  });
+
+  it('gives up with null after the retry budget', async () => {
+    vi.useFakeTimers();
+    vi.mocked(authFetchWithStatus).mockResolvedValue({ response: null, status: 503 });
+    const p = getDeckInstance('widget:w1');
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(await p).toBeNull();
+    expect(authFetchWithStatus).toHaveBeenCalledTimes(9);
+    vi.useRealTimers();
   });
 });
 
