@@ -939,15 +939,19 @@ describe('DevicePanel devices controlled on their device page', () => {
         onOpenSettings={() => {}}
         onOpenDevicePage={onOpenDevicePage}
         devicePageDevices={pageDevices}
+        onGroupsChange={() => {}}
+        onOpenSmartLights={() => {}}
       />,
     );
     return onOpenDevicePage;
   }
 
-  it('lists them in their own section after the cards, badged with the reason', () => {
+  it('lists them in their own section between the cards and the add buttons, badged with the reason', () => {
     renderPage();
     const header = screen.getByText('lighting.devices.devicePageGroup');
     expect(screen.getByText('Strip three').compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header.compareDocumentPosition(screen.getByText('lighting.devices.groupAdd')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header.compareDocumentPosition(screen.getByText('smartLights.title')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText('lighting.devices.smarthub.firmwareBadge')).toBeTruthy();
     expect(screen.getByText('lighting.devices.argbInputBadge')).toBeTruthy();
   });

@@ -682,23 +682,6 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
             );
           }}
         />
-        {discovery && <DeviceDiscoveryCard state={discovery} rgbRunning={rgbRunning} />}
-        {canAddGroup && !filtering && (
-          <button
-            type="button"
-            className={styles.addSmartLights}
-            onClick={() => onGroupsChange?.(addGroup(groups, t('lighting.devices.groupDefaultName')))}
-          >
-            <FolderPlus size={22} aria-hidden />
-            <span>{t('lighting.devices.groupAdd')}</span>
-          </button>
-        )}
-        {onOpenSmartLights && (
-          <button type="button" className={styles.addSmartLights} onClick={onOpenSmartLights}>
-            <Plus size={22} aria-hidden />
-            <span>{t('smartLights.title')}</span>
-          </button>
-        )}
         {pageDevices.length > 0 && onOpenDevicePage && (
           <CollapsibleSection
             compact
@@ -715,6 +698,23 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
               ))}
             </div>
           </CollapsibleSection>
+        )}
+        {discovery && <DeviceDiscoveryCard state={discovery} rgbRunning={rgbRunning} />}
+        {canAddGroup && !filtering && (
+          <button
+            type="button"
+            className={styles.addSmartLights}
+            onClick={() => onGroupsChange?.(addGroup(groups, t('lighting.devices.groupDefaultName')))}
+          >
+            <FolderPlus size={22} aria-hidden />
+            <span>{t('lighting.devices.groupAdd')}</span>
+          </button>
+        )}
+        {onOpenSmartLights && (
+          <button type="button" className={styles.addSmartLights} onClick={onOpenSmartLights}>
+            <Plus size={22} aria-hidden />
+            <span>{t('smartLights.title')}</span>
+          </button>
         )}
       </div>
     </aside>
