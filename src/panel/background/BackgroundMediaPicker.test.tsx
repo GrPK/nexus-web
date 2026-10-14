@@ -361,6 +361,18 @@ describe('BackgroundMediaPicker multi-file import', () => {
     expect(await screen.findByText('lighting.controls.importFolderEmpty')).toBeInTheDocument();
     expect(stageBackgroundMedia).not.toHaveBeenCalled();
   });
+
+  it('still reports the filtered pick when the browser empties the file list on reset', async () => {
+    renderPicker();
+    const input = fileInput();
+    const picked = [new File(['x'], 'icon.svg', { type: 'image/svg+xml' })];
+    Object.defineProperty(input, 'value', { configurable: true, get: () => '', set: () => { picked.length = 0; } });
+
+    fireEvent.change(input, { target: { files: picked } });
+
+    expect(await screen.findByText('lighting.controls.importFolderEmpty')).toBeInTheDocument();
+    expect(stageBackgroundMedia).not.toHaveBeenCalled();
+  });
 });
 
 describe('BackgroundMediaPicker order', () => {
