@@ -23,6 +23,9 @@ import { useLayoutPresets, devicesToLayouts, devicesToPower } from './page/useLa
 import { mediaIdle, playCurrentOrFirstMedia } from '../../../api/mediaLibrary';
 import { getLianLiLighting, isLianLiHubId, setLianLiLighting } from '../../../api/lianli';
 import { getLianLiWirelessLighting, setLianLiWirelessChainLighting } from '../../../api/lianli-wireless';
+import { getHydroShift2Lighting, setHydroShift2Lighting } from '../../../api/hydroshift2';
+import { getGalahad2Lighting, setGalahad2Lighting } from '../../../api/lianli-aio';
+import { getStrimerLighting, setStrimerLighting } from '../../../api/strimer';
 import { useLightingFrames } from '../../../hooks/useLightingFrames';
 import { useLightingSync, normalizeSync } from '../../../hooks/useLightingSync';
 import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
@@ -151,6 +154,33 @@ const layoutHistoryStore = {
 // How long the rail keeps saying a scan is running when none was ever reported.
 const DISCOVERY_GRACE_MS = 4000;
 const DEVICE_ORDER_KEY = 'lighting.deviceOrder';
+
+/** Devices that play their own effect unless set to `lightingPageMode`, keyed by their cards' deviceIds. */
+const OWN_EFFECT_DEVICES: readonly {
+  deviceIds: readonly string[];
+  lightingPageMode: string;
+  getMode: () => Promise<string | null>;
+  setMode: (mode: string) => Promise<unknown>;
+}[] = [
+  {
+    deviceIds: ['lianli-hydroshift2'],
+    lightingPageMode: 'canvas',
+    getMode: () => getHydroShift2Lighting().then(l => l?.mode ?? null),
+    setMode: mode => setHydroShift2Lighting({ mode }),
+  },
+  {
+    deviceIds: ['lianli-aio'],
+    lightingPageMode: 'canvas',
+    getMode: () => getGalahad2Lighting().then(l => l?.mode ?? null),
+    setMode: mode => setGalahad2Lighting({ mode }),
+  },
+  {
+    deviceIds: ['strimer:atx', 'strimer:gpu'],
+    lightingPageMode: 'custom',
+    getMode: () => getStrimerLighting().then(l => l?.mode ?? null),
+    setMode: mode => setStrimerLighting({ mode }),
+  },
+];
 function loadDeviceOrder(): string[] {
   try {
     const raw = localStorage.getItem(DEVICE_ORDER_KEY);
@@ -302,6 +332,44 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     setWirelessPresetIds(prev => new Set([...prev].filter(id => id !== deviceId)));
     if (!await setLianLiWirelessChainLighting(mac, { mode: 'custom' })) void refreshWirelessPresets();
   }, [refreshWirelessPresets]);
+
+  // Device ids of OWN_EFFECT_DEVICES not following the Lighting page; only present devices are read.
+  const [ownEffectIds, setOwnEffectIds] = useState<ReadonlySet<string>>(() => new Set());
+  const ownEffectPresent = useMemo(
+    () => OWN_EFFECT_DEVICES.map(e => e.deviceIds.some(id => devices.some(d => d.deviceId === id)) ? '1' : '0').join(''),
+    [devices],
+  );
+  // Only the newest read applies, so one started before a Take control cannot restore the old state.
+  const ownEffectSeq = useRef(0);
+  // A device whose read fails keeps its last known state.
+  const refreshOwnEffects = useCallback(async () => {
+    const seq = ++ownEffectSeq.current;
+    const modes = await Promise.all(OWN_EFFECT_DEVICES.map((e, i) =>
+      ownEffectPresent[i] === '1' ? e.getMode().catch(() => null) : Promise.resolve(null)));
+    if (seq !== ownEffectSeq.current) return;
+    setOwnEffectIds(prev => {
+      const next = new Set<string>();
+      OWN_EFFECT_DEVICES.forEach((e, i) => {
+        if (ownEffectPresent[i] !== '1') return;
+        const mode = modes[i];
+        if (mode === null ? e.deviceIds.some(id => prev.has(id)) : mode !== e.lightingPageMode) {
+          e.deviceIds.forEach(id => next.add(id));
+        }
+      });
+      return next;
+    });
+  }, [ownEffectPresent]);
+  const handleOwnEffectTakeControl = useCallback(async (deviceId: string) => {
+    const entry = OWN_EFFECT_DEVICES.find(e => e.deviceIds.includes(deviceId));
+    if (!entry) return;
+    ownEffectSeq.current++;
+    setOwnEffectIds(prev => new Set([...prev].filter(id => !entry.deviceIds.includes(id))));
+    if (!await entry.setMode(entry.lightingPageMode)) void refreshOwnEffects();
+  }, [refreshOwnEffects]);
+  const firmwareDeviceIds = useMemo(
+    () => new Set([...wirelessPresetIds, ...ownEffectIds]),
+    [wirelessPresetIds, ownEffectIds],
+  );
 
   // Pinned devices, keyed by device id. The service owns them; this is its
   // copy plus the optimistic edits made here, re-read on every lighting frame.
@@ -757,6 +825,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
      
     void refreshDevices();
     void refreshWirelessPresets();
+    void refreshOwnEffects();
     // A preset (picked here, on another client, or by app focus) can carry its own 3D view.
     if (SCENE_3D) void sceneApi.refreshView();
     // A pin set from another client arrives on this frame; ids with a write
@@ -1570,17 +1639,19 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (!serviceOnline) return;
     void refreshLianLiModes();
     void refreshWirelessPresets();
-  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets]);
+    void refreshOwnEffects();
+  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets, refreshOwnEffects]);
 
   useEffect(() => {
     const onFocus = () => {
       if (!serviceOnline) return;
       void refreshLianLiModes();
       void refreshWirelessPresets();
+      void refreshOwnEffects();
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets]);
+  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets, refreshOwnEffects]);
 
   useTopicCallback('devices', serviceOnline, () => {
     void refreshDevices();
@@ -2569,8 +2640,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             onOpenCommunity={handleOpenCommunity}
             lianLiFirmwareHubs={lianLiFirmwareHubs}
             onLianLiTakeControl={hubId => { void handleLianLiTakeControl(hubId); }}
-            firmwareDeviceIds={wirelessPresetIds}
-            onFirmwareTakeControl={id => { void handleWirelessTakeControl(id); }}
+            firmwareDeviceIds={firmwareDeviceIds}
+            onFirmwareTakeControl={id => {
+              void (ownEffectIds.has(id) ? handleOwnEffectTakeControl(id) : handleWirelessTakeControl(id));
+            }}
             onOpenSmartLights={() => onSectionNavigate?.('smart-lights')}
             discovery={discovery}
             rgbRunning={rgb.running}
