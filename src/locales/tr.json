@@ -3859,7 +3859,7 @@
   "panel.settings.textColor.custom.desc": "Vurgu rengindeki metin dahil tüm widget metni için tek renk",
   "panel.settings.textColor.theme": "Tema",
   "panel.settings.textColor.theme.desc": "Açık veya koyu temayı izler",
-  "panel.settings.unsupportedLaunchPath": "Yalnızca yerel dosya yolları ile http, https veya steam bağlantıları başlatılabilir",
+  "panel.settings.unsupportedLaunchPath": "C:\\Games\\game.exe gibi bir sürücü yolu ya da http, https veya steam:// bağlantısı kullanın",
   "panel.settings.url": "URL",
   "panel.settings.useThisPath": "{path} kullan",
   "panel.settings.widgetLabels": "Widget etiketleri",

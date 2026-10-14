@@ -3859,7 +3859,7 @@
   "panel.settings.textColor.custom.desc": "Eine Farbe für den gesamten Widget-Text, Akzenttext eingeschlossen",
   "panel.settings.textColor.theme": "Design",
   "panel.settings.textColor.theme.desc": "Folgt dem hellen oder dunklen Design",
-  "panel.settings.unsupportedLaunchPath": "Nur lokale Dateipfade sowie http-, https- oder steam-Links können gestartet werden",
+  "panel.settings.unsupportedLaunchPath": "Verwenden Sie einen Laufwerkspfad wie C:\\Games\\game.exe oder einen http-, https- oder steam://-Link",
   "panel.settings.url": "URL",
   "panel.settings.useThisPath": "{path} verwenden",
   "panel.settings.widgetLabels": "Widget-Beschriftungen",

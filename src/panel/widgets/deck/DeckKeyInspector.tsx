@@ -297,8 +297,9 @@ function ActionFields({ action, onChange, allowed, surface, desktopEditor, pageC
   // double-click re-opening a second dialog, not a brief request gap.
   const [browsing, setBrowsing] = useState(false);
   const locked = deckAuthoringLocked(surface, desktopEditor);
+  // Windows only: a macOS pick is never a drive path, which the service refuses.
   const canBrowseFile = canEditFreeText(surface, desktopEditor)
-    && (isWindowsAppShell() || isMacAppShell())
+    && isWindowsAppShell()
     && !isRelayActive() && !isDirectActive();
   switch (action.type) {
     case 'launchApp':

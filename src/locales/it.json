@@ -3859,7 +3859,7 @@
   "panel.settings.textColor.custom.desc": "Un colore per tutto il testo dei widget, incluso il testo in colore d'accento",
   "panel.settings.textColor.theme": "Tema",
   "panel.settings.textColor.theme.desc": "Segue il tema chiaro o scuro",
-  "panel.settings.unsupportedLaunchPath": "Puoi avviare solo percorsi di file locali e link http, https o steam",
+  "panel.settings.unsupportedLaunchPath": "Usa un percorso di unità come C:\\Games\\game.exe, oppure un link http, https o steam://",
   "panel.settings.url": "URL",
   "panel.settings.useThisPath": "Usa {path}",
   "panel.settings.widgetLabels": "Etichette dei widget",

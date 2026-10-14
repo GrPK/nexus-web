@@ -3859,7 +3859,7 @@
   "panel.settings.textColor.custom.desc": "One color for all widget text, accent text included",
   "panel.settings.textColor.theme": "Theme",
   "panel.settings.textColor.theme.desc": "Follows the light or dark theme",
-  "panel.settings.unsupportedLaunchPath": "Only local file paths and http, https or steam links can be launched",
+  "panel.settings.unsupportedLaunchPath": "Use a drive path like C:\\Games\\game.exe, or an http, https or steam:// link",
   "panel.settings.url": "URL",
   "panel.settings.useThisPath": "Use {path}",
   "panel.settings.widgetLabels": "Widget labels",

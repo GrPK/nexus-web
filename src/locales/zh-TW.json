@@ -3859,7 +3859,7 @@
   "panel.settings.textColor.custom.desc": "所有小工具文字使用同一種顏色，包括強調色文字",
   "panel.settings.textColor.theme": "主題",
   "panel.settings.textColor.theme.desc": "跟隨淺色或深色主題",
-  "panel.settings.unsupportedLaunchPath": "僅支援啟動本機檔案路徑以及 http、https 或 steam 連結",
+  "panel.settings.unsupportedLaunchPath": "請使用 C:\\Games\\game.exe 這樣的磁碟機路徑，或 http、https、steam:// 連結",
   "panel.settings.url": "URL",
   "panel.settings.useThisPath": "使用 {path}",
   "panel.settings.widgetLabels": "小工具標籤",

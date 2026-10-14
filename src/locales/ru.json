@@ -3903,7 +3903,7 @@
   "panel.settings.textColor.custom.desc": "Один цвет для всего текста виджетов, включая акцентный",
   "panel.settings.textColor.theme": "Тема",
   "panel.settings.textColor.theme.desc": "Следует светлой или тёмной теме",
-  "panel.settings.unsupportedLaunchPath": "Можно запускать только локальные пути к файлам и ссылки http, https или steam",
+  "panel.settings.unsupportedLaunchPath": "Используйте путь к диску, например C:\\Games\\game.exe, или ссылку http, https или steam://",
   "panel.settings.url": "URL",
   "panel.settings.useThisPath": "Использовать {path}",
   "panel.settings.widgetLabels": "Метки виджетов",
