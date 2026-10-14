@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DevicePanel } from './DevicePanel';
-import type { LightingDevice } from '../../../../api/lighting';
+import type { DevicePageLightingDevice, LightingDevice } from '../../../../api/lighting';
 import { MAX_DEVICE_GROUPS, type DeviceGroup } from '../../../../lib/deviceGroups';
 import styles from '../LightingPage.module.scss';
 
@@ -914,5 +914,73 @@ describe('DevicePanel deep-link anchors', () => {
     );
     expect(document.querySelector('[data-search-anchor="lighting-group:mb:lianli"]')).not.toBeNull();
     expect(document.querySelector('[data-search-anchor="lighting-device:lianli:port1"]')).not.toBeNull();
+  });
+});
+
+describe('DevicePanel devices controlled on their device page', () => {
+  const pageDevices: DevicePageLightingDevice[] = [
+    { handlerId: 'asiahorse-umbra', name: 'Asiahorse Umbra V2', reason: 'firmware' },
+    { handlerId: 'strimer', name: 'Lian Li Strimer', reason: 'argbInput' },
+  ];
+
+  beforeEach(() => localStorage.clear());
+
+  function renderPage(onOpenDevicePage = vi.fn(), list = devices) {
+    render(
+      <DevicePanel
+        devices={list}
+        selectedIds={new Set()}
+        onSetSelection={() => {}}
+        onTogglePower={() => {}}
+        onSetPower={() => {}}
+        onToggleControlled={() => {}}
+        onSetControlled={() => {}}
+        lightingOff={false}
+        onOpenSettings={() => {}}
+        onOpenDevicePage={onOpenDevicePage}
+        devicePageDevices={pageDevices}
+      />,
+    );
+    return onOpenDevicePage;
+  }
+
+  it('lists them in their own section after the cards, badged with the reason', () => {
+    renderPage();
+    const header = screen.getByText('lighting.devices.devicePageGroup');
+    expect(screen.getByText('Strip three').compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('lighting.devices.smarthub.firmwareBadge')).toBeTruthy();
+    expect(screen.getByText('lighting.devices.argbInputBadge')).toBeTruthy();
+  });
+
+  it('opens the device page from a click on the card', () => {
+    const onOpenDevicePage = renderPage();
+    fireEvent.click(screen.getByText('Asiahorse Umbra V2'));
+    expect(onOpenDevicePage).toHaveBeenCalledWith('curated-asiahorse-umbra');
+  });
+
+  it('opens the device page from the keyboard', () => {
+    const onOpenDevicePage = renderPage();
+    const card = screen.getByText('Lian Li Strimer').closest('[role="button"]') as HTMLElement;
+    fireEvent.keyDown(card, { key: 'Enter' });
+    expect(onOpenDevicePage).toHaveBeenCalledWith('curated-strimer');
+  });
+
+  it('opens the device page from the card menu', () => {
+    const onOpenDevicePage = renderPage();
+    fireEvent.contextMenu(screen.getByText('Lian Li Strimer'));
+    fireEvent.click(screen.getByText('lighting.devices.menuOpenDevicePage'));
+    expect(onOpenDevicePage).toHaveBeenCalledWith('curated-strimer');
+  });
+
+  it('shows no empty-list message while only those devices exist', () => {
+    renderPage(vi.fn(), []);
+    expect(screen.queryByText('lighting.devices.empty')).toBeNull();
+    expect(screen.getByText('Asiahorse Umbra V2')).toBeTruthy();
+  });
+
+  it('folds the section from its header', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.devices.devicePageGroup' }));
+    expect(screen.queryByText('Asiahorse Umbra V2')).toBeNull();
   });
 });

@@ -8,6 +8,7 @@ import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { LightingPage } from './LightingPage';
 
 const devicesRef = vi.hoisted(() => ({ current: [] as unknown[] }));
+const pageDevicesRef = vi.hoisted(() => ({ current: [] as unknown[] }));
 
 // Stable setters: the page's profile-load effect lists them as deps.
 const lightingSync = vi.hoisted(() => ({
@@ -41,11 +42,16 @@ vi.mock('./page/AnimateGrid', () => ({ AnimateGrid: () => null }));
 vi.mock('./page/FullscreenShader', () => ({ FullscreenShader: () => null }));
 vi.mock('./page/ModeControls', () => ({ ModeControls: () => null }));
 vi.mock('./page/DevicePanel', () => ({
-  DevicePanel: ({ firmwareDeviceIds, onFirmwareTakeControl }: {
+  DevicePanel: ({ firmwareDeviceIds, onFirmwareTakeControl, devicePageDevices }: {
     firmwareDeviceIds?: ReadonlySet<string>;
     onFirmwareTakeControl?: (deviceId: string) => void;
+    devicePageDevices?: readonly { handlerId: string }[];
   }) => (
-    <div data-testid="rail" data-firmware={[...(firmwareDeviceIds ?? [])].sort().join(',')}>
+    <div
+      data-testid="rail"
+      data-firmware={[...(firmwareDeviceIds ?? [])].sort().join(',')}
+      data-page={(devicePageDevices ?? []).map(d => d.handlerId).join(',')}
+    >
       <button type="button" onClick={() => onFirmwareTakeControl?.('lianli-hydroshift2')}>take-ring</button>
       <button type="button" onClick={() => onFirmwareTakeControl?.('strimer:gpu')}>take-strimer</button>
     </div>
@@ -83,7 +89,7 @@ vi.mock('../../../api/lighting', async importOriginal => {
     fetchMusicReactive: vi.fn(() => Promise.resolve({ enabled: false })),
     fetchScreenEffect: vi.fn(() => Promise.resolve({ hue: 0, colorize: 0, saturation: 1, contrast: 1 })),
     fetchMediaEffect: vi.fn(() => Promise.resolve({ hue: 0, colorize: 0, saturation: 1, contrast: 1 })),
-    fetchLightingDevices: vi.fn(() => Promise.resolve({ isInit: true, devices: devicesRef.current })),
+    fetchLightingDevices: vi.fn(() => Promise.resolve({ isInit: true, devices: devicesRef.current, devicePageDevices: pageDevicesRef.current })),
     fetchLedMap: vi.fn(() => Promise.resolve(null)),
     fetchAvailableMappings: vi.fn(() => Promise.resolve(null)),
     fetchLayoutPresets: vi.fn(() => Promise.resolve(null)),
@@ -109,6 +115,7 @@ describe('LightingPage cards of devices playing their own effect', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    pageDevicesRef.current = [];
     devicesRef.current = [
       device('lianli-hydroshift2:ring', 'lianli-hydroshift2'),
       device('lianli-aio:ring:inner', 'lianli-aio'),
@@ -151,5 +158,16 @@ describe('LightingPage cards of devices playing their own effect', () => {
     expect(getHydroShift2Lighting).not.toHaveBeenCalled();
     expect(getGalahad2Lighting).not.toHaveBeenCalled();
     expect(getStrimerLighting).not.toHaveBeenCalled();
+  });
+
+  it('hands the devices set on their device page to the rail', async () => {
+    pageDevicesRef.current = [
+      { handlerId: 'asiahorse-umbra', name: 'Asiahorse Umbra V2', reason: 'firmware' },
+      { handlerId: 'lianli-tl', name: 'Lian Li Uni Fan TL', reason: 'firmware' },
+    ];
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('rail').dataset.page).toBe('asiahorse-umbra,lianli-tl');
+    });
   });
 });

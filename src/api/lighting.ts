@@ -425,6 +425,16 @@ export interface LightingDevicesResponse {
   groups?: DeviceGroup[];
   /** Cards stacked to one canvas frame and one selection, each with how the frame is shared. Absent on older services. */
   stacks?: DeviceStack[];
+  /** Connected devices whose lighting is set on their device page, so they have no cards. Absent on older services. */
+  devicePageDevices?: DevicePageLightingDevice[];
+}
+
+export interface DevicePageLightingDevice {
+  /** Device handler id; the device page's sidebar key is `curated-<handlerId>`. */
+  handlerId: string;
+  name: string;
+  /** An effect the device plays itself, or a motherboard ARGB header it follows. */
+  reason: 'firmware' | 'argbInput';
 }
 
 /** Whole-list replace; the page owns group order and membership. */
