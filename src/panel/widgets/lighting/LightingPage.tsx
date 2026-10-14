@@ -2644,6 +2644,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             onFirmwareTakeControl={id => {
               void (ownEffectIds.has(id) ? handleOwnEffectTakeControl(id) : handleWirelessTakeControl(id));
             }}
+            onOpenDevicePage={deviceKey => onSectionNavigate?.('device', { deviceKey })}
             onOpenSmartLights={() => onSectionNavigate?.('smart-lights')}
             discovery={discovery}
             rgbRunning={rgb.running}

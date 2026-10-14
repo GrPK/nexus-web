@@ -2676,6 +2676,7 @@
   "lighting.devices.menuLightsOnCount.few": "Включить подсветку ({count} устройства)",
   "lighting.devices.menuLightsOnCount.one": "Включить подсветку ({count} устройство)",
   "lighting.devices.menuLightsOnCount.other": "Включить подсветку ({count} устройств)",
+  "lighting.devices.menuOpenDevicePage": "Открыть страницу устройства",
   "lighting.devices.menuTakeControl": "Взять управление",
   "lighting.devices.minimize": "Свернуть",
   "lighting.devices.minimizeCount.few": "Свернуть ({count} устройства)",

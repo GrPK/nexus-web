@@ -2654,6 +2654,7 @@
   "lighting.devices.menuLightsOn": "Impie lis lûs",
   "lighting.devices.menuLightsOnCount.one": "Impie lis lûs ({count} dispositîf)",
   "lighting.devices.menuLightsOnCount.other": "Impie lis lûs ({count} dispositîfs)",
+  "lighting.devices.menuOpenDevicePage": "Vierç la pagjine dal dispositîf",
   "lighting.devices.menuTakeControl": "Cjapâ il control",
   "lighting.devices.minimize": "Riduç",
   "lighting.devices.minimizeCount.one": "Riduç ({count} dispositîf)",

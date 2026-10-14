@@ -2654,6 +2654,7 @@
   "lighting.devices.menuLightsOn": "ライトをオンにする",
   "lighting.devices.menuLightsOnCount.one": "ライトをオンにする ({count} 台のデバイス)",
   "lighting.devices.menuLightsOnCount.other": "ライトをオンにする ({count} 台のデバイス)",
+  "lighting.devices.menuOpenDevicePage": "デバイスページを開く",
   "lighting.devices.menuTakeControl": "制御を引き継ぐ",
   "lighting.devices.minimize": "最小化",
   "lighting.devices.minimizeCount.one": "最小化 ({count} 台のデバイス)",

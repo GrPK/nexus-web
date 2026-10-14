@@ -2654,6 +2654,7 @@
   "lighting.devices.menuLightsOn": "Işıkları aç",
   "lighting.devices.menuLightsOnCount.one": "Işıkları aç ({count} cihaz)",
   "lighting.devices.menuLightsOnCount.other": "Işıkları aç ({count} cihaz)",
+  "lighting.devices.menuOpenDevicePage": "Cihaz sayfasını aç",
   "lighting.devices.menuTakeControl": "Kontrolü devral",
   "lighting.devices.minimize": "Simge Durumuna Küçült",
   "lighting.devices.minimizeCount.one": "Küçült ({count} cihaz)",

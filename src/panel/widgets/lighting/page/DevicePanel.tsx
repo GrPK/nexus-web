@@ -35,7 +35,7 @@ import styles from '../LightingPage.module.scss';
  * using the same component/styling as a motherboard group: a chevron, the brand
  * name, a group power switch, and its lights as indented child cards.
  */
-export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, colorTunedIds, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
+export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, colorTunedIds, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenDevicePage, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
   devices: LightingDevice[];
   /** Optional control rendered at the top of the scrolling list (master brightness). */
   /** Every device before the Nexus-Control-off filter, so a group header can
@@ -113,6 +113,8 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   firmwareDeviceIds?: ReadonlySet<string>;
   /** Hands one of {@link firmwareDeviceIds} back to the engine. */
   onFirmwareTakeControl?: (deviceId: string) => void;
+  /** Opens a device page by its sidebar key. */
+  onOpenDevicePage?: (deviceKey: string) => void;
   /** Renders a dashed "add smart lights" entry at the bottom of the list. */
   onOpenSmartLights?: () => void;
   /** Tail card explaining a short list; absent once a mode is running. */
@@ -366,6 +368,9 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
     const deviceId = d.deviceId;
     return deviceId !== undefined && onFirmwareTakeControl ? () => onFirmwareTakeControl(deviceId) : undefined;
   };
+  // A firmware-owned card's parentDeviceId is its device handler's id, which keys its device page.
+  const openDevicePageFor = (d: LightingDevice) =>
+    fwOf(d) && d.parentDeviceId && onOpenDevicePage ? () => onOpenDevicePage(`curated-${d.parentDeviceId}`) : undefined;
   const selectAllFor = (members: readonly LightingDevice[]) => {
     const ids = members.filter(z => !zoneCardUnavailable(z) && !fwOf(z)).map(z => z.id);
     return ids.length > 0 ? { count: ids.length, run: () => onSetSelection(new Set(ids), ids[0]) } : undefined;
@@ -428,6 +433,7 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
       onOpenCommunity={onOpenCommunity ? () => onOpenCommunity(d.id) : undefined}
       firmwareControlled={fwOf(d)}
       onTakeControl={takeControlFor(d)}
+      onOpenDevicePage={openDevicePageFor(d)}
       // Grouped members carry the notice on their group header instead.
       notice={indent ? undefined : noticeFor(d)}
       bulk={bulkFor(d)}

@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type ReactNode } from 'react';
-import { Power, PowerOff, Ban, Blend, Eye, Keyboard, Lightbulb, Users, Cpu, Check, Link2Off, Link2, Layers, MousePointerClick, Paintbrush, Pencil, Pin, PinOff, RotateCcw } from 'lucide-react';
+import { Power, PowerOff, Ban, Blend, Eye, Keyboard, Lightbulb, Users, Cpu, Check, Link2Off, Link2, Layers, MousePointerClick, Paintbrush, Pencil, Pin, PinOff, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import {
   identifyLightingDevice,
   type LightingDevice,
@@ -286,6 +286,7 @@ export function ZoneCard({
   onOpenCommunity,
   firmwareControlled,
   onTakeControl,
+  onOpenDevicePage,
   groupMove,
   inStack,
   colorTuned,
@@ -346,9 +347,10 @@ export function ZoneCard({
   /** When true, the card is non-interactive; the meta row shows a firmware badge. */
   firmwareControlled?: boolean;
   /** Present when the firmware mode driving this card can be handed back to
-   *  Nexus (the Lian Li hub's per-LED "custom" mode). Gives a firmware-owned
-   *  card its only menu row; absent, such a card stays menu-less. */
+   *  Nexus (the Lian Li hub's per-LED "custom" mode). */
   onTakeControl?: () => void;
+  /** Opens the device page, where a firmware-owned card's own effect is set. */
+  onOpenDevicePage?: () => void;
   /** Group placement for this card's rail row: the card, or the stack it is a
    *  zone of. */
   groupMove?: GroupMove;
@@ -414,14 +416,14 @@ export function ZoneCard({
   const dragEnabled = !!drag && !toggleMode && !unavailable && !firmwareControlled;
   const controlled = device.controlled !== false;
   const toggleable = toggleMode === true && !unavailable && !firmwareControlled;
-  // Same gate as the action-icon row: the onboarding grid and firmware-owned
-  // cards expose no per-device controls. A firmware-owned card offers exactly
-  // one row - take control - so it opts in only when that handler exists.
-  const menuEnabled = !toggleMode && !selectOnly
-    && (firmwareControlled ? !!onTakeControl : true);
   // Same surfaces the action row is on. A card whose whole body is a switch
   // (onboarding) or a bare pick target (Static picker) keeps a plain label.
-  const renameEnabled = !!onRename && !toggleMode && !selectOnly && !unavailable && !firmwareControlled;
+  const renameEnabled = !!onRename && !toggleMode && !selectOnly && !unavailable;
+  // Same gate as the action-icon row: the onboarding grid exposes no per-device
+  // controls. A firmware-owned card offers only its device page, take control
+  // and the naming and grouping rows, so it opts in when one of those exists.
+  const menuEnabled = !toggleMode && !selectOnly
+    && (firmwareControlled ? !!onTakeControl || !!onOpenDevicePage || renameEnabled || !!groupMove : true);
 
   // Persistent marker for a card that is not in its default state, so the
   // reason is readable without hovering. An ignored device is not driven at
@@ -449,11 +451,46 @@ export function ZoneCard({
     && (!selectOnly || zoneCardSelectable(device));
   const nameRef = useRef<EditableTextHandle>(null);
 
+  // Naming and grouping close the menu: they change what the card IS, where
+  // everything above them acts on what it does.
+  const organiseItems = (): DeviceMenuItem[] => {
+    const organise: DeviceMenuItem[] = [];
+    if (!bulk && renameEnabled) {
+      organise.push({
+        key: 'rename',
+        icon: <Pencil size={14} />,
+        label: t('lighting.devices.rename'),
+        onSelect: () => nameRef.current?.startEditing(),
+      });
+      // Clearing a rename has no inline affordance - an empty commit is
+      // dropped - so the menu is the only way back to the hardware name.
+      if (device.originalName != null) {
+        organise.push({
+          key: 'resetName',
+          icon: <RotateCcw size={14} />,
+          label: t('lighting.devices.resetName'),
+          onSelect: () => onRename?.(''),
+        });
+      }
+    }
+    organise.push(...groupMenuItems(t, language, 'lighting.devices', groupMove, bulk));
+    organise.push(...stackMenuItems(t, language, bulk ? bulk : { unstack: onUnstack }, bulk?.count ?? 1));
+    return organise;
+  };
+
   const menuItems = (): DeviceMenuItem[] => {
     const items: DeviceMenuItem[] = [];
-    // Nothing else on the menu can act while firmware owns the LEDs, so the
-    // handoff is the whole menu rather than one row among dead ones.
+    // The engine's rows (Customize, tuning, power, pins) cannot act while
+    // firmware owns the LEDs; the device page, the handoff and organising can.
     if (firmwareControlled) {
+      if (onOpenDevicePage) {
+        items.push({
+          key: 'openDevicePage',
+          icon: <SlidersHorizontal size={14} />,
+          label: t('lighting.devices.menuOpenDevicePage'),
+          onSelect: onOpenDevicePage,
+        });
+      }
       if (onTakeControl) {
         items.push({
           key: 'takeControl',
@@ -463,7 +500,7 @@ export function ZoneCard({
           highlighted: true,
         });
       }
-      return items;
+      return menuSections(items, organiseItems());
     }
     // Customize opens the LED map on THIS card's device, so it keeps its row in
     // a selection spanning devices.
@@ -556,30 +593,7 @@ export function ZoneCard({
         onSelect: onSelectOnly,
       });
     }
-    // Naming and grouping close the menu: they change what the card IS, where
-    // everything above acts on what it does.
-    const organise: DeviceMenuItem[] = [];
-    if (!bulk && renameEnabled) {
-      organise.push({
-        key: 'rename',
-        icon: <Pencil size={14} />,
-        label: t('lighting.devices.rename'),
-        onSelect: () => nameRef.current?.startEditing(),
-      });
-      // Clearing a rename has no inline affordance - an empty commit is
-      // dropped - so the menu is the only way back to the hardware name.
-      if (device.originalName != null) {
-        organise.push({
-          key: 'resetName',
-          icon: <RotateCcw size={14} />,
-          label: t('lighting.devices.resetName'),
-          onSelect: () => onRename?.(''),
-        });
-      }
-    }
-    organise.push(...groupMenuItems(t, language, 'lighting.devices', groupMove, bulk));
-    organise.push(...stackMenuItems(t, language, bulk ? bulk : { unstack: onUnstack }, bulk?.count ?? 1));
-    return menuSections(editors, toggles, locate, organise);
+    return menuSections(editors, toggles, locate, organiseItems());
   };
   // The drag spreads sit after the toggle props below: dnd-kit's
   // role/tabIndex/onKeyDown must win in normal mode, where the toggle props

@@ -795,9 +795,9 @@ describe('DevicePanel pins', () => {
 });
 
 describe('DevicePanel firmware-played devices', () => {
-  const strimer = device('lianli-wireless:64F271E566E1:z0', 'Strimer 24-Pin', { deviceId: 'lianli-wireless:64F271E566E1' });
+  const strimer = device('lianli-wireless:64F271E566E1:z0', 'Strimer 24-Pin', { deviceId: 'lianli-wireless:64F271E566E1', parentDeviceId: 'lianli-wireless' });
 
-  function renderFirmware(onFirmwareTakeControl = vi.fn()) {
+  function renderFirmware(onFirmwareTakeControl = vi.fn(), onOpenDevicePage = vi.fn()) {
     render(
       <DevicePanel
         devices={[strimer, devices[0]]}
@@ -811,10 +811,19 @@ describe('DevicePanel firmware-played devices', () => {
         onOpenSettings={() => {}}
         firmwareDeviceIds={new Set(['lianli-wireless:64F271E566E1'])}
         onFirmwareTakeControl={onFirmwareTakeControl}
+        onOpenDevicePage={onOpenDevicePage}
       />,
     );
     return onFirmwareTakeControl;
   }
+
+  it('opens the device page of the handler that plays the animation', () => {
+    const onOpenDevicePage = vi.fn();
+    renderFirmware(vi.fn(), onOpenDevicePage);
+    fireEvent.click(screen.getAllByRole('button', { name: 'lighting.devices.moreActions' })[0]);
+    fireEvent.click(screen.getByText('lighting.devices.menuOpenDevicePage'));
+    expect(onOpenDevicePage).toHaveBeenCalledWith('curated-lianli-wireless');
+  });
 
   it('badges only the card whose device plays a stored animation', () => {
     renderFirmware();
@@ -832,7 +841,7 @@ describe('DevicePanel firmware-played devices', () => {
 describe('DevicePanel wired hubs in firmware mode', () => {
   const port = (hub: string, n: number) => device(`${hub}:port${n}`, `${hub} Port ${n}`, { parentDeviceId: hub, deviceId: `${hub}:port${n}`, zoneIndex: n });
 
-  function renderHubs(onLianLiTakeControl = vi.fn()) {
+  function renderHubs(onLianLiTakeControl = vi.fn(), onOpenDevicePage = vi.fn()) {
     render(
       <DevicePanel
         devices={[port('lianli', 0), port('lianli2', 0)]}
@@ -846,10 +855,27 @@ describe('DevicePanel wired hubs in firmware mode', () => {
         onOpenSettings={() => {}}
         lianLiFirmwareHubs={new Set(['lianli2'])}
         onLianLiTakeControl={onLianLiTakeControl}
+        onOpenDevicePage={onOpenDevicePage}
       />,
     );
     return onLianLiTakeControl;
   }
+
+  it('opens that hub\'s device page from its card menu', () => {
+    const onOpenDevicePage = vi.fn();
+    renderHubs(vi.fn(), onOpenDevicePage);
+    const card = document.querySelector('[data-search-anchor="lighting-device:lianli2:port0"]') as HTMLElement;
+    fireEvent.click(within(card).getByRole('button', { name: 'lighting.devices.moreActions' }));
+    fireEvent.click(screen.getByText('lighting.devices.menuOpenDevicePage'));
+    expect(onOpenDevicePage).toHaveBeenCalledWith('curated-lianli2');
+  });
+
+  it('keeps the device page row off a card the engine drives', () => {
+    renderHubs();
+    const card = document.querySelector('[data-search-anchor="lighting-device:lianli:port0"]') as HTMLElement;
+    fireEvent.click(within(card).getByRole('button', { name: 'lighting.devices.moreActions' }));
+    expect(screen.queryByText('lighting.devices.menuOpenDevicePage')).toBeNull();
+  });
 
   it('badges only the cards of the hub playing a firmware mode', () => {
     renderHubs();

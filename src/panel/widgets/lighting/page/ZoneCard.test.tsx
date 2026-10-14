@@ -987,3 +987,49 @@ describe('ZoneCard key reactions row', () => {
     expect(onOpenKeyReactions).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ZoneCard firmware-owned menu', () => {
+  function renderFirmwareCard(props: { onTakeControl?: () => void; onOpenDevicePage?: () => void; onRename?: (name: string) => void }) {
+    return render(
+      <ZoneCard
+        device={baseDevice}
+        selected={false}
+        indent={false}
+        onSelect={() => {}}
+        onTogglePower={() => {}}
+        onToggleControlled={() => {}}
+        onOpenSettings={() => {}}
+        firmwareControlled
+        {...props}
+      />,
+    );
+  }
+
+  it('offers the device page and take control on right-click, and nothing that cannot act', () => {
+    const onOpenDevicePage = vi.fn();
+    const onTakeControl = vi.fn();
+    renderFirmwareCard({ onOpenDevicePage, onTakeControl });
+    fireEvent.contextMenu(document.querySelector(`.${styles.deviceCard}`)!);
+    expect(screen.getByRole('button', { name: /menuTakeControl/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /ledMap.settings/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /menuOpenDevicePage/ }));
+    expect(onOpenDevicePage).toHaveBeenCalledTimes(1);
+    expect(onTakeControl).not.toHaveBeenCalled();
+  });
+
+  it('keeps renaming, and drops the engine-only power and control rows', () => {
+    renderFirmwareCard({ onOpenDevicePage: () => {}, onRename: () => {} });
+    fireEvent.contextMenu(document.querySelector(`.${styles.deviceCard}`)!);
+    expect(screen.getByRole('button', { name: /lighting.devices.rename/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /menuLightsOff/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /menuControlOff/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /lighting.devices.identify/ })).toBeNull();
+  });
+
+  it('opens a menu for the device page alone when control cannot be taken', () => {
+    renderFirmwareCard({ onOpenDevicePage: () => {} });
+    fireEvent.contextMenu(document.querySelector(`.${styles.deviceCard}`)!);
+    expect(screen.getByRole('button', { name: /menuOpenDevicePage/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /menuTakeControl/ })).toBeNull();
+  });
+});
