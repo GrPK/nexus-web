@@ -20,14 +20,19 @@ export type ImportSourceId = 'fancontrol' | 'nexus2';
 export type ImportOutcome = 'clean' | 'failed' | 'needsReview';
 
 export interface ImportRunOptions {
-  /** The press came before every included preview had settled. */
-  pressedBeforeSettled?: boolean;
+  /** Nexus 2's fan curve list had not been seen when the press happened (read before any wait). */
+  fanListUnseenAtPress?: boolean;
 }
+
+/** After a reveal, import presses are ignored this long, so a double tap cannot act on a list that only just appeared. */
+const REVEAL_GUARD_MS = 600;
 
 /** Lets a host drive the import from its own footer (both onboarding screens do). */
 export interface ImportCenterHandle {
   /** Runs every included source in list order. 'clean' only when they all succeeded. */
   runImport: (options?: ImportRunOptions) => Promise<ImportOutcome>;
+  /** True when Nexus 2 is listed and its fan curve list has not been seen yet. */
+  fanListUnseen: () => boolean;
 }
 
 /** One app's row in the left column, and what it shows on the right. */
@@ -106,6 +111,7 @@ export function ImportCenter({
   const [busy, setBusy] = useState(false);
   const fanControlHandle = useRef<FanControlImportHandle | null>(null);
   const nexus2Handle = useRef<Nexus2ImportHandle | null>(null);
+  const revealGuardUntil = useRef(0);
   const listLabelId = useId();
 
   const available: Record<ImportSourceId, boolean> = {
@@ -177,12 +183,19 @@ export function ImportCenter({
   // consulting it here would make the call a silent no-op.
   const runImport = async (options?: ImportRunOptions): Promise<ImportOutcome> => {
     if (busy) return 'failed';
+    if (Date.now() < revealGuardUntil.current) return 'needsReview';
     const targets = sources.filter(runnable);
     if (targets.length === 0) return 'failed';
     // Fan curves are only imported once their list has been on screen; until
     // then a press brings it up instead of acting.
-    if (targets.includes('nexus2') && nexus2Handle.current?.fanCurvesNeedReview(options?.pressedBeforeSettled)) {
+    if (targets.includes('nexus2') && nexus2Handle.current?.fanCurvesNeedReview(options?.fanListUnseenAtPress)) {
       setHighlightOverride('nexus2');
+      revealGuardUntil.current = Date.now() + REVEAL_GUARD_MS;
+      // Once the panel is showing: bring the group into view and restart the guard from the paint.
+      requestAnimationFrame(() => {
+        nexus2Handle.current?.revealFanCurves();
+        revealGuardUntil.current = Date.now() + REVEAL_GUARD_MS;
+      });
       return 'needsReview';
     }
     setBusy(true);
@@ -205,7 +218,10 @@ export function ImportCenter({
   };
 
   // No dep list: the handle must always close over the latest selection state.
-  useImperativeHandle(handleRef, () => ({ runImport }));
+  useImperativeHandle(handleRef, () => ({
+    runImport,
+    fanListUnseen: () => (nexus2Handle.current ? !nexus2Handle.current.fanListSeen() : false),
+  }));
 
   const locked = busy || !!disabled;
 

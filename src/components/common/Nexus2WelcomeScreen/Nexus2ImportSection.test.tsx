@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Nexus2ImportSection, type Nexus2ImportHandle } from './Nexus2ImportSection';
 import { applyNexus2Import, previewNexus2Import } from '../../../api/migration';
 import type { Nexus2ApplyResponse, Nexus2PreviewResponse } from '../../../api/migration';
@@ -14,8 +14,9 @@ vi.mock('../../../lib/i18n', () => ({
   useTranslation: () => ({
     language: 'en',
     t: (key: string, params?: Record<string, string | number>) => {
-      if (key.endsWith('.fanCurves.curve')) return '{name} → {fans}';
-      if (key.endsWith('.fanCurves.reasonLine')) return '{name}: {reason}';
+      // Deliberately unlike any hardcoded separator: the locale template must win.
+      if (key.endsWith('.fanCurves.curve')) return '{name} \u21D2 {fans}';
+      if (key.endsWith('.fanCurves.reasonLine')) return '{name}\uFF1A{reason}';
       if (!params) return key;
       return `${key}:${Object.values(params).join(',')}`;
     },
@@ -252,9 +253,9 @@ describe('Nexus2ImportSection - fan curves', () => {
     renderSection();
     const fan = await screen.findByRole('switch', { name: FAN_NAME });
     expect(fan).toBeChecked();
-    expect(screen.getByText('Quiet → Front')).toBeInTheDocument();
-    expect(screen.getByText(`Pump: ${FAN}.reason.pumpKept`)).toBeInTheDocument();
-    expect(screen.getByText(`Odd: ${FAN}.reason.unknown`)).toBeInTheDocument();
+    expect(screen.getByText('Quiet \u21D2 Front')).toBeInTheDocument();
+    expect(screen.getByText(`Pump\uFF1A${FAN}.reason.pumpKept`)).toBeInTheDocument();
+    expect(screen.getByText(`Odd\uFF1A${FAN}.reason.unknown`)).toBeInTheDocument();
     expect(screen.getByText(`${FAN}.otherProfiles:`)).toBeInTheDocument();
   });
 
@@ -280,7 +281,7 @@ describe('Nexus2ImportSection - fan curves', () => {
     });
     renderSection();
     await screen.findByRole('switch', { name: FAN_NAME });
-    expect(screen.getByText('{fans} $& → {name} $1')).toBeInTheDocument();
+    expect(screen.getByText('{fans} $& \u21D2 {name} $1')).toBeInTheDocument();
   });
 
   it('shows an all-skipped group disabled, with each curve reason and no import', async () => {
@@ -295,7 +296,7 @@ describe('Nexus2ImportSection - fan curves', () => {
     const fan = await screen.findByRole('switch', { name: FAN_NAME });
     expect(fan).toBeDisabled();
     expect(fan).not.toBeChecked();
-    expect(screen.getByText(`Turbo: ${FAN}.reason.unsafeCurve`)).toBeInTheDocument();
+    expect(screen.getByText(`Turbo\uFF1A${FAN}.reason.unsafeCurve`)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: IMPORT_BUTTON_NAME })).toBeDisabled();
   });
 
@@ -327,7 +328,51 @@ describe('Nexus2ImportSection - fan curves', () => {
     vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [FAN_CATEGORY] });
     renderSection();
     await screen.findByRole('switch', { name: FAN_NAME });
-    expect(screen.getByText(`Pump: ${FAN}.reason.pumpKept`)).toBeInTheDocument();
+    expect(screen.getByText(`Pump\uFF1A${FAN}.reason.pumpKept`)).toBeInTheDocument();
+    expect(screen.getByText('Quiet \u21D2 Front')).toBeInTheDocument();
+  });
+
+  describe('with a viewport observer', () => {
+    type Entry = { target: Element; isIntersecting: boolean };
+    const observers: Array<{ cb: (e: Entry[]) => void; target: Element | null; disconnected: boolean }> = [];
+    beforeEach(() => {
+      observers.length = 0;
+      vi.stubGlobal('IntersectionObserver', class {
+        record: { cb: (e: Entry[]) => void; target: Element | null; disconnected: boolean } = { cb: () => {}, target: null, disconnected: false };
+        constructor(cb: (e: Entry[]) => void) { this.record.cb = cb; observers.push(this.record); }
+        observe(el: Element) { this.record.target = el; }
+        disconnect() { this.record.disconnected = true; }
+      });
+    });
+    afterEach(() => { vi.unstubAllGlobals(); });
+    const enterViewport = () => act(() => {
+      for (const o of observers) if (!o.disconnected && o.target) o.cb([{ target: o.target, isIntersecting: true }]);
+    });
+
+    it('counts the list as seen only once it enters the viewport', async () => {
+      vi.mocked(previewNexus2Import).mockResolvedValue({ available: true, profileName: null, categories: [FAN_CATEGORY] });
+      const handleRef = { current: null as Nexus2ImportHandle | null };
+      renderSection({ handleRef, showAction: false });
+      await screen.findByRole('switch', { name: FAN_NAME });
+      expect(handleRef.current?.fanListSeen()).toBe(false);
+      expect(handleRef.current?.fanCurvesNeedReview()).toBe(true);
+      enterViewport();
+      expect(handleRef.current?.fanListSeen()).toBe(true);
+      expect(handleRef.current?.fanCurvesNeedReview()).toBe(false);
+    });
+
+    it('never carries seen over to a newly loaded preview', async () => {
+      vi.mocked(previewNexus2Import).mockImplementation(async () => ({ available: true, profileName: null, categories: [FAN_CATEGORY] }));
+      const handleRef = { current: null as Nexus2ImportHandle | null };
+      const view = render(<Nexus2ImportSection open showAction={false} handleRef={handleRef} />);
+      await screen.findByRole('switch', { name: FAN_NAME });
+      enterViewport();
+      expect(handleRef.current?.fanListSeen()).toBe(true);
+      view.rerender(<Nexus2ImportSection open={false} showAction={false} handleRef={handleRef} />);
+      view.rerender(<Nexus2ImportSection open showAction={false} handleRef={handleRef} />);
+      await screen.findByRole('switch', { name: FAN_NAME });
+      expect(handleRef.current?.fanListSeen()).toBe(false);
+    });
   });
 
   it('sends fanCurves in the apply call', async () => {

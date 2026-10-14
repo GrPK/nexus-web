@@ -45,6 +45,14 @@ const NEXUS2: Nexus2StatusResponse = {
 const IMPORT_AND_CONTINUE = 'importOnboarding.importAndContinue';
 const SKIP = 'importOnboarding.skip';
 
+// Moves Date.now past the reveal guard without real waiting.
+const clock = { offset: 0 };
+const realNow = Date.now.bind(Date);
+beforeEach(() => {
+  clock.offset = 0;
+  vi.spyOn(Date, 'now').mockImplementation(() => realNow() + clock.offset);
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(fetchFanControlStatus).mockResolvedValue(FAN_CONTROL);
@@ -221,6 +229,12 @@ describe('ImportOnboardingScreen', () => {
     expect(dismissNexus2Welcome).not.toHaveBeenCalled();
     expect(onComplete).not.toHaveBeenCalled();
 
+    // A second press inside the reveal guard (a double tap) still does nothing.
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    expect(applyNexus2Import).not.toHaveBeenCalled();
+
+    clock.offset += 1000;
     fireEvent.keyDown(document.body, { key: 'Enter' });
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     expect(applyNexus2Import).toHaveBeenCalledTimes(1);
@@ -248,9 +262,49 @@ describe('ImportOnboardingScreen', () => {
     expect(dismissNexus2Welcome).not.toHaveBeenCalled();
     expect(onComplete).not.toHaveBeenCalled();
 
+    clock.offset += 1000;
     fireEvent.click(screen.getByRole('button', { name: IMPORT_AND_CONTINUE }));
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     expect(applyNexus2Import).toHaveBeenCalledWith(['fanCurves'], true);
+  });
+
+  it('a hung FanControl preview does not bounce a user who has seen the fan curves', async () => {
+    vi.mocked(previewFanControlImport).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(previewNexus2Import).mockResolvedValue({
+      available: true, profileName: 'Default',
+      categories: [{ id: 'fanCurves', available: true, count: 1, fanCurves: [{ name: 'Quiet', kind: 'graph', status: 'import', minimumRaised: false, targets: [{ label: 'Front', status: 'import' }] }] }],
+    });
+    const onComplete = vi.fn();
+    renderScreen({ onComplete, offeredFor: { nexus2: true, fancontrol: false } });
+    await screen.findByRole('switch', { name: 'nexus2Welcome.import.group.fanCurves.label' });
+
+    // Including FanControl holds the aggregate unsettled behind its hung preview.
+    fireEvent.click(screen.getByRole('switch', { name: /importCenter\.include.*fancontrol/ }));
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_AND_CONTINUE }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_500); });
+    } finally {
+      vi.useRealTimers();
+    }
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    expect(applyNexus2Import).toHaveBeenCalledWith(['fanCurves'], true);
+  });
+
+  it('ignores the repeats of a held Enter', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({
+      available: true, profileName: 'Default',
+      categories: [{ id: 'appearance', available: true, accentColor: '#fff', background: null }],
+    });
+    const onComplete = vi.fn();
+    renderScreen({ onComplete });
+    await screen.findByRole('button', { name: IMPORT_AND_CONTINUE });
+    fireEvent.keyDown(document.body, { key: 'Enter', repeat: true });
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    expect(applyNexus2Import).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
   });
 
   it('reads Continue with nothing ticked, live, and offers no Skip import', async () => {

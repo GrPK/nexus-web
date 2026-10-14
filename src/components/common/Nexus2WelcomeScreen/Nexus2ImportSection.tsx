@@ -26,10 +26,15 @@ export interface Nexus2ImportHandle {
   runImport: () => Promise<Nexus2ImportOutcome>;
   /**
    * True when a run now would include fan curves the user has not been shown:
-   * the list has not been on screen, or the press came before the preview
-   * settled. The host then reveals this panel instead of importing.
+   * the list has not entered the viewport for the current preview, or the
+   * host saw it unseen when the press happened. The host then reveals the
+   * list instead of importing.
    */
-  fanCurvesNeedReview: (pressedBeforeSettled?: boolean) => boolean;
+  fanCurvesNeedReview: (unseenAtPress?: boolean) => boolean;
+  /** Whether this preview's fan curve list has entered the viewport. */
+  fanListSeen: () => boolean;
+  /** Scrolls the fan curve group into view. */
+  revealFanCurves: () => void;
 }
 
 export interface Nexus2ImportSectionProps {
@@ -68,7 +73,10 @@ export function Nexus2ImportSection({
   const [importPhase, setImportPhase] = useState<ImportPhase>('idle');
   const [importResults, setImportResults] = useState<Nexus2ApplyResult[] | null>(null);
   const [importRequestError, setImportRequestError] = useState(false);
-  const fanListShownRef = useRef(false);
+  // The preview object whose fan curve list entered the viewport. Comparing
+  // identity ties "seen" to one load: a new preview is never seen already.
+  const seenPreviewRef = useRef<Nexus2PreviewResponse | null>(null);
+  const fanGroupRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -79,7 +87,6 @@ export function Nexus2ImportSection({
     setImportResults(null);
     setImportRequestError(false);
     setImportPhase('idle');
-    fanListShownRef.current = false;
     void previewNexus2Import().then(res => {
       if (cancelled) return;
       if (!res) { setPreviewStatus('error'); return; }
@@ -123,13 +130,27 @@ export function Nexus2ImportSection({
 
   const selectionEmpty = selectedWireIds(preview, selectedGroups).length === 0;
 
-  // Whether the importable fan curve list has actually been on screen: the
-  // preview is loaded, the group renders, and the host is showing this panel.
+  // The importable fan curve list counts as seen only once its group has
+  // entered the viewport while the host shows this panel. Without
+  // IntersectionObserver (a test DOM) rendering is the best signal there is.
   const fanListRenders = previewStatus === 'loaded'
     && (preview?.categories.some(c => c.id === 'fanCurves' && c.available) ?? false);
   useEffect(() => {
-    if (open && visible && fanListRenders) fanListShownRef.current = true;
-  }, [open, visible, fanListRenders]);
+    const el = fanGroupRef.current;
+    if (!open || !visible || !fanListRenders || !el || !preview) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      seenPreviewRef.current = preview;
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) {
+        seenPreviewRef.current = preview;
+        observer.disconnect();
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [open, visible, fanListRenders, preview]);
 
   // Both hooks sit above the closed-early-return so hook order stays stable
   // across open toggles (the component stays mounted, per Dashboard gating).
@@ -138,10 +159,12 @@ export function Nexus2ImportSection({
     if (previewSettled) onSelectionChange?.(!selectionEmpty);
   }, [previewSettled, selectionEmpty, onSelectionChange]);
 
+  const fanListSeen = () => preview !== null && seenPreviewRef.current === preview;
+  const fanCurvesNeedReview = (unseenAtPress?: boolean) =>
+    selectedWireIds(preview, selectedGroups).includes('fanCurves') && (!!unseenAtPress || !fanListSeen());
+  const revealFanCurves = () => fanGroupRef.current?.scrollIntoView?.({ block: 'nearest' });
   // No dep list: the handle must always close over the latest selection state.
-  const fanCurvesNeedReview = (pressedBeforeSettled?: boolean) =>
-    selectedWireIds(preview, selectedGroups).includes('fanCurves') && (!!pressedBeforeSettled || !fanListShownRef.current);
-  useImperativeHandle(handleRef, () => ({ runImport, fanCurvesNeedReview }));
+  useImperativeHandle(handleRef, () => ({ runImport, fanCurvesNeedReview, fanListSeen, revealFanCurves }));
 
   if (!open) return null;
 
@@ -216,16 +239,17 @@ export function Nexus2ImportSection({
             );
             const Icon = group.id === 'q60Panel' ? Fan : group.id === 'fanCurves' ? LineChart : LayoutGrid;
             return (
-              <SettingToggle
-                key={group.id}
-                label={label}
-                description={detail}
-                icon={<Icon />}
-                iconLeading
-                checked={selectedGroups.has(group.id)}
-                disabled={locked || !groupHasAvailable(preview, group)}
-                onChange={() => toggleGroup(group.id)}
-              />
+              <div key={group.id} ref={group.id === 'fanCurves' ? fanGroupRef : undefined}>
+                <SettingToggle
+                  label={label}
+                  description={detail}
+                  icon={<Icon />}
+                  iconLeading
+                  checked={selectedGroups.has(group.id)}
+                  disabled={locked || !groupHasAvailable(preview, group)}
+                  onChange={() => toggleGroup(group.id)}
+                />
+              </div>
             );
           })}
 
