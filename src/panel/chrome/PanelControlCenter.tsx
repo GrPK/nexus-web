@@ -146,13 +146,14 @@ export function PanelControlCenter({
   const dragProgress = opening ? Math.min(1, openSwipe.offset / (CONTROL_CENTER_COMMIT_MM * pxPerMm * 2)) : 0;
   const showScrim = open || opening;
 
+  const visible = open || opening;
   const [view, setView] = useState<'main' | 'mixer'>('main');
-  useEffect(() => { if (!open) setView('main'); }, [open]);
+  // Fresh on every open, whatever the last session left on screen.
+  useEffect(() => { if (visible) setView('main'); }, [visible]);
 
   // The body stays mounted through the close slide so the content does not
   // vanish mid-motion; the sheet's transitionend lets go of it.
   const [bodyMounted, setBodyMounted] = useState(false);
-  const visible = open || opening;
   useEffect(() => {
     if (visible) { setBodyMounted(true); return; }
     // Already fully above the panel (a pull released before it showed): no
@@ -312,6 +313,9 @@ function ControlCenterBody({
     onCommit: v => volume.commitVolume(v, { flush: true }),
     onLongPress: () => setView('mixer'),
   });
+  // A fader held while the sheet closes must not leave a hold armed.
+  const { reset: resetVolumePress } = volumePress;
+  useEffect(() => { if (!active) resetVolumePress(); }, [active, resetVolumePress]);
 
   if (view === 'mixer') {
     return (

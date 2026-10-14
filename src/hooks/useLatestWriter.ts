@@ -35,6 +35,12 @@ export function useLatestWriter(send: (value: number) => Promise<unknown>, inter
       unmounted.current = true;
       if (state.timer) clearTimeout(state.timer);
       state.timer = null;
+      // The user's final level still goes out; nothing restarts after this.
+      if (state.queued != null) {
+        const last = state.queued;
+        state.queued = null;
+        void sendRef.current(last).catch(() => null);
+      }
     };
   }, []);
 

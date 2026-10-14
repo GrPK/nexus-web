@@ -22,14 +22,24 @@ describe('useLatestWriter', () => {
 });
 
 describe('useLatestWriter unmount', () => {
-  it('does not start another write from an in-flight request that settles after unmount', async () => {
+  it('still sends the pending final value once, and never restarts the pump', async () => {
     let settle: () => void = () => {};
     const send = vi.fn(() => new Promise<null>(r => { settle = () => r(null); }));
     const { result, unmount } = renderHook(() => useLatestWriter(send, 100));
     await act(async () => { result.current(1); });
     await act(async () => { result.current(2); });
     unmount();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenLastCalledWith(2);
     await act(async () => { settle(); vi.advanceTimersByTime(500); });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends nothing at unmount when nothing is pending', async () => {
+    const send = vi.fn(() => Promise.resolve(null));
+    const { result, unmount } = renderHook(() => useLatestWriter(send, 100));
+    await act(async () => { result.current(1); });
+    unmount();
     expect(send).toHaveBeenCalledTimes(1);
   });
 });

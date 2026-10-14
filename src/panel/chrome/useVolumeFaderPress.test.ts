@@ -25,7 +25,7 @@ describe('useVolumeFaderPress', () => {
     expect(cb.onLongPress).toHaveBeenCalledTimes(1);
     // The shown level is put back; still no write.
     expect(cb.onPreview).toHaveBeenLastCalledWith(0.3);
-    act(() => { hook.result.current.captureProps.onPointerUpCapture(); hook.result.current.commit(0.95); });
+    // The mixer replaces the fader, so no release reaches it.
     expect(cb.onLive).not.toHaveBeenCalled();
     expect(cb.onCommit).not.toHaveBeenCalled();
   });
@@ -63,5 +63,62 @@ describe('useVolumeFaderPress', () => {
     const { cb, hook } = setup();
     act(() => { hook.result.current.change(0.4); });
     expect(cb.onLive).toHaveBeenCalledWith(0.4);
+  });
+});
+
+describe('useVolumeFaderPress aborted and stale presses', () => {
+  it('a held press then pointercancel writes nothing and restores the shown level', () => {
+    const { cb, hook, touch } = setup();
+    act(() => { hook.result.current.captureProps.onPointerDownCapture(touch); hook.result.current.change(0.9); });
+    act(() => { vi.advanceTimersByTime(200); });
+    act(() => {
+      hook.result.current.captureProps.onPointerCancelCapture();
+      // The fader still commits from a cancel, at a position that may read as the top.
+      hook.result.current.commit(1);
+    });
+    expect(cb.onPreview).toHaveBeenLastCalledWith(0.3);
+    expect(cb.onLive).not.toHaveBeenCalled();
+    expect(cb.onCommit).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(cb.onLongPress).not.toHaveBeenCalled();
+  });
+
+  it('a press the fader never commits (the label) does not leave keyboard changes preview-only', () => {
+    const { cb, hook, touch } = setup();
+    const label = document.createElement('div');
+    act(() => { hook.result.current.captureProps.onPointerDownCapture({ ...touch, target: label }); });
+    act(() => { hook.result.current.captureProps.onPointerUpCapture(); });
+    act(() => { vi.advanceTimersByTime(5); });
+    act(() => { hook.result.current.change(0.4); });
+    expect(cb.onLive).toHaveBeenCalledWith(0.4);
+  });
+
+  it('a long-press whose fader unmounted leaves no stale press state', () => {
+    const { cb, hook, touch } = setup();
+    act(() => { hook.result.current.captureProps.onPointerDownCapture(touch); });
+    act(() => { vi.advanceTimersByTime(700); });
+    expect(cb.onLongPress).toHaveBeenCalledTimes(1);
+    act(() => { hook.result.current.change(0.4); });
+    expect(cb.onLive).toHaveBeenCalledWith(0.4);
+  });
+
+  it('reset drops an armed hold, as when the sheet closes under a held finger', () => {
+    const { cb, hook, touch } = setup();
+    act(() => { hook.result.current.captureProps.onPointerDownCapture(touch); });
+    act(() => { hook.result.current.reset(); vi.advanceTimersByTime(2000); });
+    expect(cb.onLongPress).not.toHaveBeenCalled();
+  });
+
+  it('a second finger does not re-capture the level to restore', () => {
+    const cb = { onPreview: vi.fn(), onLive: vi.fn(), onCommit: vi.fn(), onLongPress: vi.fn() };
+    let level = 0.3;
+    const hook = renderHook(() => useVolumeFaderPress({ level, mouseAsTouch: true, holdMs: 600, ...cb }));
+    const touch = { pointerType: 'touch', clientX: 100, clientY: 100, target: document.body };
+    act(() => { hook.result.current.captureProps.onPointerDownCapture(touch); });
+    level = 0.95;
+    hook.rerender();
+    act(() => { hook.result.current.captureProps.onPointerDownCapture({ ...touch, clientX: 300 }); });
+    act(() => { vi.advanceTimersByTime(700); });
+    expect(cb.onPreview).toHaveBeenLastCalledWith(0.3);
   });
 });
