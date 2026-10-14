@@ -17,6 +17,9 @@ export interface IconLabelButtonProps {
   type?: 'button' | 'submit' | 'reset';
   /** 'bare' drops the resting fill and border - glyph only, neutral square on hover/ON. */
   variant?: 'default' | 'bare';
+  /** Act on the click, not the earlier pointer release. For a press that swaps what is under the
+   *  finger: the browser's follow-up mouse events and click then cannot land on the new view. */
+  activateOnClick?: boolean;
 }
 
 export function IconLabelButton({
@@ -31,6 +34,7 @@ export function IconLabelButton({
   onPress,
   type = 'button',
   variant = 'default',
+  activateOnClick = false,
 }: IconLabelButtonProps) {
   const pointerHandledRef = useRef(false);
   const pointerResetRef = useRef<number | null>(null);
@@ -63,7 +67,7 @@ export function IconLabelButton({
       aria-pressed={active}
       aria-label={ariaLabel}
       disabled={disabled}
-      onPointerUp={event => {
+      onPointerUp={activateOnClick ? undefined : event => {
         if (event.pointerType === 'mouse' && event.button !== 0) return;
         pointerHandledRef.current = true;
         clearPointerHandled();

@@ -564,8 +564,8 @@ export function PanelContent({
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
   const [trayOpen, setTrayOpen] = useState(false);
   const [controlCenterOpen, setControlCenterOpen] = useState(false);
-  // The layer stays up through the waking touch's release; the panel itself
-  // is hidden only until the wake starts.
+  // The layer fades in over the panel, which is hidden once the fade ends and
+  // shown again as the wake starts.
   const [screenAsleep, setScreenAsleep] = useState(false);
   const [screenHidden, setScreenHidden] = useState(false);
   const [sentrySupported, setSentrySupported] = useState(false);
@@ -2007,7 +2007,7 @@ export function PanelContent({
                 isLandscape={isLandscape}
                 resolvedThemeMode={resolvedThemeMode}
                 onSetThemeMode={panelTheme.commitThemeModePinned}
-                onScreenSleep={() => { setScreenHidden(true); setScreenAsleep(true); }}
+                onScreenSleep={() => setScreenAsleep(true)}
                 sheetOpen={Boolean(sheetMode)}
                 trayOpen={trayOpen}
                 offline={isOffline}
@@ -2170,7 +2170,7 @@ export function PanelContent({
         );
       })()}
 
-      <PanelScreenSleep asleep={screenAsleep} onWakeStart={() => setScreenHidden(false)} onWake={() => setScreenAsleep(false)} />
+      <PanelScreenSleep asleep={screenAsleep} onSleepFaded={() => setScreenHidden(true)} onWakeStart={() => setScreenHidden(false)} onWake={() => setScreenAsleep(false)} />
 
       {sheetMode && (
         <PanelEditorSheet

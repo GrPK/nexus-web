@@ -320,7 +320,7 @@ function ControlCenterBody({
         <div className={styles.date}>{dateText}</div>
       </div>
 
-      <div className={styles.card} data-cc-keep="true">
+      <div className={`${styles.card} ${styles.fadersCard}`} data-cc-keep="true">
         <div className={styles.faders}>
           {showBrightness && (
             <PanelMixerSlider
@@ -386,9 +386,10 @@ function ControlCenterBody({
         )}
       </div>
 
-      <div className={styles.card} data-cc-keep="true">
+      <div className={`${styles.card} ${styles.gridCard}`} data-cc-keep="true">
         <div className={styles.grid}>
           <IconLabelButton
+              activateOnClick
             className={styles.tile}
             icon={dark ? <Moon /> : <Sun />}
             label={t('panel.controlCenter.darkMode')}
@@ -396,18 +397,21 @@ function ControlCenterBody({
             onPress={() => onSetThemeMode(oppositeThemeMode(resolvedThemeMode))}
           />
           <IconLabelButton
+              activateOnClick
             className={styles.tile}
             icon={<Lock />}
             label={t('panel.controlCenter.lockPc')}
             onPress={() => { void systemPower('lock'); onClose(); }}
           />
           <IconLabelButton
+              activateOnClick
             className={styles.tile}
             icon={<Power />}
             label={t('panel.controlCenter.sleepPc')}
             onPress={() => { void systemPower('sleep'); onClose(); }}
           />
           <IconLabelButton
+              activateOnClick
             className={styles.tile}
             icon={<MonitorOff />}
             label={t('panel.controlCenter.screenSleep')}
@@ -415,6 +419,7 @@ function ControlCenterBody({
           />
           {/* Always present, disabled until volume reads in, so no tile after it shifts. */}
           <IconLabelButton
+              activateOnClick
             className={styles.tile}
             icon={<SlidersVertical />}
             label={t('panel.controlCenter.mixer.title')}
@@ -424,6 +429,7 @@ function ControlCenterBody({
           {/* After the fixed tiles: the radios arrive late and must not shift them. */}
           {radios?.wifi && (
             <IconLabelButton
+              activateOnClick
               className={styles.tile}
               icon={<Wifi />}
               label={t('panel.controlCenter.wifi')}
@@ -433,6 +439,7 @@ function ControlCenterBody({
           )}
           {radios?.bluetooth && (
             <IconLabelButton
+              activateOnClick
               className={styles.tile}
               icon={<Bluetooth />}
               label={t('panel.controlCenter.bluetooth')}
@@ -442,6 +449,7 @@ function ControlCenterBody({
           )}
           {radios?.airplane && (
             <IconLabelButton
+              activateOnClick
               className={styles.tile}
               icon={<Plane />}
               label={t('panel.controlCenter.airplane')}
@@ -453,7 +461,7 @@ function ControlCenterBody({
       </div>
 
       {session && (
-        <div className={styles.card} data-cc-keep="true">
+        <div className={`${styles.card} ${styles.mediaCard}`} data-cc-keep="true">
           <div className={styles.media}>
             <div className={styles.mediaText}>
               <div className={styles.mediaTitle}>{session.song.title}</div>
@@ -461,6 +469,7 @@ function ControlCenterBody({
             </div>
             <div className={styles.mediaButtons}>
               <IconLabelButton
+              activateOnClick
                 className={styles.mediaButton}
                 variant="bare"
                 icon={<SkipBack />}
@@ -468,6 +477,7 @@ function ControlCenterBody({
                 onPress={() => { void controlActiveMedia('previous'); }}
               />
               <IconLabelButton
+              activateOnClick
                 className={styles.mediaButton}
                 variant="bare"
                 icon={session.playback.playing ? <Pause /> : <Play />}
@@ -475,6 +485,7 @@ function ControlCenterBody({
                 onPress={() => { void controlActiveMedia('playpause'); }}
               />
               <IconLabelButton
+              activateOnClick
                 className={styles.mediaButton}
                 variant="bare"
                 icon={<SkipForward />}

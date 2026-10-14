@@ -7,13 +7,13 @@ afterEach(() => { vi.useRealTimers(); });
 
 describe('PanelScreenSleep', () => {
   it('renders nothing while awake', () => {
-    const { container } = render(<PanelScreenSleep asleep={false} onWakeStart={vi.fn()} onWake={vi.fn()} />);
+    const { container } = render(<PanelScreenSleep asleep={false} onSleepFaded={vi.fn()} onWakeStart={vi.fn()} onWake={vi.fn()} />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it('wakes on release, not on press', () => {
     const onWakeStart = vi.fn();
-    render(<PanelScreenSleep asleep onWakeStart={onWakeStart} onWake={vi.fn()} />);
+    render(<PanelScreenSleep asleep onSleepFaded={vi.fn()} onWakeStart={onWakeStart} onWake={vi.fn()} />);
     const layer = screen.getByRole('button');
     fireEvent.pointerDown(layer);
     expect(onWakeStart).not.toHaveBeenCalled();
@@ -26,7 +26,7 @@ describe('PanelScreenSleep', () => {
     const underneath = vi.fn();
     render(
       <div onClick={underneath} onContextMenu={underneath} onPointerUp={underneath}>
-        <PanelScreenSleep asleep onWakeStart={vi.fn()} onWake={onWake} />
+        <PanelScreenSleep asleep onSleepFaded={vi.fn()} onWakeStart={vi.fn()} onWake={onWake} />
       </div>,
     );
     const layer = screen.getByRole('button');
@@ -42,5 +42,50 @@ describe('PanelScreenSleep', () => {
     expect(underneath).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(200); });
     expect(onWake).toHaveBeenCalledTimes(1);
+  });
+
+  it('fades in to black, then reports the fade finished exactly once on transitionend', () => {
+    const onSleepFaded = vi.fn();
+    render(<PanelScreenSleep asleep onSleepFaded={onSleepFaded} onWakeStart={vi.fn()} onWake={vi.fn()} />);
+    const layer = screen.getByRole('button');
+    // Mounted transparent, so the first frame has something to fade from.
+    expect(layer).not.toHaveAttribute('data-entered');
+    act(() => { vi.advanceTimersByTime(50); });
+    expect(layer).toHaveAttribute('data-entered', 'true');
+    expect(onSleepFaded).not.toHaveBeenCalled();
+    fireEvent.transitionEnd(layer);
+    expect(onSleepFaded).toHaveBeenCalledTimes(1);
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(onSleepFaded).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to a timer when no transition end arrives, so the panel is never left half-faded', () => {
+    const onSleepFaded = vi.fn();
+    render(<PanelScreenSleep asleep onSleepFaded={onSleepFaded} onWakeStart={vi.fn()} onWake={vi.fn()} />);
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(onSleepFaded).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(400); });
+    expect(onSleepFaded).toHaveBeenCalledTimes(1);
+  });
+
+  it('a touch released during the fade-in wakes, swallows the click, and never hides the panel', () => {
+    const onSleepFaded = vi.fn();
+    const onWakeStart = vi.fn();
+    const underneath = vi.fn();
+    render(
+      <div onClick={underneath}>
+        <PanelScreenSleep asleep onSleepFaded={onSleepFaded} onWakeStart={onWakeStart} onWake={vi.fn()} />
+      </div>,
+    );
+    const layer = screen.getByRole('button');
+    act(() => { vi.advanceTimersByTime(40); });
+    fireEvent.pointerDown(layer);
+    fireEvent.pointerUp(layer);
+    fireEvent.click(layer);
+    expect(onWakeStart).toHaveBeenCalledTimes(1);
+    expect(underneath).not.toHaveBeenCalled();
+    fireEvent.transitionEnd(layer);
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(onSleepFaded).not.toHaveBeenCalled();
   });
 });

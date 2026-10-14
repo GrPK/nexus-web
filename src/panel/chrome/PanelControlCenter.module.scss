@@ -4,6 +4,7 @@
 // edge or opened by the gesture hook. Spacing goes through the flexGap mixins
 // (the panel CSS floor).
 .sheet {
+  --cc-time-size: 40px;
   position: absolute;
   top: 0;
   left: 0;
@@ -15,7 +16,8 @@
     max(16px, env(safe-area-inset-right))
     18px
     max(16px, env(safe-area-inset-left));
-  background: rgb(0 0 0 / var(--alpha-medium));
+  // Solid: a see-through panel backdrop would show the dashboard through the cards.
+  background: var(--backdrop-base);
   backdrop-filter: blur(var(--blur-backdrop)) saturate(0.95);
   border-bottom-left-radius: var(--radius);
   border-bottom-right-radius: var(--radius);
@@ -29,10 +31,6 @@
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
-}
-
-:global(.panel-root)[data-theme='light'] .sheet {
-  background: rgb(255 255 255 / var(--alpha-strong));
 }
 
 .sheet[data-state='open'] {
@@ -98,13 +96,17 @@
 
 .sheet[data-landscape='true'] .clock {
   flex: 0 0 auto;
-  min-width: 150px;
+  min-width: 130px;
+}
+
+.sheet[data-landscape='true'] {
+  --cc-time-size: 32px;
 }
 
 .time {
-  font-size: 40px;
+  font-size: var(--cc-time-size);
   font-weight: var(--weight-heading);
-  line-height: 1.1;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
@@ -135,18 +137,42 @@
   flex-direction: row;
   align-items: stretch;
   justify-content: center;
-  height: 170px;
+  height: 230px;
   @include hgap(10px);
 }
 
 .sheet[data-landscape='true'] .faders {
-  height: 130px;
+  height: 240px;
+}
+
+// Wide and short: the toggles get the most width, the faders get the height.
+.sheet[data-landscape='true'] .fadersCard {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+.sheet[data-landscape='true'] .gridCard {
+  flex: 2 1 0;
+}
+
+.sheet[data-landscape='true'] .mediaCard {
+  flex: 1 1 0;
+}
+
+// Short landscape panels (the Y70 is wide and short): faders get the height, so
+// the toggle grid goes four across to stay three rows.
+.sheet[data-landscape='true'] .faders .fader {
+  --mixer-track-max: 200px;
+}
+
+.sheet[data-landscape='true'] .grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 // Two classes beat the slider's own root vars whatever the emission order.
 .faders .fader {
-  --mixer-track-min: 70px;
-  --mixer-track-max: 120px;
+  --mixer-track-min: 110px;
+  --mixer-track-max: 180px;
   --mixer-touch-width: 64px;
   --mixer-pill-width: 48px;
   --mixer-icon-size: 28px;
@@ -169,7 +195,7 @@
 }
 
 :global(.panel-root) .tile {
-  --icon-label-button-height: 76px;
+  --icon-label-button-height: 68px;
   --icon-label-button-min-width: 0;
   --icon-label-button-padding-x: 4px;
   --icon-label-button-padding-y: 10px;
@@ -177,6 +203,9 @@
   --icon-label-button-radius: var(--radius);
   --icon-label-button-border: var(--separator);
   --icon-label-button-bg: var(--panel-control-translucent);
+  // A tap leaves :hover set on a touch panel; hover must not repaint the tile.
+  --icon-label-button-bg-hover: var(--panel-control-translucent);
+  --icon-label-button-active-bg-hover: var(--accent-soft);
   --icon-label-button-text: var(--text);
   --icon-label-button-text-hover: var(--text);
   --icon-label-icon-size: 26px;
@@ -233,6 +262,7 @@
   --icon-label-icon-size: 24px;
   --icon-label-button-text: var(--text);
   --icon-label-button-text-hover: var(--text);
+  --icon-label-button-bg-hover: transparent;
 }
 
 .mixerTitle {
@@ -258,4 +288,16 @@
 .mixerCell {
   flex: 0 0 86px;
   height: 100%;
+}
+
+// Press feedback stands in for hover, which a touch panel cannot use.
+:global(.panel-root) .tile:active:not(:disabled):not([data-active='true']) {
+  background: var(--surface-hover);
+}
+
+:global(.panel-root) .sheet[data-landscape='true'] .tile {
+  --icon-label-button-height: 60px;
+  --icon-label-button-padding-y: 6px;
+  --icon-label-button-gap: 4px;
+  --icon-label-icon-size: 22px;
 }
