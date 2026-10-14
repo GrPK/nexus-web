@@ -1960,7 +1960,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Claimed when the user asks for something, not on arrival: switching the
   // view is not a decision about which devices Nexus drives.
   const claimAllDevices = useCallback((): string[] => {
-    for (const d of devices.filter(zoneCardSelectionHoldable)) {
+    for (const d of devices.filter(d => d.devicePageReason === undefined)) {
       if (d.controlled === false) handleSetControlled(d.id, true);
       if (!d.ledsOn) handleSetPower(d.id, true);
     }
@@ -1974,8 +1974,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   }, [applyPins, pins]);
 
   // Counted over the devices the claim can actually reach. A zone with no LEDs
-  // cannot be lit, and a device-page card has its own page, so including either would leave the ratio permanently short of
-  // its total and pin the claim button on screen with nothing left to do.
+  // cannot be lit, and a device-page card is set on its own page, so including
+  // either would leave the ratio permanently short of its total and pin the
+  // claim button on screen with nothing left to do.
   const claimableDevices = useMemo(
     () => orderedDevices.filter(zoneCardSelectionHoldable),
     [orderedDevices],
