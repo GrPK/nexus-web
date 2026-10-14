@@ -1,5 +1,5 @@
-import { useEffect, useImperativeHandle, useState, type RefObject } from 'react';
-import { Fan, LayoutGrid } from 'lucide-react';
+import { useEffect, useImperativeHandle, useRef, useState, type RefObject } from 'react';
+import { Fan, LayoutGrid, LineChart } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { pluralKey } from '../../../lib/pluralKey';
 import { SettingsSection } from '../SettingsSection/SettingsSection';
@@ -10,7 +10,8 @@ import { applyNexus2Import, previewNexus2Import } from '../../../api/migration';
 import type { Nexus2ApplyResult, Nexus2PreviewResponse } from '../../../api/migration';
 import {
   allApplyResultsClean, applyDetailKey, applyStatusKey, categoryLabelKey, defaultSelectedGroupIds,
-  groupDetailParts, groupResultSummaries, selectedWireIds, visibleImportGroups, type ImportGroupId,
+  groupDetailParts, groupResultSummaries, groupHasAvailable, selectedWireIds, unavailableGroupNoteKey,
+  visibleImportGroups, importHeaderKeys, formatList, fillTemplate, type ImportGroupId,
 } from './nexus2WelcomeUtils';
 import styles from './Nexus2ImportSection.module.scss';
 
@@ -23,6 +24,17 @@ export type Nexus2ImportOutcome = 'clean' | 'failed';
 /** Lets a host drive the apply from its own button. */
 export interface Nexus2ImportHandle {
   runImport: () => Promise<Nexus2ImportOutcome>;
+  /**
+   * True when a run now would include fan curves the user has not been shown:
+   * the list has not entered the viewport for the current preview, or the
+   * host saw it unseen when the press happened. The host then reveals the
+   * list instead of importing.
+   */
+  fanCurvesNeedReview: (unseenAtPress?: boolean) => boolean;
+  /** Whether this preview's fan curve list has entered the viewport. */
+  fanListSeen: () => boolean;
+  /** Scrolls the fan curve group into view. */
+  revealFanCurves: () => void;
 }
 
 export interface Nexus2ImportSectionProps {
@@ -38,19 +50,21 @@ export interface Nexus2ImportSectionProps {
   onSelectionChange?: (hasSelection: boolean) => void;
   /** Receives the apply runner for hosts with showAction=false. */
   handleRef?: RefObject<Nexus2ImportHandle | null>;
+  /** False while the host hides this panel; the fan curve list only counts as shown while visible. */
+  visible?: boolean;
   /** True in a dialog, where the section gets the whole surface rather than
    *  the narrower onboarding column. */
   wide?: boolean;
 }
 
 /**
- * Grouped Nexus 2 import flow: preview fetch, two grouped switches (Y70
- * panel personalization, Q-Series panel personalization), apply, and per-group
+ * Grouped Nexus 2 import flow: preview fetch, three grouped switches (Y70
+ * panel personalization, Q-Series panel personalization, fan curves), apply, and per-group
  * results. Hosted by Nexus2WelcomeScreen and by ImportCenter, which is what
  * the Settings entry opens - one place owns the markup so both stay in sync.
  */
 export function Nexus2ImportSection({
-  open, disabled, onBusyChange, showAction = true, onSelectionChange, handleRef, wide,
+  open, disabled, onBusyChange, showAction = true, onSelectionChange, handleRef, wide, visible = true,
 }: Nexus2ImportSectionProps) {
   const { t, language } = useTranslation();
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>('idle');
@@ -59,6 +73,10 @@ export function Nexus2ImportSection({
   const [importPhase, setImportPhase] = useState<ImportPhase>('idle');
   const [importResults, setImportResults] = useState<Nexus2ApplyResult[] | null>(null);
   const [importRequestError, setImportRequestError] = useState(false);
+  // The preview object whose fan curve list entered the viewport. Comparing
+  // identity ties "seen" to one load: a new preview is never seen already.
+  const seenPreviewRef = useRef<Nexus2PreviewResponse | null>(null);
+  const fanGroupRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -112,6 +130,28 @@ export function Nexus2ImportSection({
 
   const selectionEmpty = selectedWireIds(preview, selectedGroups).length === 0;
 
+  // The importable fan curve list counts as seen only once its group has
+  // entered the viewport while the host shows this panel. Without
+  // IntersectionObserver (a test DOM) rendering is the best signal there is.
+  const fanListRenders = previewStatus === 'loaded'
+    && (preview?.categories.some(c => c.id === 'fanCurves' && c.available) ?? false);
+  useEffect(() => {
+    const el = fanGroupRef.current;
+    if (!open || !visible || !fanListRenders || !el || !preview) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      seenPreviewRef.current = preview;
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) {
+        seenPreviewRef.current = preview;
+        observer.disconnect();
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [open, visible, fanListRenders, preview]);
+
   // Both hooks sit above the closed-early-return so hook order stays stable
   // across open toggles (the component stays mounted, per Dashboard gating).
   const previewSettled = previewStatus === 'loaded' || previewStatus === 'error';
@@ -119,8 +159,12 @@ export function Nexus2ImportSection({
     if (previewSettled) onSelectionChange?.(!selectionEmpty);
   }, [previewSettled, selectionEmpty, onSelectionChange]);
 
+  const fanListSeen = () => preview !== null && seenPreviewRef.current === preview;
+  const fanCurvesNeedReview = (unseenAtPress?: boolean) =>
+    selectedWireIds(preview, selectedGroups).includes('fanCurves') && (!!unseenAtPress || !fanListSeen());
+  const revealFanCurves = () => fanGroupRef.current?.scrollIntoView?.({ block: 'nearest' });
   // No dep list: the handle must always close over the latest selection state.
-  useImperativeHandle(handleRef, () => ({ runImport }));
+  useImperativeHandle(handleRef, () => ({ runImport, fanCurvesNeedReview, fanListSeen, revealFanCurves }));
 
   if (!open) return null;
 
@@ -133,6 +177,7 @@ export function Nexus2ImportSection({
   };
 
   const groups = visibleImportGroups(preview);
+  const { titleKey, descriptionKey } = importHeaderKeys(preview);
   const summaries = groupResultSummaries(importResults);
   const importSuccess = importPhase === 'results' && allApplyResultsClean(importResults);
 
@@ -142,12 +187,12 @@ export function Nexus2ImportSection({
       boxClassName={styles.box}
       // In the two-column import surface the column already carries a title,
       // so the section repeating one just says it twice.
-      title={wide ? undefined : t('nexus2Welcome.import.title')}
-      ariaLabel={t('nexus2Welcome.import.title')}
-      description={wide ? undefined : <p>{t('nexus2Welcome.import.description')}</p>}
+      title={wide ? undefined : t(titleKey)}
+      ariaLabel={t(titleKey)}
+      description={wide ? undefined : <p>{t(descriptionKey)}</p>}
     >
       {wide && (
-        <p className={styles.replaceNotice} data-settings-aside>{t('nexus2Welcome.import.description')}</p>
+        <p className={styles.replaceNotice} data-settings-aside>{t(descriptionKey)}</p>
       )}
       {previewStatus === 'loading' && (
         <div className={styles.previewLoading} data-settings-aside>
@@ -170,31 +215,41 @@ export function Nexus2ImportSection({
           {groups.map(group => {
             const label = t(group.labelKey);
             // A span list: SettingToggle renders the description inside a span.
-            const detail = (
+            const noteKey = unavailableGroupNoteKey(preview, group);
+            const detail = noteKey ? <span>{t(noteKey)}</span> : (
               <span className={styles.detailBullets} role="list">
-                {groupDetailParts(preview, group).map(d => {
+                {groupDetailParts(preview, group).map((d, i) => {
                   const params = { ...d.params };
                   for (const [name, key] of Object.entries(d.paramKeys ?? {})) params[name] = t(key);
                   return (
-                    <span key={d.key} className={styles.detailBullet} role="listitem">
-                      {t(d.plural ? pluralKey(d.key, language, Number(d.params.count)) : d.key, params)}
+                    <span key={`${d.key}-${i}`} className={styles.detailBullet} role="listitem">
+                      {d.user?.list
+                        ? fillTemplate(t('nexus2Welcome.import.category.fanCurves.curve'), {
+                          name: d.user.name, fans: formatList(d.user.list, language),
+                        })
+                        : d.user
+                          ? fillTemplate(t('nexus2Welcome.import.category.fanCurves.reasonLine'), {
+                            name: d.user.name, reason: t(d.key),
+                          })
+                          : t(d.plural ? pluralKey(d.key, language, Number(d.params.count)) : d.key, params)}
                     </span>
                   );
                 })}
               </span>
             );
-            const Icon = group.id === 'q60Panel' ? Fan : LayoutGrid;
+            const Icon = group.id === 'q60Panel' ? Fan : group.id === 'fanCurves' ? LineChart : LayoutGrid;
             return (
-              <SettingToggle
-                key={group.id}
-                label={label}
-                description={detail}
-                icon={<Icon />}
-                iconLeading
-                checked={selectedGroups.has(group.id)}
-                disabled={locked}
-                onChange={() => toggleGroup(group.id)}
-              />
+              <div key={group.id} ref={group.id === 'fanCurves' ? fanGroupRef : undefined}>
+                <SettingToggle
+                  label={label}
+                  description={detail}
+                  icon={<Icon />}
+                  iconLeading
+                  checked={selectedGroups.has(group.id)}
+                  disabled={locked || !groupHasAvailable(preview, group)}
+                  onChange={() => toggleGroup(group.id)}
+                />
+              </div>
             );
           })}
 
@@ -203,7 +258,11 @@ export function Nexus2ImportSection({
               {summaries.map(s => (
                 <li key={s.groupId} className={styles.resultRow}>
                   <span className={styles.resultCategory}>{t(s.labelKey)}</span>
-                  <span className={styles[`resultStatus-${s.status}`]}>{t(applyStatusKey(s.status))}</span>
+                  <span className={styles[`resultStatus-${s.status}`]}>
+                    {s.groupId === 'fanCurves' && s.status === 'applied' && s.count !== undefined
+                      ? t(pluralKey('nexus2Welcome.import.result.fanCurvesApplied', language, s.count), { count: s.count })
+                      : t(applyStatusKey(s.status))}
+                  </span>
                   {s.issues.map(issue => (
                     <span key={issue.id} className={styles.resultDetail}>
                       {issue.detail
@@ -232,7 +291,7 @@ export function Nexus2ImportSection({
                   loading={importPhase === 'busy'}
                   loadingHidesLabel
                   disabled={selectionEmpty || locked}
-                  onClick={runImport}
+                  onClick={() => runImport()}
                 >
                   {t('nexus2Welcome.import.action')}
                 </Button>

@@ -10,9 +10,14 @@ import {
   categoryDetails,
   categoryLabelKey,
   defaultSelectedGroupIds,
+  fanCurveReasonKey,
+  fillTemplate,
+  formatList,
   groupDetailParts,
   groupResultSummaries,
+  importHeaderKeys,
   selectedWireIds,
+  unavailableGroupNoteKey,
   visibleImportGroups,
 } from './nexus2WelcomeUtils';
 
@@ -130,9 +135,9 @@ describe('availableCategories', () => {
 });
 
 describe('IMPORT_GROUPS', () => {
-  it('groups exactly the seven wire categories into two groups, excluding language', () => {
+  it('groups exactly the seven wire categories into three groups, excluding language', () => {
     const allWireIds = IMPORT_GROUPS.flatMap(g => g.wireIds);
-    expect(allWireIds.sort()).toEqual(['appearance', 'gallerySources', 'q60Face', 'rotation', 'wallpapers', 'y70Layout'].sort());
+    expect(allWireIds.sort()).toEqual(['appearance', 'fanCurves', 'gallerySources', 'q60Face', 'rotation', 'wallpapers', 'y70Layout'].sort());
   });
 
   it('y70Panel carries y70Layout, appearance, and gallerySources', () => {
@@ -260,5 +265,145 @@ describe('allApplyResultsClean', () => {
     expect(allApplyResultsClean([{ id: 'appearance', status: 'skipped', detail: null }])).toBe(true);
     expect(allApplyResultsClean([])).toBe(false);
     expect(allApplyResultsClean(null)).toBe(false);
+  });
+});
+
+const FAN = 'nexus2Welcome.import.category.fanCurves';
+const FAN_GROUP = IMPORT_GROUPS.find(g => g.id === 'fanCurves')!;
+
+const MIXED_FAN_CURVES: Nexus2PreviewCategory = {
+  id: 'fanCurves',
+  available: true,
+  count: 2,
+  otherProfiles: 1,
+  fanCurves: [
+    {
+      name: 'Quiet', kind: 'graph', status: 'import', minimumRaised: true,
+      targets: [
+        { label: 'Front 1', status: 'import' },
+        { label: 'Front 2', status: 'import' },
+        { label: 'Pump', status: 'skip', reason: 'pumpKept' },
+        { label: 'Odd', status: 'skip', reason: 'futureCode' },
+      ],
+    },
+    { name: 'Hot', kind: 'linear', status: 'skip', reason: 'unsafeCurve', minimumRaised: false, targets: [] },
+  ],
+};
+
+describe('importHeaderKeys', () => {
+  const y70: Nexus2PreviewCategory = { id: 'y70Layout', available: true, pages: 1, widgets: 1, mappedWidgets: 1, droppedTypes: [] };
+  const preview = (...categories: Nexus2PreviewCategory[]) => ({ available: true, profileName: null, categories });
+  const skippedFan: Nexus2PreviewCategory = {
+    id: 'fanCurves', available: false, count: 0,
+    fanCurves: [{ name: 'Hot', kind: 'linear', status: 'skip', reason: 'unsafeCurve', minimumRaised: false, targets: [] }],
+  };
+  it('keeps the personalization header when no fan curves group is importable', () => {
+    expect(importHeaderKeys(preview(y70))).toEqual({ titleKey: 'nexus2Welcome.import.title', descriptionKey: 'nexus2Welcome.import.description' });
+  });
+  it('uses the fan curves header when only fan curves is importable', () => {
+    expect(importHeaderKeys(preview(MIXED_FAN_CURVES))).toEqual({ titleKey: 'nexus2Welcome.import.title.fanCurves', descriptionKey: 'nexus2Welcome.import.description.fanCurves' });
+  });
+  it('uses the combined header when both are importable', () => {
+    expect(importHeaderKeys(preview(y70, MIXED_FAN_CURVES))).toEqual({ titleKey: 'nexus2Welcome.import.title.both', descriptionKey: 'nexus2Welcome.import.description.both' });
+  });
+  it('uses a neutral header when nothing is importable', () => {
+    const noted: Nexus2PreviewCategory = { id: 'fanCurves', available: false, count: 0, fanCurvesNote: 'noUserCurves' };
+    expect(importHeaderKeys(preview(noted))).toEqual({ titleKey: 'nexus2Welcome.import.title.none', descriptionKey: 'nexus2Welcome.import.description.none' });
+    expect(importHeaderKeys(preview(skippedFan)).titleKey).toBe('nexus2Welcome.import.title.none');
+    expect(importHeaderKeys(null).titleKey).toBe('nexus2Welcome.import.title.none');
+  });
+  it('ignores a note-only or all-skipped fan group', () => {
+    const noted: Nexus2PreviewCategory = { id: 'fanCurves', available: false, count: 0, fanCurvesNote: 'noUserCurves' };
+    expect(importHeaderKeys(preview(y70, noted)).titleKey).toBe('nexus2Welcome.import.title');
+    expect(importHeaderKeys(preview(y70, skippedFan)).titleKey).toBe('nexus2Welcome.import.title');
+  });
+});
+
+describe('fan curves', () => {
+  it('maps known reasons and degrades unknown or missing ones to the generic line', () => {
+    expect(fanCurveReasonKey('pumpKept')).toBe(`${FAN}.reason.pumpKept`);
+    expect(fanCurveReasonKey('followedChannel')).toBe(`${FAN}.reason.followedChannel`);
+    expect(fanCurveReasonKey('guardHealed')).toBe(`${FAN}.reason.guardHealed`);
+    expect(fanCurveReasonKey('futureCode')).toBe(`${FAN}.reason.unknown`);
+    expect(fanCurveReasonKey(undefined)).toBe(`${FAN}.reason.unknown`);
+  });
+
+  it('lists imported curves with their fans, skipped curves and targets with a reason, and the profile line', () => {
+    const lines = categoryDetails(MIXED_FAN_CURVES);
+    expect(lines).toEqual([
+      { key: `${FAN}.detail`, params: { count: 2 }, plural: true },
+      { key: '', params: {}, user: { name: 'Quiet', list: ['Front 1', 'Front 2'] } },
+      { key: `${FAN}.curveRaised`, params: {}, user: { name: 'Quiet' } },
+      { key: `${FAN}.reason.pumpKept`, params: {}, user: { name: 'Pump' } },
+      { key: `${FAN}.reason.unknown`, params: {}, user: { name: 'Odd' } },
+      { key: `${FAN}.reason.unsafeCurve`, params: {}, user: { name: 'Hot' } },
+      { key: `${FAN}.otherProfiles`, params: {} },
+    ]);
+  });
+
+  it('treats an imported curve with no importable target as noTargets', () => {
+    const lines = categoryDetails({
+      id: 'fanCurves', available: true, count: 1,
+      fanCurves: [{ name: 'X', kind: 'flat', status: 'import', minimumRaised: false, targets: [{ label: 'P', status: 'skip', reason: 'pumpKept' }] }],
+    });
+    expect(lines[1]).toEqual({ key: `${FAN}.reason.noTargets`, params: {}, user: { name: 'X' } });
+  });
+
+  it('starts checked only when available, and shows an unavailable group only with a note', () => {
+    const avail = { available: true, profileName: null, categories: [MIXED_FAN_CURVES] };
+    expect(defaultSelectedGroupIds(avail).has('fanCurves')).toBe(true);
+    expect(selectedWireIds(avail, new Set(['fanCurves']))).toEqual(['fanCurves']);
+
+    const noted = { available: true, profileName: null, categories: [{ id: 'fanCurves' as const, available: false, count: 0, fanCurvesNote: 'recommendedMode' as const }] };
+    expect(visibleImportGroups(noted)).toEqual([FAN_GROUP]);
+    expect(defaultSelectedGroupIds(noted).size).toBe(0);
+    expect(unavailableGroupNoteKey(noted, FAN_GROUP)).toBe(`${FAN}.note.recommendedMode`);
+    expect(selectedWireIds(noted, new Set(['fanCurves']))).toEqual([]);
+
+    const off = { available: true, profileName: null, categories: [{ id: 'fanCurves' as const, available: false, count: 0, fanCurvesNote: 'coolingDisabled' as const }] };
+    expect(unavailableGroupNoteKey(off, FAN_GROUP)).toBe(`${FAN}.note.coolingDisabled`);
+    expect(visibleImportGroups(off)).toEqual([FAN_GROUP]);
+
+    const bare = { available: true, profileName: null, categories: [{ id: 'fanCurves' as const, available: false, count: 0 }] };
+    expect(visibleImportGroups(bare)).toEqual([]);
+  });
+
+  it('shows an all-skipped group with each curve reason and no count line', () => {
+    const allSkipped = {
+      available: true, profileName: null,
+      categories: [{
+        id: 'fanCurves' as const, available: false, count: 0,
+        fanCurves: [{ name: 'Hot', kind: 'linear' as const, status: 'skip' as const, reason: 'unsafeCurve', minimumRaised: false, targets: [] }],
+      }],
+    };
+    expect(visibleImportGroups(allSkipped)).toEqual([FAN_GROUP]);
+    expect(defaultSelectedGroupIds(allSkipped).size).toBe(0);
+    expect(groupDetailParts(allSkipped, FAN_GROUP)).toEqual([{ key: `${FAN}.reason.unsafeCurve`, params: {}, user: { name: 'Hot' } }]);
+    expect(selectedWireIds(allSkipped, new Set(['fanCurves']))).toEqual([]);
+  });
+
+  it('keeps user names out of the translated params', () => {
+    const lines = categoryDetails({
+      id: 'fanCurves', available: true, count: 1,
+      fanCurves: [{ name: '{fans} $&', kind: 'graph', status: 'import', minimumRaised: false, targets: [{ label: '{name}', status: 'import' }] }],
+    });
+    for (const line of lines) expect(JSON.stringify(line.params)).not.toMatch(/\$&|\{fans\}|\{name\}/);
+    expect(lines[1].user).toEqual({ name: '{fans} $&', list: ['{name}'] });
+  });
+
+  it('fills templates in one pass and keeps locale punctuation', () => {
+    expect(fillTemplate('{name} : {reason}', { name: '{reason} $&', reason: 'ok' })).toBe('{reason} $& : ok');
+    expect(fillTemplate('{name}\uFF1A{reason}', { name: 'A', reason: 'B' })).toBe('A\uFF1AB');
+    expect(fillTemplate('{unknown} {name}', { name: 'N' })).toBe('{unknown} N');
+  });
+
+  it('formats lists with the locale conjunction', () => {
+    expect(formatList(['A', 'B', 'C'], 'en')).toBe('A, B, and C');
+    expect(formatList(['A'], 'en')).toBe('A');
+  });
+
+  it('carries the applied count into the group summary', () => {
+    const summaries = groupResultSummaries([{ id: 'fanCurves', status: 'applied', detail: null, count: 3 }]);
+    expect(summaries).toEqual([expect.objectContaining({ groupId: 'fanCurves', status: 'applied', count: 3 })]);
   });
 });

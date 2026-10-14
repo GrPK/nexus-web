@@ -99,7 +99,7 @@ export function PrivacyTab({ settings, serviceOnline }: PrivacyTabProps) {
             icon={<Import />}
             iconLeading="subtle"
             anchorId="set-nexus2-import"
-            description={t('nexus2Welcome.import.description')}
+            description={t('nexus2Welcome.settingsEntry.rowDescription')}
           >
             <Button
               type="button"

@@ -66,6 +66,16 @@ export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, o
   const nexus2Here = nexus2?.importAvailable === true;
   const fanControlHere = fanControl?.importAvailable === true;
 
+  // The modal stack hands onEnter no event, so a held key is read here: its
+  // repeats must not import (the first press may only have revealed a list).
+  const enterRepeat = useRef(false);
+  useEffect(() => {
+    if (!open) return;
+    const note = (e: KeyboardEvent) => { if (e.key === 'Enter') enterRepeat.current = e.repeat; };
+    document.addEventListener('keydown', note, true);
+    return () => document.removeEventListener('keydown', note, true);
+  }, [open]);
+
   // Resets on every open; the component stays mounted across open toggles.
   useEffect(() => {
     if (!open) return;
@@ -117,6 +127,10 @@ export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, o
 
     setApplyPhase('applying');
 
+    // Read before any wait: a press that preceded Nexus 2's own fan curve list
+    // acted before the user could see it, and reveals it instead of applying.
+    // Keyed on Nexus 2 alone, so a slow other app never bounces the user back.
+    const fanListUnseenAtPress = runImport && (importHandle.current?.fanListUnseen() ?? false);
     if (runImport && !selectionRef.current.settled) {
       await new Promise<void>(resolve => {
         settledWaiters.current.push(resolve);
@@ -125,7 +139,13 @@ export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, o
     }
     let importFailed = false;
     if (runImport && selectionRef.current.has && importHandle.current) {
-      importFailed = await importHandle.current.runImport() === 'failed';
+      const outcome = await importHandle.current.runImport({ fanListUnseenAtPress });
+      // Nothing ran: leave the offer unlatched so the next press imports what is now on screen.
+      if (outcome === 'needsReview') {
+        setApplyPhase('idle');
+        return;
+      }
+      importFailed = outcome === 'failed';
     }
 
     if (importFailed) {
@@ -147,7 +167,7 @@ export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, o
       onClose={() => { /* non-dismissable: only the footer proceeds */ }}
       noEscDismiss
       noBackdropDismiss
-      onEnter={() => handleContinue(true)}
+      onEnter={() => { if (!enterRepeat.current) void handleContinue(true); }}
       // Without this the first focusable is the skip button, and a Space press
       // meant to scroll the surface would skip the whole sequence.
       autoFocus="container"
