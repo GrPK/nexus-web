@@ -2,26 +2,33 @@ import { act, render, screen } from '@testing-library/react';
 import { useRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { usePanelControlCenterSwipe } from './usePanelControlCenterSwipe';
-import { inControlCenterBand } from './controlCenterGesture';
+import { dismissSwipeYields, openSwipeYields } from './controlCenterGesture';
 import { claimGestureAxis, resetGestureAxis } from './gestureAxisLock';
 import { TouchViaPointerContext } from './touchViaPointer';
 
 const BAND = 30;
 const onCommit = vi.fn();
 
-function Harness({ enabled = true }: { enabled?: boolean }) {
+function Harness({ enabled = true, direction = 'down' }: { enabled?: boolean; direction?: 'down' | 'up' }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const swipe = usePanelControlCenterSwipe({
     enabled,
     surfaceRef: ref,
-    direction: 'down',
+    direction,
     engagePx: 10,
     commitPx: 80,
     flickPxPerMs: 5,
-    shouldYield: c => !inControlCenterBand(c.clientY, BAND),
+    shouldYield: c => (direction === 'down' ? openSwipeYields(c.clientY, BAND, c.target) : dismissSwipeYields(c.target)),
     onCommit,
   });
-  return <div ref={ref} data-testid="surface" data-state={swipe.state} data-offset={swipe.offset} />;
+  // A fader's 64px hit box wraps the 48px track that carries role=slider.
+  return (
+    <div ref={ref} data-testid="surface" data-state={swipe.state} data-offset={swipe.offset}>
+      <div data-panel-scrollable="true" data-testid="fader-root">
+        <div data-testid="hitbox"><div role="slider" aria-valuenow={0} tabIndex={0} /></div>
+      </div>
+    </div>
+  );
 }
 
 // Each event advances the clock 100 ms, so a short drag is slow, not a flick.
@@ -124,5 +131,26 @@ describe('usePanelControlCenterSwipe (open)', () => {
     el = screen.getByTestId('surface');
     act(() => { pointer(el, 'pointerdown', 100, 6, 1); pointer(el, 'pointermove', 100, 120, 1); pointer(el, 'pointerup', 100, 120, 0); });
     expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('scrollable yield', () => {
+  it('a dismiss drag starting on the fader hit box edge never moves or dismisses the sheet', () => {
+    render(<Harness direction="up" />);
+    const el = screen.getByTestId('surface');
+    const hitbox = screen.getByTestId('hitbox');
+    act(() => { touch(hitbox, 'touchstart', 100, 300); touch(hitbox, 'touchmove', 100, 200); touch(hitbox, 'touchmove', 100, 20); touch(hitbox, 'touchend', 100, 20); });
+    expect(el).toHaveAttribute('data-state', 'idle');
+    expect(el).toHaveAttribute('data-offset', '0');
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it('an open drag from the band over a scroller yields', () => {
+    render(<Harness />);
+    const el = screen.getByTestId('surface');
+    const hitbox = screen.getByTestId('hitbox');
+    act(() => { touch(hitbox, 'touchstart', 100, 6); touch(hitbox, 'touchmove', 100, 120); touch(hitbox, 'touchend', 100, 120); });
+    expect(el).toHaveAttribute('data-state', 'idle');
+    expect(onCommit).not.toHaveBeenCalled();
   });
 });

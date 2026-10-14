@@ -75,3 +75,24 @@ export function readSafeAreaTopPx(): number {
   document.body.removeChild(probe);
   return px;
 }
+
+function closestMatch(target: EventTarget | null, selector: string): boolean {
+  return target instanceof Element && target.closest(selector) !== null;
+}
+
+// A widget's own scroller (the fader's whole hit box included) keeps its drag,
+// as for the actions tray.
+export function overScrollable(target: EventTarget | null): boolean {
+  return closestMatch(target, '[data-panel-scrollable="true"]');
+}
+
+// The open swipe yields outside the band and over a scroller.
+export function openSwipeYields(clientY: number, bandPx: number, target: EventTarget | null): boolean {
+  return !inControlCenterBand(clientY, bandPx) || overScrollable(target);
+}
+
+// The dismiss swipe yields over a fader or horizontal control or a scroller.
+export function dismissSwipeYields(target: EventTarget | null): boolean {
+  return overScrollable(target)
+    || closestMatch(target, 'input, [role="slider"], [data-panel-horizontal-control="true"]');
+}

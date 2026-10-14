@@ -10,7 +10,8 @@ import {
   CONTROL_CENTER_FLICK_MM_PER_MS,
   controlCenterBandPx,
   controlCenterGestureEnabled,
-  inControlCenterBand,
+  dismissSwipeYields,
+  openSwipeYields,
   oppositeThemeMode,
   readSafeAreaTopPx,
 } from '../engine/controlCenterGesture';
@@ -118,7 +119,7 @@ export function PanelControlCenter({
     engagePx: CONTROL_CENTER_ENGAGE_MM * pxPerMm,
     commitPx: CONTROL_CENTER_COMMIT_MM * pxPerMm,
     flickPxPerMs: CONTROL_CENTER_FLICK_MM_PER_MS * pxPerMm,
-    shouldYield: useCallback((c: GestureContact) => !inControlCenterBand(c.clientY, bandPx), [bandPx]),
+    shouldYield: useCallback((c: GestureContact) => openSwipeYields(c.clientY, bandPx, c.target), [bandPx]),
     onCommit: onOpen,
   });
 
@@ -129,18 +130,16 @@ export function PanelControlCenter({
     engagePx: CONTROL_CENTER_ENGAGE_MM * pxPerMm,
     commitPx: CONTROL_CENTER_DISMISS_MM * pxPerMm,
     flickPxPerMs: CONTROL_CENTER_FLICK_MM_PER_MS * pxPerMm,
-    // A fader or horizontal control owns its own drag.
-    shouldYield: useCallback((c: GestureContact) => (
-      c.target instanceof Element
-      && Boolean(c.target.closest('input, [role="slider"], [data-panel-horizontal-control="true"]'))
-    ), []),
+    shouldYield: useCallback((c: GestureContact) => dismissSwipeYields(c.target), []),
     onCommit: onClose,
   });
 
   const { reset: resetOpenSwipe } = openSwipe;
+  const { reset: resetDismissSwipe } = dismissSwipe;
   useEffect(() => {
     if (!gate || open) resetOpenSwipe();
-  }, [gate, open, resetOpenSwipe]);
+    if (!gate || !open) resetDismissSwipe();
+  }, [gate, open, resetOpenSwipe, resetDismissSwipe]);
 
   const opening = openSwipe.state === 'dragging' && !open;
   const dismissing = dismissSwipe.state === 'dragging' && open;
@@ -150,13 +149,12 @@ export function PanelControlCenter({
   const [view, setView] = useState<'main' | 'mixer'>('main');
   useEffect(() => { if (!open) setView('main'); }, [open]);
 
-  // The body stays mounted through the close slide so the content does not vanish mid-motion.
+  // The body stays mounted through the close slide so the content does not
+  // vanish mid-motion; the sheet's transitionend lets go of it.
   const [bodyMounted, setBodyMounted] = useState(false);
   const visible = open || opening;
   useEffect(() => {
-    if (visible) { setBodyMounted(true); return undefined; }
-    const id = setTimeout(() => setBodyMounted(false), 320);
-    return () => clearTimeout(id);
+    if (visible) setBodyMounted(true);
   }, [visible]);
 
   const sheetStyle = opening
@@ -187,6 +185,9 @@ export function PanelControlCenter({
         style={sheetStyle}
         aria-label={t('panel.controlCenter.label')}
         aria-hidden={!open && !opening ? true : undefined}
+        onTransitionEnd={(e) => {
+          if (e.target === e.currentTarget && e.propertyName === 'transform' && !visible) setBodyMounted(false);
+        }}
         onClick={(e) => {
           if (!open) return;
           const target = e.target instanceof Element ? e.target : null;
@@ -196,6 +197,7 @@ export function PanelControlCenter({
         {bodyMounted ? (
           <ControlCenterBody
             open={open}
+            active={visible}
             view={view}
             setView={setView}
             language={language}
@@ -214,6 +216,8 @@ export function PanelControlCenter({
 
 interface BodyProps {
   open: boolean;
+  // Open or being pulled: the body reads and polls only then.
+  active: boolean;
   view: 'main' | 'mixer';
   setView: (v: 'main' | 'mixer') => void;
   language: string;
@@ -226,7 +230,7 @@ interface BodyProps {
 }
 
 function ControlCenterBody({
-  open, view, setView, language, surface, displayId, resolvedThemeMode, onSetThemeMode, onClose, onScreenSleep,
+  open, active, view, setView, language, surface, displayId, resolvedThemeMode, onSetThemeMode, onClose, onScreenSleep,
 }: BodyProps) {
   const { t } = useTranslation();
   const touchViaPointer = useTouchViaPointer();
@@ -247,38 +251,47 @@ function ControlCenterBody({
     [now, language],
   );
 
-  const brightness = usePanelBrightness(true, brightnessTargetFor(surface, displayId));
-  const volume = useSystemVolume(true, null, 2000);
-  const mic = useSystemMic(true);
+  const brightness = usePanelBrightness(active, brightnessTargetFor(surface, displayId));
+  const volume = useSystemVolume(active, null, 2000);
+  const mic = useSystemMic(active);
 
   const [radios, setRadios] = useState<RadiosState | null>(null);
-  // Re-read every 2 s while the sheet is open: Wi-Fi and Bluetooth can come
-  // back after an airplane-off POST returned, and the OS can change them too.
+  // A read that started before a write settled describes the old state and must
+  // not overwrite the write's read-back.
+  const radioWrites = useRef({ inFlight: 0, settledAt: 0 });
+  // Read as soon as the sheet starts to come down, then again every poll
+  // interval while it stays up: Wi-Fi and Bluetooth can return after an
+  // airplane-off POST has answered, and the OS can change them too.
   useEffect(() => {
-    if (!open) return undefined;
+    if (!active) return undefined;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const tick = async () => {
+      const startedAt = Date.now();
       const r = await fetchRadios().catch(() => null);
       if (cancelled) return;
-      if (r) setRadios(r);
+      const w = radioWrites.current;
+      if (r && w.inFlight === 0 && startedAt >= w.settledAt) setRadios(r);
       timer = setTimeout(tick, RADIOS_POLL_MS);
     };
     void tick();
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [open]);
+  }, [active]);
   // The read-back state is the truth: no rollback on a mismatch, the next
   // read corrects whatever the optimistic flip got wrong.
   const toggleRadio = (kind: RadioKind) => {
     const current = radios?.[kind];
     if (!current) return;
+    const w = radioWrites.current;
+    w.inFlight += 1;
     setRadios(prev => (prev ? { ...prev, [kind]: { on: !current.on } } : prev));
     void setRadio(kind, !current.on)
       .then(r => { if (r) setRadios(r); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { w.inFlight -= 1; w.settledAt = Date.now(); });
   };
 
-  const media = useMedia(true);
+  const media = useMedia(active);
   const session = activeMediaSession(media.sessions);
 
   // Long-press on the volume fader opens the per-app mixer. The fader jumps to
@@ -314,7 +327,7 @@ function ControlCenterBody({
   if (view === 'mixer') {
     return (
       <div className={styles.content} data-landscape-hint="mixer">
-        <ControlCenterMixerView onBack={() => setView('main')} />
+        <ControlCenterMixerView active={active} onBack={() => setView('main')} />
       </div>
     );
   }
@@ -397,7 +410,7 @@ function ControlCenterBody({
                   onClick: () => { void volume.setMuted(!volume.state.muted); },
                 }}
                 ariaLabel={t('panel.controlCenter.volume')}
-                onChange={v => volume.previewVolume(v / 100)}
+                onChange={v => volume.commitVolume(v / 100)}
                 onCommit={v => volume.commitVolume(v / 100, { flush: true })}
               />
             </div>
@@ -410,6 +423,32 @@ function ControlCenterBody({
 
       <div className={styles.card} data-cc-keep="true">
         <div className={styles.grid}>
+          <IconLabelButton
+            className={styles.tile}
+            icon={dark ? <Moon /> : <Sun />}
+            label={t('panel.controlCenter.darkMode')}
+            active={dark}
+            onPress={() => onSetThemeMode(oppositeThemeMode(resolvedThemeMode))}
+          />
+          <IconLabelButton
+            className={styles.tile}
+            icon={<Lock />}
+            label={t('panel.controlCenter.lockPc')}
+            onPress={() => { void systemPower('lock'); onClose(); }}
+          />
+          <IconLabelButton
+            className={styles.tile}
+            icon={<Power />}
+            label={t('panel.controlCenter.sleepPc')}
+            onPress={() => { void systemPower('sleep'); onClose(); }}
+          />
+          <IconLabelButton
+            className={styles.tile}
+            icon={<MonitorOff />}
+            label={t('panel.controlCenter.screenSleep')}
+            onPress={() => { onClose(); onScreenSleep(); }}
+          />
+          {/* After the fixed tiles: the radios arrive late and must not shift them. */}
           {radios?.wifi && (
             <IconLabelButton
               className={styles.tile}
@@ -437,31 +476,6 @@ function ControlCenterBody({
               onPress={() => toggleRadio('airplane')}
             />
           )}
-          <IconLabelButton
-            className={styles.tile}
-            icon={dark ? <Moon /> : <Sun />}
-            label={t('panel.controlCenter.darkMode')}
-            active={dark}
-            onPress={() => onSetThemeMode(oppositeThemeMode(resolvedThemeMode))}
-          />
-          <IconLabelButton
-            className={styles.tile}
-            icon={<Lock />}
-            label={t('panel.controlCenter.lockPc')}
-            onPress={() => { void systemPower('lock'); onClose(); }}
-          />
-          <IconLabelButton
-            className={styles.tile}
-            icon={<Power />}
-            label={t('panel.controlCenter.sleepPc')}
-            onPress={() => { void systemPower('sleep'); onClose(); }}
-          />
-          <IconLabelButton
-            className={styles.tile}
-            icon={<MonitorOff />}
-            label={t('panel.controlCenter.screenSleep')}
-            onPress={() => { onClose(); onScreenSleep(); }}
-          />
         </div>
       </div>
 

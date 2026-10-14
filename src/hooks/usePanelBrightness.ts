@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLatestWriter } from './useLatestWriter';
 import { fetchService, postService } from '../api/service';
 import { fetchDisplayBrightness, setDisplayBrightness } from '../api/displays';
 import type { DeviceListItem } from './useDevices';
@@ -32,15 +33,14 @@ const OVERRIDE_MS = 1500;
  * Brightness for the surface this panel runs on, 0-100. `available` is false
  * until a read proves the control exists (hidden then); `linkDown` is the
  * Y70's USB link warning, which disables the slider with an inline notice.
+ * Reads again each time `enabled` turns on. The slider writes live during a
+ * drag (coalesced) and the release flushes.
  */
 export function usePanelBrightness(enabled: boolean, target: PanelBrightnessTarget | null) {
   const [value, setValue] = useState(0);
   const [available, setAvailable] = useState(false);
   const [linkDown, setLinkDown] = useState(false);
   const overrideUntil = useRef(0);
-  const write = useRef<{ inFlight: boolean; queued: number | null; lastAt: number; timer: ReturnType<typeof setTimeout> | null }>({
-    inFlight: false, queued: null, lastAt: 0, timer: null,
-  });
   const kind = target?.kind ?? null;
   const displayId = target?.displayId;
 
@@ -54,9 +54,12 @@ export function usePanelBrightness(enabled: boolean, target: PanelBrightnessTarg
           fetchService<DeviceListItem[]>('/devices/all').catch(() => null),
         ]);
         if (cancelled) return;
-        setLinkDown(isY70UsbDown(devices));
-        setAvailable(true);
-        if (b && typeof b.brightness === 'number' && Date.now() >= overrideUntil.current) setValue(b.brightness);
+        const down = isY70UsbDown(devices);
+        const read = !!b && typeof b.brightness === 'number';
+        setLinkDown(down);
+        // A failed read hides the slider, unless the link warning explains it.
+        setAvailable(read || down);
+        if (read && b && Date.now() >= overrideUntil.current) setValue(b.brightness);
       } else if (displayId) {
         const b = await fetchDisplayBrightness(displayId).catch(() => null);
         if (cancelled) return;
@@ -68,43 +71,24 @@ export function usePanelBrightness(enabled: boolean, target: PanelBrightnessTarg
     return () => { cancelled = true; };
   }, [enabled, kind, displayId]);
 
-  const pumpRef = useRef<() => void>(() => {});
-  const pump = useCallback(() => {
-    const w = write.current;
-    if (w.inFlight || w.queued == null) return;
-    if (w.timer) { clearTimeout(w.timer); w.timer = null; }
-    const wait = WRITE_INTERVAL_MS - (Date.now() - w.lastAt);
-    if (wait > 0) { w.timer = setTimeout(() => pumpRef.current(), wait); return; }
-    const next = w.queued;
-    w.queued = null;
-    w.inFlight = true;
-    w.lastAt = Date.now();
-    const req = kind === 'y70'
-      ? postService('/y70/brightness', { brightness: next })
-      : displayId ? setDisplayBrightness(displayId, next) : Promise.resolve(null);
-    void req.catch(() => null).finally(() => { w.inFlight = false; pumpRef.current(); });
-  }, [kind, displayId]);
-  useEffect(() => { pumpRef.current = pump; }, [pump]);
-
-  useEffect(() => () => {
-    const w = write.current;
-    if (w.timer) clearTimeout(w.timer);
-    w.timer = null;
-  }, []);
+  const send = useCallback((v: number) => (kind === 'y70'
+    ? postService('/y70/brightness', { brightness: v })
+    : displayId ? setDisplayBrightness(displayId, v) : Promise.resolve(null)), [kind, displayId]);
+  const write = useLatestWriter(send, WRITE_INTERVAL_MS);
 
   const preview = useCallback((v: number) => {
     overrideUntil.current = Date.now() + OVERRIDE_MS;
-    setValue(Math.max(0, Math.min(100, Math.round(v))));
-  }, []);
+    const clamped = Math.max(0, Math.min(100, Math.round(v)));
+    setValue(clamped);
+    write(clamped);
+  }, [write]);
 
   const commit = useCallback((v: number) => {
     overrideUntil.current = Date.now() + OVERRIDE_MS;
     const clamped = Math.max(0, Math.min(100, Math.round(v)));
     setValue(clamped);
-    write.current.queued = clamped;
-    write.current.lastAt = 0;
-    pump();
-  }, [pump]);
+    write(clamped, true);
+  }, [write]);
 
   return { available, linkDown, value, preview, commit };
 }

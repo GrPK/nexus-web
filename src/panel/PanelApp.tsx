@@ -564,7 +564,10 @@ export function PanelContent({
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
   const [trayOpen, setTrayOpen] = useState(false);
   const [controlCenterOpen, setControlCenterOpen] = useState(false);
+  // The layer stays up through the waking touch's release; the panel itself
+  // is hidden only until the wake starts.
   const [screenAsleep, setScreenAsleep] = useState(false);
+  const [screenHidden, setScreenHidden] = useState(false);
   const [sentrySupported, setSentrySupported] = useState(false);
   const [sentryOpenRequest, setSentryOpenRequest] = useState(0);
   const { t } = useTranslation();
@@ -1099,12 +1102,6 @@ export function PanelContent({
     ? touch.ctxMenu?.widget.id ?? null
     : null;
   const closeControlCenter = useCallback(() => setControlCenterOpen(false), []);
-  // Tapping the tile sets the explicit opposite of what is showing, even
-  // when the panel follows the desktop or the system.
-  const setControlCenterThemeMode = useCallback((mode: 'dark' | 'light') => {
-    if (effectiveTheme.themeSyncWithDesktop) panelTheme.commitThemeSync(false);
-    panelTheme.commitThemeMode(mode);
-  }, [effectiveTheme.themeSyncWithDesktop, panelTheme]);
   const connectionIntroBlocked = Boolean(
     sheetMode
       || trayOpen
@@ -1787,7 +1784,7 @@ export function PanelContent({
         className={`panel-root ${styles.panelRoot}`}
         data-theme={resolvedThemeMode}
         data-surface={surface}
-        data-screen-sleep={screenAsleep ? 'true' : undefined}
+        data-screen-sleep={screenHidden ? 'true' : undefined}
         data-simulator={simulator ? 'true' : undefined}
         data-show-widget-labels={effectiveTheme.widgetLabels ? 'true' : 'false'}
         data-immersive-see-through={immersiveSeeThrough ? 'true' : undefined}
@@ -2009,8 +2006,8 @@ export function PanelContent({
                 displayId={recordState.record?.displayId}
                 isLandscape={isLandscape}
                 resolvedThemeMode={resolvedThemeMode}
-                onSetThemeMode={setControlCenterThemeMode}
-                onScreenSleep={() => setScreenAsleep(true)}
+                onSetThemeMode={panelTheme.commitThemeModePinned}
+                onScreenSleep={() => { setScreenHidden(true); setScreenAsleep(true); }}
                 sheetOpen={Boolean(sheetMode)}
                 trayOpen={trayOpen}
                 offline={isOffline}
@@ -2173,7 +2170,7 @@ export function PanelContent({
         );
       })()}
 
-      <PanelScreenSleep asleep={screenAsleep} onWake={() => setScreenAsleep(false)} />
+      <PanelScreenSleep asleep={screenAsleep} onWakeStart={() => setScreenHidden(false)} onWake={() => setScreenAsleep(false)} />
 
       {sheetMode && (
         <PanelEditorSheet

@@ -140,15 +140,10 @@ export function usePanelControlCenterSwipe({
       const outcome = resolveSwipeRelease(lastOffset, velocity, commit, flick);
       setState('settling');
       clearSettle();
-      if (outcome === 'commit') {
-        cfg.current.onCommit();
-        setOffset(0);
-        settleTimer.current = setTimeout(() => { settleTimer.current = null; setState('idle'); }, SETTLE_MS);
-      } else {
-        setOffset(0);
-        cfg.current.onCancel?.();
-        settleTimer.current = setTimeout(() => { settleTimer.current = null; setState('idle'); }, SETTLE_MS);
-      }
+      setOffset(0);
+      if (outcome === 'commit') cfg.current.onCommit();
+      else cfg.current.onCancel?.();
+      settleTimer.current = setTimeout(() => { settleTimer.current = null; setState('idle'); }, SETTLE_MS);
     };
 
     return bindGestureContacts(el, touchViaPointer, { start: onStart, move: onMove, end: onEnd });

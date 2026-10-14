@@ -354,6 +354,13 @@ export function usePanelTheme(
     persistPatch({ themeMode: nextMode });
   }, [persistPatch]);
 
+  // One write that leaves desktop sync and pins a concrete mode.
+  const commitThemeModePinned = useCallback((mode: ThemeMode) => {
+    const nextMode = normalizePanelThemeMode(mode);
+    setTheme(prev => ({ ...prev, themeSyncWithDesktop: false, themeMode: nextMode }));
+    persistPatch({ themeSyncWithDesktop: false, themeMode: nextMode });
+  }, [persistPatch]);
+
   const commitAccentSync = useCallback((synced: boolean) => {
     const current = themeRef.current;
     const nextAccent = !synced && !current.accentColor
@@ -534,6 +541,7 @@ export function usePanelTheme(
     theme: { ...theme, backgroundEffectState },
     commitThemeSync,
     commitThemeMode,
+    commitThemeModePinned,
     commitAccentSync,
     previewAccent: (hex: string) => setTheme(prev => ({ ...prev, accentColor: hex })),
     commitAccent,

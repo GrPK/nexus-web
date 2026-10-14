@@ -2,38 +2,44 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '../../lib/i18n';
 import styles from './PanelScreenSleep.module.scss';
 
-// After the waking touch, the layer stays up (invisible) this long so the
-// pointerup, the synthesized mouse events and the click land on it and never
-// on whatever is underneath.
+// The layer outlives the waking touch's release by this long, so the click the
+// browser synthesizes from it lands on the layer and not on whatever is under.
 const WAKE_GUARD_MS = 400;
 
 /**
- * Full-screen black layer: the panel's screen sleep. Any touch wakes it, and
- * that touch is swallowed. The host hides the panel content while asleep.
+ * Full-screen black layer: the panel's screen sleep. Any touch wakes it, on
+ * release, and that touch is swallowed whole: the press, a long hold's
+ * context menu, the release and the click. The host hides the panel content
+ * while asleep and unhides it at `onWakeStart`; `onWake` removes the layer.
  */
-export function PanelScreenSleep({ asleep, onWake }: { asleep: boolean; onWake: () => void }) {
+export function PanelScreenSleep({ asleep, onWakeStart, onWake }: {
+  asleep: boolean;
+  onWakeStart: () => void;
+  onWake: () => void;
+}) {
   const { t } = useTranslation();
   const [waking, setWaking] = useState(false);
+  const pressed = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onWakeRef = useRef(onWake);
-  useEffect(() => { onWakeRef.current = onWake; }, [onWake]);
+  const cbs = useRef({ onWakeStart, onWake });
+  useEffect(() => { cbs.current = { onWakeStart, onWake }; }, [onWakeStart, onWake]);
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   useEffect(() => {
-    if (!asleep) setWaking(false);
+    if (!asleep) { setWaking(false); pressed.current = false; }
   }, [asleep]);
 
   if (!asleep) return null;
 
+  const swallow = (e: React.SyntheticEvent) => { e.preventDefault(); e.stopPropagation(); };
   const wake = (e: React.SyntheticEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+    swallow(e);
     if (waking) return;
     setWaking(true);
-    timer.current = setTimeout(() => { timer.current = null; onWakeRef.current(); }, WAKE_GUARD_MS);
+    cbs.current.onWakeStart();
+    timer.current = setTimeout(() => { timer.current = null; cbs.current.onWake(); }, WAKE_GUARD_MS);
   };
-  const swallow = (e: React.SyntheticEvent) => { e.preventDefault(); e.stopPropagation(); };
 
   return (
     <div
@@ -42,12 +48,13 @@ export function PanelScreenSleep({ asleep, onWake }: { asleep: boolean; onWake: 
       role="button"
       tabIndex={0}
       aria-label={t('panel.controlCenter.screenSleep.wake')}
-      onPointerDown={wake}
-      onTouchStart={wake}
-      onPointerUp={swallow}
-      onTouchEnd={swallow}
+      onPointerDown={(e) => { swallow(e); pressed.current = true; }}
+      onPointerUp={(e) => { if (pressed.current) wake(e); else swallow(e); }}
+      onPointerCancel={(e) => { if (pressed.current) wake(e); }}
+      onContextMenu={swallow}
       onMouseDown={swallow}
       onMouseUp={swallow}
+      onTouchEnd={swallow}
       onClick={swallow}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') wake(e); }}
     />

@@ -1,4 +1,5 @@
-import { ChevronLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '../../components/common/Button/Button';
 import { useAudioMixer } from '../../hooks/useAudioMixer';
 import { useTranslation } from '../../lib/i18n';
 import { MixerStrip } from '../widgets/mixer/MixerStrip';
@@ -8,17 +9,15 @@ import styles from './PanelControlCenter.module.scss';
  * Per-app volume sub-view of the control center: one fader per audio session,
  * the app icon mutes it. Built from the mixer widget's strip.
  */
-export function ControlCenterMixerView({ onBack }: { onBack: () => void }) {
+export function ControlCenterMixerView({ onBack, active }: { onBack: () => void; active: boolean }) {
   const { t } = useTranslation();
-  const mixer = useAudioMixer(true);
+  const mixer = useAudioMixer(active);
   const sessions = mixer.supported ? mixer.sessions : [];
   return (
     <div className={styles.card} data-cc-keep="true">
-      <button type="button" className={styles.backRow} onClick={onBack}>
-        {/* eslint-disable-next-line i18next/no-literal-string -- aria boolean */}
-        <ChevronLeft size={20} aria-hidden="true" />
-        <span>{t('panel.controlCenter.back')}</span>
-      </button>
+      <Button tone="ghost" icon={<ArrowLeft size={18} strokeWidth={2.2} />} onClick={onBack}>
+        {t('panel.controlCenter.back')}
+      </Button>
       <div className={styles.mixerTitle}>{t('panel.controlCenter.mixer.title')}</div>
       {sessions.length === 0 ? (
         <div className={styles.mixerEmpty}>{t('panel.controlCenter.mixer.empty')}</div>
