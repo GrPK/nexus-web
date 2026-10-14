@@ -3635,6 +3635,7 @@
   "nexus2Welcome.import.group.y70Panel.label": "Y70 패널 개인 설정",
   "nexus2Welcome.import.profileName": "활성 Nexus 2 프로필: {name}",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
+  "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "적용되지 않음: Nexus 3 팬 설정이 변경되어 그대로 유지되었습니다",
   "nexus2Welcome.import.result.detail.noQ60Record": "아직 설정된 Q-Series 기기가 없습니다.",
   "nexus2Welcome.import.result.fanCurvesApplied.one": "팬 커브 {count}개를 적용했습니다",
   "nexus2Welcome.import.result.fanCurvesApplied.other": "팬 커브 {count}개를 적용했습니다",

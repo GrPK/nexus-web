@@ -3635,6 +3635,7 @@
   "nexus2Welcome.import.group.y70Panel.label": "Personalizzazione del pannello Y70",
   "nexus2Welcome.import.profileName": "Dal tuo profilo Nexus 2 attivo: {name}",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
+  "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "Non applicato: la tua configurazione delle ventole di Nexus 3 è cambiata, quindi è stata mantenuta",
   "nexus2Welcome.import.result.detail.noQ60Record": "Nessun dispositivo Q-Series è ancora configurato.",
   "nexus2Welcome.import.result.fanCurvesApplied.one": "{count} curva della ventola applicata",
   "nexus2Welcome.import.result.fanCurvesApplied.other": "{count} curve delle ventole applicate",

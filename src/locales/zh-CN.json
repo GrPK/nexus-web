@@ -3635,6 +3635,7 @@
   "nexus2Welcome.import.group.y70Panel.label": "Y70 面板个性化",
   "nexus2Welcome.import.profileName": "来自你正在使用的 Nexus 2 配置文件：{name}",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
+  "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "未应用：你的 Nexus 3 风扇设置已更改，因此予以保留",
   "nexus2Welcome.import.result.detail.noQ60Record": "尚未设置 Q-Series 设备。",
   "nexus2Welcome.import.result.fanCurvesApplied.one": "已应用 {count} 条风扇曲线",
   "nexus2Welcome.import.result.fanCurvesApplied.other": "已应用 {count} 条风扇曲线",

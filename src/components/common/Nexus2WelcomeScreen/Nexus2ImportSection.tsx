@@ -9,9 +9,9 @@ import { Spinner } from '../Spinner/Spinner';
 import { applyNexus2Import, previewNexus2Import } from '../../../api/migration';
 import type { Nexus2ApplyResult, Nexus2PreviewResponse } from '../../../api/migration';
 import {
-  allApplyResultsClean, applyDetailKey, applyStatusKey, categoryLabelKey, defaultSelectedGroupIds,
+  allApplyResultsClean, applyDetailKey, applyStatusKey, issueCategoryLabelKey, defaultSelectedGroupIds,
   groupDetailParts, groupResultSummaries, groupHasAvailable, selectedWireIds, unavailableGroupNote,
-  presetLabelKey, visibleImportGroups, importHeaderKeys, formatList, fillTemplate, type CategoryDetail, type ImportGroupId,
+  presetLabelKey, fanGroupLabelKey, visibleImportGroups, importHeaderKeys, formatList, fillTemplate, type CategoryDetail, type ImportGroupId,
 } from './nexus2WelcomeUtils';
 import styles from './Nexus2ImportSection.module.scss';
 
@@ -218,7 +218,7 @@ export function Nexus2ImportSection({
           )}
 
           {groups.map(group => {
-            const label = t(group.labelKey);
+            const label = t(fanGroupLabelKey(preview, group));
             // A span list: SettingToggle renders the description inside a span.
             const note = unavailableGroupNote(preview, group);
             const detail = note ? <span>{t(note.key, Object.keys(note.params).length > 0 ? translatedParams(note) : undefined)}</span> : (
@@ -273,10 +273,10 @@ export function Nexus2ImportSection({
                     <span key={issue.id} className={styles.resultDetail}>
                       {issue.detail
                         ? t('nexus2Welcome.import.result.subDetail', {
-                          category: t(categoryLabelKey(issue.id), { id: issue.id }),
+                          category: t(issueCategoryLabelKey(issue), { id: issue.id }),
                           detail: t(applyDetailKey(issue.detail), { detail: issue.detail }),
                         })
-                        : t(categoryLabelKey(issue.id), { id: issue.id })}
+                        : t(issueCategoryLabelKey(issue), { id: issue.id })}
                     </span>
                   ))}
                 </li>

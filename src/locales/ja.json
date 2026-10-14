@@ -3635,6 +3635,7 @@
   "nexus2Welcome.import.group.y70Panel.label": "Y70 パネルのパーソナライズ",
   "nexus2Welcome.import.profileName": "使用中の Nexus 2 プロファイル: {name}",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
+  "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "適用されませんでした：Nexus 3 のファン設定が変更されたため、そのまま維持されました",
   "nexus2Welcome.import.result.detail.noQ60Record": "Q-Series デバイスがまだ設定されていません。",
   "nexus2Welcome.import.result.fanCurvesApplied.one": "ファンカーブ {count} 件を適用しました",
   "nexus2Welcome.import.result.fanCurvesApplied.other": "ファンカーブ {count} 件を適用しました",

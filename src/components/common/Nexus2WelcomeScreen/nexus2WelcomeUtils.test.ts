@@ -14,9 +14,12 @@ import {
   fillTemplate,
   formatList,
   groupDetailParts,
+  groupHasAvailable,
   groupResultSummaries,
   importHeaderKeys,
   selectedWireIds,
+  fanGroupLabelKey,
+  issueCategoryLabelKey,
   unavailableGroupNote,
   unavailableGroupNoteKey,
   visibleImportGroups,
@@ -479,3 +482,34 @@ describe('Recommended mode preset', () => {
   });
 });
 
+describe('Recommended mode preset follow-ups', () => {
+  const pv = (cat: Nexus2PreviewCategory): Nexus2PreviewResponse => ({ available: true, profileName: null, categories: [cat] });
+  const OK: Nexus2PreviewCategory = { id: 'fanCurves', available: true, count: 0, fanCurvesNote: 'recommendedMode', recommendedPreset: 'silent' };
+
+  it('labels a preset-only group Cooling and leaves curve groups alone', () => {
+    expect(fanGroupLabelKey(pv(OK), FAN_GROUP)).toBe('cooling.title');
+    expect(fanGroupLabelKey(pv(MIXED_FAN_CURVES), FAN_GROUP)).toBe(FAN_GROUP.labelKey);
+    expect(groupResultSummaries([{ id: 'fanCurves', status: 'applied', detail: null, preset: 'silent' }])[0].labelKey).toBe('cooling.title');
+  });
+
+  it('treats an unknown or missing preset as unmappable, never as curves', () => {
+    for (const recommendedPreset of ['future', undefined]) {
+      const p = pv({ ...OK, recommendedPreset } as Nexus2PreviewCategory);
+      expect(groupHasAvailable(p, FAN_GROUP)).toBe(false);
+      expect(selectedWireIds(p, new Set(['fanCurves']))).toEqual([]);
+      expect(defaultSelectedGroupIds(p).has('fanCurves')).toBe(false);
+      expect(unavailableGroupNoteKey(p, FAN_GROUP)).toBe(`${FAN}.note.recommendedMode`);
+      expect(importHeaderKeys(p).titleKey).toBe('nexus2Welcome.import.title.none');
+    }
+  });
+
+  it('maps the kept-setup hint; a kept-setup skip is not clean', () => {
+    expect(applyDetailKey('nexus3CoolingCustomized')).toBe('nexus2Welcome.import.result.detail.nexus3CoolingCustomized');
+    const kept: Nexus2ApplyResult = { id: 'fanCurves', status: 'skipped', detail: 'nexus3CoolingCustomized' };
+    expect(allApplyResultsClean([kept])).toBe(false);
+    expect(allApplyResultsClean([{ id: 'fanCurves', status: 'skipped', detail: null }])).toBe(true);
+    expect(groupResultSummaries([kept])[0].issues).toEqual([kept]);
+    expect(issueCategoryLabelKey(kept)).toBe('cooling.title');
+    expect(issueCategoryLabelKey({ id: 'fanCurves', status: 'failed', detail: 'other' })).toBe(categoryLabelKey('fanCurves'));
+  });
+});

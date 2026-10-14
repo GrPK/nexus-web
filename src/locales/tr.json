@@ -3635,6 +3635,7 @@
   "nexus2Welcome.import.group.y70Panel.label": "Y70 panel kişiselleştirmesi",
   "nexus2Welcome.import.profileName": "Etkin Nexus 2 profilinizden: {name}",
   "nexus2Welcome.import.result.detail.generic": "{detail}",
+  "nexus2Welcome.import.result.detail.nexus3CoolingCustomized": "Uygulanmadı: Nexus 3 fan kurulumunuz değiştiği için korundu",
   "nexus2Welcome.import.result.detail.noQ60Record": "Henüz kurulmuş bir Q-Series cihazı yok.",
   "nexus2Welcome.import.result.fanCurvesApplied.one": "{count} fan eğrisi uygulandı",
   "nexus2Welcome.import.result.fanCurvesApplied.other": "{count} fan eğrisi uygulandı",

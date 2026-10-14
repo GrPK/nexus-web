@@ -417,7 +417,7 @@ describe('Nexus2ImportSection - fan curves', () => {
     it('available: checked, one preset line, preset header, applies', async () => {
       load(PRESET_CATEGORY);
       renderSection();
-      expect(await screen.findByRole('switch', { name: FAN_NAME })).toBeChecked();
+      expect(await screen.findByRole('switch', { name: 'cooling.title' })).toBeChecked();
       expect(screen.getByText(`${FAN}.presetDetail:cooling.mode.balanced,cooling.mode.balanced`)).toBeInTheDocument();
       expect(screen.getAllByText('nexus2Welcome.import.title.fanPreset').length).toBeGreaterThan(0);
       fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
@@ -445,7 +445,7 @@ describe('Nexus2ImportSection - fan curves', () => {
       load(PRESET_CATEGORY);
       vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'applied', detail: null, preset: 'balanced' }] });
       renderSection();
-      await screen.findByRole('switch', { name: FAN_NAME });
+      await screen.findByRole('switch', { name: 'cooling.title' });
       fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
       expect(await screen.findByText('nexus2Welcome.import.result.presetApplied:cooling.mode.balanced')).toBeInTheDocument();
     });
@@ -454,11 +454,41 @@ describe('Nexus2ImportSection - fan curves', () => {
       load(PRESET_CATEGORY);
       const handleRef = { current: null as Nexus2ImportHandle | null };
       const view = renderSection({ handleRef, showAction: false, visible: false });
-      await screen.findByRole('switch', { name: FAN_NAME });
+      await screen.findByRole('switch', { name: 'cooling.title' });
       expect(handleRef.current?.fanCurvesNeedReview()).toBe(true);
       expect(handleRef.current?.fanCurvesNeedReview(true)).toBe(true);
       view.rerender(<Nexus2ImportSection open showAction={false} handleRef={handleRef} visible />);
       expect(handleRef.current?.fanCurvesNeedReview()).toBe(false);
+    });
+
+    it('result row is labeled Cooling when the preset applied', async () => {
+      load(PRESET_CATEGORY);
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'applied', detail: null, preset: 'balanced' }] });
+      renderSection();
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      await screen.findByText('nexus2Welcome.import.result.presetApplied:cooling.mode.balanced');
+      expect(screen.queryByText(FAN_NAME)).not.toBeInTheDocument();
+    });
+
+    it('a post-preview skip shows the reason and no success summary', async () => {
+      load(PRESET_CATEGORY);
+      vi.mocked(applyNexus2Import).mockResolvedValue({ results: [{ id: 'fanCurves', status: 'skipped', detail: 'nexus3CoolingCustomized' }] });
+      renderSection();
+      await screen.findByRole('switch', { name: 'cooling.title' });
+      fireEvent.click(screen.getByRole('button', { name: IMPORT_BUTTON_NAME }));
+      expect(await screen.findByText(/nexus2Welcome.import.result.detail.nexus3CoolingCustomized/)).toBeInTheDocument();
+      expect(screen.queryByText('nexus2Welcome.import.successSummary')).not.toBeInTheDocument();
+    });
+
+    it('an unknown preset is unmappable: note shown, group disabled, never curves', async () => {
+      load({ ...PRESET_CATEGORY, recommendedPreset: 'future' });
+      renderSection();
+      const fan = await screen.findByRole('switch', { name: FAN_NAME });
+      expect(fan).toBeDisabled();
+      expect(fan).not.toBeChecked();
+      expect(screen.getByText(`${FAN}.note.recommendedMode`)).toBeInTheDocument();
+      expect(screen.queryByText(/fanCurves.detail/)).not.toBeInTheDocument();
     });
   });
 });
