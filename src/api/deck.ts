@@ -143,33 +143,11 @@ export async function importDeckPreset(file: File, allowPrivileged: boolean): Pr
 }
 
 /** `grid` sizes a widget instance's first-time preset (no-op once one exists). */
-export async function getDeckInstance(id: string, grid?: { cols: number; rows: number }, signal?: AbortSignal): Promise<DeckInstance | null> {
+export async function getDeckInstance(id: string, grid?: { cols: number; rows: number }): Promise<DeckInstance | null> {
   const qs = grid ? `?cols=${grid.cols}&rows=${grid.rows}` : '';
-  // 503 means the service's listed-apps cache is still cold right after boot
-  // and it refuses to bind a preset yet; retry with backoff instead of
-  // reporting a load failure.
-  for (let attempt = 0; ; attempt++) {
-    const { response, status } = await authFetchWithStatus(`/deck/instances/${encodeURIComponent(id)}${qs}`, { cache: 'no-store', signal });
-    if (response?.ok) {
-      try {
-        return ((await response.json()) as DeckInstanceResponse).instance ?? null;
-      } catch {
-        return null;
-      }
-    }
-    if (status !== 503 || attempt >= INSTANCE_503_RETRIES || signal?.aborted) return null;
-    const delayMs = Math.min(INSTANCE_503_BASE_MS * 2 ** attempt, INSTANCE_503_MAX_MS);
-    const live = await new Promise<boolean>(resolve => {
-      const timer = setTimeout(() => resolve(true), delayMs);
-      signal?.addEventListener('abort', () => { clearTimeout(timer); resolve(false); }, { once: true });
-    });
-    if (!live) return null;
-  }
+  const res = await fetchService<DeckInstanceResponse>(`/deck/instances/${encodeURIComponent(id)}${qs}`);
+  return res?.instance ?? null;
 }
-
-const INSTANCE_503_RETRIES = 8;
-const INSTANCE_503_BASE_MS = 1000;
-const INSTANCE_503_MAX_MS = 8000;
 
 export interface UpdateDeckInstanceBody {
   mode?: DeckInstanceMode;

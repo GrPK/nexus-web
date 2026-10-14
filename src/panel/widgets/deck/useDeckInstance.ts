@@ -136,22 +136,14 @@ function useOwnDeckInstance(
   const instanceGridRef = useRef(instanceGrid);
   instanceGridRef.current = instanceGrid;
 
-  // One load loop at a time: a new load (retry, reconnect, id change) aborts
-  // the previous one's 503 backoff.
-  const loadAbortRef = useRef<AbortController | null>(null);
-  useEffect(() => () => loadAbortRef.current?.abort(), []);
-
   const loadAll = useCallback(async () => {
     if (!instanceId) return;
-    loadAbortRef.current?.abort();
-    const ctrl = new AbortController();
-    loadAbortRef.current = ctrl;
     // Only a widget instance's first-ever GET needs its grid (a fresh
     // instance joins the first preset sized to it); a physical instance
     // already carries its grid on the deck's own preset once one exists.
     const grid = kind === 'widget' ? instanceGridRef.current : undefined;
-    const [inst, list] = await Promise.all([getDeckInstance(instanceId, grid, ctrl.signal), getDeckPresets()]);
-    if (instanceIdRef.current !== instanceId || ctrl.signal.aborted) return;
+    const [inst, list] = await Promise.all([getDeckInstance(instanceId, grid), getDeckPresets()]);
+    if (instanceIdRef.current !== instanceId) return;
     if (!inst) { setLoadError(true); return; }
     setInstance(normalizeInstance(inst));
     setPresets(list);
