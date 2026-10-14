@@ -8,6 +8,17 @@
   min-height: 0;
 }
 
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  > :first-child {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 .list {
   flex: 1;
   min-height: 0;

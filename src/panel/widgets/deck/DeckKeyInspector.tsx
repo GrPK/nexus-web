@@ -297,11 +297,36 @@ function ActionFields({ action, onChange, allowed, surface, desktopEditor, pageC
   // double-click re-opening a second dialog, not a brief request gap.
   const [browsing, setBrowsing] = useState(false);
   const locked = deckAuthoringLocked(surface, desktopEditor);
+  const canBrowseFile = canEditFreeText(surface, desktopEditor)
+    && (isWindowsAppShell() || isMacAppShell())
+    && !isRelayActive() && !isDirectActive();
+  const handleBrowseApp = async () => {
+    setBrowsing(true);
+    try {
+      const path = await pickSystemPath(false);
+      if (path) onChange({ type: 'launchApp', appId: path });
+    } finally {
+      setBrowsing(false);
+    }
+  };
 
   switch (action.type) {
     case 'launchApp':
       // No wrapping Field label: the Action box header already reads "Launch app".
-      return <AppPicker selectedId={action.appId} onSelect={app => onChange({ type: 'launchApp', appId: app.id })} />;
+      return (
+        <>
+          <AppPicker
+            selectedId={action.appId}
+            onSelect={app => onChange({ type: 'launchApp', appId: app.id })}
+            customPath={{
+              onUse: canEditFreeText(surface, desktopEditor) ? appId => onChange({ type: 'launchApp', appId }) : undefined,
+              onBrowse: canBrowseFile ? handleBrowseApp : undefined,
+              browsing,
+            }}
+          />
+          {locked && <DesktopOnlyBadge />}
+        </>
+      );
     case 'openUrl': {
       const canType = canEditFreeText(surface, desktopEditor);
       return (

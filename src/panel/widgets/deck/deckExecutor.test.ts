@@ -1,3 +1,4 @@
+import { resetListedAppIdsForTest, setListedAppIds } from '../common/listedApps';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const postService = vi.fn().mockResolvedValue(null);
@@ -283,6 +284,24 @@ describe('executeDeckAction → /panel/deck/dispatch', () => {
     expect(postService).toHaveBeenCalledWith('/panel/deck/dispatch', {
       deviceId: 'dev1', widgetId: 'w1', page: 0, folderPath: [2], slot: 3,
     });
+  });
+
+  it('a direct launchApp target dispatches server-side unless the id is listed; an unloaded list fails closed', async () => {
+    resetListedAppIdsForTest();
+    const steam: DeckAction = { type: 'launchApp', appId: 'steam://rungameid/2139460' };
+    await executeDeckAction(steam, location);
+    expect(postService).toHaveBeenCalledWith('/panel/deck/dispatch', {
+      deviceId: 'dev1', widgetId: 'w1', page: 0, folderPath: [2], slot: 3,
+    });
+    postService.mockClear();
+    setListedAppIds(['steam://rungameid/2139460']);
+    await executeDeckAction(steam, location);
+    expect(postService.mock.calls[0][0]).toMatch(/^\/shortcuts\/launch/);
+    postService.mockClear();
+    await executeDeckAction({ type: 'launchApp', appId: 'Some.Uwp!App' }, location);
+    expect(postService.mock.calls[0][0]).toMatch(/^\/shortcuts\/launch/);
+    expect(isPrivilegedDeckAction({ type: 'launchApp', appId: 'C:\\Games\\a.exe' })).toBe(true);
+    resetListedAppIdsForTest();
   });
 
   it('carries the resolved toggle branch on the dispatch body', async () => {

@@ -6,7 +6,8 @@ import type { WidgetProps } from '../types';
 import { DeckGrid } from './DeckGrid';
 import { innerGridForSize, fitToGrid, resolveViewSlots, padSlots, emptyDeck } from './deckLayout';
 import { useDeckInstance } from './useDeckInstance';
-import { executeDeckAction, isPrivilegedDeckAction } from './deckExecutor';
+import { executeDeckAction, hasDirectLaunchApp, isPrivilegedDeckAction } from './deckExecutor';
+import { ensureListedAppIds } from '../common/listedApps';
 import { useDeckLiveState } from './useDeckState';
 import { toggleBranchSlot, withPageIndicatorDisplay } from './deckIcons';
 import { usePanelPreview } from '../common/PanelPreviewContext';
@@ -117,7 +118,8 @@ export function DeckWidget({ widget, deviceId, selectedSlot, onSelectSlot, editV
   // (file path / key chord / text / audio file) over the wire. No deviceId
   // (the desktop dashboard's own "My Computer" preview, which has no backing
   // panel device record) keeps every action on its unchanged direct route.
-  const dispatchAction = (action: DeckAction, i: number, branch?: 'on' | 'off') => {
+  const dispatchAction = async (action: DeckAction, i: number, branch?: 'on' | 'off') => {
+    if (hasDirectLaunchApp(action)) await ensureListedAppIds();
     if (deviceId && isPrivilegedDeckAction(action)) {
       const location = { deviceId, widgetId: widget.id, page, folderPath, slot: i };
       if (branch) void executeDeckAction(action, location, branch);
@@ -138,7 +140,7 @@ export function DeckWidget({ widget, deviceId, selectedSlot, onSelectSlot, editV
       const key = keyFor(i);
       const target = !toggleOn(a, key);
       if (live.isOn(a.state) === undefined) setFlips(prev => ({ ...prev, [key]: target }));
-      dispatchAction(target ? a.on : a.off, i, target ? 'on' : 'off');
+      void dispatchAction(target ? a.on : a.off, i, target ? 'on' : 'off');
       return;
     }
     if (a.type === 'page') {
@@ -149,7 +151,7 @@ export function DeckWidget({ widget, deviceId, selectedSlot, onSelectSlot, editV
       return;
     }
     if (a.type === 'pageIndicator') return;
-    dispatchAction(a, i);
+    void dispatchAction(a, i);
   };
 
   const onDragEnd = (e: DragEndEvent) => {

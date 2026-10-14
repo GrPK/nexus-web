@@ -4,6 +4,8 @@ import { applyProfile, activateCoolingPreset } from '../../../api/cooling';
 import { mediaIdle, playCurrentOrFirstMedia } from '../../../api/mediaLibrary';
 import { controlMedia } from '../../../hooks/useMedia';
 import type { MediaSession } from '../../../hooks/useMedia';
+import { isDirectLaunchTarget } from '../common/customAppPath';
+import { getListedAppIds } from '../common/listedApps';
 import { requestOpenMonitoring } from './deckMonitoringNav';
 import type { DeckAction, DeckActionType, DeckMonitoringPress, DeckSequenceStep, DeckSystemAction, DeckNexusAction } from './types';
 
@@ -26,10 +28,22 @@ export const PRIVILEGED_DECK_ACTION_TYPES: ReadonlySet<DeckActionType> = new Set
   'openFile', 'openFolder', 'hotkey', 'hotkeySwitch', 'text', 'playAudio',
 ]);
 
+/** True when `action` is, or contains, a launchApp with a direct-shaped id. */
+export function hasDirectLaunchApp(action: DeckAction): boolean {
+  if (action.type === 'launchApp') return isDirectLaunchTarget(action.appId);
+  if (action.type === 'sequence') return action.steps.some(step => hasDirectLaunchApp(step.action));
+  if (action.type === 'toggle') return hasDirectLaunchApp(action.on) || hasDirectLaunchApp(action.off);
+  return false;
+}
+
 /** True when `action` is, or transitively contains (a sequence step, either
  * toggle branch), one of PRIVILEGED_DECK_ACTION_TYPES. */
 export function isPrivilegedDeckAction(action: DeckAction): boolean {
   if (PRIVILEGED_DECK_ACTION_TYPES.has(action.type)) return true;
+  // /shortcuts/launch only resolves listed app ids; an unlisted direct target
+  // runs through the server-side dispatcher like openFile. An unloaded list
+  // fails closed.
+  if (action.type === 'launchApp') return isDirectLaunchTarget(action.appId) && !getListedAppIds()?.has(action.appId);
   if (action.type === 'sequence') return action.steps.some(step => isPrivilegedDeckAction(step.action));
   if (action.type === 'toggle') return isPrivilegedDeckAction(action.on) || isPrivilegedDeckAction(action.off);
   return false;
