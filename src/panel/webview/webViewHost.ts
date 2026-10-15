@@ -8,11 +8,11 @@ import {
   type WebViewInbound,
   type WebViewLoadState,
   type WebViewOutbound,
-  type WebViewRect,
   type WebViewSyncView,
   type WebViewTransport,
 } from './webViewProtocol';
 import { computeVisible } from './webViewVisibility';
+import { measureTile } from './webViewMeasure';
 
 export type WebViewHostStatus = 'idle' | 'pending' | 'supported' | 'unsupported';
 
@@ -54,10 +54,6 @@ interface ClaimRecord extends WebViewClaimInput {
 const BURST_MS = 600;
 
 const EMPTY_KEY = JSON.stringify([null, []]);
-
-function round1(v: number): number {
-  return Math.round(v * 10) / 10;
-}
 
 /**
  * The single owner of the native web-view bridge for the whole panel page.
@@ -295,13 +291,13 @@ export class WebViewHost {
     }
     const views: WebViewSyncView[] = [];
     for (const c of winners.values()) {
-      const r = c.element.getBoundingClientRect();
-      const rect: WebViewRect = { x: round1(r.left), y: round1(r.top), w: round1(r.width), h: round1(r.height) };
+      const { rect, target, radius } = measureTile(c.element);
       const st = this.viewStates[c.id]?.state;
       views.push({
         id: c.id,
         url: c.url,
         rect,
+        radius,
         interactive: c.immersive && this.interactive,
         visible: computeVisible({
           supported,
@@ -310,7 +306,7 @@ export class WebViewHost {
           connected: c.element.isConnected,
           loadFailed: st === 'error' || st === 'crashed',
           rect,
-          el: c.element,
+          el: target,
           hit,
         }),
       });

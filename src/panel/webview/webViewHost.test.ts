@@ -111,7 +111,7 @@ describe('sync stream', () => {
     bridge.push(caps());
     const [first] = syncs();
     expect(first.views).toEqual([{
-      id: 'a', url: 'https://a.test/', rect: { x: 10, y: 20, w: 300, h: 300 }, interactive: false, visible: true,
+      id: 'a', url: 'https://a.test/', rect: { x: 10, y: 20, w: 300, h: 300 }, radius: 0, interactive: false, visible: true,
     }]);
     expect(first.viewport).toEqual({ w: window.innerWidth, h: window.innerHeight });
     vi.advanceTimersByTime(2500);
@@ -205,6 +205,32 @@ describe('sync stream', () => {
     host.register({ id: 'a', url: 'https://a.test/', element: makeEl().el, immersive: true });
     bridge.push(caps({ interactive: false }));
     expect(syncs().at(-1)!.views[0].interactive).toBe(false);
+  });
+});
+
+describe('card geometry', () => {
+  it('sends the card content box and radius, and treats the card as the hit target', () => {
+    const host = makeHost();
+    const card = document.createElement('div');
+    card.className = 'panel-card';
+    card.style.borderTopLeftRadius = '16px';
+    card.getBoundingClientRect = () => ({
+      left: 15, top: 10, width: 704, height: 500, right: 719, bottom: 510, x: 15, y: 10, toJSON: () => ({}),
+    });
+    const scaler = makeEl({ x: 0, y: 10, w: 734, h: 500 }).el;
+    card.appendChild(scaler);
+    document.body.appendChild(card);
+    document.elementFromPoint = () => scaler;
+    host.register({ id: 'a', url: 'https://a.test/', element: scaler, immersive: false });
+    bridge.push(caps());
+    expect(syncs().at(-1)!.views[0]).toMatchObject({ rect: { x: 15, y: 10, w: 704, h: 500 }, radius: 16, visible: true });
+  });
+
+  it('is square with no card (immersive)', () => {
+    const host = makeHost();
+    host.register({ id: 'a', url: 'https://a.test/', element: makeEl().el, immersive: true });
+    bridge.push(caps());
+    expect(syncs().at(-1)!.views[0].radius).toBe(0);
   });
 });
 

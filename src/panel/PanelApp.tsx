@@ -1114,7 +1114,7 @@ export function PanelContent({
       || immersiveWidgetId,
   );
   // Any state that moves or covers tiles hides the native web views.
-  const webViewSuppressed = Boolean(sheetMode) || trayOpen || controlCenterOpen
+  const webViewSuppressed = Boolean(sheetMode) || trayOpen || controlCenterOpen || Boolean(touch.ctxMenu)
     || touch.rearranging || Boolean(dragArmedId) || Boolean(activeDragId);
   useEffect(() => {
     webViewHost.setSuppressed(webViewSuppressed);

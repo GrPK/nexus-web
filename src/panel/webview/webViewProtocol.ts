@@ -15,6 +15,8 @@ export interface WebViewSyncView {
   rect: WebViewRect;
   interactive: boolean;
   visible: boolean;
+  /** Corner radius in CSS px of the visible card; absent or 0 means square. */
+  radius?: number;
 }
 
 export interface WebViewHello { type: 'nexus.webview.hello'; version: number }

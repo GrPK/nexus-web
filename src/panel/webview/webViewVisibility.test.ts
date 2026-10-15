@@ -12,10 +12,12 @@ function setup() {
 }
 
 describe('probePoints', () => {
-  it('returns the center and four corners inside the rect', () => {
+  it('returns a 3x3 grid plus four edge midpoints inside the rect', () => {
     const pts = probePoints(rect);
-    expect(pts).toHaveLength(5);
-    expect(pts[0]).toEqual([300, 350]);
+    expect(pts).toHaveLength(13);
+    expect(pts).toContainEqual([300, 350]);
+    expect(pts).toContainEqual([300, 202]);
+    expect(pts).toContainEqual([102, 350]);
     for (const [x, y] of pts) {
       expect(x).toBeGreaterThanOrEqual(rect.x);
       expect(x).toBeLessThanOrEqual(rect.x + rect.w);
@@ -26,7 +28,7 @@ describe('probePoints', () => {
 
   it('keeps corners distinct on a tiny rect', () => {
     const pts = probePoints({ x: 0, y: 0, w: 10, h: 10 });
-    expect(new Set(pts.map(p => p.join(','))).size).toBe(5);
+    expect(new Set(pts.map(p => p.join(','))).size).toBe(13);
   });
 });
 
@@ -41,6 +43,11 @@ describe('isTopmost', () => {
     const { el, other } = setup();
     let n = 0;
     expect(isTopmost(el, rect, () => (++n === 3 ? other : el))).toBe(false);
+  });
+
+  it('fails when a slim bar covers only an edge midpoint', () => {
+    const { el, other } = setup();
+    expect(isTopmost(el, rect, (_x, y) => (y < rect.y + 3 ? other : el))).toBe(false);
   });
 
   it('fails when a point is outside the document', () => {

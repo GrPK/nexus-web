@@ -8,18 +8,26 @@ const MIN_INSET = 4;
 const MAX_INSET = 24;
 const INSET_FRACTION = 0.12;
 
-/** The five probe points: center plus four inset corners. */
+// Edge midpoints sit this close to the true edge, where a slim bar or toast
+// along a side would otherwise slip between the inset grid points.
+const EDGE_INSET = 2;
+
+/** A 3x3 grid on the inset rect plus the four edge midpoints. */
 export function probePoints(rect: WebViewRect): Array<[number, number]> {
   const inset = Math.min(MAX_INSET, Math.max(MIN_INSET, Math.min(rect.w, rect.h) * INSET_FRACTION));
-  const cx = rect.x + rect.w / 2;
-  const cy = rect.y + rect.h / 2;
-  return [
-    [cx, cy],
-    [rect.x + inset, rect.y + inset],
-    [rect.x + rect.w - inset, rect.y + inset],
-    [rect.x + inset, rect.y + rect.h - inset],
-    [rect.x + rect.w - inset, rect.y + rect.h - inset],
-  ];
+  const xs = [rect.x + inset, rect.x + rect.w / 2, rect.x + rect.w - inset];
+  const ys = [rect.y + inset, rect.y + rect.h / 2, rect.y + rect.h - inset];
+  const pts: Array<[number, number]> = [];
+  for (const y of ys) for (const x of xs) pts.push([x, y]);
+  const cx = xs[1];
+  const cy = ys[1];
+  pts.push(
+    [cx, rect.y + EDGE_INSET],
+    [cx, rect.y + rect.h - EDGE_INSET],
+    [rect.x + EDGE_INSET, cy],
+    [rect.x + rect.w - EDGE_INSET, cy],
+  );
+  return pts;
 }
 
 /**
