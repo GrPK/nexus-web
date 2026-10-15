@@ -1,0 +1,60 @@
+# Fork-only check for feat/tl-zone-select (not part of the PR): installs, tests, lints and builds the
+# dashboard on GitHub's runner, and uploads the service build for a local test. The baseline job runs
+# the same full checks on main, so failures that were already there can be told apart.
+name: fork-check
+
+on:
+  push:
+    branches: [ci-build]
+  workflow_dispatch:
+
+jobs:
+  change:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Tests of the changed page
+        run: npx vitest run src/components/views/DevicePage/LianLiWirelessLightingTab.test.tsx
+      - name: Lint of the changed files
+        run: npx eslint src/api/lianli-wireless.ts src/components/views/DevicePage/LianLiWirelessLightingTab.tsx src/components/views/DevicePage/LianLiWirelessLightingTab.test.tsx
+      - name: Locale parity
+        run: node scripts/audit-locales.mjs
+      - name: Type check and service build
+        run: npm run build:service
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nexus-web-service-dist
+          path: dist
+          retention-days: 14
+      - name: Full test suite
+        if: always()
+        continue-on-error: true
+        run: npm test
+      - name: Full lint
+        if: always()
+        continue-on-error: true
+        run: npm run lint
+
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Full test suite on main
+        continue-on-error: true
+        run: npm test
+      - name: Full lint on main
+        if: always()
+        continue-on-error: true
+        run: npm run lint
