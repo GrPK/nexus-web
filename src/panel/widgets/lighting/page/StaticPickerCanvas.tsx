@@ -4,7 +4,7 @@ import { useTranslation } from '../../../../lib/i18n';
 import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import {
   PICKER_SEGMENT_COLS, PICKER_SEGMENT_ROWS, SEGMENT_SWATCHES,
-  pickerHexAt, pickerPointFor, sameSwatch, segmentCellFor, snapToSegment,
+  pickerHexAt, pickerPointFor, sameSwatch, segmentCellFor, segmentHexAt,
 } from './staticPickerField';
 import styles from '../LightingPage.module.scss';
 
@@ -79,7 +79,8 @@ export function StaticPickerCanvas({
   const [notice, setNotice] = useState<{ title: string; body: string; seq: number } | null>(null);
   const noticeSeq = useRef(0);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragging = useRef(false);
+  // The pointer that owns the current pick; a second contact never steers it.
+  const activePointer = useRef<number | null>(null);
   const lastHex = useRef<string | null>(null);
   // Held only while the input is focused, so a half-typed hex is not clobbered
   // by the value the last valid keystroke already committed.
@@ -162,8 +163,7 @@ export function StaticPickerCanvas({
     if (!r.width || !r.height) return null;
     const fx = (clientX - r.left) / r.width;
     const fy = (clientY - r.top) / r.height;
-    const p = segmented ? snapToSegment(fx, fy) : { x: fx, y: fy };
-    return pickerHexAt(p.x, p.y);
+    return segmented ? segmentHexAt(fx, fy) : pickerHexAt(fx, fy);
   }, [segmented]);
 
   const blocked = () => {
@@ -175,26 +175,28 @@ export function StaticPickerCanvas({
   };
 
   const handleDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // A primary down takes over, so a missed release can never lock the field.
+    if (activePointer.current !== null && e.pointerId !== activePointer.current && !e.isPrimary) return;
     if (blocked()) return;
     const picked = hexAtEvent(e.clientX, e.clientY);
     if (!picked) return;
-    dragging.current = true;
+    activePointer.current = e.pointerId;
     lastHex.current = picked;
     e.currentTarget.setPointerCapture(e.pointerId);
     onPreview(picked);
   };
 
   const handleMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragging.current) return;
+    if (e.pointerId !== activePointer.current) return;
     const picked = hexAtEvent(e.clientX, e.clientY);
     if (!picked || picked === lastHex.current) return;
     lastHex.current = picked;
     onPreview(picked);
   };
 
-  const handleUp = () => {
-    if (!dragging.current) return;
-    dragging.current = false;
+  const handleUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerId !== activePointer.current) return;
+    activePointer.current = null;
     if (lastHex.current) onCommit(lastHex.current);
   };
 
@@ -230,6 +232,7 @@ export function StaticPickerCanvas({
         onPointerMove={handleMove}
         onPointerUp={handleUp}
         onPointerCancel={handleUp}
+        onLostPointerCapture={handleUp}
       >
         {!patternEffect && segmented && (
           <div
