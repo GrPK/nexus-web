@@ -71,6 +71,13 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   const showAudioOutput = platform === 'windows';
   const audioOutput = useLightingAudioOutput(showAudioOutput && serviceOnline);
 
+  // Another surface can switch Lighting off while one of these dialogs is open.
+  useEffect(() => {
+    if (features.lighting) return;
+    setScheduleOpen(false);
+    setRestartOpen(false);
+  }, [features.lighting]);
+
   useEffect(() => {
     if (!showGpuPicker || !serviceOnline) return;
     let cancelled = false;

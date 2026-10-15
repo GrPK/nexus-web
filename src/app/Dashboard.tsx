@@ -61,7 +61,8 @@ import { UiSettingsProvider } from '../hooks/useUiSettings';
 import { LightingFeatureSeed } from './LightingFeatureSeed';
 import { PillarsReporter } from './PillarsReporter';
 import { importStepOffered } from './importStep';
-import type { FeatureFlags } from '../hooks/useUiSettings';
+import { usePillarsLatch } from './usePillarsLatch';
+import { useNexus2NonCoolingContent } from './useNexus2NonCoolingContent';
 import { useTranslation } from '../lib/i18n';
 import { applyThemeMode, applyAccentColor, cachePreferencesLocally, loadSettings } from '../lib/settings';
 import type { Preferences } from '../api/profiles';
@@ -428,11 +429,19 @@ export function Dashboard() {
   // on dismissal, so it is offered once per app and never for an app already
   // dealt with - whether or not that app turned out to have data to import.
   // Null until preferences are read; the step stays closed until then so a hidden source never flashes.
-  const [pillars, setPillars] = useState<FeatureFlags | null>(null);
-  const coolingOn = pillars?.cooling ?? true;
+  const { pillars, report: reportPillars } = usePillarsLatch(
+    onboardingGeneration,
+    onboardingStatus === 'unknown' || welcomeOpen || featuresOpen,
+  );
+  // An unknown value (the preferences read failed) decides as before pillars existed.
+  const coolingOn = pillars?.flags?.cooling ?? true;
+  const nexus2NonCooling = useNexus2NonCoolingContent(pillars !== null && !coolingOn && nexus2.status === 'pending');
+  const pillarsReady = pillars !== null && nexus2NonCooling !== null;
+  const nexus2Offered = nexus2.status === 'pending' && (coolingOn || nexus2NonCooling === true);
+  const fanControlOffered = fanControl.status === 'pending' && coolingOn;
   // FanControl is a cooling import, so with Cooling off it is not offered here (the Cooling page still has it).
-  const importOffered = importStepOffered(nexus2.status === 'pending', fanControl.status === 'pending', coolingOn);
-  const importOpen = pillars !== null && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
+  const importOffered = importStepOffered(nexus2.status === 'pending', nexus2NonCooling !== false, fanControl.status === 'pending', coolingOn);
+  const importOpen = pillarsReady && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
     && fanControl.status !== 'unknown'
     && (onboardingStatus === 'completed' || onboardingDismissed)
     && !welcomeOpen && !featuresOpen && importOffered && !importDismissed;
@@ -456,14 +465,14 @@ export function Dashboard() {
   // Live from the moment the gates before it close until the step is spent
   // or completed; the gates behind it (and the dashboard) wait on it, so the
   // snapshot read cannot flash them open before the decision.
-  const conflictStepPending = pillars !== null && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
+  const conflictStepPending = pillarsReady && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
     && fanControl.status !== 'unknown'
     && ranEarlierGate && !welcomeOpen && !featuresOpen && !importOpen && !conflictStepDone;
   // Last gate: device selection, against the fullest device list. Waits on
   // nexus2.status resolving so it cannot flash open before the heavier
   // Nexus 2 detection read decides whether the import gate comes first.
   // Skipped entirely when the features gate already turned Lighting off.
-  const lightingOnboardingOpen = pillars !== null && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
+  const lightingOnboardingOpen = pillarsReady && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
     && fanControl.status !== 'unknown'
     && !welcomeOpen && !importOpen && !featuresOpen && !conflictStepPending && !lightingFeatureOff
     && lightingStatus === 'pending' && !lightingOnboardingDismissed;
@@ -483,8 +492,8 @@ export function Dashboard() {
       completeOnboarding(),
       completeFeaturesOnboarding(),
       completeLightingOnboarding(),
-      ...(nexus2.status === 'pending' ? [dismissNexus2Welcome()] : []),
-      ...(fanControl.status === 'pending' ? [dismissFanControlImport()] : []),
+      ...(nexus2Offered ? [dismissNexus2Welcome()] : []),
+      ...(fanControlOffered ? [dismissFanControlImport()] : []),
     ]).then(() => { latchedAt.current = Date.now(); });
     setOnboardingDismissed(true);
     setFeaturesOnboardingDismissed(true);
@@ -492,7 +501,7 @@ export function Dashboard() {
     setLightingOnboardingDismissed(true);
     setConflictStepDone(true);
     setWelcomeRevisit(false);
-  }, [nexus2.status, fanControl.status]);
+  }, [nexus2Offered, fanControlOffered]);
 
   // 'unknown' renders neither the dashboard nor any onboarding gate (only
   // the app background) so a fresh install never flashes the dashboard
@@ -505,7 +514,7 @@ export function Dashboard() {
   // from a local flag, but the service's Nexus 2 detection ladder is a
   // heavier read - without this the dashboard would flash before
   // Nexus2WelcomeScreen pops in on top of it.
-  const showDashboard = onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
+  const showDashboard = pillarsReady && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
     && fanControl.status !== 'unknown'
     && !welcomeOpen && !featuresOpen && !lightingOnboardingOpen && !importOpen && !conflictStepPending;
   const multiplex = useMultiplexConnection(online);
@@ -1124,7 +1133,7 @@ export function Dashboard() {
         {/* Feature-pillars gate: lets the user turn off whole functional
             areas up front. Back only steps into first-run onboarding while
             that sequence is still running. */}
-        <PillarsReporter onPillars={setPillars} />
+        <PillarsReporter onPillars={reportPillars} generation={onboardingGeneration} />
         <LightingFeatureSeed active={featuresStatus === 'completed'} lightingPending={lightingStatus === 'pending'} onLightingOff={markLightingFeatureOff} />
         <FeaturesOnboardingScreen
           open={featuresOpen}
@@ -1149,8 +1158,8 @@ export function Dashboard() {
           // an app already dealt with is still listed if it holds data, but off
           // by default so it cannot re-apply itself.
           offeredFor={{
-            nexus2: nexus2.status === 'pending',
-            fancontrol: fanControl.status === 'pending',
+            nexus2: nexus2Offered,
+            fancontrol: fanControlOffered,
           }}
           coolingOn={coolingOn}
           onComplete={() => setImportDismissed(true)}

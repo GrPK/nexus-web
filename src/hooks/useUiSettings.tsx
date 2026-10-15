@@ -207,6 +207,8 @@ interface UiSettingsContextValue {
    * (accentSource='system') makes them clobber the real accent.
    */
   hydrated: boolean;
+  /** The last attempt to read the server preferences found nothing (offline, failed, or no answer). */
+  hydrationFailed: boolean;
 }
 
 const UiSettingsContext = createContext<UiSettingsContextValue | null>(null);
@@ -572,6 +574,7 @@ export function UiSettingsProvider({
     fromNexusSettings(loadSettings()),
   );
   const [hydrated, setHydrated] = useState(false);
+  const [hydrationFailed, setHydrationFailed] = useState(false);
 
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingWriteRef = useRef<PreferencesPatch | null>(null);
@@ -651,7 +654,7 @@ export function UiSettingsProvider({
   }, [persistLocal, scheduleServerWrite, setLanguage, manageDom]);
 
   const reload = useCallback((coalesceWithPendingWrite = false) => {
-    if (!serviceOnline) return;
+    if (!serviceOnline) { setHydrationFailed(true); return; }
     // The 'prefs' topic echoes our OWN writes back. A theme toggle makes two
     // /preferences writes: themeMode (debounced 250ms via scheduleServerWrite)
     // and, through ResolvedThemeSync, resolvedThemeMode (immediate). The
@@ -663,7 +666,7 @@ export function UiSettingsProvider({
     // server is consistent. (Mount / profile-switch reloads pass false.)
     if (coalesceWithPendingWrite && writeTimer.current) return;
     fetchPreferences().then(prefs => {
-      if (!prefs) return;
+      if (!prefs) { setHydrationFailed(true); return; }
       setSettings(prev => {
         const next = { ...applyServerToLocal(prefs, prev), ...pendingLocalRef.current };
         persistLocal(next);
@@ -691,6 +694,7 @@ export function UiSettingsProvider({
         }
       }
       setHydrated(true);
+      setHydrationFailed(false);
       // Mirror to the legacy cache so code paths still reading via
       // loadSettings() see refreshed values. Removable once every view
       // goes through this hook.
@@ -706,7 +710,7 @@ export function UiSettingsProvider({
         pinnedSidebarApps: prefs.ui?.pinnedSidebarApps,
         sidebarAppOrder: prefs.ui?.sidebarAppOrder,
       });
-    }).catch(() => { /* best-effort */ });
+    }).catch(() => { setHydrationFailed(true); });
   }, [serviceOnline, persistLocal, setLanguage, manageDom, scheduleServerWrite]);
 
   // Hydrate from server when online or when the profile changes.
@@ -737,8 +741,8 @@ export function UiSettingsProvider({
   }, []);
 
   const value = useMemo<UiSettingsContextValue>(() => ({
-    settings, update, reload, hydrated,
-  }), [settings, update, reload, hydrated]);
+    settings, update, reload, hydrated, hydrationFailed,
+  }), [settings, update, reload, hydrated, hydrationFailed]);
 
   return (
     <UiSettingsContext.Provider value={value}>
@@ -859,6 +863,16 @@ export function useIgnoredComponents(): { isIgnored: (id: string) => boolean; to
 export function useUiSettingsHydrated(): boolean {
   const ctx = useContext(UiSettingsContext);
   return ctx ? ctx.hydrated : true;
+}
+
+/**
+ * Whether the first preferences read has an outcome, success or failure, so a
+ * gate waiting on it is never stuck behind an unreachable service. True
+ * outside a provider.
+ */
+export function useUiSettingsSettled(): boolean {
+  const ctx = useContext(UiSettingsContext);
+  return ctx ? ctx.hydrated || ctx.hydrationFailed : true;
 }
 
 /** One of the four global feature switches (Lighting, Cooling, Monitoring, Diagnostics). */

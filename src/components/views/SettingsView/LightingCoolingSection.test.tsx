@@ -121,6 +121,18 @@ describe('LightingCoolingSection section split', () => {
     expect(screen.getByRole('button', { name: 'cooling.settings.cpuLabel' })).toBeInTheDocument();
   });
 
+  it('closes the brightness schedule dialog when Lighting turns off while it is open', async () => {
+    const view = render(<LightingCoolingSection serviceOnline platform="windows" />);
+    await screen.findByText('lighting.schedule.row.off');
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.schedule.row.action' }));
+    expect(screen.getByRole('switch', { name: 'lighting.schedule.enable.label' })).toBeInTheDocument();
+
+    prefs.lighting = false;
+    view.rerender(<LightingCoolingSection serviceOnline platform="windows" />);
+
+    expect(screen.queryByRole('switch', { name: 'lighting.schedule.enable.label' })).toBeNull();
+  });
+
   it('keeps the Lighting section for the schedule row before the platform resolves', () => {
     // The blackout rows are platform-gated; the schedule row is not, so the
     // section is never empty, even before the platform ping resolves.

@@ -88,4 +88,22 @@ describe('useSearchAnchorScroller', () => {
     await vi.waitFor(() => expect(spy).toHaveBeenCalled());
     notice.remove();
   });
+
+  it('prefers a mounted row over a notice that also lists its anchor', async () => {
+    const row = document.createElement('div');
+    row.setAttribute('data-search-anchor', 'set-both');
+    const notice = document.createElement('div');
+    notice.setAttribute('data-search-fallback', 'set-both');
+    document.body.append(row, notice);
+    const rowSpy = vi.spyOn(row, 'scrollIntoView').mockImplementation(() => {});
+    const noticeSpy = vi.spyOn(notice, 'scrollIntoView').mockImplementation(() => {});
+
+    renderHook(() => useSearchAnchorScroller());
+    requestSearchScroll('set-both');
+
+    await vi.waitFor(() => expect(rowSpy).toHaveBeenCalled());
+    expect(noticeSpy).not.toHaveBeenCalled();
+    row.remove();
+    notice.remove();
+  });
 });

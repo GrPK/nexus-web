@@ -26,7 +26,8 @@ vi.mock('../../../hooks/useUiSettings', () => ({
   useUiSettings: () => ({ settings: uiSettings, update }),
   useFeatureFlags: () => ({ lighting: true, ...pillars }),
 }));
-vi.mock('../../../hooks/useMultiplexSocket', () => ({ useTopicCallback: () => {} }));
+const topic = vi.hoisted(() => ({ cbs: {} as Record<string, () => void> }));
+vi.mock('../../../hooks/useMultiplexSocket', () => ({ useTopicCallback: (name: string, _e: boolean, cb: () => void) => { topic.cbs[name] = cb; } }));
 
 describe('SmartPollSection', () => {
   beforeEach(() => {
@@ -109,11 +110,33 @@ describe('SmartPollSection', () => {
     expect(screen.queryByText('settings.pillarOff.smartPoll')).toBeNull();
   });
 
-  it('refetches when a pillar changes, so the notice follows the switches', async () => {
+  it('shows neither the rows nor the notice until the first answer arrives', async () => {
+    let answer!: (v: Awaited<ReturnType<typeof fetchSmartPoll>>) => void;
+    vi.mocked(fetchSmartPoll).mockReturnValue(new Promise(r => { answer = r; }));
+    render(<SmartPollSection serviceOnline />);
+    expect(screen.queryByLabelText('settings.smartPoll.defaultLabel')).toBeNull();
+    expect(screen.queryByText('settings.pillarOff.smartPoll')).toBeNull();
+    answer({ defaultSeconds: 30, perDrive: true, choices: SMART_POLL_CHOICES, drives: [], active: false });
+    expect(await screen.findByText('settings.pillarOff.smartPoll')).toBeInTheDocument();
+  });
+
+  it('refetches on the preferences topic, not when a pillar flips locally', async () => {
     const view = render(<SmartPollSection serviceOnline />);
     await waitFor(() => expect(fetchSmartPoll).toHaveBeenCalledTimes(1));
     Object.assign(pillars, { monitoring: false });
     view.rerender(<SmartPollSection serviceOnline />);
-    await waitFor(() => expect(fetchSmartPoll).toHaveBeenCalledTimes(2));
+    expect(fetchSmartPoll).toHaveBeenCalledTimes(1);
+    vi.mocked(fetchSmartPoll).mockResolvedValue({ defaultSeconds: 30, perDrive: true, choices: SMART_POLL_CHOICES, drives: [], active: false });
+    topic.cbs.prefs();
+    expect(await screen.findByText('settings.pillarOff.smartPoll')).toBeInTheDocument();
+    expect(fetchSmartPoll).toHaveBeenCalledTimes(2);
+  });
+
+  it('refetches when the service pings the smart-poll topic', async () => {
+    render(<SmartPollSection serviceOnline />);
+    await waitFor(() => expect(fetchSmartPoll).toHaveBeenCalledTimes(1));
+    vi.mocked(fetchSmartPoll).mockResolvedValue({ defaultSeconds: 30, perDrive: true, choices: SMART_POLL_CHOICES, drives: [], active: false });
+    topic.cbs['smart-poll']();
+    expect(await screen.findByText('settings.pillarOff.smartPoll')).toBeInTheDocument();
   });
 });

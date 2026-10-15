@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { HardDrive } from 'lucide-react';
+import { Spinner } from '../../common/Spinner/Spinner';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { SettingSlider, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
-import { useFeatureFlags, useUiSettings } from '../../../hooks/useUiSettings';
+import { useUiSettings } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import {
   defaultSecondsForMedia, fetchSmartPoll, SMART_POLL_CHOICES, SMART_POLL_NEVER,
@@ -22,9 +23,11 @@ export function SmartPollSection({ serviceOnline }: { serviceOnline: boolean }) 
   const { settings, update } = useUiSettings();
   const [drives, setDrives] = useState<SmartPollDrive[]>([]);
   const [serviceActive, setServiceActive] = useState<boolean | undefined>(undefined);
-  const features = useFeatureFlags();
+  // False until the first answer, so neither the rows nor the notice show for a moment and then swap.
+  const [fetched, setFetched] = useState(false);
   // An older service omits the flag and always polls, so the section stays.
   const active = serviceActive !== false;
+  const awaitingFirstRead = !!serviceOnline && !fetched;
   const perDrive = settings.smartPollPerDrive;
 
   const load = useCallback(() => {
@@ -32,13 +35,16 @@ export function SmartPollSection({ serviceOnline }: { serviceOnline: boolean }) 
     let cancelled = false;
     void fetchSmartPoll()
       .then(res => { if (!cancelled && res) { setDrives(res.drives); setServiceActive(res.active); } })
-      .catch(() => { /* the section renders the default row alone */ });
+      .catch(() => { /* the section renders the default row alone */ })
+      .finally(() => { if (!cancelled) setFetched(true); });
     return () => { cancelled = true; };
   }, [serviceOnline]);
 
-  useEffect(() => load(), [load, features.monitoring, features.diagnostics, features.cooling]);
-  // The service recomputes the flag once it has the new pillars, which the preferences topic announces.
+  useEffect(() => load(), [load]);
+  // The service recomputes the flag after a preferences write and announces it on the preferences topic.
   useTopicCallback('prefs', serviceOnline, load);
+  // The service pings this when the flag flips on its own (a live consumer connecting, a curve using a drive).
+  useTopicCallback('smart-poll', serviceOnline, load);
 
   const label = useCallback((seconds: number) => {
     if (seconds === SMART_POLL_NEVER) return t('settings.smartPoll.never');
@@ -65,8 +71,9 @@ export function SmartPollSection({ serviceOnline }: { serviceOnline: boolean }) 
     <SettingsSection
       title={t('settings.smartPoll.title')}
       description={t('settings.smartPoll.description')}
-      pillarOff={active ? undefined : { message: t('settings.pillarOff.smartPoll'), anchors: SMART_POLL_ANCHORS }}
+      pillarOff={active || awaitingFirstRead ? undefined : { message: t('settings.pillarOff.smartPoll'), anchors: SMART_POLL_ANCHORS }}
     >
+      {awaitingFirstRead ? <div data-settings-aside><Spinner size={20} /></div> : <>
       <SettingToggle
         label={t('settings.smartPoll.perDriveLabel')}
         anchorId="set-smart-poll-per-drive"
@@ -112,6 +119,7 @@ export function SmartPollSection({ serviceOnline }: { serviceOnline: boolean }) 
           onChange={i => setDriveSeconds(drive.id, SMART_POLL_CHOICES[i])}
         />
       ))}
+      </>}
     </SettingsSection>
   );
 }
