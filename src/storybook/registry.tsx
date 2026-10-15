@@ -3052,7 +3052,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'FeaturesOnboardingScreen', category: 'modals',
     filePath: 'src/components/common/FeaturesOnboardingScreen/FeaturesOnboardingScreen.tsx',
-    description: 'Non-dismissable onboarding gate, queued right after WelcomeScreen: a 2x2 grid of feature-pillar cards (Lighting, Cooling, Monitoring, Diagnostics), all on by default, and a Continue button that saves all four pillar values before writing /onboarding/features-complete.',
+    description: 'Non-dismissable onboarding gate, queued right after WelcomeScreen: a 2x2 grid of feature-pillar cards (Lighting, Cooling, Monitoring, Diagnostics), all on on a fresh install and starting from the current pillars on a replay, and a Continue button that saves all four pillar values before writing /onboarding/features-complete.',
     notes: 'No live preview - Continue posts real /preferences and /onboarding/features-complete requests (and /onboarding/lighting-complete when Lighting is switched off), so opening it here would mutate the running install\'s feature switches.',
   },
   {

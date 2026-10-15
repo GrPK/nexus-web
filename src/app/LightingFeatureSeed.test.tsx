@@ -39,4 +39,14 @@ describe('LightingFeatureSeed', () => {
     expect(onOff).not.toHaveBeenCalled();
     expect(completeLightingOnboarding).not.toHaveBeenCalled();
   });
+
+  it('posts lighting-complete once across re-renders with a new callback and a hydration flip', () => {
+    state.lighting = false;
+    const { rerender } = render(<LightingFeatureSeed active lightingPending onLightingOff={vi.fn()} />);
+    state.hydrated = false;
+    rerender(<LightingFeatureSeed active lightingPending onLightingOff={vi.fn()} />);
+    state.hydrated = true;
+    rerender(<LightingFeatureSeed active lightingPending onLightingOff={vi.fn()} />);
+    expect(completeLightingOnboarding).toHaveBeenCalledTimes(1);
+  });
 });
