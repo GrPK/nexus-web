@@ -34,6 +34,10 @@ export interface MixerView {
   output: OutputHeader;
   sessions: AudioSession[];
   presets: AudioMixerPreset[];
+  /** False hides the names above the faders. */
+  showLabels: boolean;
+  /** False hides the output band that opens the device picker. */
+  showOutput: boolean;
   changeVolume: (id: string, volume: number) => void;
   commitVolume: (id: string, volume: number) => void;
   toggleMuted: (id: string, muted: boolean) => void;
@@ -70,7 +74,9 @@ export function useMixerView(
 ): MixerView {
   const preview = usePanelPreview();
   const live = !preview;
-  const devices = useAudioDevices(live);
+  const showOutput = (config?.showOutput as boolean | undefined) ?? true;
+  // The list feeds only the output band and its picker, so a hidden band polls nothing.
+  const devices = useAudioDevices(live && showOutput);
   // The endpoints ride the mixer's config revision, so a switch made anywhere
   // re-reads the device list instead of waiting out its 5s poll.
   const mixer = useAudioMixer(live, devices.refresh);
@@ -79,6 +85,7 @@ export function useMixerView(
   const showMaster = (config?.showMaster as boolean | undefined) ?? true;
   const hideIdle = (config?.hideIdle as boolean | undefined) ?? false;
   const showPresets = (config?.showPresets as boolean | undefined) ?? true;
+  const showLabels = (config?.showLabels as boolean | undefined) ?? true;
 
   const sessions = preview ? MIXER_PREVIEW.sessions : mixer.sessions;
   const visible = hideIdle ? sessions.filter(s => s.active) : sessions;
@@ -127,6 +134,8 @@ export function useMixerView(
     master,
     output,
     sessions: visible,
+    showLabels,
+    showOutput,
     presets: showPresets ? (preview ? MIXER_PREVIEW.presets : mixer.presets) : [],
     changeVolume: mixer.changeVolume,
     commitVolume: mixer.commitVolume,
@@ -143,6 +152,8 @@ export function MixerBody({
   output,
   sessions,
   presets,
+  showLabels,
+  showOutput,
   immersive,
   changeVolume,
   commitVolume,
@@ -151,6 +162,12 @@ export function MixerBody({
 }: MixerView) {
   const { t } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Otherwise the picker would reopen by itself when the band comes back.
+  const [sawOutput, setSawOutput] = useState(showOutput);
+  if (sawOutput !== showOutput) {
+    setSawOutput(showOutput);
+    if (!showOutput) setPickerOpen(false);
+  }
   // Master rides the same row, so it pages with everything else.
   const faders: Array<AudioSession | null> = [...(master ? [null] : []), ...sessions];
   const pager = useFaderPager(faders, FADERS_PER_PAGE);
@@ -159,7 +176,7 @@ export function MixerBody({
     arrowReserve: PRESET_ARROW_RESERVE,
   });
 
-  if (pickerOpen) {
+  if (pickerOpen && showOutput) {
     return (
       <div className={styles.mixer} data-immersive={immersive ? 'true' : 'false'}>
         <MixerOutputPicker
@@ -177,7 +194,7 @@ export function MixerBody({
 
   return (
     <div className={styles.mixer} data-immersive={immersive ? 'true' : 'false'}>
-      <MixerOutputSection name={output.name} onClick={() => setPickerOpen(true)} />
+      {showOutput && <MixerOutputSection name={output.name} onClick={() => setPickerOpen(true)} />}
 
       <div className={styles.faderStage} data-paged={pager.paged ? 'true' : 'false'}>
         {pager.paged && (
@@ -194,6 +211,7 @@ export function MixerBody({
             <MixerStrip
               key="@master"
               name={t('panel.widget.mixer.master')}
+              showLabel={showLabels}
               volume={master!.volume}
               muted={master!.muted}
               disabled={!master!.supported}
@@ -206,6 +224,7 @@ export function MixerBody({
               key={session.id}
               id={session.id}
               name={sessionLabel(session, t)}
+              showLabel={showLabels}
               volume={session.volume}
               muted={session.muted}
               peak={session.peak}
