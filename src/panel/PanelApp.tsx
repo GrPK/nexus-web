@@ -57,6 +57,7 @@ import { PanelScreenSleep } from './chrome/PanelScreenSleep';
 import { PanelSwipeHint } from './chrome/PanelSwipeHint';
 import { hasTouchInput, usePanelSwipeOnboarding } from './engine/usePanelSwipeOnboarding';
 import { PanelImmersiveOverlay } from './overlays/PanelImmersiveOverlay';
+import { webViewHost } from './webview/webViewHost';
 import {
   canMarkImmersiveOnLoad,
   immersiveOnLoadResolvable,
@@ -1112,6 +1113,13 @@ export function PanelContent({
       || activeDragId
       || immersiveWidgetId,
   );
+  // Any state that moves or covers tiles hides the native web views.
+  const webViewSuppressed = Boolean(sheetMode) || trayOpen || controlCenterOpen
+    || touch.rearranging || Boolean(dragArmedId) || Boolean(activeDragId);
+  useEffect(() => {
+    webViewHost.setSuppressed(webViewSuppressed);
+    return () => webViewHost.setSuppressed(false);
+  }, [webViewSuppressed]);
   const { connectionIntroHost, clearConnectionIntro, resetAnnounced } = useConnectionIntro({
     blocked: connectionIntroBlocked,
     embedded,
