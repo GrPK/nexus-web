@@ -2,8 +2,8 @@
 @use '../../../styles/onboarding' as *;
 
 // Shared secondary text treatment for this screen: matches SettingRow's
-// .desc (the telemetry description's own style) so Version, the tagline, and
-// the hint all read as one consistent small muted body size instead of three.
+// .desc (the telemetry description's own style) so Version and the tagline
+// read as one consistent small muted body size instead of three.
 @mixin small-muted {
   font-size: var(--type-small);
   font-weight: var(--weight-body);
@@ -135,12 +135,6 @@ $group-gap: 0.75rem;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-}
-
-.hint {
-  @include small-muted;
-  margin: 0;
-  text-align: center;
 }
 
 .telemetryRow {

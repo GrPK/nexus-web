@@ -1,7 +1,7 @@
 // t() is uninitialised under vitest and returns the raw key, so assertions use
 // key strings for copy.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { AudioMixerPreset } from '../../../api/mixer';
 import { clampPresetName, presetNameTaken } from '../../../api/mixer';
 import type { PanelConfigValue, PanelWidget } from '../../types';
@@ -315,17 +315,16 @@ describe('device order', () => {
     expect(reorderDevices).toHaveBeenCalledWith('input', ['m2', 'm1']);
   });
 
-  it('shows a lone device as an inert row with the same hint', () => {
-    deviceOutputs = [dev('a')];
-    renderSettings();
-    expect(screen.getByText('a')).toBeTruthy();
-    expect(screen.queryByLabelText(MOVE)).toBeNull();
-    expect(screen.getByText('panel.widget.mixer.settings.orderHint')).toBeTruthy();
-  });
-
-  it('shows no section for a direction without devices', () => {
+  it('shows no section for a direction with zero or one device', () => {
     renderSettings();
     expect(screen.queryByText('panel.widget.mixer.settings.outputOrder')).toBeNull();
     expect(screen.queryByText('panel.widget.mixer.settings.inputOrder')).toBeNull();
+    cleanup();
+    deviceOutputs = [dev('a')];
+    deviceInputs = [dev('m1', 'input')];
+    renderSettings();
+    expect(screen.queryByText('panel.widget.mixer.settings.outputOrder')).toBeNull();
+    expect(screen.queryByText('panel.widget.mixer.settings.inputOrder')).toBeNull();
+    expect(screen.queryByLabelText(MOVE)).toBeNull();
   });
 });

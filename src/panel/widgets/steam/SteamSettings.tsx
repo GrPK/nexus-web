@@ -59,18 +59,22 @@ export function SteamSettings({ onSaved }: Partial<WidgetSettingsProps> & { onSa
 
   return (
     <>
-      <SettingsSection title={t('steam.settings.apiTitle')}>
-        <SettingsHint>
-          {t('steam.settings.apiKeyHint.before')}{' '}
-          {/* eslint-disable-next-line i18next/no-literal-string -- URL link text */}
-          <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noreferrer noopener">
-            steamcommunity.com/dev/apikey
-          </a>
-          {' '}{t('steam.settings.apiKeyHint.middle')}{' '}
-          {/* eslint-disable-next-line i18next/no-literal-string -- technical example value */}
-          <code>localhost</code>
-          {t('steam.settings.apiKeyHint.after')}
-        </SettingsHint>
+      <SettingsSection
+        title={t('steam.settings.apiTitle')}
+        description={(
+          <p>
+            {t('steam.settings.apiKeyHint.before')}{' '}
+            {/* eslint-disable-next-line i18next/no-literal-string -- URL link text */}
+            <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noreferrer noopener">
+              steamcommunity.com/dev/apikey
+            </a>
+            {' '}{t('steam.settings.apiKeyHint.middle')}{' '}
+            {/* eslint-disable-next-line i18next/no-literal-string -- technical example value */}
+            <code>localhost</code>
+            {t('steam.settings.apiKeyHint.after')}
+          </p>
+        )}
+      >
         <SettingsRow label={t('steam.settings.apiKeyLabel')}>
           <SettingsInput
             type="password"

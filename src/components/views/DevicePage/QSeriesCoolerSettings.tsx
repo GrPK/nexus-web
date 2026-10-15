@@ -250,11 +250,11 @@ export function QSeriesCoolerSettings() {
 
     </SettingsSection>
 
-    <SettingsSection title={t('devices.q60.lightingFirmwareSection')} boxClassName={styles.sectionBox}>
-      {/* The cooler only drives these LEDs itself when Nexus is not driving them,
-          so say when that is rather than leave the setting looking inert. */}
-      <div className={styles.note} data-settings-aside="true">{t('devices.q60.lightingFirmwareHelp')}</div>
-
+    <SettingsSection
+      title={t('devices.q60.lightingFirmwareSection')}
+      boxClassName={styles.sectionBox}
+      description={<p>{t('devices.q60.lightingFirmwareHelp')}</p>}
+    >
       {!state.fwAnimationSupported ? (
         <div className={styles.note} data-settings-aside="true">{t('devices.q60.fwAnimationUnsupported')}</div>
       ) : (

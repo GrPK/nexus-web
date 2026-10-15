@@ -1846,8 +1846,7 @@ function PreviewSettingsSection() {
     <div data-testid="settings-section-stack" style={{ width: 340 }}>
       <SettingsSection
         title="General"
-        description="Optional muted description under the title."
-        footnote="Footnote: short text under the box."
+        description="Section-level explanation goes here, under the title and outside the box."
         footer={<span style={{ color: 'var(--text-dim)', fontSize: 12 }}>Footer: controls under the box</span>}
       >
         {row('Language')}
@@ -3463,8 +3462,8 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'SettingsSection', category: 'panel-kit',
     filePath: 'src/components/common/SettingsSection/SettingsSection.tsx',
-    description: 'Canonical settings group: a muted header (optional description) above a surface box holding the rows. Sections own the gap below them, so never add a parent gap or margin between sections. Under-box text is `footnote`, under-box controls are `footer`, a column-ending section takes `fill` and `flush`, and non-section children of a stack are wrapped in SettingsBlock. titleStyle recolors the header; boxClassName tunes the box.',
-    notes: 'Rule: sections own the gap below them; no parent gap/margin between sections. footnote = text, footer = controls, SettingsBlock = non-section stack children.',
+    description: 'Canonical settings group: a muted header (optional description) above a surface box holding the rows. Sections own the gap below them, so never add a parent gap or margin between sections. Section-level explanatory text is `description`, never a hint row inside the box (guarded by a test); under-box controls are `footer`, a column-ending section takes `fill` and `flush`, and non-section children of a stack are wrapped in SettingsBlock. titleStyle recolors the header; boxClassName tunes the box.',
+    notes: 'Rule: sections own the gap below them; no parent gap/margin between sections. explanatory text = description (outside the box, never a first-row hint), footer = controls, SettingsBlock = non-section stack children.',
     Preview: PreviewSettingsSection,
   },
   {

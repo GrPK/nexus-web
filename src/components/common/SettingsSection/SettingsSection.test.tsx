@@ -27,22 +27,22 @@ describe('SettingsSection pillarOff', () => {
 // measuring a real render, not here. These tests pin the slots the component
 // owns inside the section, so the enforced gap always follows them.
 describe('SettingsSection slots', () => {
-  it('renders footer then footnote inside the section, after the box', () => {
+  it('renders the description in the header before the box, and the footer after it', () => {
     const { container } = render(
-      <SettingsSection title="Levels" footer={<button type="button">Manage</button>} footnote="Short note">
+      <SettingsSection title="Levels" description="Short intro" footer={<button type="button">Manage</button>}>
         <div>row</div>
       </SettingsSection>,
     );
-    const section = container.querySelector('section');
-    const kids = Array.from(section?.children ?? []);
-    expect(section?.contains(screen.getByText('Short note'))).toBe(true);
-    expect(kids[kids.length - 1]).toBe(screen.getByText('Short note'));
-    expect(kids[kids.length - 2]?.contains(screen.getByRole('button', { name: 'Manage' }))).toBe(true);
+    const kids = Array.from(container.querySelector('section')?.children ?? []);
+    expect(kids).toHaveLength(3);
+    expect(kids[0]?.contains(screen.getByText('Short intro'))).toBe(true);
+    expect(kids[1]?.contains(screen.getByText('Short intro'))).toBe(false);
+    expect(kids[2]?.contains(screen.getByRole('button', { name: 'Manage' }))).toBe(true);
   });
 
   it('omits the slots when they are empty', () => {
     const { container } = render(
-      <SettingsSection title="Levels" footer={undefined} footnote="">
+      <SettingsSection title="Levels" footer={undefined}>
         <div>row</div>
       </SettingsSection>,
     );

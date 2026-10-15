@@ -105,7 +105,7 @@ export function DisplaysSettings({ widget, onUpdate }: WidgetSettingsProps) {
 
   return (
     <div className={styles.settings}>
-      <SettingsSection title={t('displays.settings.title')} footnote={t('displays.settings.hint')}>
+      <SettingsSection title={t('displays.settings.title')} description={t('displays.settings.hint')}>
         {displays === null ? (
           <span className={styles.name}>{hint || t('displays.empty')}</span>
         ) : displays.length === 0 ? (

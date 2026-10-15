@@ -46,7 +46,7 @@ export function GallerySettings({ widget, onUpdate, onSectionNavigate }: WidgetS
             {t('gallery.manage')}
           </Button>
         ) : undefined}
-        footnote={onSectionNavigate ? undefined : t('gallery.settings.manageHint')}
+        description={onSectionNavigate ? undefined : t('gallery.settings.manageHint')}
       >
         {/* Offered only once a playlist exists; until then every widget
             plays the whole library and there is nothing to choose. */}

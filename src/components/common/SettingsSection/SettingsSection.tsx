@@ -20,7 +20,6 @@ export function SettingsSection({
   title,
   description,
   footer,
-  footnote,
   fill,
   flush,
   titleStyle,
@@ -33,14 +32,12 @@ export function SettingsSection({
 }: {
   // Omit for a titleless box (e.g. the welcome screen's preferences group).
   title?: ReactNode;
-  // Optional muted hint under the title (still outside the box). Laid out as a
+  // The one place a section's explanatory text lives: a muted line under the title, outside the box. Laid out as a
   // column, so each child becomes its own stacked line - a sentence with inline
   // markup must be wrapped in a single element or it breaks apart mid-sentence.
   description?: ReactNode;
   // Controls bound to the box (a pager strip under a preview), directly under it.
   footer?: ReactNode;
-  // Short text under the box.
-  footnote?: ReactNode;
   // Grow to fill the parent column and end flush with its bottom.
   fill?: boolean;
   // Drop the gap below, for a section that ends its column or row.
@@ -73,7 +70,6 @@ export function SettingsSection({
         {pillarOff ? <PillarNotice message={pillarOff.message} anchors={pillarOff.anchors} /> : children}
       </div>
       {footer ? <div className={styles.footer}>{footer}</div> : null}
-      {footnote ? <div className={styles.footnote}>{footnote}</div> : null}
     </section>
   );
 }

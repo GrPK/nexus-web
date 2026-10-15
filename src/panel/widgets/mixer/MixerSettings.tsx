@@ -212,7 +212,7 @@ export function MixerSettings({ widget, surface, desktopEditor, onUpdate }: Widg
   );
 }
 
-/** Drag order of the plugged-in devices; a lone device keeps the row layout with an inert handle slot. */
+/** Drag order of the plugged-in devices; with fewer than two there is nothing to order, so no section. */
 function DeviceOrder({ title, devices, onReorder }: {
   title: string;
   devices: AudioDevice[];
@@ -222,12 +222,10 @@ function DeviceOrder({ title, devices, onReorder }: {
   // A device unplugged mid-drag keeps its name on the overlay and the aria label.
   const names = useRef(new Map<string, string>());
   for (const d of devices) names.current.set(d.id, d.name);
-  if (devices.length === 0) return null;
+  if (devices.length < 2) return null;
   const nameOf = (id: string) => names.current.get(id) ?? '';
-  const draggable = devices.length > 1;
   return (
-    <SettingsSection title={title}>
-      <SettingsHint>{t('panel.widget.mixer.settings.orderHint')}</SettingsHint>
+    <SettingsSection title={title} description={t('panel.widget.mixer.settings.orderHint')}>
       <SortableList
         opaqueOverlay
         ariaLabel={title}
@@ -239,18 +237,14 @@ function DeviceOrder({ title, devices, onReorder }: {
             style={a.style}
             className={`${styles.orderRow} ${a.isDragging ? a.placeholderClassName : ''}`}
           >
-            {draggable ? (
-              <span
-                className={styles.orderHandle}
-                {...a.attributes}
-                {...a.listeners}
-                aria-label={t('panel.widget.mixer.aria.moveDevice', { name: nameOf(id) })}
-              >
-                <GripVertical size={18} strokeWidth={2} />
-              </span>
-            ) : (
-              <span className={styles.orderHandle} aria-hidden />
-            )}
+            <span
+              className={styles.orderHandle}
+              {...a.attributes}
+              {...a.listeners}
+              aria-label={t('panel.widget.mixer.aria.moveDevice', { name: nameOf(id) })}
+            >
+              <GripVertical size={18} strokeWidth={2} />
+            </span>
             <span className={styles.orderName}>{nameOf(id)}</span>
           </div>
         )}

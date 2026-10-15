@@ -91,15 +91,15 @@ export function KrakenFirmwareLightingSection() {
     <SettingsSection
       title={t('devices.q60.lightingFirmwareSection')}
       boxClassName={lianli.sectionBox}
+      description={(
+        <>
+          <p>{t('devices.q60.lightingFirmwareHelp')}</p>
+          {/* Bench-proven on an Elite V2: while the host pushes LCD frames the cooler freezes
+              whatever animation is set, and resumes it once the screen stops being streamed. */}
+          <p>{t('devices.nzxt-kraken.lightingFirmwareScreenNote')}</p>
+        </>
+      )}
     >
-      <p className={lianli.customNote} data-settings-aside="true">
-        {t('devices.q60.lightingFirmwareHelp')}
-      </p>
-      {/* Bench-proven on an Elite V2: while the host pushes LCD frames the cooler freezes
-          whatever animation is set, and resumes it once the screen stops being streamed. */}
-      <p className={lianli.customNote} data-settings-aside="true">
-        {t('devices.nzxt-kraken.lightingFirmwareScreenNote')}
-      </p>
 
       {channels.map(channel => {
         const draft = drafts[channel.id];

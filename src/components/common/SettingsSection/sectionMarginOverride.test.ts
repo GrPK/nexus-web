@@ -46,7 +46,7 @@ export function classBody(scss: string, cls: string): string {
 
 // Every `styles.xxx` reference inside the className / boxClassName attributes
 // of the opening tag at `from`, ternaries and template literals included.
-// Classes on elements nested in other props (footer, footnote) are not counted.
+// Classes on elements nested in other props (footer) are not counted.
 export function classRefs(src: string, from: number): Array<[string, string]> {
   const refs: Array<[string, string]> = [];
   let depth = 0;

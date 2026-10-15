@@ -328,7 +328,7 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
   const stackSection: ReactNode = (
     <SettingsSection
       title={t('panel.settings.deck.dial.stack.title')}
-      footnote={entry.action ? undefined : t('panel.settings.deck.dial.emptyHint')}
+      description={entry.action ? undefined : t('panel.settings.deck.dial.emptyHint')}
     >
       {stacked ? (
         <div className={styles.stackList}>
