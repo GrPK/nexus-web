@@ -1,7 +1,6 @@
 @use '../../../styles/text' as *;
 @use '../../../styles/onboarding' as *;
 
-// Secondary text treatment for this screen.
 @mixin small-muted {
   font-size: var(--type-small);
   font-weight: var(--weight-body);

@@ -48,12 +48,12 @@ export function opensWithIntro(rest: string): boolean {
   let conditional = false;
   for (let guard = 0; guard < 6; guard += 1) {
     if (text.startsWith('<>')) { text = text.slice(2).trimStart(); continue; }
-    const cond = /^\{[^<]*?(?:&&|\?(?!\.))\s*\(?\s*/.exec(text);
+    const cond = /^\{[^{}]*?(?:&&|\?(?!\.))\s*\(?\s*/.exec(text);
     if (cond) { conditional = true; text = text.slice(cond[0].length); continue; }
     break;
   }
   // A warning-tone hint is a live state the user must act on, not an intro.
-  if (text.startsWith('<SettingsHint')) return !/\btone=/.test(text.slice(0, tagEnd(text, 0)));
+  if (text.startsWith('<SettingsHint')) return !/\btone="warning"/.test(text.slice(0, tagEnd(text, 0)));
   if (conditional || !/^<p[\s>]/.test(text)) return false;
   return /data-settings-aside|description/i.test(text.slice(0, tagEnd(text, 0)));
 }
@@ -91,6 +91,8 @@ describe('SettingsSection explanatory text', () => {
     expect(startsWithHint(wrap('<p className={styles.description}>x</p>'))).toHaveLength(1);
     expect(startsWithHint(wrap('<p role="status">state</p>'))).toHaveLength(0);
     expect(startsWithHint(wrap('{bad && <SettingsHint tone="warning">x</SettingsHint>}'))).toHaveLength(0);
+    expect(startsWithHint(wrap('{bad && <SettingsHint tone="info">x</SettingsHint>}'))).toHaveLength(1);
+    expect(startsWithHint(wrap('{list.length < 1 && <SettingsHint>x</SettingsHint>}'))).toHaveLength(1);
     expect(startsWithHint(wrap('{open?.x && <SettingsRow label="r" />}'))).toHaveLength(0);
   });
 });
