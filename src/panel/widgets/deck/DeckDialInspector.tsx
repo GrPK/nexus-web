@@ -3,13 +3,11 @@ import { ArrowDown, ArrowUp, Plus, Trash2, X } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { Button } from '../../../components/common/Button/Button';
 import { CollapsibleSection } from '../../../components/common/CollapsibleSection/CollapsibleSection';
-import { EmptyState } from '../../../components/common/EmptyState/EmptyState';
 import { Select } from '../../../components/common/Select/Select';
 import { Slider } from '../../../components/common/Slider/Slider';
 import { useTranslation } from '../../../lib/i18n';
 import { fetchAudioMixer } from '../../../api/mixer';
 import { SettingsRow, SettingsSection } from '../common/SettingsRow/SettingsRow';
-import { SettingsBlock } from '../../../components/common/SettingsSection/SettingsSection';
 import { IconPicker } from '../common/IconPicker';
 import { canEditFreeText } from '../../types';
 import type { PanelSurface } from '../../types';
@@ -328,7 +326,10 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
   }
 
   const stackSection: ReactNode = (
-    <SettingsSection title={t('panel.settings.deck.dial.stack.title')}>
+    <SettingsSection
+      title={t('panel.settings.deck.dial.stack.title')}
+      footnote={entry.action ? undefined : t('panel.settings.deck.dial.emptyHint')}
+    >
       {stacked ? (
         <div className={styles.stackList}>
           {dial.stack!.map((e, i) => (
@@ -365,14 +366,12 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
     <div className={keyStyles.root}>
       {stackSection}
 
-      {action ? (
+      {action && (
         <SettingsSection title={t(`panel.settings.deck.dial.action.${action.type}`)}>
           <div className={keyStyles.fieldStack}>
             <DialActionFields action={action} onChange={a => writeEntry({ ...entry, action: a })} target={target} surface={surface} desktopEditor={desktopEditor} inherited={inherited} />
           </div>
         </SettingsSection>
-      ) : (
-        <SettingsBlock><EmptyState compact title={t('panel.settings.deck.dial.emptyHint')} /></SettingsBlock>
       )}
 
       <SettingsSection title={t('panel.settings.icon')}>

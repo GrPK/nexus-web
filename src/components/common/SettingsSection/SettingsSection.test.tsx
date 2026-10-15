@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { SettingsBlock, SettingsSection } from './SettingsSection';
+import styles from './SettingsSection.module.scss';
 
 // The gap below a section is CSS (jsdom applies none), so it is verified by
 // measuring a real render, not here. These tests pin the slots the component
@@ -43,6 +44,6 @@ describe('SettingsSection gap', () => {
 
   it('wraps a non-section child in the block class', () => {
     const { container } = render(<SettingsBlock><span>note</span></SettingsBlock>);
-    expect(container.firstElementChild?.className).toBeTruthy();
+    expect(container.firstElementChild?.className).toBe(styles.block);
   });
 });

@@ -756,11 +756,14 @@ Uppercase section header for grouping a page. Host renders `src/components/commo
 | `title` | `string` |
 | `grow` | `boolean` |
 
-Every Section carries the standard gap below it, so stacked Sections need no
-`gap` or margin of their own in the parent `Column`; adding one doubles the
-space. `grow` fills the parent's main axis, stretches the box with it and drops
-that gap, so a growing Section ends flush with its parent and Sections side by
-side in an `align="stretch"` row share the taller one's height.
+Every Section carries the standard gap below it. Do not add a `Stack` `gap` (or
+`Spacer`) between Sections: a `Stack direction="column"` with its own `gap` now
+shows both, so the space doubles. A `Stack` gap is still right between a Section
+and non-Section content. `grow` fills the parent's main axis and stretches the
+box with it. A grow Section drops the gap unless something other than another
+grow Section follows it, so a grow Section ends flush with its parent and grow
+Sections side by side in an `align="stretch"` row share the taller one's height.
+A non-grow Section as the last child leaves the standard gap under it.
 
 ### Data visualization
 

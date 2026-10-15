@@ -17,11 +17,16 @@
 }
 
 // Grows along its parent's main axis and ends flush with it, so fill sections
-// side by side in a stretched row keep matching bottom edges.
+// side by side in a stretched row keep matching bottoms. When something other
+// than another fill section follows, the standard gap returns.
 .fill {
-  flex: 1 1 0;
+  flex: 1;
   min-height: 0;
   margin-bottom: 0;
+
+  &:has(+ :not(.fill)) {
+    margin-bottom: var(--space-xl);
+  }
 
   > .box {
     flex: 1 1 auto;

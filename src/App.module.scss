@@ -597,25 +597,8 @@
 }
 
 .phonePairQrPanel,
-.phonePairSessionsPanel {
-  min-width: 0;
-}
-
+.phonePairSessionsPanel,
 .phonePairSessions {
-  min-width: 0;
-}
-
-.phonePairQrPanel,
-.phonePairSessionsPanel {
-  min-width: 0;
-}
-
-// Header-above-box wrapper for the authorized-devices list, mirroring the
-// SettingsSection layout used by the Connection options group.
-.phonePairSessions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
   min-width: 0;
 }
 
