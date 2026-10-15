@@ -1,7 +1,6 @@
 @use '../../../styles/text' as *;
 @use '../../../styles/onboarding' as *;
 
-// Length of the Activity icon's trace path.
 // lucide-react does not forward pathLength, so the dash must be sized to the real length.
 $activity-path-length: 50;
 
@@ -73,8 +72,8 @@ $activity-path-length: 50;
   min-height: 0;
   overflow-y: auto;
   // Room inside the scroller for the hover lift and its shadow tail, which it would clip.
-  padding: 4px 20px 28px;
-  margin: -4px -20px -28px;
+  padding: 4px 20px 12px;
+  margin: -4px -20px -12px;
 }
 
 .pillarCard {
