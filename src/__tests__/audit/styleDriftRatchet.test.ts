@@ -16,7 +16,9 @@ const RATCHETS = [
     // The Frames history card's enlarged avg-fps number needs a tighter
     // line-height than text-heading's own 1.3 (the hero digits otherwise
     // carry visible line-box padding); it added a second raw type line.
-    baseline: 726,
+    // The features onboarding pillar description reserves two lines at its own
+    // 1.45 line-height, no text mixin has that leading.
+    baseline: 727,
     hint: 'use the --radius/--shadow/--alpha/--blur/--ease tokens and text mixins instead of raw values (run "npm run audit:styles" for the list)',
   },
   {

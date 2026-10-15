@@ -146,7 +146,18 @@ export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack
             <span className={styles.pillarIndicator} aria-hidden>
               {flags[key] ? <Check /> : <Ban />}
             </span>
-            <span className={styles.pillarIcon} aria-hidden><Icon size={36} /></span>
+            <span className={`${styles.pillarIcon} ${styles[`icon_${key}`]}`} aria-hidden>
+              <Icon size={56} strokeWidth={1.75} />
+              {key === 'lighting' && (
+                <svg className={styles.rays} viewBox="0 0 24 24" width={56} height={56} strokeWidth={1.75}>
+                  <path d="M12 -2.5v1.5" />
+                  <path d="M4.2 0.6l1 1" />
+                  <path d="M19.8 0.6l-1 1" />
+                  <path d="M1.5 7.5h1.5" />
+                  <path d="M21 7.5h1.5" />
+                </svg>
+              )}
+            </span>
             <span className={styles.pillarTitle}>{t(titleKey)}</span>
             <span className={styles.pillarDescription}>{t(`featuresOnboarding.pillar.${key}.description`)}</span>
           </button>

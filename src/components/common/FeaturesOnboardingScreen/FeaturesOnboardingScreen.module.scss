@@ -1,6 +1,8 @@
 @use '../../../styles/text' as *;
 @use '../../../styles/onboarding' as *;
 
+$description-line-height: 1.45;
+
 // Neutralizes Overlay's dimmed/blurred backdropDialog fill - same treatment
 // as the other full-viewport onboarding screens.
 .backdrop {
@@ -62,11 +64,15 @@
 .pillarGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(240px, 320px));
+  grid-auto-rows: 1fr;
   gap: 1rem;
   width: min(680px, 100%);
   flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
+  // Room inside the scroller for the hover lift and its shadow, which it would clip.
+  padding: 4px 0 12px;
+  margin: -4px 0 -12px;
 }
 
 .pillarCard {
@@ -75,13 +81,14 @@
   flex-direction: column;
   align-items: center;
   gap: 0.6rem;
-  padding: 1.5rem 1.25rem;
+  padding: 1.75rem 1.5rem 1.5rem;
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
   text-align: center;
   cursor: pointer;
+  transition: border-color var(--ease), transform var(--ease), box-shadow var(--ease);
 
   &:hover { border-color: var(--border-strong); }
 }
@@ -89,6 +96,11 @@
 .pillarCard.pillarCardOn {
   border-color: var(--accent);
   background: var(--accent-soft);
+
+  &:not(:disabled):hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px -10px var(--accent-glow-shadow);
+  }
 }
 
 .pillarIndicator {
@@ -110,8 +122,96 @@
 }
 
 .pillarIcon {
+  position: relative;
   display: flex;
+  margin: 0.25rem 0;
   color: var(--accent);
+  transition: color var(--ease), opacity var(--ease);
+
+  svg { overflow: visible; }
+}
+
+.pillarCard:not(.pillarCardOn) .pillarIcon {
+  color: var(--text-dim);
+  opacity: 0.55;
+}
+
+.rays {
+  position: absolute;
+  top: 0;
+  left: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--ease);
+}
+
+.icon_cooling svg { transform-origin: 50% 50%; }
+.icon_diagnostics svg { transform-origin: 30% 5%; }
+.icon_diagnostics circle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.pillarCard.pillarCardOn:not(:disabled):hover {
+  .icon_lighting > svg:first-child { animation: bulbGlow 1.4s ease-in-out infinite; }
+  .icon_lighting .rays { animation: rays 1.4s ease-in-out infinite; }
+  .icon_cooling svg { animation: fanSpin calc(var(--ease-slow) * 3) linear infinite; }
+  // 50 is the Activity trace's measured path length; lucide-react does not forward pathLength.
+  .icon_monitoring path {
+    stroke-dasharray: 50;
+    animation: trace 1.3s ease-in-out infinite;
+  }
+  .icon_diagnostics svg { animation: swing 1.2s ease-in-out infinite; }
+  .icon_diagnostics circle { animation: beat calc(var(--ease-slow) * 2) ease-in-out infinite; }
+}
+
+@keyframes bulbGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 0 #ffd66600);
+    color: var(--accent);
+  }
+  50% {
+    filter: drop-shadow(0 0 10px #ffd666bf);
+    color: #ffd666;
+  }
+}
+
+@keyframes rays {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+@keyframes fanSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes trace {
+  0% { stroke-dashoffset: 50; }
+  60%, 100% { stroke-dashoffset: 0; }
+}
+
+@keyframes swing {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+
+@keyframes beat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pillarCard,
+  .pillarCard * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .pillarCard.pillarCardOn:not(:disabled):hover { transform: none; }
 }
 
 .pillarTitle {
@@ -121,6 +221,8 @@
 
 .pillarDescription {
   font-size: var(--type-small);
+  line-height: $description-line-height;
+  min-height: calc(#{$description-line-height} * 1em * 2);
   color: var(--text-dim);
 }
 
