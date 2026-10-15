@@ -34,10 +34,11 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2rem;
+  justify-content: safe center;
   padding: 2rem;
-  // The settings section is the only scroller, so Enter stays in view.
-  overflow: hidden;
+  // The settings box scrolls first; on a window too short even for that, the
+  // whole screen scrolls so nothing overlaps.
+  overflow-y: auto;
 
   :global(html.nexus-shell-native-glass[data-bg='glass']) & {
     background: transparent;
@@ -45,8 +46,7 @@
 }
 
 // Small gap between the three visual groups (logo, heading+version,
-// icons+tagline); the toggles block below matches it via .section's
-// margin-top (surface gap 2rem - 1.25rem = this same 0.75rem).
+// icons+tagline) and below the hero.
 $group-gap: 0.75rem;
 
 .hero {
@@ -55,6 +55,7 @@ $group-gap: 0.75rem;
   align-items: center;
   flex-shrink: 0;
   gap: $group-gap;
+  margin-bottom: $group-gap;
   color: var(--text);
   animation: heroIn 0.5s ease-out both;
 }
@@ -124,15 +125,21 @@ $group-gap: 0.75rem;
 
 .section {
   width: min($onboarding-content-width, 100%);
-  margin-top: -1.25rem;
   flex: 0 1 auto;
+  // Room for one row and the hint; below it the surface scrolls.
+  min-height: 12rem;
+}
+
+// Shrinks and scrolls before anything else.
+.sectionBox {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
 }
 
 .hint {
   @include small-muted;
-  margin: -1.5rem 0 0;
+  margin: 0;
   text-align: center;
 }
 
@@ -147,7 +154,7 @@ $group-gap: 0.75rem;
 
 .error {
   @include text-caption;
-  margin: -1rem 0 0;
+  margin: 0 0 var(--space-xl);
   color: var(--bad);
   text-align: center;
 }

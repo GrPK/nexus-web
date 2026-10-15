@@ -62,6 +62,8 @@ interface SortableListProps {
   renderRow: (id: string, args: SortableRowArgs) => ReactNode;
   /** Render the floating clone for the dragged id (defaults to the row). */
   renderOverlay?: (id: string) => ReactNode;
+  /** Fill the floating clone so the rows it passes over do not show through. */
+  opaqueOverlay?: boolean;
   className?: string;
   ariaLabel?: string;
 }
@@ -110,7 +112,7 @@ function SortableRow({ id, renderRow, registerNode }: {
   );
 }
 
-export function SortableList({ ids, onReorder, renderRow, renderOverlay, className, ariaLabel }: SortableListProps) {
+export function SortableList({ ids, onReorder, renderRow, renderOverlay, opaqueOverlay, className, ariaLabel }: SortableListProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   // Live row element refs so a drop can flash the confirm ring at the row's
   // final resting slot (read on the next frame, after the reorder re-renders).
@@ -157,7 +159,7 @@ export function SortableList({ ids, onReorder, renderRow, renderOverlay, classNa
       </SortableContext>
       <DragOverlay dropAnimation={null}>
         {activeId !== null && (
-          <div className={styles.overlay}>
+          <div className={opaqueOverlay ? `${styles.overlay} ${styles.overlayOpaque}` : styles.overlay}>
             {(renderOverlay ?? ((id: string) => renderRow(id, {
               ref: () => {}, style: {}, attributes: {}, listeners: undefined,
               isDragging: false, placeholderClassName: styles.placeholder,

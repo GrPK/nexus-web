@@ -556,23 +556,22 @@ export function PairRemoteContent({
   // ── Region 3: authorized devices ─────────────────────────────────────────
   const sessionsSection = (
     <div className={appStyles.phonePairSessions} aria-label={t('phonePair.ariaSessions')} data-disabled={effRemoteEnabled ? 'false' : 'true'}>
-      <div className={appStyles.phonePairSessionsHeader}>
-        <div>
-          <h3>{t('phonePair.authorizedDevices')}</h3>
-          <span>{sessionCountLabel}</span>
-        </div>
-        <button
-          type="button"
-          className={appStyles.phonePairRevoke}
-          disabled={sessionList.length === 0}
-          onClick={() => setConfirmRemoveAllOpen(true)}
-        >
-          <LogOut size={14} />
-          {t('phonePair.removeAll')}
-        </button>
-      </div>
-
-      <section className={appStyles.phonePairCard + ' ' + appStyles.phonePairSessionsPanel}>
+      <SettingsSection
+        title={t('phonePair.authorizedDevices')}
+        description={sessionCountLabel}
+        action={(
+          <button
+            type="button"
+            className={appStyles.phonePairRevoke}
+            disabled={sessionList.length === 0}
+            onClick={() => setConfirmRemoveAllOpen(true)}
+          >
+            <LogOut size={14} />
+            {t('phonePair.removeAll')}
+          </button>
+        )}
+        boxClassName={appStyles.phonePairBox + ' ' + appStyles.phonePairSessionsPanel}
+      >
         {sessionsLoading && sessionList.length === 0 ? (
           <div className={appStyles.phonePairEmpty}>{t('phonePair.loadingSessions')}</div>
         ) : sessionList.length === 0 ? (
@@ -673,7 +672,7 @@ export function PairRemoteContent({
             })}
           </div>
         )}
-      </section>
+      </SettingsSection>
     </div>
   );
 

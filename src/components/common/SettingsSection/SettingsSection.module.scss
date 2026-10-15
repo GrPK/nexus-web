@@ -6,6 +6,31 @@
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+
+  // Always on and larger than the title-to-box gap, so a title heads its own box.
+  margin-bottom: var(--space-xl);
+}
+
+// Non-section sibling in a section stack (a notice, a card): same gap below.
+.block {
+  margin-bottom: var(--space-xl);
+}
+
+// Grows along its parent's main axis. Must be `flex: 1` (0% basis): `1 1 0`
+// collapses in a column with no definite height.
+.fill {
+  flex: 1;
+  min-height: 0;
+
+  > .box {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
+
+// Ends its column or row flush: drops the standard gap below it.
+.flush {
+  margin-bottom: 0;
 }
 
 .header {
@@ -42,6 +67,20 @@
   p {
     margin: 0;
   }
+}
+
+// Controls bound to the box sit directly under it.
+.footer {
+  display: flex;
+  flex-direction: column;
+}
+
+.footnote {
+  @include text-caption;
+  font-size: var(--type-small);
+  font-weight: var(--weight-body);
+  padding: 0 1.1rem;
+  color: var(--text-dim);
 }
 
 // Surface fill, no visible stroke - the box reads via its lighter --surface

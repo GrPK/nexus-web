@@ -162,8 +162,12 @@ export interface AudioSpatialState {
 export interface AudioDeviceList {
   error: boolean;
   msg: string;
+  /** Devices in the saved order first, then the rest in the system order. */
   outputs: AudioDevice[];
   inputs: AudioDevice[];
+  /** Saved order, including devices not plugged in. Absent from a service that predates it. */
+  outputOrder?: string[];
+  inputOrder?: string[];
   /** Absent from a service that predates spatial sound. */
   spatial?: AudioSpatialState;
 }
@@ -174,6 +178,10 @@ export const fetchAudioDevices = () =>
 /** An empty formatId turns spatial sound off. */
 export const setSpatialSound = (deviceId: string, formatId: string) =>
   postService('/system/audio/spatial', { deviceId, formatId });
+
+/** Replaces the whole saved device order for one direction. */
+export const setAudioDeviceOrder = (direction: 'output' | 'input', ids: string[]) =>
+  postService('/system/audio/order', { direction, ids });
 
 export const setDefaultOutput = (deviceId: string) =>
   postService('/system/audio/default-output', { deviceId });

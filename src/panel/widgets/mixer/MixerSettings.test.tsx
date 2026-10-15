@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { AudioMixerPreset } from '../../../api/mixer';
 import { clampPresetName, presetNameTaken } from '../../../api/mixer';
-import type { PanelWidget } from '../../types';
+import type { PanelConfigValue, PanelWidget } from '../../types';
 import { MixerSettings } from './MixerSettings';
 
 const renamePreset = vi.fn();
@@ -31,9 +31,29 @@ vi.mock('../../../hooks/useAudioMixer', () => ({
   }),
 }));
 
+let deviceOutputs: Array<{ id: string; name: string; isDefault: boolean; direction: string }> = [];
+let deviceInputs: typeof deviceOutputs = [];
+const reorderDevices = vi.fn();
+const dev = (id: string, direction = 'output') => ({ id, name: id, isDefault: false, direction });
+
+// jsdom cannot drive dnd-kit, so the list is a stand-in whose button reverses the ids.
+vi.mock('../../../components/common/SortableList/SortableList', () => ({
+  SortableList: ({ ids, onReorder, renderRow, ariaLabel }: {
+    ids: string[]; onReorder: (ids: string[]) => void; ariaLabel?: string;
+    renderRow: (id: string, a: unknown) => React.ReactNode;
+  }) => (
+    <div>
+      <button type="button" data-testid={`reverse-${ariaLabel}`} onClick={() => onReorder([...ids].reverse())} />
+      {ids.map(id => (
+        <div key={id}>{renderRow(id, { ref: () => {}, style: {}, attributes: {}, listeners: {}, isDragging: false, placeholderClassName: '' })}</div>
+      ))}
+    </div>
+  ),
+}));
+
 vi.mock('../../../hooks/useAudioDevices', () => ({
   useAudioDevices: () => ({
-    outputs: [], inputs: [], activeOutput: null, activeInput: null,
+    outputs: deviceOutputs, inputs: deviceInputs, reorderDevices, activeOutput: null, activeInput: null,
     selectOutput: vi.fn(), selectInput: vi.fn(), refresh: refreshDevices,
   }),
 }));
@@ -61,12 +81,17 @@ function makePreset(id: string, name: string): AudioMixerPreset {
   };
 }
 
-function renderSettings() {
-  const widget: PanelWidget = { id: 'mixer-1', type: 'mixer', size: '4x4', col: 0, row: 0, config: {} };
+function renderSettings(config: Record<string, PanelConfigValue> = {}, onUpdate = vi.fn()) {
+  const widget: PanelWidget = { id: 'mixer-1', type: 'mixer', size: '4x4', col: 0, row: 0, config };
   return render(
-    <MixerSettings widget={widget} surface="desktop" desktopEditor onUpdate={vi.fn()} />,
+    <MixerSettings widget={widget} surface="desktop" desktopEditor onUpdate={onUpdate} />,
   );
 }
+
+const SHOW_IDLE = 'panel.widget.mixer.settings.showIdle';
+const SHOW_LABELS = 'panel.widget.mixer.settings.showLabels';
+const SHOW_OUTPUT = 'panel.widget.mixer.settings.showOutput';
+const toggle = (name: string) => screen.getByRole('switch', { name });
 
 // SettingsRow renders its label as a div, not a <label for>, and t() collapses
 // every row's rename label to the same key - so both fields are found by role.
@@ -85,6 +110,8 @@ function openRename(name: string): HTMLElement {
 beforeEach(() => {
   vi.clearAllMocks();
   presets = [makePreset('p1', 'Gaming')];
+  deviceOutputs = [];
+  deviceInputs = [];
 });
 
 describe('preset name helpers', () => {
@@ -234,5 +261,71 @@ describe('MixerSettings duplicate names', () => {
     fireEvent.keyDown(field, { key: 'Enter' });
 
     expect(renamePreset).toHaveBeenCalledWith('p1', 'Chatting');
+  });
+});
+
+describe('display toggles', () => {
+  it('default to on when nothing is stored', () => {
+    renderSettings();
+    for (const name of [SHOW_IDLE, SHOW_LABELS, SHOW_OUTPUT]) {
+      expect(toggle(name).getAttribute('aria-checked')).toBe('true');
+    }
+  });
+
+  it('reads an old stored hideIdle=true as Show idle apps off', () => {
+    renderSettings({ hideIdle: true });
+    expect(toggle(SHOW_IDLE).getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('writes the inverted idle value under the stored key', () => {
+    const onUpdate = vi.fn();
+    renderSettings({}, onUpdate);
+    fireEvent.click(toggle(SHOW_IDLE));
+    expect(onUpdate).toHaveBeenCalledWith({ hideIdle: true });
+  });
+
+  it('writes labels and output as plain show flags', () => {
+    const onUpdate = vi.fn();
+    renderSettings({}, onUpdate);
+    fireEvent.click(toggle(SHOW_LABELS));
+    fireEvent.click(toggle(SHOW_OUTPUT));
+    expect(onUpdate).toHaveBeenCalledWith({ showLabels: false });
+    expect(onUpdate).toHaveBeenCalledWith({ showOutput: false });
+  });
+});
+
+describe('device order', () => {
+  const MOVE = 'panel.widget.mixer.aria.moveDevice';
+
+  it('lists detected outputs with a drag handle each', () => {
+    deviceOutputs = [dev('a'), dev('b')];
+    renderSettings();
+    expect(screen.getByText('panel.widget.mixer.settings.outputOrder')).toBeTruthy();
+    expect(screen.getAllByLabelText(MOVE)).toHaveLength(2);
+    expect(screen.getByText('panel.widget.mixer.settings.orderHint')).toBeTruthy();
+  });
+
+  it('reorders each direction through reorderDevices', () => {
+    deviceOutputs = [dev('a'), dev('b')];
+    deviceInputs = [dev('m1', 'input'), dev('m2', 'input')];
+    renderSettings();
+    fireEvent.click(screen.getByTestId('reverse-panel.widget.mixer.settings.outputOrder'));
+    fireEvent.click(screen.getByTestId('reverse-panel.widget.mixer.settings.inputOrder'));
+    expect(reorderDevices).toHaveBeenCalledWith('output', ['b', 'a']);
+    expect(reorderDevices).toHaveBeenCalledWith('input', ['m2', 'm1']);
+  });
+
+  it('shows a lone device as an inert row with the same hint', () => {
+    deviceOutputs = [dev('a')];
+    renderSettings();
+    expect(screen.getByText('a')).toBeTruthy();
+    expect(screen.queryByLabelText(MOVE)).toBeNull();
+    expect(screen.getByText('panel.widget.mixer.settings.orderHint')).toBeTruthy();
+  });
+
+  it('shows no section for a direction without devices', () => {
+    renderSettings();
+    expect(screen.queryByText('panel.widget.mixer.settings.outputOrder')).toBeNull();
+    expect(screen.queryByText('panel.widget.mixer.settings.inputOrder')).toBeNull();
   });
 });

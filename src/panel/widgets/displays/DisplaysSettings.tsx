@@ -13,7 +13,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { fetchDisplays, type Display } from '../../../api/displays';
-import { SettingsSection, SettingsHint } from '../common/SettingsRow/SettingsRow';
+import { SettingsSection } from '../common/SettingsRow/SettingsRow';
 import type { WidgetSettingsProps } from '../types';
 import styles from './DisplaysSettings.module.scss';
 
@@ -105,7 +105,7 @@ export function DisplaysSettings({ widget, onUpdate }: WidgetSettingsProps) {
 
   return (
     <div className={styles.settings}>
-      <SettingsSection title={t('displays.settings.title')}>
+      <SettingsSection title={t('displays.settings.title')} footnote={t('displays.settings.hint')}>
         {displays === null ? (
           <span className={styles.name}>{hint || t('displays.empty')}</span>
         ) : displays.length === 0 ? (
@@ -139,7 +139,6 @@ export function DisplaysSettings({ widget, onUpdate }: WidgetSettingsProps) {
           </DndContext>
         )}
       </SettingsSection>
-      <SettingsHint>{t('displays.settings.hint')}</SettingsHint>
     </div>
   );
 }

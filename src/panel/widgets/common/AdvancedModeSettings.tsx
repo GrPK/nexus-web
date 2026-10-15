@@ -10,7 +10,7 @@
 import { useUiSettings } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import type { WidgetSettingsProps } from '../types';
-import { SettingsToggle } from './SettingsRow/SettingsRow';
+import { SettingsSection, SettingsToggle } from './SettingsRow/SettingsRow';
 
 export function AdvancedModeSettings({ widget, onUpdate }: WidgetSettingsProps) {
   const { t } = useTranslation();
@@ -18,11 +18,13 @@ export function AdvancedModeSettings({ widget, onUpdate }: WidgetSettingsProps) 
   const override = widget.config?.advancedMode;
   const checked = typeof override === 'boolean' ? override : ui.widgetAdvancedMode;
   return (
-    <SettingsToggle
-      label={t('panel.widget.advancedMode')}
-      checked={checked}
-      onChange={value => onUpdate({ ...widget.config, advancedMode: value })}
-    />
+    <SettingsSection>
+      <SettingsToggle
+        label={t('panel.widget.advancedMode')}
+        checked={checked}
+        onChange={value => onUpdate({ ...widget.config, advancedMode: value })}
+      />
+    </SettingsSection>
   );
 }
 

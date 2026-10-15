@@ -1958,7 +1958,7 @@ export function PanelDevicePage({ device, onOpenFirmware, onSectionNavigate }: P
                       panel page's first load, Reboot panel takes no record id,
                       and the record-bound resets disable until one binds. */}
                   {activeTab === 'settings' && !isSimulated && (
-                    <div className={`${styles.settingsContent} ${styles.settingsContentDanger}`}>
+                    <div className={styles.settingsContent}>
                       {/* eslint-disable-next-line i18next/no-literal-string -- CSS variable token */}
                       <SettingsSection title={t('settings.dangerZone')} titleStyle={{ color: 'var(--bad)' }}>
                         <SettingRow
@@ -2778,15 +2778,6 @@ function SettingsPanel({
             />
           )}
 
-          {keepCursorOff !== undefined && (
-            <SettingToggle
-              label={t('devices.y70.keepCursorOff')}
-              description={t('devices.y70.keepCursorOffHint')}
-              checked={keepCursorOff}
-              onChange={onKeepCursorOffToggle}
-            />
-          )}
-
           <SettingRow
             label={t('devices.y70.touchRepair')}
             description={t('devices.y70.touchRepairHint')}
@@ -2837,6 +2828,15 @@ function SettingsPanel({
             checked={reserveMonitor}
             onChange={onReserveMonitorToggle}
           />
+
+          {keepCursorOff !== undefined && (
+            <SettingToggle
+              label={t('devices.y70.keepCursorOff')}
+              description={t('devices.y70.keepCursorOffHint')}
+              checked={keepCursorOff}
+              onChange={onKeepCursorOffToggle}
+            />
+          )}
         </SettingsSection>
       )}
 

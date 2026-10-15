@@ -33,3 +33,31 @@
   flex: 0 0 auto;
   margin-left: auto;
 }
+
+.orderRow {
+  display: flex;
+  align-items: center;
+  @include hgap(8px);
+  width: 100%;
+  min-height: 44px;
+}
+
+// The handle alone starts a drag, so a touch on the name still scrolls the sheet.
+.orderHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.orderName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
