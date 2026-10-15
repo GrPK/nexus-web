@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from '../../../lib/i18n';
 import { useAudioDevices } from '../../../hooks/useAudioDevices';
 import { useAudioMixer } from '../../../hooks/useAudioMixer';
@@ -166,7 +166,11 @@ export function MixerBody({
   const { t } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
   // Otherwise the picker would reopen by itself when the band comes back.
-  useEffect(() => { if (!showOutput) setPickerOpen(false); }, [showOutput]);
+  const [sawOutput, setSawOutput] = useState(showOutput);
+  if (sawOutput !== showOutput) {
+    setSawOutput(showOutput);
+    if (!showOutput) setPickerOpen(false);
+  }
   // Master rides the same row, so it pages with everything else.
   const faders: Array<AudioSession | null> = [...(master ? [null] : []), ...sessions];
   const pager = useFaderPager(faders, FADERS_PER_PAGE);

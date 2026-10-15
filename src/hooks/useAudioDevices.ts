@@ -47,6 +47,15 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
   const pendingWrites = useRef(0);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  // Hold timers and the generation that voids them when the hook is disabled or unmounted.
+  const holdTimers = useRef(new Set<number>());
+  const generation = useRef(0);
+  const voidWrites = useCallback(() => {
+    generation.current++;
+    holdTimers.current.forEach(id => window.clearTimeout(id));
+    holdTimers.current.clear();
+    pendingWrites.current = 0;
+  }, []);
 
   const refresh = useCallback(async () => {
     const seq = ++requestSeq.current;
@@ -67,23 +76,32 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
     return () => {
       mounted.current = false;
       window.clearInterval(timer);
+      voidWrites();
     };
-  }, [enabled, refresh]);
+  }, [enabled, refresh, voidWrites]);
 
   const settleAfter = useCallback((write: Promise<unknown>) => {
+    const gen = generation.current;
     pendingWrites.current++;
     requestSeq.current++;
-    let released = false;
-    const release = () => {
-      if (released) return;
-      released = true;
-      window.clearTimeout(timer);
+    let holding = true;
+    const lift = () => {
+      if (!holding || gen !== generation.current) return;
+      holding = false;
       pendingWrites.current--;
+    };
+    // The timeout only lifts the hold; the re-read still follows the settle.
+    const timer = window.setTimeout(() => { holdTimers.current.delete(timer); lift(); }, WRITE_HOLD_MS);
+    holdTimers.current.add(timer);
+    const settle = () => {
+      window.clearTimeout(timer);
+      holdTimers.current.delete(timer);
+      if (gen !== generation.current) return;
+      lift();
       // Only the last write to settle re-reads, so overlapping writes do not flicker.
       if (pendingWrites.current === 0) void refresh();
     };
-    const timer = window.setTimeout(release, WRITE_HOLD_MS);
-    void write.then(release, release);
+    void write.then(settle, settle);
   }, [refresh]);
 
   // The list reorders at once; the re-read after the POST confirms it.
