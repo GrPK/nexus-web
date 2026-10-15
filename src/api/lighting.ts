@@ -89,6 +89,8 @@ export interface LightingStatusResponse {
   gpuState?: 'ready' | 'initializing' | 'unavailable';
   /** A second adapter exists to move rendering to. */
   gpuCanSwitch?: boolean;
+  /** Shader lighting renders on the CPU; absent on older services. */
+  gpuSoftware?: boolean;
   /** True while an RGB device detection pass or bridge reconnect is in flight. */
   scanning: boolean;
   /** True while the bundled OpenRGB subprocess is running. */

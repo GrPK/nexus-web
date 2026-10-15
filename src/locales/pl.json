@@ -2785,6 +2785,7 @@
   "lighting.gameSync.signal.vendorConflict": "Aplikacja oświetleniowa innego producenta (np. Razer Synapse) zajmuje jeden z interfejsów gier na tym komputerze. Gry, które z niego korzystają, sterują tą aplikacją zamiast Nexus.",
   "lighting.gpuInitializingNotice": "Przygotowywanie karty graficznej do podświetlenia - urządzenia pozostaną wygaszone do zakończenia.",
   "lighting.gpuPickGpu": "Wybierz GPU",
+  "lighting.gpuSoftwareNotice": "Nie znaleziono zgodnego GPU. Efekty oświetlenia są renderowane na CPU i zwiększają jego użycie.",
   "lighting.gpuUnavailableNotice": "Brak użytecznego GPU na tym PC - efekt jest wyświetlany tu w podglądzie, ale urządzenia pozostaną ciemne.",
   "lighting.idleDim.enable.description": "Przyciemnia oświetlenie, gdy komputer jest bezczynny. Działa niezależnie od tego, czy harmonogram jest włączony.",
   "lighting.idleDim.enable.label": "Przyciemnij światła przy bezczynności",

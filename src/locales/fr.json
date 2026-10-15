@@ -2754,6 +2754,7 @@
   "lighting.gameSync.signal.vendorConflict": "Le logiciel d'éclairage d'un autre fabricant (comme Razer Synapse) occupe l'une des interfaces de jeu sur ce PC. Les jeux qui l'utilisent pilotent ce logiciel au lieu de Nexus.",
   "lighting.gpuInitializingNotice": "Préparation de la carte graphique pour l'éclairage - vos appareils restent éteints jusqu'à la fin.",
   "lighting.gpuPickGpu": "Choisir le GPU",
+  "lighting.gpuSoftwareNotice": "Aucun GPU compatible trouvé. Les effets d'éclairage sont calculés sur le CPU et sollicitent davantage le CPU.",
   "lighting.gpuUnavailableNotice": "Aucun GPU utilisable sur ce PC - l'effet est affiché en aperçu ici, mais n'éclairera pas vos appareils.",
   "lighting.idleDim.enable.description": "Atténue l'éclairage lorsque votre PC est inactif. Fonctionne que le programme soit activé ou non.",
   "lighting.idleDim.enable.label": "Atténuer l'éclairage en cas d'inactivité",

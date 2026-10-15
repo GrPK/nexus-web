@@ -2754,6 +2754,7 @@
   "lighting.gameSync.signal.vendorConflict": "他社の照明アプリ（Razer Synapse など）がこの PC のゲーム用インターフェースの一つを占有しています。それを使うゲームは Nexus ではなくそのアプリを制御します。",
   "lighting.gpuInitializingNotice": "ライティング用にグラフィックカードを準備しています。完了するまでデバイスは消灯したままです。",
   "lighting.gpuPickGpu": "GPUを選択",
+  "lighting.gpuSoftwareNotice": "対応する GPU が見つかりません。ライティングエフェクトは CPU で処理され、CPU の使用量が増えます。",
   "lighting.gpuUnavailableNotice": "このPCに使用可能なGPUがないため、エフェクトはここでプレビューされますが、デバイスは点灯しません。",
   "lighting.idleDim.enable.description": "PC がアイドル状態の間、ライティングを暗くします。スケジュールのオン/オフに関係なく動作します。",
   "lighting.idleDim.enable.label": "アイドル時にライトを暗くする",

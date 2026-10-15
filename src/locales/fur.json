@@ -2754,6 +2754,7 @@
   "lighting.gameSync.signal.vendorConflict": "La aplicazion di iluminazion di un altri produtôr (come Razer Synapse) e ocupe une des interfacis di zûc su chest PC. I zûcs che le doprin a controlin chê aplicazion invezit di Nexus.",
   "lighting.gpuInitializingNotice": "Daûr a preparâ la schede grafiche pe iluminazion - i tiei dispositîfs a restin scûrs fin che al finis.",
   "lighting.gpuPickGpu": "Sielç GPU",
+  "lighting.gpuSoftwareNotice": "Nissune GPU compatibile cjatade. I efiets di iluminazion a vegnin elaborâts de CPU e a doprin plui CPU.",
   "lighting.gpuUnavailableNotice": "Nissun GPU disponibil su chest PC - l'efiet al mostre chi la anteprime, ma nol luminarà i tiei dispositîfs.",
   "lighting.idleDim.enable.description": "Al sbasse la lûs intant che il to PC al è inatîf. Al funzione cun o cence il program ativât.",
   "lighting.idleDim.enable.label": "Sbasse la lûs cuant che al è inatîf",

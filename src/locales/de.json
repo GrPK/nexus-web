@@ -2754,6 +2754,7 @@
   "lighting.gameSync.signal.vendorConflict": "Die Beleuchtungssoftware eines anderen Herstellers (z. B. Razer Synapse) belegt eine der Spielschnittstellen auf diesem PC. Spiele, die sie nutzen, steuern diese Software statt Nexus.",
   "lighting.gpuInitializingNotice": "Die Grafikkarte wird für die Beleuchtung vorbereitet - Ihre Geräte bleiben bis zum Abschluss dunkel.",
   "lighting.gpuPickGpu": "GPU wählen",
+  "lighting.gpuSoftwareNotice": "Keine kompatible GPU gefunden. Beleuchtungseffekte werden auf der CPU berechnet und beanspruchen mehr CPU.",
   "lighting.gpuUnavailableNotice": "Kein nutzbarer GPU auf diesem PC - der Effekt wird hier als Vorschau angezeigt, leuchtet Ihre Geräte aber nicht.",
   "lighting.idleDim.enable.description": "Dimmt die Beleuchtung, solange dein PC inaktiv ist. Funktioniert unabhängig davon, ob der Zeitplan aktiv ist.",
   "lighting.idleDim.enable.label": "Beleuchtung bei Inaktivität dimmen",

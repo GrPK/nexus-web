@@ -2754,6 +2754,7 @@
   "lighting.gameSync.signal.vendorConflict": "Another vendor's lighting app (such as Razer Synapse) owns one of the game interfaces on this PC. Games that use it light that app instead of Nexus.",
   "lighting.gpuInitializingNotice": "Setting up the graphics card for lighting - your devices stay dark until it finishes.",
   "lighting.gpuPickGpu": "Choose GPU",
+  "lighting.gpuSoftwareNotice": "No compatible GPU found. Lighting effects render on the CPU and use more CPU.",
   "lighting.gpuUnavailableNotice": "No usable GPU on this PC, so this effect previews here but won't light your devices.",
   "lighting.idleDim.enable.description": "Dims the lighting while your PC sits idle. Works whether or not the schedule is on.",
   "lighting.idleDim.enable.label": "Dim lights when idle",

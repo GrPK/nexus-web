@@ -28,6 +28,8 @@ interface LightingStatus {
   gpuState?: 'ready' | 'initializing' | 'unavailable';
   /** A second adapter exists to move rendering to. */
   gpuCanSwitch?: boolean;
+  /** Shader lighting renders on the CPU; absent on older services. */
+  gpuSoftware?: boolean;
   scanning: boolean;
 }
 

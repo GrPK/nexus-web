@@ -2754,6 +2754,7 @@
   "lighting.gameSync.signal.vendorConflict": "O aplicativo de iluminação de outro fabricante (como o Razer Synapse) ocupa uma das interfaces de jogo neste PC. Os jogos que a usam controlam esse aplicativo em vez do Nexus.",
   "lighting.gpuInitializingNotice": "Preparando a placa de vídeo para a iluminação - seus dispositivos ficam apagados até concluir.",
   "lighting.gpuPickGpu": "Escolher GPU",
+  "lighting.gpuSoftwareNotice": "Nenhuma GPU compatível encontrada. Os efeitos de iluminação são renderizados na CPU e usam mais CPU.",
   "lighting.gpuUnavailableNotice": "Nenhum GPU utilizável neste PC - o efeito é exibido aqui em pré-visualização, mas não iluminará seus dispositivos.",
   "lighting.idleDim.enable.description": "Reduz a iluminação enquanto o PC estiver inativo. Funciona com a agenda ativada ou não.",
   "lighting.idleDim.enable.label": "Reduzir as luzes quando inativo",

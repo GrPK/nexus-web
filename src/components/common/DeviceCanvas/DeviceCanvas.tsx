@@ -73,6 +73,7 @@ interface DeviceCanvasProps {
   onSetDevicesPower?: (ids: string[], on: boolean) => void;
   gpuAvailable?: boolean;
   gpuState?: GpuState;
+  gpuSoftware?: boolean;
   /** Absent when the box has no second card to fall back to. */
   onPickRenderGpu?: () => void;
   /** Cards stacked to one frame: the first member drawn stands for the set,
@@ -1064,8 +1065,8 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, foreig
   );
 });
 
-export function DeviceCanvas({ backdrop, devices, hideFrames, selectedIds, primaryDeviceId, onSelectDevice, onSetSelection, shaderEffect, shaderState, shaderPaused, audioRef, hiddenFrameIds, foreignFrames, selectedDeviceLeds, onOpenSettings, onOpenKeyReactions, keyReactiveIds, onDragActiveChange, onBeforeLayoutSave, onLayoutCommit, onSetDevicesPower, gpuAvailable, gpuState, onPickRenderGpu, stacks, stackActionsFor }: DeviceCanvasProps) {
-  const notice = gpuNotice(gpuState, gpuAvailable);
+export function DeviceCanvas({ backdrop, devices, hideFrames, selectedIds, primaryDeviceId, onSelectDevice, onSetSelection, shaderEffect, shaderState, shaderPaused, audioRef, hiddenFrameIds, foreignFrames, selectedDeviceLeds, onOpenSettings, onOpenKeyReactions, keyReactiveIds, onDragActiveChange, onBeforeLayoutSave, onLayoutCommit, onSetDevicesPower, gpuAvailable, gpuState, gpuSoftware, onPickRenderGpu, stacks, stackActionsFor }: DeviceCanvasProps) {
+  const notice = gpuNotice(gpuState, gpuAvailable, gpuSoftware);
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const glCanvasRef = useRef<HTMLCanvasElement>(null);

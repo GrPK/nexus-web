@@ -2754,6 +2754,7 @@
   "lighting.gameSync.signal.vendorConflict": "另一家厂商的灯光软件（如 Razer Synapse）占用了这台电脑上的一个游戏接口。使用该接口的游戏会控制那个软件，而不是 Nexus。",
   "lighting.gpuInitializingNotice": "正在为灯效准备显卡，完成前设备将保持熄灭。",
   "lighting.gpuPickGpu": "选择 GPU",
+  "lighting.gpuSoftwareNotice": "未找到兼容的 GPU。灯效将在 CPU 上渲染，并占用更多 CPU。",
   "lighting.gpuUnavailableNotice": "此PC没有可用的GPU，效果在此处预览，但不会点亮您的设备。",
   "lighting.idleDim.enable.description": "PC 空闲时调暗灯光。无论计划是否开启都有效。",
   "lighting.idleDim.enable.label": "空闲时调暗灯光",

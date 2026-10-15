@@ -17,4 +17,15 @@ describe('gpuNotice', () => {
     expect(gpuNotice(undefined, true)).toBeNull();
     expect(gpuNotice(undefined, undefined)).toBeNull();
   });
+
+  it('warns about CPU rendering only when the service reports software rendering', () => {
+    expect(gpuNotice('ready', true, true)).toEqual({ key: 'lighting.gpuSoftwareNotice', tone: 'fault' });
+    expect(gpuNotice('ready', true, false)).toBeNull();
+    // Older services omit the field.
+    expect(gpuNotice('ready', true, undefined)).toBeNull();
+  });
+
+  it('keeps the unavailable notice ahead of the software one', () => {
+    expect(gpuNotice('unavailable', false, true)?.key).toBe('lighting.gpuUnavailableNotice');
+  });
 });

@@ -11,14 +11,17 @@ export interface GpuNotice {
 /**
  * Canvas GPU notice, or null when there is nothing to say. `available` is the
  * pre-tri-state field, so a newer UI against an older service still says
- * something sensible.
+ * something sensible. `software` is a working context that renders on the CPU.
  */
 export function gpuNotice(
   state: GpuState | undefined,
   available: boolean | undefined,
+  software?: boolean,
 ): GpuNotice | null {
   const resolved: GpuState = state ?? (available === false ? 'unavailable' : 'ready');
-  if (resolved === 'ready') return null;
+  if (resolved === 'ready') {
+    return software ? { key: 'lighting.gpuSoftwareNotice', tone: 'fault' } : null;
+  }
   return resolved === 'initializing'
     ? { key: 'lighting.gpuInitializingNotice', tone: 'wait' }
     : { key: 'lighting.gpuUnavailableNotice', tone: 'fault' };

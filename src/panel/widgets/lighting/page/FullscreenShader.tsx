@@ -26,6 +26,7 @@ interface FullscreenShaderProps {
   panelSlots?: Set<number> | null;
   gpuAvailable?: boolean;
   gpuState?: GpuState;
+  gpuSoftware?: boolean;
   /** Freezes the shader clock so fullscreen holds the same frame the paused
    *  lighting engine and the main canvas preview are holding. */
   paused?: boolean;
@@ -33,10 +34,10 @@ interface FullscreenShaderProps {
 
 export function FullscreenShader({
   effect, state, bundle, canReset, audioRef,
-  onTemplateSelect, onChange, onCommit, onReset, onClose, onPrev, onNext, panelSlots, gpuAvailable, gpuState, paused,
+  onTemplateSelect, onChange, onCommit, onReset, onClose, onPrev, onNext, panelSlots, gpuAvailable, gpuState, gpuSoftware, paused,
 }: FullscreenShaderProps) {
   const { t } = useTranslation();
-  const notice = gpuNotice(gpuState, gpuAvailable);
+  const notice = gpuNotice(gpuState, gpuAvailable, gpuSoftware);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(state);

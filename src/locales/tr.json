@@ -2754,6 +2754,7 @@
   "lighting.gameSync.signal.vendorConflict": "Başka bir üreticinin aydınlatma uygulaması (örneğin Razer Synapse) bu bilgisayardaki oyun arayüzlerinden birini kullanıyor. Onu kullanan oyunlar Nexus yerine o uygulamayı yönetir.",
   "lighting.gpuInitializingNotice": "Aydınlatma için ekran kartı hazırlanıyor - işlem bitene kadar cihazlarınız kapalı kalır.",
   "lighting.gpuPickGpu": "GPU seç",
+  "lighting.gpuSoftwareNotice": "Uyumlu GPU bulunamadı. Aydınlatma efektleri CPU üzerinde işlenir ve daha fazla CPU kullanır.",
   "lighting.gpuUnavailableNotice": "Bu PC'de kullanılabilir GPU yok - efekt burada önizleniyor, ancak cihazlarınızı aydınlatmayacak.",
   "lighting.idleDim.enable.description": "PC boşta kaldığı sürece aydınlatmayı kısar. Zamanlama açık olsa da olmasa da çalışır.",
   "lighting.idleDim.enable.label": "Boştayken ışıkları kıs",
