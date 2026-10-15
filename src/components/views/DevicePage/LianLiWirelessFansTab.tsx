@@ -267,12 +267,12 @@ function DeviceRow({
       label={typeLabel}
       description={details || undefined}
       state={bindState}
-    >
-      {onOpenPanel && (
+      labelSuffix={onOpenPanel && (
         <Button size="sm" tone="neutral" icon={<MonitorSmartphone size={14} />} onClick={onOpenPanel}>
           {t('devices.lianli-wireless.managePanel')}
         </Button>
       )}
+    >
       {fan.boundToUs ? (
         <Button size="sm" tone="danger" disabled={busy} onClick={() => onUnbindRequest(fan.mac)}>
           {unbindLabel}
