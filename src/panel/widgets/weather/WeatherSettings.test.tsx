@@ -49,6 +49,7 @@ vi.mock('../../../lib/i18n', () => {
     'panel.widget.weather.settings.condition': 'Condition',
     'panel.widget.weather.settings.humidityAndWind': 'Humidity and wind',
     'panel.widget.weather.settings.animatedSky': 'Animated sky',
+    'panel.widget.weather.settings.accentBars': 'Accent color bars',
     'common.loading': 'Loading...',
     'common.desktopOnly': 'Full options available on desktop',
   };
@@ -86,6 +87,15 @@ describe('WeatherSettings', () => {
     expect(toggle).not.toBeChecked();
     fireEvent.click(toggle);
     expect(onUpdate).toHaveBeenCalledWith({ animatedSky: true });
+  });
+
+  it('writes the accent bars toggle, off by default', () => {
+    const onUpdate = vi.fn();
+    render(<WeatherSettings widget={weatherWidget()} surface="q60" onUpdate={onUpdate} onResize={vi.fn()} />);
+    const toggle = screen.getByRole('switch', { name: 'Accent color bars' });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(onUpdate).toHaveBeenCalledWith({ accentBars: true });
   });
 
   it('hides the location picker while auto-detect is on', () => {

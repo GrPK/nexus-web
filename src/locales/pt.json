@@ -4512,6 +4512,7 @@
   "panel.widget.weather.precipitation": "Precipitação",
   "panel.widget.weather.pressure": "Pressão",
   "panel.widget.weather.removeLocation": "Remover {location}",
+  "panel.widget.weather.settings.accentBars": "Barras na cor de destaque",
   "panel.widget.weather.settings.animatedSky": "Céu animado",
   "panel.widget.weather.settings.animatedSkyDescription": "Mostra o estado do tempo atual e a hora do dia como um céu em movimento atrás do widget.",
   "panel.widget.weather.settings.auto": "Automático",

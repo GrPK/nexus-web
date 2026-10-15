@@ -93,6 +93,69 @@ describe('WeatherWidget', () => {
     expect(screen.getByText('Today')).toBeInTheDocument();
   });
 
+  it('colors the daily bars from the absolute temperature scale by default', async () => {
+    const { container } = render(<WeatherWidget widget={weatherWidget('4x4')} />);
+    await screen.findByText('Today');
+    const fills = Array.from(container.querySelectorAll<HTMLElement>('[style*="linear-gradient"]'));
+    expect(fills).toHaveLength(2);
+    expect(fills[0].style.background).toMatch(/rgb\(\d+, \d+, \d+\)/);
+  });
+
+  it('uses the flat accent color for the daily bars when accent bars is on', async () => {
+    const { container } = render(<WeatherWidget widget={weatherWidget('4x4', { accentBars: true })} />);
+    await screen.findByText('Today');
+    expect(container.querySelectorAll('[style*="linear-gradient"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[style*="var(--accent-glow)"]')).toHaveLength(2);
+  });
+
+  it('keeps the accent bars on the real accent variable over the animated sky', async () => {
+    const { container } = render(<WeatherWidget widget={weatherWidget('4x4', { accentBars: true, animatedSky: true })} />);
+    await screen.findByText('Today');
+    expect(container.querySelectorAll('[style*="var(--accent-glow)"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[style*="--panel-accent-glow"]')).toHaveLength(0);
+  });
+
+  describe('current temperature dot', () => {
+    const dots = (c: HTMLElement) => Array.from(c.querySelectorAll<HTMLElement>('[class*="dailyBarDot"]'));
+    function snapshotWith(overrides: Record<string, unknown>) {
+      vi.mocked(fetchService).mockImplementation(() => Promise.resolve({ ...mockSnapshot.build(), ...overrides }) as never);
+    }
+    afterEach(() => {
+      vi.mocked(fetchService).mockImplementation(() => Promise.resolve(mockSnapshot.build()) as never);
+    });
+
+    it('renders once, on Today, in the temperature-scale mode', async () => {
+      const { container } = render(<WeatherWidget widget={weatherWidget('4x4')} />);
+      await screen.findByText('Today');
+      expect(dots(container)).toHaveLength(1);
+    });
+
+    it('is absent in accent mode and without a current temperature', async () => {
+      const accent = render(<WeatherWidget widget={weatherWidget('4x4', { accentBars: true })} />);
+      await screen.findByText('Today');
+      expect(dots(accent.container)).toHaveLength(0);
+      accent.unmount();
+      resetWeatherSnapshotCache();
+      snapshotWith({ temperatureF: null, temperatureC: null });
+      const none = render(<WeatherWidget widget={weatherWidget('4x4')} />);
+      await screen.findByText('Today');
+      expect(dots(none.container)).toHaveLength(0);
+    });
+
+    it('clamps to the track when the current temperature is outside the week range', async () => {
+      snapshotWith({ temperatureF: 120, temperatureC: 49 });
+      const { container } = render(<WeatherWidget widget={weatherWidget('4x4', { unit: 'F' })} />);
+      await screen.findByText('Today');
+      expect(dots(container)[0].style.left).toBe('100%');
+    });
+
+    it('positions from the Celsius reading in a Celsius widget', async () => {
+      const { container } = render(<WeatherWidget widget={weatherWidget('4x4', { unit: 'C' })} />);
+      await screen.findByText('Today');
+      expect(parseFloat(dots(container)[0].style.left)).toBeCloseTo(80, 5);
+    });
+  });
+
   it('shows only the glyph and temperature on a 1x1', async () => {
     render(<WeatherWidget widget={weatherWidget('1x1')} />);
     expect(await screen.findByText('72°')).toBeInTheDocument();

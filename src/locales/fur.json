@@ -4512,6 +4512,7 @@
   "panel.widget.weather.precipitation": "Precipitazions",
   "panel.widget.weather.pressure": "Pression",
   "panel.widget.weather.removeLocation": "Gjave {location}",
+  "panel.widget.weather.settings.accentBars": "Sbaris cu la tinte di aciento",
   "panel.widget.weather.settings.animatedSky": "Cîl animât",
   "panel.widget.weather.settings.animatedSkyDescription": "Al mostre il timp atuâl e la ore dal dì come un cîl in moviment daûr dal widget.",
   "panel.widget.weather.settings.auto": "Automatic",
