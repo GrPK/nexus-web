@@ -34,7 +34,7 @@ beforeEach(() => {
     theme: { themeMode: 'dark', accentColor: '#2563eb', language: 'en' },
     features: { lighting: true, cooling: true, monitoring: true, diagnostics: true },
   } as never);
-  vi.mocked(savePreferences).mockResolvedValue(undefined as never);
+  vi.mocked(savePreferences).mockResolvedValue({} as never);
   vi.mocked(completeFeaturesOnboarding).mockResolvedValue({ completed: true, featuresCompleted: true });
 });
 

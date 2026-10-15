@@ -24,7 +24,7 @@ export function MonitoringTab({ settings, updateGeneral, serviceOnline }: Monito
       <SettingsSection title={t('settings.features.title')}>
         <SettingToggle
           label={t('settings.features.monitoring.label')}
-          labelSuffix={<Badge label={t('settings.features.master')} color="var(--accent)" uppercase />}
+          labelSuffix={<Badge label={t('settings.features.master')} color="var(--text)" compact uppercase />}
           description={t('settings.features.monitoring.description')}
           icon={<Activity />}
           iconLeading="subtle"
@@ -34,7 +34,7 @@ export function MonitoringTab({ settings, updateGeneral, serviceOnline }: Monito
         />
         <SettingToggle
           label={t('settings.features.diagnostics.label')}
-          labelSuffix={<Badge label={t('settings.features.master')} color="var(--accent)" uppercase />}
+          labelSuffix={<Badge label={t('settings.features.master')} color="var(--text)" compact uppercase />}
           description={t('settings.features.diagnostics.description')}
           icon={<Stethoscope />}
           iconLeading="subtle"

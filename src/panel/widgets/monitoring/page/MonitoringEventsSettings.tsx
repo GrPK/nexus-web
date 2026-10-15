@@ -42,7 +42,8 @@ export function MonitoringEventsSettings() {
             label={label}
             checked={!isHidden(kind)}
             onChange={next => setKindHidden(kind, !next)}
-            disabled={!enabled}
+            // The section is inert as a whole when Monitoring is off; dimming the rows too would compound.
+            disabled={monitoringOn && !enabled}
           />
         );
       })}

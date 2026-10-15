@@ -4,6 +4,7 @@ import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { SettingToggle } from '../../common/SettingRow/SettingRow';
 import { LightingCoolingSection } from './LightingCoolingSection';
 import { ManualRgbDevicesSection } from './ManualRgbDevicesSection';
+import { useFeatureFlags } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import type { NexusSettings } from '../../../lib/settings';
 import styles from './SettingsView.module.scss';
@@ -17,13 +18,14 @@ export interface LightingCoolingTabProps {
 
 export function LightingCoolingTab({ settings, updateGeneral, serviceOnline, platform }: LightingCoolingTabProps) {
   const { t } = useTranslation();
+  const features = useFeatureFlags();
 
   return (
     <div className={styles.tabPanel}>
       <SettingsSection title={t('settings.features.title')}>
         <SettingToggle
           label={t('settings.features.lighting.label')}
-          labelSuffix={<Badge label={t('settings.features.master')} color="var(--accent)" uppercase />}
+          labelSuffix={<Badge label={t('settings.features.master')} color="var(--text)" compact uppercase />}
           description={t('settings.features.lighting.description')}
           icon={<Lightbulb />}
           iconLeading="subtle"
@@ -33,7 +35,7 @@ export function LightingCoolingTab({ settings, updateGeneral, serviceOnline, pla
         />
         <SettingToggle
           label={t('settings.features.cooling.label')}
-          labelSuffix={<Badge label={t('settings.features.master')} color="var(--accent)" uppercase />}
+          labelSuffix={<Badge label={t('settings.features.master')} color="var(--text)" compact uppercase />}
           description={t('settings.features.cooling.description')}
           icon={<Fan />}
           iconLeading="subtle"
@@ -45,7 +47,7 @@ export function LightingCoolingTab({ settings, updateGeneral, serviceOnline, pla
 
       <LightingCoolingSection serviceOnline={serviceOnline} platform={platform} />
 
-      <ManualRgbDevicesSection serviceOnline={serviceOnline} disabled={!settings.general.featureLightingEnabled} />
+      <ManualRgbDevicesSection serviceOnline={serviceOnline} disabled={!features.lighting} />
     </div>
   );
 }

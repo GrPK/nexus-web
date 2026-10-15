@@ -1,11 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LightingCoolingSection } from './LightingCoolingSection';
 import type { TempUnit } from '../../../lib/units';
 
 // Mutable so a test can flip the unit and re-render, mimicking the C/F chip on
 // the same settings page writing through useUiSettings.
-const prefs = vi.hoisted(() => ({ monitoringTempUnit: 'c' as TempUnit }));
+const prefs = vi.hoisted(() => ({ monitoringTempUnit: 'c' as TempUnit, lighting: true, cooling: true }));
 
 vi.mock('../../../hooks/useUiSettings', () => ({
   useUiSettings: () => ({
@@ -21,7 +21,7 @@ vi.mock('../../../hooks/useUiSettings', () => ({
     reload: vi.fn(),
   }),
   useUnitPrefs: () => ({ monitoringTempUnit: prefs.monitoringTempUnit, timeFormat: '24h', numberFormat: 'dot' }),
-  useFeatureFlags: () => ({ lighting: true, cooling: true, monitoring: true, diagnostics: true }),
+  useFeatureFlags: () => ({ lighting: prefs.lighting, cooling: prefs.cooling, monitoring: true, diagnostics: true }),
 }));
 
 const tempSensor = (id: string, name: string, value: number) => ({
@@ -94,6 +94,8 @@ vi.mock('../../../lib/i18n', () => ({
 }));
 
 describe('LightingCoolingSection section split', () => {
+  afterEach(() => { prefs.lighting = true; prefs.cooling = true; });
+
   it('groups sleep blackout under Lighting and the sensor pickers under Cooling', () => {
     render(<LightingCoolingSection serviceOnline platform="windows" />);
 
@@ -101,6 +103,21 @@ describe('LightingCoolingSection section split', () => {
     expect(screen.getByText('cooling.title')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'lighting.sleepBlackout.label' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'cooling.settings.cpuLabel' })).toBeInTheDocument();
+  });
+
+  it('dims the Lighting section when Lighting is off but keeps the shared sensor pickers live', () => {
+    prefs.lighting = false;
+    render(<LightingCoolingSection serviceOnline platform="windows" />);
+    const dimmed = (el: HTMLElement) => el.closest('[aria-disabled="true"]') !== null;
+    expect(dimmed(screen.getByRole('switch', { name: 'lighting.sleepBlackout.label', hidden: true }))).toBe(true);
+    expect(dimmed(screen.getByRole('button', { name: 'cooling.settings.cpuLabel' }))).toBe(false);
+  });
+
+  it('leaves the sensor pickers live and the Lighting section undimmed when only Cooling is off', () => {
+    prefs.cooling = false;
+    render(<LightingCoolingSection serviceOnline platform="windows" />);
+    expect(screen.getByRole('switch', { name: 'lighting.sleepBlackout.label' }).closest('[aria-disabled="true"]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'cooling.settings.cpuLabel' }).closest('[aria-disabled="true"]')).toBeNull();
   });
 
   it('keeps the Lighting section for the schedule row before the platform resolves', () => {

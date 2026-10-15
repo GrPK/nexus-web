@@ -230,7 +230,7 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
       {scheduleOpen && (
         <BrightnessScheduleModal open onClose={() => setScheduleOpen(false)} state={brightnessSchedule} />
       )}
-      <SettingsSection title={t('cooling.title')} action={resetAction} disabled={!features.cooling}>
+      <SettingsSection title={t('cooling.title')} action={resetAction}>
         <SensorRow
           icon={<Cpu />}
           label={t('cooling.settings.cpuLabel')}

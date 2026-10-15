@@ -22,7 +22,7 @@ vi.mock('../../../lib/i18n', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(savePreferences).mockResolvedValue(undefined as never);
+  vi.mocked(savePreferences).mockResolvedValue({} as never);
 });
 
 describe('FeaturesOnboardingScreen', () => {
@@ -105,7 +105,7 @@ describe('FeaturesOnboardingScreen', () => {
 
   it('sends the chosen pillars to the service, and waits for that write, before completing features onboarding', async () => {
     let finishSave!: () => void;
-    vi.mocked(savePreferences).mockReturnValue(new Promise<void>(r => { finishSave = r; }) as never);
+    vi.mocked(savePreferences).mockReturnValue(new Promise<object>(r => { finishSave = () => r({}); }) as never);
     vi.mocked(completeFeaturesOnboarding).mockResolvedValue({ completed: true, featuresCompleted: true });
     render(<FeaturesOnboardingScreen open onComplete={vi.fn()} />);
 
@@ -118,5 +118,18 @@ describe('FeaturesOnboardingScreen', () => {
     expect(completeFeaturesOnboarding).not.toHaveBeenCalled();
     finishSave();
     await waitFor(() => expect(completeFeaturesOnboarding).toHaveBeenCalled());
+  });
+
+  it('shows the error and does not complete features onboarding when the pillars could not be saved', async () => {
+    vi.mocked(savePreferences).mockResolvedValue(null as never);
+    const onComplete = vi.fn();
+    render(<FeaturesOnboardingScreen open onComplete={onComplete} />);
+
+    fireEvent.click(screen.getByText('featuresOnboarding.continue'));
+
+    await waitFor(() => expect(savePreferences).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText('featuresOnboarding.continue')).toBeInTheDocument());
+    expect(completeFeaturesOnboarding).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
   });
 });

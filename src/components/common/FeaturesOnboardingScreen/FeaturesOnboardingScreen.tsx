@@ -70,7 +70,11 @@ export function FeaturesOnboardingScreen({ open, onComplete, onBack, onSkipOnboa
       // updateUiSettings debounces its server write, so completion could land
       // first and the service would treat Lighting and Cooling as off until
       // the choice arrives. Send the choice now and wait for it.
-      await savePreferences({ features: flags });
+      // postService reports a failure as null instead of throwing.
+      if (!(await savePreferences({ features: flags }))) {
+        setError(true);
+        return;
+      }
 
       const result = await completeFeaturesOnboarding();
       if (!result?.featuresCompleted) {

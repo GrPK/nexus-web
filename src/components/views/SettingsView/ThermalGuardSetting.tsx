@@ -171,14 +171,18 @@ export function ThermalGuardSettingView({
   const on = !coolingOff && (pendingEnabled ?? guardEnabled(guard));
   return (
     <>
+      {/* Its own undimmed row, so the reason stays readable beside the dimmed controls. */}
+      {coolingOff && (
+        <div data-settings-aside>
+          <SettingRow description={<span role="status">{t('cooling.guard.featureOff')}</span>} />
+        </div>
+      )}
       <SettingToggle
         label={t('cooling.guard.label')}
         description={(
           <>
             {t('cooling.guard.description')}
-            {coolingOff
-              ? <span role="status">{` ${t('cooling.guard.featureOff')}`}</span>
-              : guard.state === 'inactive' && <span role="status">{` ${t('cooling.guard.inactive')}`}</span>}
+            {!coolingOff && guard.state === 'inactive' && <span role="status">{` ${t('cooling.guard.inactive')}`}</span>}
             {error && <> <InlineError>{error}</InlineError></>}
           </>
         )}
@@ -212,6 +216,21 @@ export function ThermalGuardSettingView({
   );
 }
 
+export interface GuardActions {
+  onToggle: (enabled: boolean) => void;
+  onLintWarningsChange: (enabled: boolean) => void;
+  onSetLimit: (c: number) => void;
+  onClearLimit: () => void;
+}
+
+const NO_OP = () => {};
+
+/** With Cooling off the service refuses guard writes, so none is sent. */
+export function gateGuardActions(coolingOff: boolean, actions: GuardActions): GuardActions {
+  if (!coolingOff) return actions;
+  return { onToggle: NO_OP, onLintWarningsChange: NO_OP, onSetLimit: NO_OP, onClearLimit: NO_OP };
+}
+
 /**
  * Settings > Cooling controls for the CPU thermal guard: the switch (on by
  * default; the service reads a missing setting as on) and the temperature
@@ -224,8 +243,15 @@ export function ThermalGuardSetting({ serviceOnline }: { serviceOnline: boolean 
   } = useThermalGuard(serviceOnline);
   const coolingOff = !useFeatureFlags().cooling;
   if (!guard) return null;
+  const actions = gateGuardActions(coolingOff, {
+    onToggle: next => { void toggle(next); },
+    onLintWarningsChange: enabled => setLintWarnings(enabled),
+    onSetLimit: c => setLimit(c),
+    onClearLimit: () => { void clearLimit(); },
+  });
   return (
     <ThermalGuardSettingView
+      {...actions}
       guard={guard}
       pendingEnabled={pendingEnabled}
       pendingLintWarnings={pendingLintWarnings}
@@ -234,10 +260,6 @@ export function ThermalGuardSetting({ serviceOnline }: { serviceOnline: boolean 
       error={toggleError?.message ?? null}
       limitError={limitError?.message ?? null}
       lintWarningsError={lintWarningsError?.message ?? null}
-      onLintWarningsChange={enabled => { if (!coolingOff) setLintWarnings(enabled); }}
-      onToggle={next => { if (!coolingOff) void toggle(next); }}
-      onSetLimit={c => { if (!coolingOff) setLimit(c); }}
-      onClearLimit={() => { if (!coolingOff) void clearLimit(); }}
     />
   );
 }

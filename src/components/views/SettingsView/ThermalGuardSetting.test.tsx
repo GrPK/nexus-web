@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { GuardResponse } from '../../../api/cooling';
-import { ThermalGuardSettingView } from './ThermalGuardSetting';
+import { gateGuardActions, ThermalGuardSettingView } from './ThermalGuardSetting';
 
 // Rendered outside I18nProvider, so t() falls back to raw keys.
 
@@ -203,5 +203,26 @@ describe('ThermalGuardSettingView', () => {
       expect(lintSwitch()).not.toBeDisabled();
       expect(screen.getByRole('slider')).toBeDisabled();
     });
+  });
+});
+
+describe('gateGuardActions', () => {
+  const make = () => ({ onToggle: vi.fn(), onLintWarningsChange: vi.fn(), onSetLimit: vi.fn(), onClearLimit: vi.fn() });
+
+  it('passes every action through while Cooling is on', () => {
+    const a = make();
+    const g = gateGuardActions(false, a);
+    g.onToggle(true); g.onLintWarningsChange(true); g.onSetLimit(97); g.onClearLimit();
+    expect(a.onToggle).toHaveBeenCalledWith(true);
+    expect(a.onLintWarningsChange).toHaveBeenCalledWith(true);
+    expect(a.onSetLimit).toHaveBeenCalledWith(97);
+    expect(a.onClearLimit).toHaveBeenCalled();
+  });
+
+  it('drops every action while Cooling is off', () => {
+    const a = make();
+    const g = gateGuardActions(true, a);
+    g.onToggle(true); g.onLintWarningsChange(true); g.onSetLimit(97); g.onClearLimit();
+    for (const fn of Object.values(a)) expect(fn).not.toHaveBeenCalled();
   });
 });
