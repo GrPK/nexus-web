@@ -35,6 +35,8 @@ describe('isLaunchablePath', () => {
   it.each(['C:\\Games\\a.exe', 'D:/x.lnk', 'https://example.com', 'steam://rungameid/1'])('accepts %s', t => expect(isLaunchablePath(t)).toBe(true));
   it.each(['\\\\host\\share\\a.exe', 'ftp://x/y', 'file:///C:/a.exe', 'javascript://x', '/usr/bin/x', '~/x'])('rejects %s', t => expect(isLaunchablePath(t)).toBe(false));
   it.each(['C:\\Program Files\\App\\app.exe', '"C:\\Program Files\\App\\app.exe"', 'C:\\Games\\Once Human\\launcher.exe'])('accepts spaces and quotes in %s', t => expect(isLaunchablePath(t)).toBe(true));
+  it.each(['steam://rungameid/440', 'STEAM://RUN/440', 'C:\\Games\\Example.com Games\\run.exe'])('accepts %s', x => expect(isLaunchablePath(x)).toBe(true));
+  it.each(['steam://open/games', 'steam://run/440//+connect x', 'steam://rungameid/440/x'])('rejects %s', x => expect(isLaunchablePath(x)).toBe(false));
   it.each(['C:\\Games\\game.exe -windowed', 'C:\\Games\\a.lnk /x', 'D:/x/y.BAT arg'])('rejects arguments in %s', t => expect(isLaunchablePath(t)).toBe(false));
 });
 

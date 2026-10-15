@@ -29,17 +29,23 @@ export function launchPathLabel(path: string): string {
   return stem || name;
 }
 
+/** Text after an executable extension. A path that itself ends in the extension
+ *  has none, so a folder like "Example.com Games" is not mistaken for arguments. */
+function hasTrailingArgs(s: string, extensions: string): boolean {
+  return new RegExp(`\\.(${extensions})\\s+\\S`, 'i').test(s) && !new RegExp(`\\.(${extensions})$`, 'i').test(s);
+}
+
 /** What the service will actually launch: on Windows a drive-letter path (no UNC
  *  share), on a Mac an absolute POSIX path (drive paths are refused there), and
- *  on both an http, https or steam URI. A path with text after its executable
+ *  on both an http or https URI or a steam run link. A path with text after its executable
  *  extension is rejected, since the service launches a file and passes no
  *  arguments. Anything else looksLikeLaunchPath accepts would save but silently
  *  never run. */
 export function isLaunchablePath(text: string, posix: boolean = isMacAppShell()): boolean {
   const s = normalizeLaunchPath(text);
-  if (/^(https?|steam):\/\/\S/i.test(s)) return true;
-  if (posix) return /^\/[^/\s]/.test(s) && !/\.app\s+\S/i.test(s);
-  return /^[a-zA-Z]:[\\/]/.test(s) && !/\.(exe|lnk|bat|cmd|com|url|appref-ms)\s+\S/i.test(s);
+  if (/^https?:\/\/\S/i.test(s) || /^steam:\/\/(rungameid|run)\/[0-9]+$/i.test(s)) return true;
+  if (posix) return /^\/[^/\s]/.test(s) && !hasTrailingArgs(s, 'app');
+  return /^[a-zA-Z]:[\\/]/.test(s) && !hasTrailingArgs(s, 'exe|lnk|bat|cmd|com|url|appref-ms');
 }
 
 /** Shape of an id the service launches directly (URI, path separator, drive
