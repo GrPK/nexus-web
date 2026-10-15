@@ -16,7 +16,7 @@ describe('absolute scale', () => {
   it('keeps any green-range chroma muted', () => {
     for (let c = -10; c <= 38; c += 0.25) {
       const [, chroma, hue] = scaleOklch(c);
-      if (hue >= 110 && hue <= 190) expect(chroma).toBeLessThan(0.12);
+      if (hue >= 110 && hue <= 190) expect(chroma).toBeLessThan(0.09);
       if (c < 13 || c > 18.5) expect(hue >= 110 && hue <= 190).toBe(false);
     }
   });
@@ -24,8 +24,16 @@ describe('absolute scale', () => {
   it('is cold blue below freezing-ish and red when hot', () => {
     expect(hexHue(absoluteColor(2))).toBeGreaterThan(200);
     expect(hexHue(absoluteColor(2))).toBeLessThan(260);
-    expect(absoluteColor(40)).toBe(absoluteColor(33));
+    expect(absoluteColor(45)).toBe(absoluteColor(37));
     expect(absoluteColor(-20)).toBe(absoluteColor(-10));
+  });
+
+  it('keeps pleasant temperatures out of red', () => {
+    for (let c = 20; c <= 27; c += 0.5) {
+      const hue = scaleOklch(c)[2];
+      expect(hue).toBeGreaterThan(60);
+    }
+    expect(scaleOklch(37)[2]).toBeLessThan(40);
   });
 
   it('converts Fahrenheit to Celsius', () => {
