@@ -56,3 +56,11 @@ describe('WebViewWidget placeholder', () => {
     expect(webViewHost.getSnapshot().status).toBe('unsupported');
   });
 });
+
+describe('web-view surface availability', () => {
+  it('is limited to y70 and monitor, 4x4 only', async () => {
+    const { webViewApp } = await import('./index');
+    expect(webViewApp.meta.surfaces).toEqual(['y70', 'monitor']);
+    expect(webViewApp.meta.sizes).toEqual(['4x4']);
+  });
+});

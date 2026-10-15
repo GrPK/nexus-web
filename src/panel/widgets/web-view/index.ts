@@ -17,7 +17,7 @@ export const webViewApp: AppManifest = {
     // The native layer exists only on the on-device panel hosts.
     panelOnly: true,
     // Surfaces whose host can layer a native view; Q-series and LCD panels cannot.
-    surfaces: ['y70', 'phone', 'monitor'],
+    surfaces: ['y70', 'monitor'],
   },
   Widget: WebViewWidget,
   Touch: WebViewImmersive,
