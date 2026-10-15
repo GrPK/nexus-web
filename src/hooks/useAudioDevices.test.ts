@@ -40,4 +40,25 @@ describe('useAudioDevices reorderDevices', () => {
     expect(result.current.outputs.map(d => d.id)).toEqual(['b', 'a']);
     await waitFor(() => expect(fetchAudioDevices).toHaveBeenCalledTimes(2));
   });
+
+  it('ignores a read that left before the drop and returns after it', async () => {
+    const fresh = {
+      error: false, msg: '', outputs: [dev('a', 'output'), dev('b', 'output')], inputs: [], outputOrder: ['a', 'b'],
+    };
+    let releaseStale: (list: AudioDeviceList) => void = () => {};
+    fetchAudioDevices.mockReset();
+    fetchAudioDevices.mockResolvedValueOnce(fresh);
+    const { result } = renderHook(() => useAudioDevices(true));
+    await waitFor(() => expect(result.current.outputs).toHaveLength(2));
+
+    fetchAudioDevices.mockReturnValueOnce(new Promise(resolve => { releaseStale = resolve; }));
+    act(() => result.current.refresh());
+    fetchAudioDevices.mockResolvedValue({ ...fresh, outputs: [dev('b', 'output'), dev('a', 'output')], outputOrder: ['b', 'a'] });
+    act(() => result.current.reorderDevices('output', ['b', 'a']));
+    await waitFor(() => expect(fetchAudioDevices).toHaveBeenCalledTimes(3));
+
+    await act(async () => { releaseStale(fresh); });
+
+    expect(result.current.outputs.map(d => d.id)).toEqual(['b', 'a']);
+  });
 });

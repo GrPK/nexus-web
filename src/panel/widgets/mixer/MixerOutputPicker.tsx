@@ -90,6 +90,7 @@ export function MixerOutputPicker({
     if (!isTab(key)) return;
     setPicked(key);
     setPage(0);
+    setEditing(false);
   };
   const tabDefs: TabDef[] = tabs.map(entry => ({ key: entry, label: t(TAB_LABEL[entry]) }));
 
@@ -113,19 +114,22 @@ export function MixerOutputPicker({
           ariaLabel={t('panel.widget.mixer.aria.pickOutput')}
         />
       )}
-      {reorderDirection && rows.length > 1 && (
+      {tab && (
+        // Always mounted so the tab bar beside it keeps its width.
         <Button
           tone="ghost"
-          icon={editing ? <Check size={18} strokeWidth={2.2} /> : <Pencil size={18} strokeWidth={2.2} />}
-          aria-pressed={editing}
-          aria-label={t(editing ? 'panel.widget.mixer.aria.reorderDone' : 'panel.widget.mixer.aria.reorder')}
-          onClick={() => setEditing(v => !v)}
+          disabled={!reorderDirection || rows.length < 2}
+          icon={reordering ? <Check size={18} strokeWidth={2.2} /> : <Pencil size={18} strokeWidth={2.2} />}
+          aria-pressed={reordering}
+          aria-label={t(reordering ? 'panel.widget.mixer.aria.reorderDone' : 'panel.widget.mixer.aria.reorder')}
+          onClick={() => setEditing(!reordering)}
         />
       )}
     </div>
     {reordering && reorderDirection ? (
       <div className={styles.pickerReorder}>
         <SortableList
+          opaqueOverlay
           ids={rows.map(r => r.id)}
           onReorder={ids => onReorder(reorderDirection, ids)}
           renderRow={(id, a) => {

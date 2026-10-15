@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { mergeDeviceOrder } from '../panel/widgets/mixer/deviceOrder';
+import { mergeDeviceOrder } from '../lib/deviceOrder';
 import {
   fetchAudioDevices,
   setDefaultInput,
@@ -38,9 +38,14 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
   const [inputOrder, setInputOrder] = useState<string[]>([]);
   const mounted = useRef(true);
 
+  // Only the newest read may land: a poll that left before a drop or a pick
+  // must not put the old order or default back when it returns late.
+  const requestSeq = useRef(0);
+
   const refresh = useCallback(async () => {
+    const seq = ++requestSeq.current;
     const list = await fetchAudioDevices();
-    if (!list || !mounted.current) return;
+    if (!list || !mounted.current || seq !== requestSeq.current) return;
     setOutputs(list.outputs ?? []);
     setInputs(list.inputs ?? []);
     setOutputOrder(list.outputOrder ?? []);
@@ -67,6 +72,7 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
       const byId = new Map(prev.map(d => [d.id, d]));
       return orderedIds.flatMap(id => byId.get(id) ?? []);
     };
+    requestSeq.current++;
     if (isOutput) { setOutputOrder(next); setOutputs(sortBy); }
     else { setInputOrder(next); setInputs(sortBy); }
     void setAudioDeviceOrder(direction, next).then(() => refresh());
