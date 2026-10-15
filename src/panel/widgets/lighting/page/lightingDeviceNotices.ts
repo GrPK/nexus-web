@@ -14,5 +14,7 @@ export function lightingDeviceNoticeKey(device: LightingDevice): string | null {
   if (device.id.startsWith('nzxt-kraken:')) return 'lighting.devices.partialStreaming';
   // The HydroShift II ring plays an uploaded loop; each upload stalls the pump-head screen.
   if (device.id.startsWith('lianli-hydroshift2:')) return 'lighting.devices.partialStreaming';
+  // The MEK 4 drops keystrokes above the service's per-model lighting rate cap.
+  if (device.id.startsWith('ibp:mek4-keyboard:')) return 'lighting.devices.partialStreaming';
   return null;
 }
