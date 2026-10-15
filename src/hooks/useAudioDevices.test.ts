@@ -1,6 +1,6 @@
 // A drag rewrites the saved order of the visible devices only; ids of devices
 // that are unplugged must survive the write.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { AudioDeviceList } from '../api/mixer';
 import { useAudioDevices } from './useAudioDevices';
@@ -88,5 +88,81 @@ describe('useAudioDevices reorderDevices', () => {
     const { result } = renderHook(() => useAudioDevices(false));
     act(() => result.current.refresh());
     expect(fetchAudioDevices).not.toHaveBeenCalled();
+  });
+
+  describe('write hold', () => {
+    const fresh = () => ({
+      error: false, msg: '', outputs: [dev('a', 'output'), dev('b', 'output')], inputs: [], outputOrder: ['a', 'b'],
+    });
+    const deferred = () => {
+      let resolve: (v: null) => void = () => {};
+      let reject: (e: unknown) => void = () => {};
+      const promise = new Promise<null>((res, rej) => { resolve = res; reject = rej; });
+      return { promise, resolve, reject };
+    };
+
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('re-reads once, after the last of two overlapping writes settles', async () => {
+      fetchAudioDevices.mockReset();
+      fetchAudioDevices.mockResolvedValue(fresh());
+      const first = deferred();
+      const second = deferred();
+      setAudioDeviceOrder.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+      const { result } = renderHook(() => useAudioDevices(true));
+      await waitFor(() => expect(result.current.outputs).toHaveLength(2));
+      fetchAudioDevices.mockClear();
+
+      act(() => result.current.reorderDevices('output', ['b', 'a']));
+      act(() => result.current.reorderDevices('output', ['a', 'b']));
+      await act(async () => { first.resolve(null); });
+      expect(fetchAudioDevices).not.toHaveBeenCalled();
+
+      await act(async () => { second.resolve(null); });
+      await waitFor(() => expect(fetchAudioDevices).toHaveBeenCalledTimes(1));
+    });
+
+    it('releases the hold when the write rejects', async () => {
+      fetchAudioDevices.mockReset();
+      fetchAudioDevices.mockResolvedValue(fresh());
+      const write = deferred();
+      setAudioDeviceOrder.mockReturnValueOnce(write.promise);
+      const { result } = renderHook(() => useAudioDevices(true));
+      await waitFor(() => expect(result.current.outputs).toHaveLength(2));
+      fetchAudioDevices.mockClear();
+
+      act(() => result.current.reorderDevices('output', ['b', 'a']));
+      await act(async () => { write.reject(new Error('down')); });
+
+      await waitFor(() => expect(fetchAudioDevices).toHaveBeenCalledTimes(1));
+    });
+
+    it('lifts the hold after the timeout when a write never answers', async () => {
+      fetchAudioDevices.mockReset();
+      fetchAudioDevices.mockResolvedValue(fresh());
+      setAudioDeviceOrder.mockReturnValueOnce(new Promise<null>(() => {}));
+      const { result } = renderHook(() => useAudioDevices(true));
+      await waitFor(() => expect(result.current.outputs).toHaveLength(2));
+      vi.useFakeTimers();
+      fetchAudioDevices.mockClear();
+
+      act(() => result.current.reorderDevices('output', ['b', 'a']));
+      await act(async () => { await vi.advanceTimersByTimeAsync(4100); });
+
+      expect(fetchAudioDevices).toHaveBeenCalled();
+      expect(result.current.outputs.map(d => d.id)).toEqual(['a', 'b']);
+    });
+
+    it('fetches again as soon as it is re-enabled', async () => {
+      fetchAudioDevices.mockReset();
+      fetchAudioDevices.mockResolvedValue(fresh());
+      const { result, rerender } = renderHook(({ on }) => useAudioDevices(on), { initialProps: { on: false } });
+      expect(fetchAudioDevices).not.toHaveBeenCalled();
+
+      rerender({ on: true });
+
+      await waitFor(() => expect(result.current.outputs).toHaveLength(2));
+      expect(fetchAudioDevices).toHaveBeenCalledTimes(1);
+    });
   });
 });

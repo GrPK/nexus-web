@@ -13,6 +13,8 @@ import {
 // The default endpoint can move without us (Windows' own flyout, a deck key, a
 // headset powering on), so the header polls rather than trusting its own writes.
 const REFRESH_MS = 5000;
+// A write that never answers must not freeze the list: past this the hold lifts and polls land again.
+const WRITE_HOLD_MS = 4000;
 
 export interface AudioDeviceController {
   outputs: AudioDevice[];
@@ -71,8 +73,17 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
   const settleAfter = useCallback((write: Promise<unknown>) => {
     pendingWrites.current++;
     requestSeq.current++;
-    const settle = () => { pendingWrites.current--; return refresh(); };
-    void write.then(settle, settle);
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      window.clearTimeout(timer);
+      pendingWrites.current--;
+      // Only the last write to settle re-reads, so overlapping writes do not flicker.
+      if (pendingWrites.current === 0) void refresh();
+    };
+    const timer = window.setTimeout(release, WRITE_HOLD_MS);
+    void write.then(release, release);
   }, [refresh]);
 
   // The list reorders at once; the re-read after the POST confirms it.
