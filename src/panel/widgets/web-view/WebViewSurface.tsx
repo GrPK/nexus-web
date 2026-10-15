@@ -5,6 +5,7 @@ import { webViewHost } from '../../webview/webViewHost';
 import { isLivePanelPage } from '../../webview/webViewProtocol';
 import { usePanelPreview } from '../common/PanelPreviewContext';
 import type { WidgetProps } from '../types';
+import { resolveRefreshMinutes, resolveZoom } from './webViewConfig';
 import { normalizeWebViewUrl, webViewHostName, webViewSiteName } from './webViewUrl';
 import { useWebViewClaim } from './useWebViewClaim';
 import styles from './WebViewWidget.module.scss';
@@ -24,7 +25,9 @@ export function WebViewSurface({ widget, surface, editorPreview, immersive }: We
   const url = normalizeWebViewUrl(widget.config?.url);
   // The catalog, the editor canvas, the device page preview and the desktop dashboard never talk to a native host.
   const native = !preview && !editorPreview && surface !== 'desktop' && url !== null && isLivePanelPage();
-  const { ref, snapshot } = useWebViewClaim({ id: widget.id, url, immersive, enabled: native });
+  const { ref, snapshot } = useWebViewClaim({ id: widget.id, url, immersive, enabled: native,
+    zoom: resolveZoom(widget.config?.zoom), refreshMinutes: resolveRefreshMinutes(widget.config?.refreshMinutes),
+  });
 
   const view = snapshot.views[widget.id];
   const failed = native && (view?.state === 'error' || view?.state === 'crashed');

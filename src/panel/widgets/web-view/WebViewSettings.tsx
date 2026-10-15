@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from '../../../lib/i18n';
 import type { WidgetSettingsProps } from '../types';
-import { SettingsInput, SettingsRow, SettingsSection } from '../common/SettingsRow/SettingsRow';
+import { Slider } from '../../../components/common/Slider/Slider';
+import { SettingsInput, SettingsRow, SettingsSection, SettingsSelect } from '../common/SettingsRow/SettingsRow';
+import { REFRESH_CHOICES, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, resolveRefreshMinutes, resolveZoom } from './webViewConfig';
 import { normalizeWebViewUrl } from './webViewUrl';
 
 export function WebViewSettings({ widget, onUpdate }: WidgetSettingsProps) {
@@ -9,6 +11,10 @@ export function WebViewSettings({ widget, onUpdate }: WidgetSettingsProps) {
   const saved = typeof widget.config?.url === 'string' ? widget.config.url : '';
   const [draft, setDraft] = useState(saved);
   const normalized = normalizeWebViewUrl(draft);
+  const savedZoom = resolveZoom(widget.config?.zoom);
+  // The Slider is controlled, so a drag needs somewhere to land before the commit.
+  const [dragZoom, setDragZoom] = useState<number | null>(null);
+  const refresh = resolveRefreshMinutes(widget.config?.refreshMinutes);
   const invalid = draft.trim() !== '' && normalized === null;
 
   // Saved on blur or Enter, never per keystroke: a half-typed address would
@@ -39,6 +45,33 @@ export function WebViewSettings({ widget, onUpdate }: WidgetSettingsProps) {
           onKeyDown={e => { if (e.key === 'Enter') commit(); }}
         />
       </SettingsRow>
+      <Slider
+        label={t('panel.widget.web-view.settings.zoom')}
+        value={dragZoom ?? savedZoom}
+        min={ZOOM_MIN}
+        max={ZOOM_MAX}
+        step={ZOOM_STEP}
+        // eslint-disable-next-line i18next/no-literal-string -- slider layout enum
+        orientation="stacked"
+        editable
+        trackFill
+        formatValue={v => t('panel.widget.web-view.settings.zoomValue', { n: v.toFixed(2) })}
+        onChange={v => setDragZoom(v)}
+        onCommit={v => { setDragZoom(null); onUpdate({ zoom: resolveZoom(Math.round(v / ZOOM_STEP) * ZOOM_STEP) }); }}
+      />
+      <SettingsSelect
+        label={t('panel.widget.web-view.settings.refresh')}
+        value={String(refresh)}
+        options={REFRESH_CHOICES.map(m => ({
+          value: String(m),
+          label: m === 0
+            ? t('panel.widget.web-view.settings.refreshOff')
+            : m === 1
+              ? t('panel.widget.web-view.settings.refreshOne')
+              : t('panel.widget.web-view.settings.refreshMany', { n: m }),
+        }))}
+        onChange={v => onUpdate({ refreshMinutes: resolveRefreshMinutes(Number(v)) })}
+      />
     </SettingsSection>
   );
 }

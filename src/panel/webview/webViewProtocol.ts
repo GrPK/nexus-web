@@ -6,6 +6,13 @@ export const WEBVIEW_PROTOCOL_VERSION = 1;
 export const CAPS_TIMEOUT_MS = 1500;
 // The native watchdog destroys every view after 3000 ms without a sync.
 export const HEARTBEAT_MS = 1000;
+export const ZOOM_MIN = 0.25;
+export const ZOOM_MAX = 3;
+
+export function clampZoom(v: unknown): number {
+  const n = typeof v === 'number' && Number.isFinite(v) ? v : 1;
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, n));
+}
 
 export interface WebViewRect { x: number; y: number; w: number; h: number }
 
@@ -17,6 +24,8 @@ export interface WebViewSyncView {
   visible: boolean;
   /** Corner radius in CSS px of the visible card; absent or 0 means square. */
   radius?: number;
+  /** Page zoom factor, clamped to the zoom range. Changing it never reloads the view. */
+  zoom?: number;
 }
 
 export interface WebViewHello { type: 'nexus.webview.hello'; version: number }

@@ -2,6 +2,7 @@ import {
   CAPS_TIMEOUT_MS,
   HEARTBEAT_MS,
   WEBVIEW_PROTOCOL_VERSION,
+  clampZoom,
   detectTransport,
   parseInbound,
   type WebViewCommandName,
@@ -38,10 +39,16 @@ export interface WebViewClaimInput {
   element: HTMLElement;
   /** The immersive claim owns the rect and the input while it exists. */
   immersive: boolean;
+  /** Page zoom factor; defaults to 1. */
+  zoom?: number;
+  /** Tile claims only: reload every N minutes while the tile is what is shown. 0 or absent is off. */
+  refreshMinutes?: number;
 }
 
 export interface WebViewClaimHandle {
   setUrl: (url: string) => void;
+  setZoom: (zoom: number) => void;
+  setRefreshMinutes: (minutes: number) => void;
   release: () => void;
 }
 
@@ -84,6 +91,7 @@ export class WebViewHost {
   private resizeObserver: ResizeObserver | null = null;
   private mutationObserver: MutationObserver | null = null;
   private teardown: Array<() => void> = [];
+  private refreshTimers = new Map<string, { minutes: number; handle: ReturnType<typeof setInterval> }>();
 
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -99,16 +107,28 @@ export class WebViewHost {
     this.resizeObserver?.observe(rec.element);
     this.ensureHeartbeat();
     this.schedule();
+    this.updateRefreshTimers();
     return {
       setUrl: (url: string) => {
         if (rec.url === url) return;
         rec.url = url;
         this.schedule();
       },
+      setZoom: (zoom: number) => {
+        if (rec.zoom === zoom) return;
+        rec.zoom = zoom;
+        this.schedule();
+      },
+      setRefreshMinutes: (minutes: number) => {
+        if (rec.refreshMinutes === minutes) return;
+        rec.refreshMinutes = minutes;
+        this.updateRefreshTimers();
+      },
       release: () => {
         if (!this.claims.delete(rec.key)) return;
         this.resizeObserver?.unobserve(rec.element);
         this.schedule();
+        this.updateRefreshTimers();
       },
     };
   }
@@ -135,6 +155,8 @@ export class WebViewHost {
     for (const off of this.teardown) off();
     this.teardown = [];
     this.stopHeartbeat();
+    for (const t of this.refreshTimers.values()) clearInterval(t.handle);
+    this.refreshTimers.clear();
     if (this.capsTimer) clearTimeout(this.capsTimer);
     this.capsTimer = null;
     this.resizeObserver?.disconnect();
@@ -277,7 +299,37 @@ export class WebViewHost {
       maxViews: this.maxViews,
       views: this.viewStates,
     };
+    this.updateRefreshTimers();
     for (const l of [...this.listeners]) l();
+  }
+
+  // One reload timer per id, alive only while that id is shown as a tile on a
+  // supported host and has not failed. An immersive claim removes it, so the
+  // interval starts over when immersive closes. A timer whose interval is
+  // unchanged is left running, so unrelated updates never postpone a reload.
+  private updateRefreshTimers(): void {
+    const want = new Map<string, number>();
+    if (this.status === 'supported') {
+      const immersiveIds = new Set<string>();
+      for (const c of this.claims.values()) if (c.immersive) immersiveIds.add(c.id);
+      for (const c of this.claims.values()) {
+        const minutes = c.refreshMinutes ?? 0;
+        const st = this.viewStates[c.id]?.state;
+        if (c.immersive || immersiveIds.has(c.id) || minutes <= 0 || st === 'error' || st === 'crashed') continue;
+        want.set(c.id, minutes);
+      }
+    }
+    for (const [id, t] of this.refreshTimers) {
+      if (want.get(id) !== t.minutes) {
+        clearInterval(t.handle);
+        this.refreshTimers.delete(id);
+      }
+    }
+    for (const [id, minutes] of want) {
+      if (this.refreshTimers.has(id)) continue;
+      const handle = setInterval(() => this.sendCommand(id, 'reload'), minutes * 60_000);
+      this.refreshTimers.set(id, { minutes, handle });
+    }
   }
 
   private buildViews(): WebViewSyncView[] {
@@ -298,6 +350,7 @@ export class WebViewHost {
         url: c.url,
         rect,
         radius,
+        zoom: clampZoom(c.zoom),
         interactive: c.immersive && this.interactive,
         visible: computeVisible({
           supported,

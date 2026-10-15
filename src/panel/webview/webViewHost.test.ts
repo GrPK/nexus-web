@@ -111,7 +111,7 @@ describe('sync stream', () => {
     bridge.push(caps());
     const [first] = syncs();
     expect(first.views).toEqual([{
-      id: 'a', url: 'https://a.test/', rect: { x: 10, y: 20, w: 300, h: 300 }, radius: 0, interactive: false, visible: true,
+      id: 'a', url: 'https://a.test/', rect: { x: 10, y: 20, w: 300, h: 300 }, radius: 0, zoom: 1, interactive: false, visible: true,
     }]);
     expect(first.viewport).toEqual({ w: window.innerWidth, h: window.innerHeight });
     vi.advanceTimersByTime(2500);
@@ -366,5 +366,106 @@ describe('tile to immersive to tile', () => {
     claim.setUrl('https://two.test/');
     frame();
     expect(syncs().at(-1)!.views[0].url).toBe('https://two.test/');
+  });
+});
+
+describe('zoom', () => {
+  it('sends a clamped zoom on every view and changes only that field', () => {
+    const host = makeHost();
+    const claim = host.register({ id: 'a', url: 'https://a.test/', element: makeEl().el, immersive: false, zoom: 9 });
+    bridge.push(caps());
+    expect(syncs().at(-1)!.views[0].zoom).toBe(3);
+    const before = syncs().at(-1)!.views[0];
+    claim.setZoom(0.05);
+    frame();
+    const after = syncs().at(-1)!.views[0];
+    expect(after.zoom).toBe(0.25);
+    expect({ ...after, zoom: 0 }).toEqual({ ...before, zoom: 0 });
+    const cmds = bridge.postMessage.mock.calls.filter(c => c[0].type === 'nexus.webview.command');
+    expect(cmds).toHaveLength(0);
+  });
+
+  it('defaults to 1', () => {
+    const host = makeHost();
+    host.register({ id: 'a', url: 'https://a.test/', element: makeEl().el, immersive: false });
+    bridge.push(caps());
+    expect(syncs().at(-1)!.views[0].zoom).toBe(1);
+  });
+});
+
+describe('auto-refresh timer', () => {
+  const reloads = () => bridge.postMessage.mock.calls
+    .map(c => c[0]).filter(m => m.type === 'nexus.webview.command' && m.command === 'reload');
+  const min = (n: number) => vi.advanceTimersByTime(n * 60_000);
+  const tile = (host: WebViewHost, refreshMinutes = 1) =>
+    host.register({ id: 'a', url: 'https://a.test/', element: makeEl().el, immersive: false, refreshMinutes });
+
+  it('reloads every N minutes while a tile on a supported host', () => {
+    const host = makeHost();
+    tile(host, 5);
+    bridge.push(caps());
+    min(4);
+    expect(reloads()).toHaveLength(0);
+    min(1);
+    expect(reloads()).toHaveLength(1);
+    min(5);
+    expect(reloads()).toHaveLength(2);
+  });
+
+  it('is off at 0 and before the host is supported', () => {
+    const host = makeHost();
+    tile(host, 0);
+    bridge.push(caps());
+    min(120);
+    expect(reloads()).toHaveLength(0);
+    const host2 = makeHost();
+    delete (window as TestWindow).chrome;
+    tile(host2, 1);
+    min(10);
+    expect(reloads()).toHaveLength(0);
+  });
+
+  it('never fires while immersive is open and restarts the full interval on close', () => {
+    const host = makeHost();
+    tile(host, 1);
+    bridge.push(caps());
+    min(0.5);
+    const imm = host.register({ id: 'a', url: 'https://a.test/', element: makeEl().el, immersive: true });
+    min(10);
+    expect(reloads()).toHaveLength(0);
+    imm.release();
+    min(0.9);
+    expect(reloads()).toHaveLength(0);
+    min(0.1);
+    expect(reloads()).toHaveLength(1);
+  });
+
+  it('stops on error or crash and resumes after the view recovers', () => {
+    const host = makeHost();
+    tile(host, 1);
+    bridge.push(caps());
+    bridge.push({ type: 'nexus.webview.state', id: 'a', state: 'error', canGoBack: false });
+    min(5);
+    expect(reloads()).toHaveLength(0);
+    bridge.push({ type: 'nexus.webview.state', id: 'a', state: 'crashed', canGoBack: false });
+    min(5);
+    expect(reloads()).toHaveLength(0);
+    bridge.push({ type: 'nexus.webview.state', id: 'a', state: 'loaded', canGoBack: false });
+    min(1);
+    expect(reloads()).toHaveLength(1);
+  });
+
+  it('does not postpone the timer on unrelated updates, and stops when released', () => {
+    const host = makeHost();
+    const claim = tile(host, 1);
+    bridge.push(caps());
+    min(0.5);
+    bridge.push({ type: 'nexus.webview.state', id: 'a', state: 'loaded', canGoBack: true });
+    claim.setZoom(2);
+    min(0.5);
+    expect(reloads()).toHaveLength(1);
+    claim.release();
+    min(5);
+    expect(reloads()).toHaveLength(1);
   });
 });
