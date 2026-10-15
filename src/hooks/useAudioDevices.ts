@@ -70,7 +70,7 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
 
   useEffect(() => {
     mounted.current = true;
-    if (!enabled) return () => { mounted.current = false; };
+    if (!enabled) return () => { mounted.current = false; voidWrites(); };
     refresh();
     const timer = window.setInterval(refresh, REFRESH_MS);
     return () => {
@@ -99,7 +99,7 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
       if (gen !== generation.current) return;
       lift();
       // Only the last write to settle re-reads, so overlapping writes do not flicker.
-      if (pendingWrites.current === 0) void refresh();
+      if (pendingWrites.current === 0 && mounted.current && enabledRef.current) void refresh();
     };
     void write.then(settle, settle);
   }, [refresh]);

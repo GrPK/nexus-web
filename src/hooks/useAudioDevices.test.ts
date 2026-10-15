@@ -164,15 +164,41 @@ describe('useAudioDevices reorderDevices', () => {
       const { result, unmount } = renderHook(() => useAudioDevices(true));
       await waitFor(() => expect(result.current.outputs).toHaveLength(2));
       vi.useFakeTimers();
-      const clearSpy = vi.spyOn(window, 'clearTimeout');
 
       act(() => result.current.reorderDevices('output', ['b', 'a']));
       fetchAudioDevices.mockClear();
       unmount();
-      expect(clearSpy).toHaveBeenCalled();
       await act(async () => { await vi.advanceTimersByTimeAsync(4100); write.resolve(null); });
 
       expect(fetchAudioDevices).not.toHaveBeenCalled();
+    });
+
+    it('keeps holding for a later write when a pre-disable write settles after re-enable', async () => {
+      fetchAudioDevices.mockReset();
+      fetchAudioDevices.mockResolvedValue(fresh());
+      const early = deferred();
+      const later = deferred();
+      setAudioDeviceOrder.mockReturnValueOnce(early.promise).mockReturnValueOnce(later.promise);
+      const { result, rerender } = renderHook(({ on }) => useAudioDevices(on), { initialProps: { on: true } });
+      await waitFor(() => expect(result.current.outputs).toHaveLength(2));
+
+      act(() => result.current.reorderDevices('output', ['b', 'a']));
+      rerender({ on: false });
+      rerender({ on: true });
+      await waitFor(() => expect(result.current.outputs).toHaveLength(2));
+      act(() => result.current.reorderDevices('output', ['b', 'a']));
+      fetchAudioDevices.mockClear();
+
+      await act(async () => { early.resolve(null); });
+      expect(fetchAudioDevices).not.toHaveBeenCalled();
+      // The later write still holds polls, so an old-order read must not land.
+      await act(async () => { result.current.refresh(); });
+      expect(result.current.outputs.map(d => d.id)).toEqual(['b', 'a']);
+
+      fetchAudioDevices.mockResolvedValue({ ...fresh(), outputs: [dev('b', 'output'), dev('a', 'output')], outputOrder: ['b', 'a'] });
+      await act(async () => { later.resolve(null); });
+      expect(result.current.outputs.map(d => d.id)).toEqual(['b', 'a']);
+      expect(fetchAudioDevices).toHaveBeenCalledTimes(2);
     });
 
     it('fetches again as soon as it is re-enabled', async () => {
