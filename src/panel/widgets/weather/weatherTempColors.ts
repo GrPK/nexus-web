@@ -59,25 +59,28 @@ function mixOklch(a: Oklch, b: Oklch, t: number): Oklch {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (a[2] + dh * t + 360) % 360];
 }
 
-const CHROMA_SCALE = 0.7;
+// Stops sampled from the iOS Weather range bars, in Fahrenheit.
+const SCALE_F: ReadonlyArray<readonly [number, string]> = [
+  [10, '#5a8fe6'],
+  [33, '#64b5f6'],
+  [45, '#7bcdd7'],
+  [52, '#7dced1'],
+  [57, '#aed1a8'],
+  [62, '#b6d2a1'],
+  [66, '#d6d17a'],
+  [69, '#eacf55'],
+  [72, '#f6c938'],
+  [76, '#f5b52f'],
+  [80, '#f4a52b'],
+  [84, '#f39a2a'],
+  [87, '#ef8735'],
+  [91, '#ed7439'],
+  [104, '#e0453a'],
+];
 
-const soft = ([L, C, H]: Oklch): Oklch => [L, C * CHROMA_SCALE, H];
-
-// The 16.5 degree stop is a muted sage that keeps the blue-to-yellow handoff
-// narrow and low in chroma.
-const SCALE: ReadonlyArray<readonly [number, Oklch]> = ([
-  [-10, '#4b3fa8'],
-  [0, '#3b6fe0'],
-  [8, '#5b9bf0'],
-  [13, '#8fc3f2'],
-  [19, '#f2d230'],
-  [23, '#f2d230'],
-  [27, '#f3b043'],
-  [30, '#f2922a'],
-  [37, '#e8432e'],
-] as ReadonlyArray<readonly [number, string]>)
-  .flatMap(([c, hex]) => (c === 19 ? [[16.5, [0.87, 0.045, 130] as Oklch] as const] : []).concat([[c, hexToOklch(hex)] as const]))
-  .map(([c, ok]) => [c, soft(ok)] as const);
+const SCALE: ReadonlyArray<readonly [number, Oklch]> = SCALE_F.map(
+  ([f, hex]) => [((f - 32) * 5) / 9, hexToOklch(hex)] as const,
+);
 
 export function scaleOklch(celsius: number): Oklch {
   const first = SCALE[0];

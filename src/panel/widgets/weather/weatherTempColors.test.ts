@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ACCENT_MAX_SHIFT_DEG, absoluteColor, accentAt, barGradient, fahrenheitToCelsius, parseHsl, scaleOklch,
+  ACCENT_MAX_SHIFT_DEG, absoluteColor, accentAt, barGradient, fahrenheitToCelsius, parseHsl,
 } from './weatherTempColors';
 
 function hexHue(hex: string) {
@@ -13,27 +13,27 @@ function hexHue(hex: string) {
 }
 
 describe('absolute scale', () => {
-  it('keeps any green-range chroma muted', () => {
-    for (let c = -10; c <= 38; c += 0.25) {
-      const [, chroma, hue] = scaleOklch(c);
-      if (hue >= 110 && hue <= 190) expect(chroma).toBeLessThan(0.09);
-      if (c < 13 || c > 18.5) expect(hue >= 110 && hue <= 190).toBe(false);
+  it('is sky blue when freezing', () => {
+    const h = hexHue(absoluteColor(fahrenheitToCelsius(30)));
+    expect(h).toBeGreaterThan(200);
+    expect(h).toBeLessThan(220);
+  });
+
+  it('reads yellow to amber at pleasant temperatures, never red', () => {
+    for (let f = 68; f <= 80; f += 1) {
+      const hue = hexHue(absoluteColor(fahrenheitToCelsius(f)));
+      expect(hue).toBeGreaterThan(35);
+      expect(hue).toBeLessThan(60);
     }
   });
 
-  it('is cold blue below freezing-ish and red when hot', () => {
-    expect(hexHue(absoluteColor(2))).toBeGreaterThan(200);
-    expect(hexHue(absoluteColor(2))).toBeLessThan(260);
-    expect(absoluteColor(45)).toBe(absoluteColor(37));
-    expect(absoluteColor(-20)).toBe(absoluteColor(-10));
+  it('only reaches red well above 90 F', () => {
+    expect(hexHue(absoluteColor(fahrenheitToCelsius(92)))).toBeGreaterThan(18);
+    expect(absoluteColor(100)).toBe(absoluteColor(fahrenheitToCelsius(104)));
   });
 
-  it('keeps pleasant temperatures out of red', () => {
-    for (let c = 20; c <= 27; c += 0.5) {
-      const hue = scaleOklch(c)[2];
-      expect(hue).toBeGreaterThan(60);
-    }
-    expect(scaleOklch(37)[2]).toBeLessThan(40);
+  it('clamps below the first stop', () => {
+    expect(absoluteColor(-40)).toBe(absoluteColor(fahrenheitToCelsius(10)));
   });
 
   it('converts Fahrenheit to Celsius', () => {
