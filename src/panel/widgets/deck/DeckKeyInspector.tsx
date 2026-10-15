@@ -347,8 +347,8 @@ function ActionFields({ action, onChange, allowed, surface, desktopEditor, pageC
     }
     case 'system': {
       const a = action.action;
-      // Capture ops run on the host through a physical deck's service handler; a widget target never offers them.
-      const ops = ['volumeUp', 'volumeDown', 'volumeSet', 'muteToggle', 'mediaPlayPause', 'mediaNext', 'mediaPrev', 'brightnessUp', 'brightnessDown', 'brightnessSet', 'openSettings']
+      // Capture ops open the host's own capture UI; a widget target offers them only when a key already uses one.
+      const ops = ['volumeUp', 'volumeDown', 'volumeSet', 'muteToggle', 'mediaPlayPause', 'mediaNext', 'mediaPrev', 'brightnessUp', 'brightnessDown', 'brightnessSet', 'openSettings', 'taskManager']
         .concat(physical || a.op === 'screenshot' || a.op === 'screenRecord' ? ['screenshot', 'screenRecord'] : []);
       return (
         <>

@@ -74,7 +74,7 @@ export function deckCategory(action: DeckAction | undefined): DeckCategory {
     case 'openFolder':
     case 'openUrl': return 'open';
     case 'system':
-      if (action.action.op === 'openSettings' || action.action.op === 'screenshot' || action.action.op === 'screenRecord') return 'open';
+      if (action.action.op === 'openSettings' || action.action.op === 'screenshot' || action.action.op === 'screenRecord' || action.action.op === 'taskManager') return 'open';
       if (action.action.op.startsWith('volume') || action.action.op === 'muteToggle') return 'volume';
       if (action.action.op.startsWith('media')) return 'media';
       return 'brightness';
@@ -166,6 +166,7 @@ export function autoIconName(action: DeckAction | undefined, isFolder = false): 
         case 'openSettings': return 'Settings';
         case 'screenshot': return 'Camera';
         case 'screenRecord': return 'Disc';
+        case 'taskManager': return 'Activity';
         default: return 'Sliders';
       }
     case 'hotkey': return 'Keyboard';

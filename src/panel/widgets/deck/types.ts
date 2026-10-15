@@ -18,7 +18,7 @@ export type DeckSystemOp =
   | 'volumeUp' | 'volumeDown' | 'volumeSet' | 'muteToggle'
   | 'mediaPlayPause' | 'mediaNext' | 'mediaPrev'
   | 'brightnessUp' | 'brightnessDown' | 'brightnessSet'
-  | 'openSettings' | 'screenshot' | 'screenRecord';
+  | 'openSettings' | 'screenshot' | 'screenRecord' | 'taskManager';
 
 export interface DeckSystemAction {
   op: DeckSystemOp;
