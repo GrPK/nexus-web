@@ -3873,6 +3873,7 @@
   "panel.settings.backgroundOpacity.desc": "배경을 어둡게 합니다",
   "panel.settings.channel": "채널",
   "panel.settings.connectForApps": "데스크톱에 연결해 앱 검색",
+  "panel.settings.customAppHint": "목록에 없나요? 검색창에 경로나 링크를 붙여넣으세요.",
   "panel.settings.deck.action.audioInput": "오디오 입력",
   "panel.settings.deck.action.audioOutput": "오디오 출력",
   "panel.settings.deck.action.cooling": "쿨링",

@@ -18,13 +18,15 @@ describe('normalizeLaunchPath', () => {
   it('trims and strips wrapping quotes', () => {
     expect(normalizeLaunchPath('  "C:\\a b\\c.exe" ')).toBe('C:\\a b\\c.exe');
     expect(normalizeLaunchPath('C:\\a.exe')).toBe('C:\\a.exe');
+    expect(normalizeLaunchPath('/Applications/Foo.app/')).toBe('/Applications/Foo.app');
+    expect(normalizeLaunchPath('/')).toBe('/');
   });
 });
 
 describe('launchPathLabel', () => {
   it('uses the file name for paths and the raw text for URIs', () => {
-    expect(launchPathLabel('C:\\Games\\OnceHuman\\launcher.exe')).toBe('launcher.exe');
-    expect(launchPathLabel('/Applications/Foo.app')).toBe('Foo.app');
+    expect(launchPathLabel('C:\\Games\\OnceHuman\\launcher.exe')).toBe('launcher');
+    expect(launchPathLabel('/Applications/Foo.app')).toBe('Foo');
     expect(launchPathLabel('steam://rungameid/2139460')).toBe('steam://rungameid/2139460');
   });
 });
@@ -32,4 +34,9 @@ describe('launchPathLabel', () => {
 describe('isLaunchablePath', () => {
   it.each(['C:\\Games\\a.exe', 'D:/x.lnk', 'https://example.com', 'steam://rungameid/1'])('accepts %s', t => expect(isLaunchablePath(t)).toBe(true));
   it.each(['\\\\host\\share\\a.exe', 'ftp://x/y', 'file:///C:/a.exe', 'javascript://x', '/usr/bin/x', '~/x'])('rejects %s', t => expect(isLaunchablePath(t)).toBe(false));
+});
+
+describe('isLaunchablePath on a Mac', () => {
+  it.each(['/Applications/Foo.app', '/usr/local/bin/tool'])('accepts %s', t => expect(isLaunchablePath(t, true)).toBe(true));
+  it.each(['/', '//host/x', '~/x', 'Foo.app'])('rejects %s', t => expect(isLaunchablePath(t, true)).toBe(false));
 });

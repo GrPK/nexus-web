@@ -3873,6 +3873,7 @@
   "panel.settings.backgroundOpacity.desc": "Arka planı karartır",
   "panel.settings.channel": "Kanal",
   "panel.settings.connectForApps": "Uygulamalari gormek icin masaustune baglanin",
+  "panel.settings.customAppHint": "Listede yok mu? Arama kutusuna bir yol veya bağlantı yapıştırın.",
   "panel.settings.deck.action.audioInput": "Ses girişi",
   "panel.settings.deck.action.audioOutput": "Ses çıkışı",
   "panel.settings.deck.action.cooling": "Sogutma",

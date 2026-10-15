@@ -3873,6 +3873,7 @@
   "panel.settings.backgroundOpacity.desc": "Assombrit le fond",
   "panel.settings.channel": "Chaîne",
   "panel.settings.connectForApps": "Connecter au bureau pour parcourir les apps",
+  "panel.settings.customAppHint": "Pas dans la liste ? Collez un chemin ou un lien dans le champ de recherche.",
   "panel.settings.deck.action.audioInput": "Entrée audio",
   "panel.settings.deck.action.audioOutput": "Sortie audio",
   "panel.settings.deck.action.cooling": "Refroidissement",

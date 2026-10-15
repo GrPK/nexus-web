@@ -154,8 +154,9 @@ export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = fal
     setBrowsing(true);
     setBrowseRejected(false);
     try {
-      const path = await customPath.onBrowse();
-      if (!path) return;
+      const picked = await customPath.onBrowse();
+      if (!picked) return;
+      const path = normalizeLaunchPath(picked);
       if (isLaunchablePath(path)) customPath.onUse?.(path);
       else setBrowseRejected(true);
     } finally {
@@ -179,6 +180,7 @@ export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = fal
           </Button>
         )}
       </div>
+      {customPath?.onUse && <div className={styles.hint}>{t('panel.settings.customAppHint')}</div>}
       <div className={styles.list} data-panel-scrollable="true">
         {loading && <div className={styles.empty}>{t('panel.settings.loadingApps')}</div>}
         {storedCustom && (

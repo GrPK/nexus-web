@@ -3919,6 +3919,7 @@
   "panel.settings.backgroundOpacity.desc": "Затемняет фон",
   "panel.settings.channel": "Канал",
   "panel.settings.connectForApps": "Подключитесь к рабочему столу для просмотра приложений",
+  "panel.settings.customAppHint": "Нет в списке? Вставьте путь или ссылку в поле поиска.",
   "panel.settings.deck.action.audioInput": "Аудиовход",
   "panel.settings.deck.action.audioOutput": "Аудиовыход",
   "panel.settings.deck.action.cooling": "Охлаждение",

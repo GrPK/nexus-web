@@ -3873,6 +3873,7 @@
   "panel.settings.backgroundOpacity.desc": "調暗背景",
   "panel.settings.channel": "頻道",
   "panel.settings.connectForApps": "連線到桌面以瀏覽應用",
+  "panel.settings.customAppHint": "清單中沒有？請在搜尋框中貼上路徑或連結。",
   "panel.settings.deck.action.audioInput": "音訊輸入",
   "panel.settings.deck.action.audioOutput": "音訊輸出",
   "panel.settings.deck.action.cooling": "散熱",

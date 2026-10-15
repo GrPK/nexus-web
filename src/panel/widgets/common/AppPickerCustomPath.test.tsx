@@ -53,6 +53,16 @@ describe('AppPicker custom launch path', () => {
     expect(onUse).not.toHaveBeenCalled();
   });
 
+  it('shows the not-in-the-list hint only when typing a path is allowed', async () => {
+    const { unmount } = render(<AppPicker onSelect={vi.fn()} customPath={{ onUse: vi.fn() }} />);
+    await screen.findByText('Google Chrome');
+    expect(screen.getByText('panel.settings.customAppHint')).toBeTruthy();
+    unmount();
+    render(<AppPicker onSelect={vi.fn()} customPath={{}} />);
+    await screen.findByText('Google Chrome');
+    expect(screen.queryByText('panel.settings.customAppHint')).toBeNull();
+  });
+
   it('never offers typed paths without onUse (locked)', async () => {
     render(<AppPicker onSelect={vi.fn()} customPath={{}} />);
     await screen.findByText('Google Chrome');
@@ -69,7 +79,7 @@ describe('AppPicker custom launch path', () => {
 
   it('shows a stored custom path as selected by file name, even when locked', async () => {
     render(<AppPicker selectedId="C:\Games\OnceHuman\launcher.exe" onSelect={vi.fn()} customPath={{}} />);
-    const row = (await screen.findByText('launcher.exe')).closest('button')!;
+    const row = (await screen.findByText('launcher')).closest('button')!;
     expect(row.className).toMatch(/appRowSelected/);
   });
 

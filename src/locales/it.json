@@ -3873,6 +3873,7 @@
   "panel.settings.backgroundOpacity.desc": "Attenua lo sfondo",
   "panel.settings.channel": "Canale",
   "panel.settings.connectForApps": "Connetti al desktop per cercare le app",
+  "panel.settings.customAppHint": "Non è nell'elenco? Incolla un percorso o un link nel campo di ricerca.",
   "panel.settings.deck.action.audioInput": "Ingresso audio",
   "panel.settings.deck.action.audioOutput": "Uscita audio",
   "panel.settings.deck.action.cooling": "Raffreddamento",

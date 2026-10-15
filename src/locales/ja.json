@@ -3873,6 +3873,7 @@
   "panel.settings.backgroundOpacity.desc": "背景を暗くします",
   "panel.settings.channel": "チャンネル",
   "panel.settings.connectForApps": "デスクトップに接続してアプリを閲覧",
+  "panel.settings.customAppHint": "一覧にない場合は、検索ボックスにパスまたはリンクを貼り付けてください。",
   "panel.settings.deck.action.audioInput": "音声入力",
   "panel.settings.deck.action.audioOutput": "音声出力",
   "panel.settings.deck.action.cooling": "冷却",

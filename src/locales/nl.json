@@ -3873,6 +3873,7 @@
   "panel.settings.backgroundOpacity.desc": "Dimt de achtergrond",
   "panel.settings.channel": "Kanaal",
   "panel.settings.connectForApps": "Verbind met bureaublad om apps te bekijken",
+  "panel.settings.customAppHint": "Niet in de lijst? Plak een pad of link in het zoekvak.",
   "panel.settings.deck.action.audioInput": "Audio-invoer",
   "panel.settings.deck.action.audioOutput": "Audio-uitvoer",
   "panel.settings.deck.action.cooling": "Koeling",

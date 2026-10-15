@@ -3919,6 +3919,7 @@
   "panel.settings.backgroundOpacity.desc": "Przyciemnia tło",
   "panel.settings.channel": "Kanał",
   "panel.settings.connectForApps": "Polacz z desktopem aby przegladac aplikacje",
+  "panel.settings.customAppHint": "Nie ma na liście? Wklej ścieżkę lub link w polu wyszukiwania.",
   "panel.settings.deck.action.audioInput": "Wejście audio",
   "panel.settings.deck.action.audioOutput": "Wyjście audio",
   "panel.settings.deck.action.cooling": "Chlodzenie",

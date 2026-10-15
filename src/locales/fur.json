@@ -3873,6 +3873,7 @@
   "panel.settings.backgroundOpacity.desc": "Al scurìs il sfont",
   "panel.settings.channel": "Canâl",
   "panel.settings.connectForApps": "Conet al scritori par esplorâ lis aplicazions",
+  "panel.settings.customAppHint": "No je te liste? Incolle un percors o un colegament te casele di ricercje.",
   "panel.settings.deck.action.audioInput": "Jentrade audio",
   "panel.settings.deck.action.audioOutput": "Jessude audio",
   "panel.settings.deck.action.cooling": "Rinfrescjament",

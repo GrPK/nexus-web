@@ -19,6 +19,11 @@
   }
 }
 
+.hint {
+  color: var(--text-dim);
+  font-size: var(--type-small);
+}
+
 .list {
   flex: 1;
   min-height: 0;

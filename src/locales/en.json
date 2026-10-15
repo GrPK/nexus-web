@@ -3873,6 +3873,7 @@
   "panel.settings.backgroundOpacity.desc": "Dims the background",
   "panel.settings.channel": "Channel",
   "panel.settings.connectForApps": "Connect to desktop to browse apps",
+  "panel.settings.customAppHint": "Not in the list? Paste a path or link in the search box.",
   "panel.settings.deck.action.audioInput": "Audio input",
   "panel.settings.deck.action.audioOutput": "Audio output",
   "panel.settings.deck.action.cooling": "Cooling",
