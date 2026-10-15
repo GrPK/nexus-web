@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { AppWindow } from 'lucide-react';
+import { AppWindow, FolderOpen } from 'lucide-react';
+import { Button } from '../../../components/common/Button/Button';
+import { setListedAppIds } from './listedApps';
+import { isLaunchablePath, launchPathLabel, looksLikeLaunchPath, normalizeLaunchPath } from './customAppPath';
 import { useTranslation } from '../../../lib/i18n';
 import { fetchService, fetchServiceBlob, fetchServiceBlobWithStatus } from '../../../api/service';
 import { processIconPath } from '../../../api/processIcon';
@@ -44,12 +47,20 @@ interface AppPickerProps {
    *  reads as taken whichever list it came from. They stay clickable so the
    *  caller can explain; they just do not read as selectable. */
   unavailableIds?: Record<string, string>;
+  /** Opts in to free-form launch targets (a file path or URI) stored as the
+   *  id. `onUse` enables typing one; omit it to keep the field read-only while
+   *  a stored custom target still reads as selected. `onBrowse` adds a native
+   *  file dialog button. The caller owns the gating for both. */
+  customPath?: { onUse?: (path: string) => void; onBrowse?: () => Promise<string | null | undefined> };
 }
 
-export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = false, unavailableIds }: AppPickerProps) {
+export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = false, unavailableIds, customPath }: AppPickerProps) {
   const { t } = useTranslation();
   const [apps, setApps] = useState<Shortcut[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listLoaded, setListLoaded] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
+  const [browseRejected, setBrowseRejected] = useState(false);
   const [query, setQuery] = useState('');
   const [running, setRunning] = useState<string[]>([]);
 
@@ -71,6 +82,8 @@ export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = fal
       const res = await fetchService<{ shortcuts: Shortcut[] }>('/shortcuts');
       if (!cancelled) {
         setApps(res?.shortcuts ?? []);
+        setListLoaded(!!res?.shortcuts);
+        if (res?.shortcuts) setListedAppIds(res.shortcuts.map(a => a.id));
         setLoading(false);
       }
     };
@@ -132,16 +145,62 @@ export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = fal
   const unavailableReason = (entry: PickerEntry) =>
     unavailableIds?.[entry.id] ?? (entry.processName ? unavailableIds?.[entry.processName] : undefined);
 
+  const typedPath = normalizeLaunchPath(query);
+  const typedLooksLikePath = !!customPath?.onUse && looksLikeLaunchPath(typedPath);
+  const offerTyped = typedLooksLikePath && isLaunchablePath(typedPath);
+  const typedUnsupported = typedLooksLikePath && !offerTyped;
+  const handleBrowse = async () => {
+    if (!customPath?.onBrowse) return;
+    setBrowsing(true);
+    setBrowseRejected(false);
+    try {
+      const picked = await customPath.onBrowse();
+      if (!picked) return;
+      const path = normalizeLaunchPath(picked);
+      if (isLaunchablePath(path)) customPath.onUse?.(path);
+      else setBrowseRejected(true);
+    } finally {
+      setBrowsing(false);
+    }
+  };
+  const knownIds = new Set([...apps.map(a => a.id), ...runningEntries.map(e => e.id)]);
+  const storedCustom = customPath && !loading && selectedId && !knownIds.has(selectedId) && (listLoaded || isLaunchablePath(selectedId)) ? selectedId : '';
+
   return (
     <div className={styles.picker}>
-      <SearchInput
-        value={query}
-        onChange={setQuery}
-        placeholder={t('panel.settings.searchApps')}
-      />
+      <div className={styles.searchRow}>
+        <SearchInput
+          value={query}
+          onChange={v => { setQuery(v); setBrowseRejected(false); }}
+          placeholder={t('panel.settings.searchApps')}
+        />
+        {customPath?.onBrowse && (
+          <Button type="button" size="sm" tone="neutral" icon={<FolderOpen size={14} aria-hidden />} disabled={browsing} onClick={handleBrowse}>
+            {t('panel.settings.deck.browse')}
+          </Button>
+        )}
+      </div>
+      {customPath?.onUse && <div className={styles.hint}>{t('panel.settings.customAppHint')}</div>}
       <div className={styles.list} data-panel-scrollable="true">
         {loading && <div className={styles.empty}>{t('panel.settings.loadingApps')}</div>}
-        {!loading && filtered.length === 0 && filteredRunning.length === 0 && (
+        {storedCustom && (
+          <AppRow
+            app={{ id: storedCustom, name: launchPathLabel(storedCustom), iconPath: `/shortcuts/icon?targetId=${encodeURIComponent(storedCustom)}`, processName: '' }}
+            selected
+            title={storedCustom}
+            onSelect={() => customPath?.onUse?.(storedCustom)}
+          />
+        )}
+        {offerTyped && typedPath !== storedCustom && (
+          <AppRow
+            app={{ id: typedPath, name: t('panel.settings.useThisPath', { path: launchPathLabel(typedPath) }), iconPath: '', processName: '' }}
+            selected={false}
+            title={typedPath}
+            onSelect={() => { customPath?.onUse?.(typedPath); setQuery(''); }}
+          />
+        )}
+        {(typedUnsupported || browseRejected) && <div className={styles.empty} role="status" aria-live="polite">{t('panel.settings.unsupportedLaunchPath')}</div>}
+        {!loading && !offerTyped && !typedUnsupported && !browseRejected && filtered.length === 0 && filteredRunning.length === 0 && !storedCustom && (
           <div className={styles.empty}>
             {apps.length === 0 ? t('panel.settings.connectForApps') : t('panel.settings.noApps')}
           </div>
@@ -175,10 +234,11 @@ export function AppPicker({ selectedId, selectedIds, onSelect, showRunning = fal
   );
 }
 
-function AppRow({ app, selected, unavailable, onSelect }: {
+function AppRow({ app, selected, unavailable, title, onSelect }: {
   app: PickerEntry;
   selected: boolean;
   unavailable?: string;
+  title?: string;
   onSelect: () => void;
 }) {
   const [iconUrl, setIconUrl] = useState<string | null>(null);
@@ -186,7 +246,7 @@ function AppRow({ app, selected, unavailable, onSelect }: {
   const loadedRef = useRef(false);
 
   useEffect(() => {
-    if (loadedRef.current) return;
+    if (loadedRef.current || !app.iconPath) return;
     const el = rowRef.current;
     if (!el) return;
 
@@ -223,7 +283,7 @@ function AppRow({ app, selected, unavailable, onSelect }: {
       type="button"
       className={`${styles.appRow} ${selected ? styles.appRowSelected : ''} ${unavailable ? styles.appRowTaken : ''}`}
       onClick={onSelect}
-      title={unavailable}
+      title={unavailable ?? title}
       aria-disabled={unavailable ? true : undefined}
     >
       {iconUrl

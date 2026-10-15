@@ -6,7 +6,8 @@ import type { WidgetProps } from '../types';
 import { DeckGrid } from './DeckGrid';
 import { innerGridForSize, fitToGrid, resolveViewSlots, padSlots, emptyDeck } from './deckLayout';
 import { useDeckInstance } from './useDeckInstance';
-import { executeDeckAction, isPrivilegedDeckAction } from './deckExecutor';
+import { executeDeckAction, hasDirectLaunchApp, isPrivilegedDeckAction } from './deckExecutor';
+import { ensureListedAppIds } from '../common/listedApps';
 import { useDeckLiveState } from './useDeckState';
 import { toggleBranchSlot, withPageIndicatorDisplay } from './deckIcons';
 import { usePanelPreview } from '../common/PanelPreviewContext';
@@ -117,7 +118,15 @@ export function DeckWidget({ widget, deviceId, selectedSlot, onSelectSlot, editV
   // (file path / key chord / text / audio file) over the wire. No deviceId
   // (the desktop dashboard's own "My Computer" preview, which has no backing
   // panel device record) keeps every action on its unchanged direct route.
+  // Routing of a direct-shaped launchApp key depends on the listed-id set;
+  // load it ahead of the press so no press waits on the fetch.
+  const hasDirectKey = slots.some(s => !!s.action && hasDirectLaunchApp(s.action));
+  useEffect(() => {
+    if (hasDirectKey) void ensureListedAppIds();
+  }, [hasDirectKey]);
+
   const dispatchAction = (action: DeckAction, i: number, branch?: 'on' | 'off') => {
+    if (hasDirectLaunchApp(action)) void ensureListedAppIds();
     if (deviceId && isPrivilegedDeckAction(action)) {
       const location = { deviceId, widgetId: widget.id, page, folderPath, slot: i };
       if (branch) void executeDeckAction(action, location, branch);

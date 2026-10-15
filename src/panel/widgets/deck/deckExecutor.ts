@@ -4,6 +4,8 @@ import { applyProfile, activateCoolingPreset } from '../../../api/cooling';
 import { mediaIdle, playCurrentOrFirstMedia } from '../../../api/mediaLibrary';
 import { controlMedia } from '../../../hooks/useMedia';
 import type { MediaSession } from '../../../hooks/useMedia';
+import { isDirectLaunchTarget, isLaunchablePath } from '../common/customAppPath';
+import { getListedAppIds } from '../common/listedApps';
 import { requestOpenMonitoring } from './deckMonitoringNav';
 import type { DeckAction, DeckActionType, DeckMonitoringPress, DeckSequenceStep, DeckSystemAction, DeckNexusAction } from './types';
 
@@ -26,10 +28,22 @@ export const PRIVILEGED_DECK_ACTION_TYPES: ReadonlySet<DeckActionType> = new Set
   'openFile', 'openFolder', 'hotkey', 'hotkeySwitch', 'text', 'playAudio',
 ]);
 
+/** True when `action` is, or contains, a launchApp with a direct-shaped id. */
+export function hasDirectLaunchApp(action: DeckAction): boolean {
+  if (action.type === 'launchApp') return isDirectLaunchTarget(action.appId);
+  if (action.type === 'sequence') return action.steps.some(step => hasDirectLaunchApp(step.action));
+  if (action.type === 'toggle') return hasDirectLaunchApp(action.on) || hasDirectLaunchApp(action.off);
+  return false;
+}
+
 /** True when `action` is, or transitively contains (a sequence step, either
  * toggle branch), one of PRIVILEGED_DECK_ACTION_TYPES. */
 export function isPrivilegedDeckAction(action: DeckAction): boolean {
   if (PRIVILEGED_DECK_ACTION_TYPES.has(action.type)) return true;
+  // /shortcuts/launch only resolves listed app ids; an unlisted direct target
+  // runs through the server-side dispatcher like openFile. An unloaded list
+  // fails closed.
+  if (action.type === 'launchApp') return isDirectLaunchTarget(action.appId) && !getListedAppIds()?.has(action.appId);
   if (action.type === 'sequence') return action.steps.some(step => isPrivilegedDeckAction(step.action));
   if (action.type === 'toggle') return isPrivilegedDeckAction(action.on) || isPrivilegedDeckAction(action.off);
   return false;
@@ -73,9 +87,28 @@ export async function executeDeckAction(action: DeckAction, location?: DeckDispa
     return;
   }
   switch (action.type) {
-    case 'launchApp':
+    case 'launchApp': {
+      // No deviceId (the desktop dashboard deck): no route reaches
+      // DeckActionExecutor, so an unlisted direct target uses the desktop-token
+      // routes openUrl and openFile already use; steam:// goes to launch-uri.
+      const id = action.appId.trim();
+      if (isDirectLaunchTarget(id) && !getListedAppIds()?.has(action.appId)) {
+        if (/^steam:\/\//i.test(id)) {
+          await postService('/system/launch-uri', { url: id });
+          return;
+        }
+        if (/^https?:\/\//i.test(id)) {
+          await postService('/system/open-url', { url: id });
+          return;
+        }
+        if (isLaunchablePath(id) && !/^[a-zA-Z][a-zA-Z0-9+.-]+:\/\//.test(id)) {
+          await postService('/system/open-path', { path: id });
+          return;
+        }
+      }
       await postService(`/shortcuts/launch?targetId=${encodeURIComponent(action.appId)}`, {});
       return;
+    }
     case 'openFile':
     case 'openFolder':
       await postService('/system/open-path', { path: action.path });
