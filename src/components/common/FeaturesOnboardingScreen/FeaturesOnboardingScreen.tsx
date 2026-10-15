@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { ArrowLeft, Activity, Ban, Check, Fan, Lightbulb, SlidersHorizontal, Stethoscope, type LucideIcon } from 'lucide-react';
 import { SkipOnboardingButton } from '../SkipOnboardingButton/SkipOnboardingButton';
 import { useTranslation } from '../../../lib/i18n';
@@ -6,7 +6,7 @@ import { Overlay } from '../Overlay/Overlay';
 import { Button } from '../Button/Button';
 import { completeFeaturesOnboarding, completeLightingOnboarding } from '../../../api/onboarding';
 import { savePreferences } from '../../../api/profiles';
-import { useFeatureFlags, useUiSettingsUpdateSafe, type FeatureFlags, type FeatureKey } from '../../../hooks/useUiSettings';
+import { useFeatureFlags, useUiSettingsHydrated, useUiSettingsUpdateSafe, type FeatureFlags, type FeatureKey } from '../../../hooks/useUiSettings';
 import styles from './FeaturesOnboardingScreen.module.scss';
 
 export interface FeaturesOnboardingScreenProps {
@@ -42,26 +42,26 @@ const ALL_ON: FeatureFlags = { lighting: true, cooling: true, monitoring: true, 
  */
 export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack, onSkipOnboarding }: FeaturesOnboardingScreenProps) {
   const { t } = useTranslation();
-  const [flags, setFlags] = useState<FeatureFlags>(ALL_ON);
+  // Set once the user touches a switch; until then the switches follow the base values.
+  const [picked, setPicked] = useState<FeatureFlags | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
   const updateUiSettings = useUiSettingsUpdateSafe();
   // A replay reads what the user has now, so Continue alone changes nothing; a fresh install stays all on.
   const current = useFeatureFlags();
-  const touched = useRef(false);
-  useEffect(() => {
-    if (fromCurrent && !touched.current) setFlags({ lighting: current.lighting, cooling: current.cooling, monitoring: current.monitoring, diagnostics: current.diagnostics });
-  }, [open, fromCurrent, current.lighting, current.cooling, current.monitoring, current.diagnostics]);
+  // Before the server preferences arrive, current is only the local cache and could save a pillar back on.
+  const hydrated = useUiSettingsHydrated();
+  const waiting = !!fromCurrent && !hydrated;
+  const flags = picked ?? (fromCurrent ? current : ALL_ON);
 
   if (!open) return null;
 
   const togglePillar = (key: FeatureKey) => {
-    touched.current = true;
-    setFlags(prev => ({ ...prev, [key]: !prev[key] }));
+    setPicked({ ...flags, [key]: !flags[key] });
   };
 
   const handleContinue = async () => {
-    if (submitting) return;
+    if (submitting || waiting) return;
     setSubmitting(true);
     setError(false);
     try {
@@ -138,6 +138,7 @@ export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack
             type="button"
             role="checkbox"
             aria-checked={flags[key]}
+            disabled={waiting}
             className={`${styles.pillarCard} ${flags[key] ? styles.pillarCardOn : ''}`}
             onClick={() => togglePillar(key)}
           >
@@ -162,6 +163,7 @@ export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack
           onClick={handleContinue}
           loading={submitting}
           loadingHidesLabel
+          disabled={waiting}
           className={styles.continueButton}
         >
           {t('featuresOnboarding.continue')}

@@ -58,6 +58,7 @@ import { fetchPanelRemoteControlState } from '../api/panel';
 import { isLocalhostUnreachable, isRemoteOrigin } from '../api/service';
 import { MultiplexContext, useMultiplexConnection, useTopicCallback } from '../hooks/useMultiplexSocket';
 import { UiSettingsProvider } from '../hooks/useUiSettings';
+import { LightingFeatureSeed } from './LightingFeatureSeed';
 import { useTranslation } from '../lib/i18n';
 import { applyThemeMode, applyAccentColor, cachePreferencesLocally, loadSettings } from '../lib/settings';
 import type { Preferences } from '../api/profiles';
@@ -381,6 +382,7 @@ export function Dashboard() {
   // (it renders the provider), so this is the only way the skip decision
   // reaches the lighting gate below.
   const [lightingFeatureOff, setLightingFeatureOff] = useState(false);
+  const markLightingFeatureOff = useCallback(() => setLightingFeatureOff(true), []);
   // A dismissal latch is per-session, so a reset that puts the server flag back
   // to pending has to clear it. Keyed on a NEW read, never on the value: the
   // latch is set the moment a screen completes, while the status this render
@@ -1115,6 +1117,7 @@ export function Dashboard() {
         {/* Feature-pillars gate: lets the user turn off whole functional
             areas up front. Back only steps into first-run onboarding while
             that sequence is still running. */}
+        <LightingFeatureSeed active={featuresStatus === 'completed'} onLightingOff={markLightingFeatureOff} />
         <FeaturesOnboardingScreen
           open={featuresOpen}
           fromCurrent={featuresReplay}

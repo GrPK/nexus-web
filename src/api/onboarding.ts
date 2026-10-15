@@ -6,6 +6,8 @@ export interface OnboardingStatusResponse {
   lightingCompleted?: boolean;
   /** Absent on services that predate the feature-pillars onboarding screen. */
   featuresCompleted?: boolean;
+  /** True from a replay's reset until features-complete or skip. Absent on a service that predates it. */
+  featuresReplay?: boolean;
   /** Ids of one-time hints the user has acted on or closed. Absent on a service that predates hints. */
   dismissedHints?: string[];
 }

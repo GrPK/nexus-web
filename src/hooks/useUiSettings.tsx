@@ -852,6 +852,15 @@ export function useIgnoredComponents(): { isIgnored: (id: string) => boolean; to
   return { isIgnored, toggle };
 }
 
+/**
+ * Whether the server preferences have been read. True outside a provider
+ * (tests, providerless surfaces), where there is nothing to wait for.
+ */
+export function useUiSettingsHydrated(): boolean {
+  const ctx = useContext(UiSettingsContext);
+  return ctx ? ctx.hydrated : true;
+}
+
 /** One of the four global feature switches (Lighting, Cooling, Monitoring, Diagnostics). */
 export type FeatureKey = 'lighting' | 'cooling' | 'monitoring' | 'diagnostics';
 

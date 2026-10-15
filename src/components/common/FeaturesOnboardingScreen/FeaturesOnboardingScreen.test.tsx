@@ -12,10 +12,11 @@ vi.mock('../../../api/onboarding', () => ({
 vi.mock('../../../api/profiles', () => ({ savePreferences: vi.fn() }));
 
 const mockUpdate = vi.fn();
-const current = vi.hoisted(() => ({ lighting: true, cooling: true, monitoring: true, diagnostics: true }));
+const current = vi.hoisted(() => ({ lighting: true, cooling: true, monitoring: true, diagnostics: true, hydrated: true }));
 vi.mock('../../../hooks/useUiSettings', () => ({
   useUiSettingsUpdateSafe: () => mockUpdate,
-  useFeatureFlags: () => ({ ...current }),
+  useFeatureFlags: () => ({ lighting: current.lighting, cooling: current.cooling, monitoring: current.monitoring, diagnostics: current.diagnostics }),
+  useUiSettingsHydrated: () => current.hydrated,
 }));
 
 vi.mock('../../../lib/i18n', () => ({
@@ -24,7 +25,7 @@ vi.mock('../../../lib/i18n', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  Object.assign(current, { lighting: true, cooling: true, monitoring: true, diagnostics: true });
+  Object.assign(current, { lighting: true, cooling: true, monitoring: true, diagnostics: true, hydrated: true });
   vi.mocked(savePreferences).mockResolvedValue({} as never);
 });
 
@@ -156,5 +157,26 @@ describe('FeaturesOnboardingScreen', () => {
     Object.assign(current, { cooling: false });
     render(<FeaturesOnboardingScreen open onComplete={vi.fn()} />);
     for (const box of screen.getAllByRole('checkbox')) expect(box).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('on a replay blocks Continue until the preferences are hydrated, then uses the hydrated pillars', async () => {
+    Object.assign(current, { hydrated: false });
+    vi.mocked(completeFeaturesOnboarding).mockResolvedValue({ completed: true, featuresCompleted: true });
+    const onComplete = vi.fn();
+    const { rerender } = render(<FeaturesOnboardingScreen open fromCurrent onComplete={onComplete} />);
+
+    const cont = screen.getByText('featuresOnboarding.continue').closest('button')!;
+    expect(cont).toBeDisabled();
+    fireEvent.click(cont);
+    expect(savePreferences).not.toHaveBeenCalled();
+
+    Object.assign(current, { hydrated: true, monitoring: false });
+    rerender(<FeaturesOnboardingScreen open fromCurrent onComplete={onComplete} />);
+    expect(screen.getByRole('checkbox', { name: /nav.monitoring/ })).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(screen.getByText('featuresOnboarding.continue'));
+
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({
+      features: { lighting: true, cooling: true, monitoring: false, diagnostics: true },
+    }));
   });
 });

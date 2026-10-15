@@ -75,4 +75,18 @@ describe('useOnboardingStatus', () => {
 
     await waitFor(() => expect(result.current).toMatchObject({ featuresStatus: 'completed', featuresReplay: false }));
   });
+
+  it('uses the service featuresReplay flag, so a re-read after welcome completes still replays', async () => {
+    vi.mocked(fetchOnboardingStatus).mockResolvedValue({ completed: true, lightingCompleted: true, featuresCompleted: true, featuresReplay: true });
+    const { result } = renderHook(() => useOnboardingStatus());
+
+    await waitFor(() => expect(result.current).toMatchObject({ status: 'completed', featuresStatus: 'pending', featuresReplay: true }));
+  });
+
+  it('trusts an explicit featuresReplay false over the inferred replay', async () => {
+    vi.mocked(fetchOnboardingStatus).mockResolvedValue({ completed: false, lightingCompleted: true, featuresCompleted: true, featuresReplay: false });
+    const { result } = renderHook(() => useOnboardingStatus());
+
+    await waitFor(() => expect(result.current).toMatchObject({ featuresStatus: 'completed', featuresReplay: false }));
+  });
 });

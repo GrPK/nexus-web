@@ -51,12 +51,14 @@ export function useOnboardingStatus(reloadKey?: unknown): OnboardingGates {
       const data = await fetchOnboardingStatus();
       if (cancelled) return;
       if (data) {
+        // The service's durable flag; an older service lacks it, so a replay is inferred from the welcome flag
+        // (cleared by the reset) while features stays set, which a re-read after welcome completes cannot see.
+        const replay = data.featuresReplay ?? (data.featuresCompleted === true && !data.completed);
         setGates(prev => ({
           status: data.completed ? 'completed' : 'pending',
           lightingStatus: data.lightingCompleted === false ? 'pending' : 'completed',
-          // A replay leaves the features flag set but clears the welcome one: the step runs again.
-          featuresStatus: data.featuresCompleted === false || (data.featuresCompleted !== undefined && !data.completed) ? 'pending' : 'completed',
-          featuresReplay: data.featuresCompleted === true && !data.completed,
+          featuresStatus: data.featuresCompleted === false || replay ? 'pending' : 'completed',
+          featuresReplay: replay,
           generation: prev.generation + 1,
           readAt: issuedAt,
         }));
