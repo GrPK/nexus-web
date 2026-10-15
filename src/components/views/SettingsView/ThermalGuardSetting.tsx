@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ShieldCheck, Thermometer, TriangleAlert } from 'lucide-react';
+import { Info, ShieldCheck, Thermometer, TriangleAlert } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { InlineError } from '../../common/InlineError/InlineError';
 import { InfoTooltip } from '../../common/InfoTooltip/InfoTooltip';
@@ -173,7 +173,7 @@ export function ThermalGuardSettingView({
     <>
       {/* Its own undimmed row, so the reason stays readable beside the dimmed controls. */}
       {coolingOff && (
-        <SettingRow description={<span role="status">{t('cooling.guard.featureOff')}</span>} />
+        <SettingRow icon={<Info />} iconLeading="subtle" description={<span role="status">{t('cooling.guard.featureOff')}</span>} />
       )}
       <SettingToggle
         label={t('cooling.guard.label')}
