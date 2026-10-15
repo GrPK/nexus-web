@@ -21,6 +21,7 @@ export function SettingsSection({
   footer,
   footnote,
   fill,
+  flush,
   titleStyle,
   action,
   children,
@@ -40,6 +41,8 @@ export function SettingsSection({
   footnote?: ReactNode;
   // Grow to fill the parent column and end flush with its bottom.
   fill?: boolean;
+  // Drop the gap below, for a section that ends its column or row.
+  flush?: boolean;
   // Per-section title colour override (e.g. the danger zone red).
   titleStyle?: CSSProperties;
   // Optional trailing control next to the title (e.g. a section-wide "Sync
@@ -52,7 +55,7 @@ export function SettingsSection({
 }) {
   const hasHeader = title !== undefined || description !== undefined || action !== undefined;
   return (
-    <section className={[styles.section, fill ? styles.fill : '', className ?? ''].filter(Boolean).join(' ')} aria-label={ariaLabel}>
+    <section className={[styles.section, fill ? styles.fill : '', flush ? styles.flush : '', className ?? ''].filter(Boolean).join(' ')} aria-label={ariaLabel}>
       {hasHeader && (
         <div className={styles.header}>
           <div className={styles.titleRow}>

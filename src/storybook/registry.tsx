@@ -103,7 +103,7 @@ import { CollapsibleSection } from '../components/common/CollapsibleSection/Coll
 import { SortableList, type SortableRowArgs } from '../components/common/SortableList/SortableList';
 import { GroupedSortableList } from '../components/common/SortableList/GroupedSortableList';
 import { type Arrangement } from '../components/common/SortableList/groupedDrag';
-import { SettingsSection } from '../components/common/SettingsSection/SettingsSection';
+import { SettingsBlock, SettingsSection } from '../components/common/SettingsSection/SettingsSection';
 import { SettingRow, SettingSelect, SettingSlider, SettingToggle } from '../components/common/SettingRow/SettingRow';
 import { ServiceLaunchButton } from '../components/common/ServiceLaunchButton/ServiceLaunchButton';
 import { DesktopOnlyBadge } from '../components/common/DesktopOnlyBadge/DesktopOnlyBadge';
@@ -1841,19 +1841,36 @@ function PreviewGroupedSortableList() {
 }
 
 function PreviewSettingsSection() {
+  const row = (label: string) => <div style={{ color: 'var(--text)', fontSize: 14, padding: '0.4rem 0' }}>{label}</div>;
   return (
-    <div style={{ width: 340 }}>
+    <div data-testid="settings-section-stack" style={{ width: 340 }}>
       <SettingsSection
         title="General"
         description="Optional muted description under the title."
-        footnote="Optional short note under the box."
-        footer={<span style={{ color: 'var(--text-dim)', fontSize: 12 }}>Optional controls under the box</span>}
+        footnote="Footnote: short text under the box."
+        footer={<span style={{ color: 'var(--text-dim)', fontSize: 12 }}>Footer: controls under the box</span>}
       >
-        <div style={{ color: 'var(--text)', fontSize: 14, padding: '0.4rem 0' }}>Language</div>
-        <div style={{ color: 'var(--text)', fontSize: 14, padding: '0.4rem 0' }}>Show conflict warnings</div>
+        {row('Language')}
+        {row('Show conflict warnings')}
       </SettingsSection>
       <SettingsSection title="Danger zone" titleStyle={{ color: 'var(--bad)' }}>
-        <div style={{ color: 'var(--text)', fontSize: 14, padding: '0.4rem 0' }}>Shut down · Reset to defaults</div>
+        {row('Shut down')}
+      </SettingsSection>
+      <div style={{ display: 'flex', flexDirection: 'column', height: 140 }}>
+        <SettingsSection title="Fill, flush" fill flush>
+          {row('Grows to the column bottom')}
+        </SettingsSection>
+      </div>
+    </div>
+  );
+}
+
+function PreviewSettingsBlock() {
+  return (
+    <div style={{ width: 340 }}>
+      <SettingsBlock><Notice tone="warning" role="status">A non-section child of a section stack.</Notice></SettingsBlock>
+      <SettingsSection title="Section after the block">
+        <div style={{ color: 'var(--text)', fontSize: 14, padding: '0.4rem 0' }}>Row</div>
       </SettingsSection>
     </div>
   );
@@ -3440,8 +3457,15 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'SettingsSection', category: 'panel-kit',
     filePath: 'src/components/common/SettingsSection/SettingsSection.tsx',
-    description: 'Canonical settings group: a muted body-type header (optional description) sitting outside/above a surface-filled, subtly-bordered box that holds the section rows. The one header-outside-box pattern every settings surface uses (dashboard Settings, panel editor, widget settings, device pages, pairing modal). footnote adds short text under the box; footer adds controls bound to the box (a pager strip, a Manage button) directly under it, and anything else that follows a section is a sibling that sits one section gap below. The gap below every section (before the next title) is built in and larger than the title-to-box gap; stacks add none. titleStyle recolors the header (e.g. the danger zone); boxClassName tunes the box (per-surface row gap).',
+    description: 'Canonical settings group: a muted header (optional description) above a surface box holding the rows. Sections own the gap below them, so never add a parent gap or margin between sections. Under-box text is `footnote`, under-box controls are `footer`, a column-ending section takes `fill` and `flush`, and non-section children of a stack are wrapped in SettingsBlock. titleStyle recolors the header; boxClassName tunes the box.',
+    notes: 'Rule: sections own the gap below them; no parent gap/margin between sections. footnote = text, footer = controls, SettingsBlock = non-section stack children.',
     Preview: PreviewSettingsSection,
+  },
+  {
+    name: 'SettingsBlock', category: 'panel-kit',
+    filePath: 'src/components/common/SettingsSection/SettingsSection.tsx',
+    description: 'Wraps a non-section child of a section stack (a notice, a card, a toolbar) so it carries the same gap below as a SettingsSection. Use it instead of a parent gap or margin.',
+    Preview: PreviewSettingsBlock,
   },
   {
     name: 'PanelThemeSettings', category: 'panel-kit',

@@ -313,6 +313,7 @@ export function KeebMacroView({ loadMacro, saveMacro }: KeebMacroViewProps) {
 
         <SettingsSection
           fill
+          flush
           boxClassName={styles.recordBox}
           ariaLabel={t('keeb.macro.slotsAria')}
         >

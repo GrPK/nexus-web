@@ -304,7 +304,7 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
 
   if (part === 'picker') {
     return (
-      <SettingsSection title={t('panel.settings.deck.actionType')} action={pickerHeaderAction} fill boxClassName={keyStyles.pickerFillBox}>
+      <SettingsSection title={t('panel.settings.deck.actionType')} action={pickerHeaderAction} fill flush boxClassName={keyStyles.pickerFillBox}>
         <div className={keyStyles.categoryList}>
           {DIAL_PICKER_CATEGORIES.map(cat => (
             <CollapsibleSection key={cat.key} title={t(cat.labelKey)} open={openKeys.has(cat.key)} onToggle={() => toggleOpen(cat.key)} compact>

@@ -16,22 +16,21 @@
   margin-bottom: var(--space-xl);
 }
 
-// Grows along its parent's main axis and ends flush with it, so fill sections
-// side by side in a stretched row keep matching bottoms. When something other
-// than another fill section follows, the standard gap returns.
+// Grows along its parent's main axis. Must be `flex: 1` (0% basis): `1 1 0`
+// collapses in a column with no definite height.
 .fill {
   flex: 1;
   min-height: 0;
-  margin-bottom: 0;
-
-  &:has(+ :not(.fill)) {
-    margin-bottom: var(--space-xl);
-  }
 
   > .box {
     flex: 1 1 auto;
     min-height: 0;
   }
+}
+
+// Ends its column or row flush: drops the standard gap below it.
+.flush {
+  margin-bottom: 0;
 }
 
 .header {

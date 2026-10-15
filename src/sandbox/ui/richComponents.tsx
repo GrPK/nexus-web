@@ -236,6 +236,7 @@ export function Section(p: HostProps) {
     <SettingsSection
       title={str(p.title) ?? ''}
       fill={!!p.grow}
+      flush={!!p.grow}
     >
       {p.children}
     </SettingsSection>
