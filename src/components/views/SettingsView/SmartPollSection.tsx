@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { HardDrive } from 'lucide-react';
 import { Spinner } from '../../common/Spinner/Spinner';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
@@ -30,14 +30,18 @@ export function SmartPollSection({ serviceOnline }: { serviceOnline: boolean }) 
   const awaitingFirstRead = !!serviceOnline && !fetched;
   const perDrive = settings.smartPollPerDrive;
 
+  // Only the latest read may land: a topic ping can start one while another is in flight.
+  const cancelPrevious = useRef<() => void>(() => {});
   const load = useCallback(() => {
+    cancelPrevious.current();
     if (!serviceOnline) return () => {};
     let cancelled = false;
     void fetchSmartPoll()
       .then(res => { if (!cancelled && res) { setDrives(res.drives); setServiceActive(res.active); } })
       .catch(() => { /* the section renders the default row alone */ })
       .finally(() => { if (!cancelled) setFetched(true); });
-    return () => { cancelled = true; };
+    cancelPrevious.current = () => { cancelled = true; };
+    return cancelPrevious.current;
   }, [serviceOnline]);
 
   useEffect(() => load(), [load]);

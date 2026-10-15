@@ -207,7 +207,7 @@ interface UiSettingsContextValue {
    * (accentSource='system') makes them clobber the real accent.
    */
   hydrated: boolean;
-  /** The last attempt to read the server preferences found nothing (offline, failed, or no answer). */
+  /** A preferences read ran and found nothing (the service answered nothing or failed). Never set merely because the service is not yet online. */
   hydrationFailed: boolean;
 }
 
@@ -654,7 +654,7 @@ export function UiSettingsProvider({
   }, [persistLocal, scheduleServerWrite, setLanguage, manageDom]);
 
   const reload = useCallback((coalesceWithPendingWrite = false) => {
-    if (!serviceOnline) { setHydrationFailed(true); return; }
+    if (!serviceOnline) return;
     // The 'prefs' topic echoes our OWN writes back. A theme toggle makes two
     // /preferences writes: themeMode (debounced 250ms via scheduleServerWrite)
     // and, through ResolvedThemeSync, resolvedThemeMode (immediate). The

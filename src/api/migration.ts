@@ -173,8 +173,8 @@ export async function uninstallNexus2() {
   return postService<Nexus2ActionResponse>('/migration/nexus2/uninstall', {});
 }
 
-export async function previewNexus2Import() {
-  return postService<Nexus2PreviewResponse>('/migration/nexus2/preview', {});
+export async function previewNexus2Import(signal?: AbortSignal) {
+  return postService<Nexus2PreviewResponse>('/migration/nexus2/preview', {}, signal);
 }
 
 export async function applyNexus2Import(categories: string[], replaceCustomizedLayout: boolean) {

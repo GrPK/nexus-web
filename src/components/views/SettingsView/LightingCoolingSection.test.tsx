@@ -5,7 +5,7 @@ import type { TempUnit } from '../../../lib/units';
 
 // Mutable so a test can flip the unit and re-render, mimicking the C/F chip on
 // the same settings page writing through useUiSettings.
-const prefs = vi.hoisted(() => ({ monitoringTempUnit: 'c' as TempUnit, lighting: true, cooling: true }));
+const prefs = vi.hoisted(() => ({ monitoringTempUnit: 'c' as TempUnit, lighting: true, cooling: true, gpus: [] as { id: string; name: string; integrated: boolean }[] }));
 
 vi.mock('../../../hooks/useUiSettings', () => ({
   useUiSettings: () => ({
@@ -34,7 +34,7 @@ vi.mock('../../../hooks/useSensors', () => ({
   useSensors: () => ({
     cpu: [tempSensor('cpu/temp/pkg', 'CPU Package', 45), tempSensor('cpu/temp/core0', 'CPU Core 0', 50)],
     gpu: [tempSensor('gpu/0/temp', 'GPU Core', 60)],
-    gpuComponents: [],
+    gpuComponents: prefs.gpus,
   }),
 }));
 
@@ -94,7 +94,7 @@ vi.mock('../../../lib/i18n', () => ({
 }));
 
 describe('LightingCoolingSection section split', () => {
-  afterEach(() => { prefs.lighting = true; prefs.cooling = true; });
+  afterEach(() => { prefs.lighting = true; prefs.cooling = true; prefs.gpus = []; });
 
   it('groups sleep blackout under Lighting and the sensor pickers under Cooling', () => {
     render(<LightingCoolingSection serviceOnline platform="windows" />);
@@ -131,6 +131,19 @@ describe('LightingCoolingSection section split', () => {
     view.rerender(<LightingCoolingSection serviceOnline platform="windows" />);
 
     expect(screen.queryByRole('switch', { name: 'lighting.schedule.enable.label' })).toBeNull();
+  });
+
+  it('closes the render GPU restart confirm when Lighting turns off while it is open', async () => {
+    prefs.gpus = [{ id: 'a', name: 'Integrated GPU', integrated: true }, { id: 'b', name: 'Discrete GPU', integrated: false }];
+    const view = render(<LightingCoolingSection serviceOnline platform="windows" />);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.renderGpu.label' }));
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('Discrete GPU'));
+    expect(await screen.findByText('lighting.renderGpu.confirmTitle')).toBeInTheDocument();
+
+    prefs.lighting = false;
+    view.rerender(<LightingCoolingSection serviceOnline platform="windows" />);
+
+    expect(screen.queryByText('lighting.renderGpu.confirmTitle')).toBeNull();
   });
 
   it('keeps the Lighting section for the schedule row before the platform resolves', () => {

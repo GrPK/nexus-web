@@ -1,20 +1,16 @@
 import { useEffect } from 'react';
-import { useFeatureFlags, useUiSettingsHydrated, useUiSettingsSettled, type FeatureFlags } from '../hooks/useUiSettings';
+import { useFeatureFlags, useUiSettingsSettled, type FeatureFlags } from '../hooks/useUiSettings';
 
 /**
  * Hands the pillar values to Dashboard, which renders the settings provider
- * and cannot read them itself. Reports nothing until the preferences read has
- * an outcome; a failed read reports null (values unknown), so a gate waiting
- * on it is never stuck. `generation` re-reports on every new onboarding read.
+ * and cannot read them itself. Reports once the preferences read has an
+ * outcome; after a failed read the values are the local cache.
  */
-export function PillarsReporter({ onPillars, generation }: { onPillars: (flags: FeatureFlags | null) => void; generation: number }) {
-  const flags = useFeatureFlags();
-  const hydrated = useUiSettingsHydrated();
+export function PillarsReporter({ onPillars }: { onPillars: (flags: FeatureFlags) => void }) {
+  const { lighting, cooling, monitoring, diagnostics } = useFeatureFlags();
   const settled = useUiSettingsSettled();
-  const { lighting, cooling, monitoring, diagnostics } = flags;
   useEffect(() => {
-    if (!settled) return;
-    onPillars(hydrated ? { lighting, cooling, monitoring, diagnostics } : null);
-  }, [settled, hydrated, lighting, cooling, monitoring, diagnostics, generation, onPillars]);
+    if (settled) onPillars({ lighting, cooling, monitoring, diagnostics });
+  }, [settled, lighting, cooling, monitoring, diagnostics, onPillars]);
   return null;
 }

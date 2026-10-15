@@ -35,4 +35,24 @@ describe('useNexus2NonCoolingContent', () => {
     const { result } = renderHook(() => useNexus2NonCoolingContent(true));
     await waitFor(() => expect(result.current).toBe(true));
   });
+
+  it('is true when the preview request is aborted', async () => {
+    vi.mocked(previewNexus2Import).mockImplementation(signal => new Promise((_, reject) => {
+      signal?.addEventListener('abort', () => reject(new Error('aborted')));
+    }));
+    const { result, unmount } = renderHook(() => useNexus2NonCoolingContent(true));
+    expect(vi.mocked(previewNexus2Import).mock.calls[0][0]).toBeInstanceOf(AbortSignal);
+    unmount();
+    expect(result.current).toBeNull();
+  });
+
+  it('forgets the previous answer when asked again', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValueOnce({ available: true, profileName: null, categories: [FAN] });
+    const { result, rerender } = renderHook(({ ask }) => useNexus2NonCoolingContent(ask), { initialProps: { ask: true } });
+    await waitFor(() => expect(result.current).toBe(false));
+    rerender({ ask: false });
+    vi.mocked(previewNexus2Import).mockReturnValueOnce(new Promise(() => {}));
+    rerender({ ask: true });
+    expect(result.current).toBeNull();
+  });
 });
