@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { HardDrive } from 'lucide-react';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { SettingSlider, SettingToggle } from '../../common/SettingRow/SettingRow';
-import { useUiSettings } from '../../../hooks/useUiSettings';
+import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
+import { useFeatureFlags, useUiSettings } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import {
   defaultSecondsForMedia, fetchSmartPoll, SMART_POLL_CHOICES, SMART_POLL_NEVER,
   type SmartPollDrive,
 } from '../../../api/smartPoll';
+
+const SMART_POLL_ANCHORS = ['set-smart-poll-per-drive', 'set-smart-poll-default'] as const;
 
 /**
  * Per-drive SMART read interval. Reading SMART is an ATA pass-through that
@@ -18,16 +21,24 @@ export function SmartPollSection({ serviceOnline }: { serviceOnline: boolean }) 
   const { t } = useTranslation();
   const { settings, update } = useUiSettings();
   const [drives, setDrives] = useState<SmartPollDrive[]>([]);
+  const [serviceActive, setServiceActive] = useState<boolean | undefined>(undefined);
+  const features = useFeatureFlags();
+  // An older service omits the flag and always polls, so the section stays.
+  const active = serviceActive !== false;
   const perDrive = settings.smartPollPerDrive;
 
-  useEffect(() => {
-    if (!serviceOnline) return;
+  const load = useCallback(() => {
+    if (!serviceOnline) return () => {};
     let cancelled = false;
     void fetchSmartPoll()
-      .then(res => { if (!cancelled && res) setDrives(res.drives); })
+      .then(res => { if (!cancelled && res) { setDrives(res.drives); setServiceActive(res.active); } })
       .catch(() => { /* the section renders the default row alone */ });
     return () => { cancelled = true; };
   }, [serviceOnline]);
+
+  useEffect(() => load(), [load, features.monitoring, features.diagnostics, features.cooling]);
+  // The service recomputes the flag once it has the new pillars, which the preferences topic announces.
+  useTopicCallback('prefs', serviceOnline, load);
 
   const label = useCallback((seconds: number) => {
     if (seconds === SMART_POLL_NEVER) return t('settings.smartPoll.never');
@@ -54,6 +65,7 @@ export function SmartPollSection({ serviceOnline }: { serviceOnline: boolean }) 
     <SettingsSection
       title={t('settings.smartPoll.title')}
       description={t('settings.smartPoll.description')}
+      pillarOff={active ? undefined : { message: t('settings.pillarOff.smartPoll'), anchors: SMART_POLL_ANCHORS }}
     >
       <SettingToggle
         label={t('settings.smartPoll.perDriveLabel')}

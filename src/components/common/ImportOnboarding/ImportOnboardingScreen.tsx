@@ -14,6 +14,8 @@ import styles from './ImportOnboardingScreen.module.scss';
 type ApplyPhase = 'idle' | 'applying' | 'failed';
 
 const HERO_ICON_SIZE = 40;
+// Nexus 2 groups that belong to the Cooling pillar.
+const COOLING_GROUPS = ['fanCurves'] as const;
 // Upper bound on waiting for a still-loading preview before acting on the
 // selection as it stands; the preview is a local read, so this is only hit
 // when the service has gone away.
@@ -28,6 +30,8 @@ export interface ImportOnboardingScreenProps {
   nexus2: Nexus2StatusResponse | null;
   /** Which apps this gate is being shown for: only these start included and have their offer flag latched. An app not listed here may still appear (it holds importable data) but stays off by default. */
   offeredFor: Partial<Record<ImportSourceId, boolean>>;
+  /** The Cooling pillar: off hides FanControl and Nexus 2's fan curves, which stay importable from the Cooling page. */
+  coolingOn?: boolean;
   onComplete: () => void;
   /** Steps back to the previous onboarding screen; the Back button only renders when provided. */
   onBack?: () => void;
@@ -38,7 +42,7 @@ export interface ImportOnboardingScreenProps {
  * app; the end-of-onboarding conflict step does that, per app, on an explicit
  * click.
  */
-export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, onComplete, onBack, onSkipOnboarding }: ImportOnboardingScreenProps) {
+export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, coolingOn = true, onComplete, onBack, onSkipOnboarding }: ImportOnboardingScreenProps) {
   const { t } = useTranslation();
 
   const [applyPhase, setApplyPhase] = useState<ApplyPhase>('idle');
@@ -64,7 +68,7 @@ export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, o
 
   // Listed when the app holds data to import.
   const nexus2Here = nexus2?.importAvailable === true;
-  const fanControlHere = fanControl?.importAvailable === true;
+  const fanControlHere = coolingOn && fanControl?.importAvailable === true;
 
   // The modal stack hands onEnter no event, so a held key is read here: its
   // repeats must not import (the first press may only have revealed a list).
@@ -107,7 +111,7 @@ export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, o
   // the other would silently consume a gate that app has not had yet.
   const dismissOffered = async () => {
     if (offeredFor.nexus2) await dismissNexus2Welcome().catch(() => null);
-    if (offeredFor.fancontrol) await dismissFanControlImport().catch(() => null);
+    if (offeredFor.fancontrol && coolingOn) await dismissFanControlImport().catch(() => null);
   };
 
   // Neither button touches the detected apps; closing them is the
@@ -201,6 +205,7 @@ export function ImportOnboardingScreen({ open, fanControl, nexus2, offeredFor, o
           showAction={false}
           onSelectionChange={noteSelection}
           handleRef={importHandle}
+          excludeNexus2Groups={coolingOn ? undefined : COOLING_GROUPS}
         />
       </div>
 

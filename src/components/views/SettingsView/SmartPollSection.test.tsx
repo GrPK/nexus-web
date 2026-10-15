@@ -21,13 +21,17 @@ vi.mock('../../../api/smartPoll', async (importActual) => ({
 const update = vi.fn();
 const uiSettings = { smartPollSeconds: {} as Record<string, number>, smartPollDefaultSeconds: 30, smartPollPerDrive: true };
 
+const pillars = vi.hoisted(() => ({ monitoring: true, diagnostics: true, cooling: true }));
 vi.mock('../../../hooks/useUiSettings', () => ({
   useUiSettings: () => ({ settings: uiSettings, update }),
+  useFeatureFlags: () => ({ lighting: true, ...pillars }),
 }));
+vi.mock('../../../hooks/useMultiplexSocket', () => ({ useTopicCallback: () => {} }));
 
 describe('SmartPollSection', () => {
   beforeEach(() => {
     update.mockClear();
+    Object.assign(pillars, { monitoring: true, diagnostics: true, cooling: true });
     vi.mocked(fetchSmartPoll).mockClear();
     uiSettings.smartPollSeconds = {};
     uiSettings.smartPollDefaultSeconds = 30;
@@ -81,5 +85,35 @@ describe('SmartPollSection', () => {
     render(<SmartPollSection serviceOnline={false} />);
     expect(fetchSmartPoll).not.toHaveBeenCalled();
     expect(screen.getByLabelText('settings.smartPoll.defaultLabel')).toBeInTheDocument();
+  });
+
+  it('hides the rows behind a notice when the service reports polling inactive', async () => {
+    vi.mocked(fetchSmartPoll).mockResolvedValue({ defaultSeconds: 30, perDrive: true, choices: SMART_POLL_CHOICES, drives: [], active: false });
+    render(<SmartPollSection serviceOnline />);
+    expect(await screen.findByText('settings.pillarOff.smartPoll')).toBeInTheDocument();
+    expect(screen.queryByLabelText('settings.smartPoll.defaultLabel')).toBeNull();
+  });
+
+  it('keeps the rows when the service reports polling active, even with both pillars off', async () => {
+    Object.assign(pillars, { monitoring: false, diagnostics: false });
+    vi.mocked(fetchSmartPoll).mockResolvedValue({ defaultSeconds: 30, perDrive: true, choices: SMART_POLL_CHOICES, drives: [], active: true });
+    render(<SmartPollSection serviceOnline />);
+    await waitFor(() => expect(screen.queryByText('settings.pillarOff.smartPoll')).toBeNull());
+    expect(screen.getByLabelText('settings.smartPoll.defaultLabel')).toBeInTheDocument();
+  });
+
+  it('keeps the rows when the service omits the flag, whatever the pillars', async () => {
+    Object.assign(pillars, { monitoring: false, diagnostics: false });
+    render(<SmartPollSection serviceOnline />);
+    await waitFor(() => expect(screen.getByLabelText('ST4000DM004')).toBeInTheDocument());
+    expect(screen.queryByText('settings.pillarOff.smartPoll')).toBeNull();
+  });
+
+  it('refetches when a pillar changes, so the notice follows the switches', async () => {
+    const view = render(<SmartPollSection serviceOnline />);
+    await waitFor(() => expect(fetchSmartPoll).toHaveBeenCalledTimes(1));
+    Object.assign(pillars, { monitoring: false });
+    view.rerender(<SmartPollSection serviceOnline />);
+    await waitFor(() => expect(fetchSmartPoll).toHaveBeenCalledTimes(2));
   });
 });

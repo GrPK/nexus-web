@@ -75,4 +75,17 @@ describe('useSearchAnchorScroller', () => {
     a.remove();
     b.remove();
   });
+
+  it('lands on the notice that lists a hidden setting\'s anchor', async () => {
+    const notice = document.createElement('div');
+    notice.setAttribute('data-search-fallback', 'set-a set-hidden');
+    document.body.appendChild(notice);
+    const spy = vi.spyOn(notice, 'scrollIntoView').mockImplementation(() => {});
+
+    renderHook(() => useSearchAnchorScroller());
+    requestSearchScroll('set-hidden');
+
+    await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+    notice.remove();
+  });
 });

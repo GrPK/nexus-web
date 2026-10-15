@@ -2,18 +2,20 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { SettingsSection } from './SettingsSection';
 
-describe('SettingsSection disabled', () => {
-  it('marks the box inert and aria-disabled, keeping the contents rendered', () => {
-    render(<SettingsSection title="T" disabled><button type="button">go</button></SettingsSection>);
-    const box = screen.getByRole('button', { name: 'go', hidden: true }).parentElement!;
-    expect(box).toHaveAttribute('aria-disabled', 'true');
-    expect(box.hasAttribute('inert')).toBe(true);
+describe('SettingsSection pillarOff', () => {
+  it('swaps the rows for one notice that carries the hidden rows\' search anchors', () => {
+    render(
+      <SettingsSection title="T" pillarOff={{ message: 'Turn it on', anchors: ['a', 'b'] }}>
+        <button type="button">go</button>
+      </SettingsSection>,
+    );
+    expect(screen.queryByRole('button', { name: 'go' })).toBeNull();
+    const notice = screen.getByText('Turn it on').closest('[data-search-fallback]');
+    expect(notice?.getAttribute('data-search-fallback')).toBe('a b');
   });
 
-  it('leaves the box interactive by default', () => {
+  it('renders the rows when the pillar is on', () => {
     render(<SettingsSection title="T"><button type="button">go</button></SettingsSection>);
-    const box = screen.getByRole('button', { name: 'go' }).parentElement!;
-    expect(box.hasAttribute('aria-disabled')).toBe(false);
-    expect(box.hasAttribute('inert')).toBe(false);
+    expect(screen.getByRole('button', { name: 'go' })).toBeInTheDocument();
   });
 });

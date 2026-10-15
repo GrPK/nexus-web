@@ -158,18 +158,23 @@ describe('ThermalGuardSetting writes', () => {
     await waitFor(() => { expect(bodies()).toEqual([{ limitOverrideC: 102 }]); });
   });
 
-  it('with Cooling off, disables every control, writes nothing, and names the feature rather than the sensor', async () => {
+  it('with Cooling off, hides the guard rows behind a notice and writes nothing', async () => {
     flags.cooling = false;
-    await mount();
-    const sw = screen.getByRole('switch', { name: 'cooling.guard.label' });
-    expect(sw).toBeDisabled();
-    expect(sw.getAttribute('aria-checked')).toBe('false');
-    expect(slider()).toBeDisabled();
-    expect(screen.getByRole('switch', { name: 'cooling.guard.lintWarnings.label' })).toBeDisabled();
-    expect(screen.getByText('cooling.guard.featureOff')).toBeInTheDocument();
-    expect(screen.queryByText('cooling.guard.inactive')).toBeNull();
-    fireEvent.click(sw);
+    render(<ThermalGuardSetting serviceOnline />);
+    expect(await screen.findByText('settings.pillarOff.coolingGuard')).toBeInTheDocument();
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByRole('slider')).toBeNull();
     await tick();
     expect(api.setGuardConfig).not.toHaveBeenCalled();
+  });
+
+  it('brings the guard rows back when Cooling turns on', async () => {
+    flags.cooling = false;
+    const view = render(<ThermalGuardSetting serviceOnline />);
+    await screen.findByText('settings.pillarOff.coolingGuard');
+    flags.cooling = true;
+    view.rerender(<ThermalGuardSetting serviceOnline />);
+    expect(await screen.findByRole('switch', { name: 'cooling.guard.label' })).toBeInTheDocument();
+    expect(screen.queryByText('settings.pillarOff.coolingGuard')).toBeNull();
   });
 });

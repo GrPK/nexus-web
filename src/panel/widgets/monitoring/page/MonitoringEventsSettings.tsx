@@ -25,7 +25,7 @@ export function MonitoringEventsSettings() {
     <SettingsSection
       title={t('monitoring.events.settingsTitle')}
       description={t('monitoring.events.settingsDescription')}
-      disabled={!monitoringOn}
+      pillarOff={monitoringOn ? undefined : { message: t('settings.pillarOff.monitoring'), anchors: [] }}
     >
       <SettingToggle
         label={t('monitoring.events.enableLabel')}
@@ -42,8 +42,7 @@ export function MonitoringEventsSettings() {
             label={label}
             checked={!isHidden(kind)}
             onChange={next => setKindHidden(kind, !next)}
-            // The section is inert as a whole when Monitoring is off; dimming the rows too would compound.
-            disabled={monitoringOn && !enabled}
+            disabled={!enabled}
           />
         );
       })}

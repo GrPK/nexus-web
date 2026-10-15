@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { PillarNotice } from '../PillarNotice/PillarNotice';
 import { SectionHeader } from '../SectionHeader/SectionHeader';
 import styles from './SettingsSection.module.scss';
 
@@ -21,7 +22,7 @@ export function SettingsSection({
   className,
   boxClassName,
   ariaLabel,
-  disabled,
+  pillarOff,
 }: {
   // Omit for a titleless box (e.g. the welcome screen's preferences group).
   title?: ReactNode;
@@ -38,8 +39,8 @@ export function SettingsSection({
   className?: string;
   boxClassName?: string;
   ariaLabel?: string;
-  // Dims the box and blocks interaction without hiding it, for a group whose feature is off.
-  disabled?: boolean;
+  // The group's feature pillar is off: its rows give way to one notice naming where to turn it on.
+  pillarOff?: { message: string; anchors: readonly string[] };
 }) {
   const hasHeader = title !== undefined || description !== undefined || action !== undefined;
   return (
@@ -53,12 +54,8 @@ export function SettingsSection({
           {description !== undefined && <div className={styles.description}>{description}</div>}
         </div>
       )}
-      <div
-        className={[styles.box, boxClassName, disabled && styles.disabled].filter(Boolean).join(' ')}
-        aria-disabled={disabled || undefined}
-        inert={disabled || undefined}
-      >
-        {children}
+      <div className={boxClassName ? `${styles.box} ${boxClassName}` : styles.box}>
+        {pillarOff ? <PillarNotice message={pillarOff.message} anchors={pillarOff.anchors} /> : children}
       </div>
     </section>
   );

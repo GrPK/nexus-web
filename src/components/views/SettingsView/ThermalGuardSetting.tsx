@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Info, ShieldCheck, Thermometer, TriangleAlert } from 'lucide-react';
+import { ShieldCheck, Thermometer, TriangleAlert } from 'lucide-react';
+import { PillarNotice } from '../../common/PillarNotice/PillarNotice';
 import { Button } from '../../common/Button/Button';
 import { InlineError } from '../../common/InlineError/InlineError';
 import { InfoTooltip } from '../../common/InfoTooltip/InfoTooltip';
@@ -12,6 +13,7 @@ import type { GuardResponse } from '../../../api/cooling';
 import { guardEnabled } from '../../../panel/widgets/cooling/page/guardUtils';
 import styles from './ThermalGuardSetting.module.scss';
 
+const GUARD_ANCHORS = ['set-thermal-guard', 'set-thermal-guard-limit', 'set-thermal-guard-lint'] as const;
 const STACKED = 'stacked' as const;
 // The bar spans these bounds, widened to include a detected value outside them;
 // the service clamps an override to the same range.
@@ -150,7 +152,7 @@ interface ThermalGuardSettingViewProps {
   pendingLintWarnings?: boolean | null;
   /** The limit asked for but not yet confirmed by the service; the slider shows it meanwhile. */
   pendingLimit?: number | 'reset' | null;
-  /** The Cooling feature is off: the guard cannot act and the service refuses its writes. */
+  /** The Cooling feature is off: the rows give way to a notice, and the service would refuse their writes. */
   coolingOff?: boolean;
   error: string | null;
   /** A failed limit write, shown on the limit row apart from the switch's error. */
@@ -168,19 +170,16 @@ export function ThermalGuardSettingView({
   guard, pendingEnabled = null, pendingLintWarnings = null, pendingLimit = null, coolingOff = false, error, limitError = null, lintWarningsError = null, onLintWarningsChange = () => {}, onToggle, onSetLimit, onClearLimit,
 }: ThermalGuardSettingViewProps) {
   const { t } = useTranslation();
-  const on = !coolingOff && (pendingEnabled ?? guardEnabled(guard));
+  const on = pendingEnabled ?? guardEnabled(guard);
+  if (coolingOff) return <PillarNotice message={t('settings.pillarOff.coolingGuard')} anchors={GUARD_ANCHORS} />;
   return (
     <>
-      {/* Its own undimmed row, so the reason stays readable beside the dimmed controls. */}
-      {coolingOff && (
-        <SettingRow icon={<Info />} iconLeading="subtle" description={<span role="status">{t('cooling.guard.featureOff')}</span>} />
-      )}
       <SettingToggle
         label={t('cooling.guard.label')}
         description={(
           <>
             {t('cooling.guard.description')}
-            {!coolingOff && guard.state === 'inactive' && <span role="status">{` ${t('cooling.guard.inactive')}`}</span>}
+            {guard.state === 'inactive' && <span role="status">{` ${t('cooling.guard.inactive')}`}</span>}
             {error && <> <InlineError>{error}</InlineError></>}
           </>
         )}
@@ -189,7 +188,6 @@ export function ThermalGuardSettingView({
         anchorId="set-thermal-guard"
         checked={on}
         onChange={onToggle}
-        disabled={coolingOff}
       />
       {guard.detectedLimitSource && (
         <LimitRow guard={guard} pendingLimit={pendingLimit} disabled={!on} error={limitError} onCommit={onSetLimit} onReset={onClearLimit} />
@@ -208,7 +206,6 @@ export function ThermalGuardSettingView({
         anchorId="set-thermal-guard-lint"
         checked={pendingLintWarnings ?? guard.lintWarnings !== false}
         onChange={onLintWarningsChange}
-        disabled={coolingOff}
       />
     </>
   );
@@ -221,12 +218,18 @@ export interface GuardActions {
   onClearLimit: () => void;
 }
 
-const NO_OP = () => {};
-
-/** With Cooling off the service refuses guard writes, so none is sent. */
-export function gateGuardActions(coolingOff: boolean, actions: GuardActions): GuardActions {
-  if (!coolingOff) return actions;
-  return { onToggle: NO_OP, onLintWarningsChange: NO_OP, onSetLimit: NO_OP, onClearLimit: NO_OP };
+/**
+ * With Cooling off the service refuses guard writes, so none is sent. Read at
+ * call time: a keyed value flushed as the rows unmount runs a handler captured
+ * before the switch went off.
+ */
+export function gateGuardActions(isCoolingOff: () => boolean, actions: GuardActions): GuardActions {
+  return {
+    onToggle: v => { if (!isCoolingOff()) actions.onToggle(v); },
+    onLintWarningsChange: v => { if (!isCoolingOff()) actions.onLintWarningsChange(v); },
+    onSetLimit: c => { if (!isCoolingOff()) actions.onSetLimit(c); },
+    onClearLimit: () => { if (!isCoolingOff()) actions.onClearLimit(); },
+  };
 }
 
 /**
@@ -240,8 +243,10 @@ export function ThermalGuardSetting({ serviceOnline }: { serviceOnline: boolean 
     guard, pendingEnabled, pendingLintWarnings, pendingLimit, toggleError, limitError, lintWarningsError, toggle, setLimit, clearLimit, setLintWarnings,
   } = useThermalGuard(serviceOnline);
   const coolingOff = !useFeatureFlags().cooling;
+  const coolingOffRef = useRef(coolingOff);
+  coolingOffRef.current = coolingOff;
   if (!guard) return null;
-  const actions = gateGuardActions(coolingOff, {
+  const actions = gateGuardActions(() => coolingOffRef.current, {
     onToggle: next => { void toggle(next); },
     onLintWarningsChange: enabled => setLintWarnings(enabled),
     onSetLimit: c => setLimit(c),

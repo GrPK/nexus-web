@@ -334,4 +334,36 @@ describe('ImportOnboardingScreen', () => {
     expect(nexus2).toHaveAttribute('aria-checked', 'true');
     expect(fanControl).toHaveAttribute('aria-checked', 'false');
   });
+
+  it('hides FanControl and does not latch its offer when Cooling is off', async () => {
+    const onComplete = vi.fn();
+    renderScreen({ coolingOn: false, onComplete });
+
+    await screen.findByText('importCenter.source.nexus2');
+    expect(screen.queryByText('importCenter.source.fancontrol')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: IMPORT_AND_CONTINUE }));
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    expect(dismissFanControlImport).not.toHaveBeenCalled();
+  });
+
+  it('shows FanControl when Cooling is on', async () => {
+    renderScreen({ coolingOn: true });
+    expect(await screen.findByText('importCenter.source.fancontrol')).toBeInTheDocument();
+  });
+
+  it('leaves Nexus 2 fan curves out when Cooling is off but keeps its other groups', async () => {
+    vi.mocked(previewNexus2Import).mockResolvedValue({
+      available: true, profileName: null,
+      categories: [
+        { id: 'appearance', available: true, accentColor: '#fff', background: null },
+        { id: 'fanCurves', available: true, count: 1, otherProfiles: 0, fanCurves: [{ name: 'Quiet', kind: 'graph', status: 'import', minimumRaised: false, targets: [{ label: 'Front', status: 'import' }] }] },
+      ],
+    });
+    renderScreen({ coolingOn: false });
+
+    await screen.findByText('importCenter.source.nexus2');
+    expect(screen.queryByRole('switch', { name: 'nexus2Welcome.import.group.fanCurves.label' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Quiet/)).not.toBeInTheDocument();
+  });
 });

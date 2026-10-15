@@ -105,19 +105,20 @@ describe('LightingCoolingSection section split', () => {
     expect(screen.getByRole('button', { name: 'cooling.settings.cpuLabel' })).toBeInTheDocument();
   });
 
-  it('dims the Lighting section when Lighting is off but keeps the shared sensor pickers live', () => {
+  it('hides the Lighting rows behind a notice when Lighting is off, keeping the shared sensor pickers', () => {
     prefs.lighting = false;
     render(<LightingCoolingSection serviceOnline platform="windows" />);
-    const dimmed = (el: HTMLElement) => el.closest('[aria-disabled="true"]') !== null;
-    expect(dimmed(screen.getByRole('switch', { name: 'lighting.sleepBlackout.label', hidden: true }))).toBe(true);
-    expect(dimmed(screen.getByRole('button', { name: 'cooling.settings.cpuLabel' }))).toBe(false);
+    expect(screen.getByText('settings.pillarOff.lighting')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'lighting.sleepBlackout.label' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'cooling.settings.cpuLabel' })).toBeInTheDocument();
   });
 
-  it('leaves the sensor pickers live and the Lighting section undimmed when only Cooling is off', () => {
+  it('keeps the sensor pickers and the Lighting rows with only Cooling off', () => {
     prefs.cooling = false;
     render(<LightingCoolingSection serviceOnline platform="windows" />);
-    expect(screen.getByRole('switch', { name: 'lighting.sleepBlackout.label' }).closest('[aria-disabled="true"]')).toBeNull();
-    expect(screen.getByRole('button', { name: 'cooling.settings.cpuLabel' }).closest('[aria-disabled="true"]')).toBeNull();
+    expect(screen.queryByText('settings.pillarOff.lighting')).toBeNull();
+    expect(screen.getByRole('switch', { name: 'lighting.sleepBlackout.label' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'cooling.settings.cpuLabel' })).toBeInTheDocument();
   });
 
   it('keeps the Lighting section for the schedule row before the platform resolves', () => {

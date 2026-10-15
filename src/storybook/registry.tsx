@@ -2992,6 +2992,12 @@ export const REGISTRY: StorybookEntry[] = [
     description: 'A short failure message in the error colour (role alert), for beside or under a control. A boxed warning belongs in Notice.', Preview: PreviewInlineError,
   },
   {
+    name: 'PillarNotice', category: 'inputs',
+    filePath: 'src/components/common/PillarNotice/PillarNotice.tsx',
+    description: 'One info row that stands in for a settings group whose feature pillar is off, naming where to turn it on. Carries the hidden rows\' search anchors so a search hit lands here.',
+    notes: 'No live preview - it only makes sense inside a settings section whose pillar switch is off.',
+  },
+  {
     name: 'ConfirmModal (wide, warning bullets)', category: 'modals',
     filePath: 'src/components/common/ConfirmModal/ConfirmModal.tsx',
     description: 'size wide widens the modal for lines of prose, and bulletTone warning colours the list markers in the warning tone. Used by the save-time cooling lint dialog, which also carries a Checkbox as children.', Preview: PreviewWideConfirmModal,

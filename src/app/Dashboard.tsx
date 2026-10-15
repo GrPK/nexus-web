@@ -59,6 +59,9 @@ import { isLocalhostUnreachable, isRemoteOrigin } from '../api/service';
 import { MultiplexContext, useMultiplexConnection, useTopicCallback } from '../hooks/useMultiplexSocket';
 import { UiSettingsProvider } from '../hooks/useUiSettings';
 import { LightingFeatureSeed } from './LightingFeatureSeed';
+import { PillarsReporter } from './PillarsReporter';
+import { importStepOffered } from './importStep';
+import type { FeatureFlags } from '../hooks/useUiSettings';
 import { useTranslation } from '../lib/i18n';
 import { applyThemeMode, applyAccentColor, cachePreferencesLocally, loadSettings } from '../lib/settings';
 import type { Preferences } from '../api/profiles';
@@ -424,8 +427,12 @@ export function Dashboard() {
   // get closed. Opens on the service's own per-app pending flags, which latch
   // on dismissal, so it is offered once per app and never for an app already
   // dealt with - whether or not that app turned out to have data to import.
-  const importOffered = nexus2.status === 'pending' || fanControl.status === 'pending';
-  const importOpen = onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
+  // Null until preferences are read; the step stays closed until then so a hidden source never flashes.
+  const [pillars, setPillars] = useState<FeatureFlags | null>(null);
+  const coolingOn = pillars?.cooling ?? true;
+  // FanControl is a cooling import, so with Cooling off it is not offered here (the Cooling page still has it).
+  const importOffered = importStepOffered(nexus2.status === 'pending', fanControl.status === 'pending', coolingOn);
+  const importOpen = pillars !== null && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
     && fanControl.status !== 'unknown'
     && (onboardingStatus === 'completed' || onboardingDismissed)
     && !welcomeOpen && !featuresOpen && importOffered && !importDismissed;
@@ -449,14 +456,14 @@ export function Dashboard() {
   // Live from the moment the gates before it close until the step is spent
   // or completed; the gates behind it (and the dashboard) wait on it, so the
   // snapshot read cannot flash them open before the decision.
-  const conflictStepPending = onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
+  const conflictStepPending = pillars !== null && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
     && fanControl.status !== 'unknown'
     && ranEarlierGate && !welcomeOpen && !featuresOpen && !importOpen && !conflictStepDone;
   // Last gate: device selection, against the fullest device list. Waits on
   // nexus2.status resolving so it cannot flash open before the heavier
   // Nexus 2 detection read decides whether the import gate comes first.
   // Skipped entirely when the features gate already turned Lighting off.
-  const lightingOnboardingOpen = onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
+  const lightingOnboardingOpen = pillars !== null && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
     && fanControl.status !== 'unknown'
     && !welcomeOpen && !importOpen && !featuresOpen && !conflictStepPending && !lightingFeatureOff
     && lightingStatus === 'pending' && !lightingOnboardingDismissed;
@@ -1117,6 +1124,7 @@ export function Dashboard() {
         {/* Feature-pillars gate: lets the user turn off whole functional
             areas up front. Back only steps into first-run onboarding while
             that sequence is still running. */}
+        <PillarsReporter onPillars={setPillars} />
         <LightingFeatureSeed active={featuresStatus === 'completed'} lightingPending={lightingStatus === 'pending'} onLightingOff={markLightingFeatureOff} />
         <FeaturesOnboardingScreen
           open={featuresOpen}
@@ -1144,6 +1152,7 @@ export function Dashboard() {
             nexus2: nexus2.status === 'pending',
             fancontrol: fanControl.status === 'pending',
           }}
+          coolingOn={coolingOn}
           onComplete={() => setImportDismissed(true)}
           onSkipOnboarding={skipOnboarding}
           // Back steps to whichever earlier gate ran this session: features,

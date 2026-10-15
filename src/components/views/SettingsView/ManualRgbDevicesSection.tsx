@@ -10,9 +10,11 @@ import {
 import { useTranslation } from '../../../lib/i18n';
 import styles from './ManualRgbDevicesSection.module.scss';
 
+const MANUAL_RGB_ANCHORS = ['set-manual-rgb-import', 'set-manual-rgb-qmk', 'set-manual-rgb-e131'] as const;
+
 interface ManualRgbDevicesSectionProps {
   serviceOnline: boolean;
-  disabled?: boolean;
+  lightingOff?: boolean;
 }
 
 const EMPTY: ManualDevicesResponse = {
@@ -29,7 +31,7 @@ const EMPTY: ManualDevicesResponse = {
  * Each change restarts the RGB subprocess service-side, so lighting drops for a
  * moment; the copy says so.
  */
-export function ManualRgbDevicesSection({ serviceOnline, disabled }: ManualRgbDevicesSectionProps) {
+export function ManualRgbDevicesSection({ serviceOnline, lightingOff }: ManualRgbDevicesSectionProps) {
   const { t } = useTranslation();
   const [data, setData] = useState<ManualDevicesResponse>(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -89,7 +91,7 @@ export function ManualRgbDevicesSection({ serviceOnline, disabled }: ManualRgbDe
     <SettingsSection
       title={t('settings.manualRgb.title')}
       description={t('settings.manualRgb.description')}
-      disabled={disabled}
+      pillarOff={lightingOff ? { message: t('settings.pillarOff.lighting'), anchors: MANUAL_RGB_ANCHORS } : undefined}
     >
       <SettingRow
         label={t('settings.manualRgb.import.label')}

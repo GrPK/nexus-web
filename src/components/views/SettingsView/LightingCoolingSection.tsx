@@ -25,6 +25,8 @@ import {
   type NumberFormat, type TempUnit,
 } from '../../../lib/units';
 
+export const LIGHTING_ANCHORS = ['set-render-gpu', 'set-audio-output', 'set-sleep-blackout', 'set-lock-blackout', 'set-brightness-schedule'] as const;
+
 interface LightingCoolingSectionProps {
   serviceOnline: boolean;
   platform: string;
@@ -164,7 +166,10 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
 
   return (
     <>
-      <SettingsSection title={t('lighting.title')} disabled={!features.lighting}>
+      <SettingsSection
+        title={t('lighting.title')}
+        pillarOff={features.lighting ? undefined : { message: t('settings.pillarOff.lighting'), anchors: LIGHTING_ANCHORS }}
+      >
         {showGpuPicker && (
           <SettingSelect
             label={t('lighting.renderGpu.label')}

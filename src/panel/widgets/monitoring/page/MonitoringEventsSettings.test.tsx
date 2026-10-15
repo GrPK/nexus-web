@@ -12,22 +12,23 @@ vi.mock('./useEventKindVisibility', () => ({
   useEventKindVisibility: () => ({ isHidden: () => false, setKindHidden: vi.fn() }),
 }));
 
-const box = () => screen.getByRole('switch', { name: 'monitoring.events.enableLabel', hidden: true }).closest('[aria-disabled]');
 
-describe('MonitoringEventsSettings pillar dimming', () => {
+describe('MonitoringEventsSettings pillar notice', () => {
   afterEach(() => { state.monitoring = true; state.eventsEnabled = true; });
 
-  it('is interactive while Monitoring is on', () => {
+  it('shows the rows while Monitoring is on', () => {
     render(<MonitoringEventsSettings />);
-    expect(box()).toBeNull();
+    expect(screen.getByRole('switch', { name: 'monitoring.events.enableLabel' })).toBeInTheDocument();
   });
 
-  it('dims as a whole when Monitoring is off, without dimming the rows a second time', () => {
+  it('hides the rows behind a notice when Monitoring is off, and restores them when it turns on', () => {
     state.monitoring = false;
-    state.eventsEnabled = false;
-    render(<MonitoringEventsSettings />);
-    expect(box()).toHaveAttribute('aria-disabled', 'true');
-    const kindSwitches = screen.getAllByRole('switch', { hidden: true }).slice(1);
-    for (const sw of kindSwitches) expect(sw).not.toBeDisabled();
+    const view = render(<MonitoringEventsSettings />);
+    expect(screen.getByText('settings.pillarOff.monitoring')).toBeInTheDocument();
+    expect(screen.queryAllByRole('switch')).toHaveLength(0);
+    state.monitoring = true;
+    view.rerender(<MonitoringEventsSettings />);
+    expect(screen.queryByText('settings.pillarOff.monitoring')).toBeNull();
+    expect(screen.getAllByRole('switch').length).toBeGreaterThan(0);
   });
 });

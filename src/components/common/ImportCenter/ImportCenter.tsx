@@ -9,6 +9,7 @@ import { SectionHeader } from '../SectionHeader/SectionHeader';
 import { Toggle } from '../Toggle/Toggle';
 import { FanControlImportSection, type FanControlImportHandle } from '../FanControlImport/FanControlImportSection';
 import { Nexus2ImportSection, type Nexus2ImportHandle } from '../Nexus2WelcomeScreen/Nexus2ImportSection';
+import type { ImportGroupId } from '../Nexus2WelcomeScreen/nexus2WelcomeUtils';
 import { useFanControlStatus } from '../../../hooks/useFanControlStatus';
 import { useNexus2WelcomeStatus } from '../../../hooks/useNexus2WelcomeStatus';
 import styles from './ImportCenter.module.scss';
@@ -78,6 +79,8 @@ export interface ImportCenterProps {
    *  source: a host that opened because an app was found must not then be
    *  told by a second read that it is missing. */
   detected?: Partial<Record<ImportSourceId, SourceDetection>>;
+  /** Nexus 2 groups to leave out (the cooling fan curves when Cooling is off). */
+  excludeNexus2Groups?: readonly ImportGroupId[];
 }
 
 /** What a host can hand over in place of this component's own detection. */
@@ -94,7 +97,7 @@ export interface SourceDetection {
  */
 export function ImportCenter({
   open, sources, disabled, onBusyChange, onSelectionChange, showAction = true, handleRef, onImported, detected,
-  includedByDefault, rowFooter,
+  includedByDefault, rowFooter, excludeNexus2Groups,
 }: ImportCenterProps) {
   const { t, language } = useTranslation();
   const fanControl = useFanControlStatus();
@@ -288,6 +291,7 @@ export function ImportCenter({
             onSelectionChange={noteNexus2Selection}
             handleRef={nexus2Handle}
             visible={currentId === 'nexus2'}
+            excludeGroups={excludeNexus2Groups}
             wide
           />
         )

@@ -15,6 +15,8 @@ export interface SmartPollResponse {
   perDrive: boolean;
   choices: number[];
   drives: SmartPollDrive[];
+  /** Whether the service is polling at all. Absent on a service that predates it. */
+  active?: boolean;
 }
 
 export const SMART_POLL_NEVER = 0;

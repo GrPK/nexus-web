@@ -55,6 +55,8 @@ export interface Nexus2ImportSectionProps {
   /** True in a dialog, where the section gets the whole surface rather than
    *  the narrower onboarding column. */
   wide?: boolean;
+  /** Groups to leave out, for a pillar the user switched off: they are neither shown nor selected. */
+  excludeGroups?: readonly ImportGroupId[];
 }
 
 /**
@@ -64,7 +66,7 @@ export interface Nexus2ImportSectionProps {
  * the Settings entry opens - one place owns the markup so both stay in sync.
  */
 export function Nexus2ImportSection({
-  open, disabled, onBusyChange, showAction = true, onSelectionChange, handleRef, wide, visible = true,
+  open, disabled, onBusyChange, showAction = true, onSelectionChange, handleRef, wide, visible = true, excludeGroups,
 }: Nexus2ImportSectionProps) {
   const { t, language } = useTranslation();
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>('idle');
@@ -81,6 +83,9 @@ export function Nexus2ImportSection({
   const fanGroupRef = useRef<HTMLDivElement | null>(null);
   // Bumped on every (re)open and on unmount so a late refetch response is dropped.
   const loadEpochRef = useRef(0);
+  // Read when a preview lands; a new exclusion list alone must not refetch it.
+  const excludeRef = useRef(excludeGroups);
+  excludeRef.current = excludeGroups;
   useEffect(() => () => { loadEpochRef.current += 1; }, []);
 
   useEffect(() => {
@@ -97,7 +102,7 @@ export function Nexus2ImportSection({
       if (cancelled) return;
       if (!res) { setPreviewStatus('error'); return; }
       setPreview(res);
-      setSelectedGroups(defaultSelectedGroupIds(res));
+      setSelectedGroups(new Set([...defaultSelectedGroupIds(res)].filter(g => !excludeRef.current?.includes(g))));
       setPreviewStatus('loaded');
     });
     return () => { cancelled = true; };
@@ -159,6 +164,7 @@ export function Nexus2ImportSection({
   // entered the viewport while the host shows this panel. Without
   // IntersectionObserver (a test DOM) rendering is the best signal there is.
   const fanListRenders = previewStatus === 'loaded'
+    && !excludeGroups?.includes('fanCurves')
     && (preview?.categories.some(c => c.id === 'fanCurves' && c.available) ?? false);
   useEffect(() => {
     const el = fanGroupRef.current;
@@ -206,7 +212,7 @@ export function Nexus2ImportSection({
     for (const [name, key] of Object.entries(d.paramKeys ?? {})) params[name] = t(key);
     return params;
   };
-  const groups = visibleImportGroups(preview);
+  const groups = visibleImportGroups(preview).filter(g => !excludeGroups?.includes(g.id));
   const { titleKey, descriptionKey } = importHeaderKeys(preview);
   const summaries = groupResultSummaries(importResults, appliedPreview);
   const importSuccess = importPhase === 'results' && allApplyResultsClean(importResults) && !hasKeptSetupSkip(importResults);

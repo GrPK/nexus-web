@@ -41,6 +41,13 @@ export function useSearchAnchorScroller(): void {
           el = document.querySelector<HTMLElement>(`[data-search-anchor="${CSS.escape(candidate)}"]`);
           if (el) { id = candidate; break; }
         }
+        // A hidden setting's notice carries its anchors; it only stands in when no row itself is mounted.
+        if (!el) {
+          for (const candidate of ids) {
+            el = document.querySelector<HTMLElement>(`[data-search-fallback~="${CSS.escape(candidate)}"]`);
+            if (el) { id = `fallback:${candidate}`; break; }
+          }
+        }
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           // Restart the animation if it's still mid-play from a prior hit.
