@@ -4507,7 +4507,6 @@
   "panel.widget.weather.pressure": "Presión",
   "panel.widget.weather.removeLocation": "Quitar {location}",
   "panel.widget.weather.settings.accentBars": "Barras con color de acento",
-  "panel.widget.weather.settings.accentBarsDescription": "Colorea las barras diarias con tu color de acento, ligeramente desplazado según la temperatura, en lugar de la escala fija de temperatura.",
   "panel.widget.weather.settings.animatedSky": "Cielo animado",
   "panel.widget.weather.settings.animatedSkyDescription": "Muestra el tiempo actual y la hora del día como un cielo en movimiento detrás del widget.",
   "panel.widget.weather.settings.auto": "Automático",

@@ -14,7 +14,7 @@ import { WeatherIcon } from './WeatherIcon';
 import { DAY_LABEL_KEYS, dailyMax, dailyMin, formatTemp, hourlyTemp, resolveUnit, upcomingHours } from './weatherFormat';
 import { useWeatherSnapshot } from './useWeatherSnapshot';
 import { WeatherSky } from './sky/WeatherSky';
-import { barGradient, fahrenheitToCelsius, type WeatherBarColors } from './weatherTempColors';
+import { barGradient, fahrenheitToCelsius, type AccentParams, type WeatherBarColors } from './weatherTempColors';
 import styles from './WeatherWidget.module.scss';
 
 // Deck cells import the tile's glyph + formatting through here.
@@ -22,9 +22,10 @@ export { WeatherIcon, formatTemp, resolveUnit };
 
 export interface WeatherWidgetProps extends WidgetProps {
   barColors?: WeatherBarColors;
+  accentParams?: AccentParams;
 }
 
-export function WeatherWidget({ widget, surface, barColors: barColorsOverride }: WeatherWidgetProps) {
+export function WeatherWidget({ widget, surface, barColors: barColorsOverride, accentParams }: WeatherWidgetProps) {
   const { t } = useTranslation();
   const { timeFormat } = useUnitPrefs();
   const location = (widget.config?.location as WeatherLocation | null | undefined) ?? null;
@@ -182,7 +183,7 @@ export function WeatherWidget({ widget, surface, barColors: barColorsOverride }:
         } as CSSProperties;
         if (barColors !== 'current') {
           const toC = (v: number) => (unit === 'F' ? fahrenheitToCelsius(v) : v);
-          const gradient = barGradient(toC(min), toC(max), { mode: barColors, accentGlow });
+          const gradient = barGradient(toC(min), toC(max), { mode: barColors, accentGlow, accentParams });
           if (gradient) {
             barStyle.background = gradient;
             barStyle.boxShadow = 'none';

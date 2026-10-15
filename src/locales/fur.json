@@ -4507,7 +4507,6 @@
   "panel.widget.weather.pressure": "Pression",
   "panel.widget.weather.removeLocation": "Gjave {location}",
   "panel.widget.weather.settings.accentBars": "Sbaris cu la tinte di aciento",
-  "panel.widget.weather.settings.accentBarsDescription": "Al colore lis sbaris dal dì cu la tinte di aciento, lizerementri spostade seont la temperadure, invezit de scjale fisse des temperaduris.",
   "panel.widget.weather.settings.animatedSky": "Cîl animât",
   "panel.widget.weather.settings.animatedSkyDescription": "Al mostre il timp atuâl e la ore dal dì come un cîl in moviment daûr dal widget.",
   "panel.widget.weather.settings.auto": "Automatic",

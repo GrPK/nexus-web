@@ -126,7 +126,6 @@ export function WeatherSettings({ widget, surface, desktopEditor, onUpdate }: Wi
         />
         <SettingsToggle
           label={t('panel.widget.weather.settings.accentBars')}
-          description={t('panel.widget.weather.settings.accentBarsDescription')}
           checked={accentBars}
           onChange={checked => onUpdate({ accentBars: checked })}
         />

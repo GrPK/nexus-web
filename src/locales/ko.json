@@ -4507,7 +4507,6 @@
   "panel.widget.weather.pressure": "기압",
   "panel.widget.weather.removeLocation": "{location} 제거",
   "panel.widget.weather.settings.accentBars": "강조 색상 막대",
-  "panel.widget.weather.settings.accentBarsDescription": "고정된 기온 스케일 대신 기온에 따라 색조를 약간 이동한 강조 색상으로 일별 막대를 표시합니다.",
   "panel.widget.weather.settings.animatedSky": "애니메이션 하늘",
   "panel.widget.weather.settings.animatedSkyDescription": "현재 날씨와 시간대를 위젯 뒤에 움직이는 하늘로 표시합니다.",
   "panel.widget.weather.settings.auto": "자동",

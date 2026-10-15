@@ -4507,7 +4507,6 @@
   "panel.widget.weather.pressure": "Luchtdruk",
   "panel.widget.weather.removeLocation": "{location} verwijderen",
   "panel.widget.weather.settings.accentBars": "Accentkleur voor balken",
-  "panel.widget.weather.settings.accentBarsDescription": "Kleurt de dagbalken met je accentkleur, licht verschoven op basis van de temperatuur, in plaats van de vaste temperatuurschaal.",
   "panel.widget.weather.settings.animatedSky": "Geanimeerde lucht",
   "panel.widget.weather.settings.animatedSkyDescription": "Toont het huidige weer en het tijdstip van de dag als een bewegende lucht achter de widget.",
   "panel.widget.weather.settings.auto": "Automatisch",

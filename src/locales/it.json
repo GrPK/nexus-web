@@ -4507,7 +4507,6 @@
   "panel.widget.weather.pressure": "Pressione",
   "panel.widget.weather.removeLocation": "Rimuovi {location}",
   "panel.widget.weather.settings.accentBars": "Barre con colore di accento",
-  "panel.widget.weather.settings.accentBarsDescription": "Colora le barre giornaliere con il tuo colore di accento, leggermente variato in base alla temperatura, invece della scala di temperatura fissa.",
   "panel.widget.weather.settings.animatedSky": "Cielo animato",
   "panel.widget.weather.settings.animatedSkyDescription": "Mostra il meteo attuale e l'ora del giorno come un cielo in movimento dietro il widget.",
   "panel.widget.weather.settings.auto": "Automatico",

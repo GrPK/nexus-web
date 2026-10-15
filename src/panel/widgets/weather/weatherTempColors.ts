@@ -122,33 +122,49 @@ function hslToHex({ h, s, l }: Hsl): string {
   return `#${[f(0), f(8), f(4)].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('')}`;
 }
 
+export interface AccentParams {
+  maxShift: number;
+  // Saturation and lightness ramp across [coldC, hotC]; absent keeps the hue-only behavior.
+  ramp?: { coldC: number; hotC: number; satCold: number; satHot: number; lightCold: number; lightHot: number };
+}
+
+export const DEFAULT_ACCENT_PARAMS: AccentParams = { maxShift: ACCENT_MAX_SHIFT_DEG };
+
 // Hue moves toward blue when cold and orange when hot by the shorter way
 // round the wheel, and stops at the target.
-export function accentAt(base: Hsl, celsius: number): string {
+export function accentAt(base: Hsl, celsius: number, params: AccentParams = DEFAULT_ACCENT_PARAMS): string {
   const cold = celsius < ACCENT_NEUTRAL_C;
   const k = cold
     ? Math.min(1, (ACCENT_NEUTRAL_C - celsius) / (ACCENT_NEUTRAL_C - ACCENT_COLD_C))
     : Math.min(1, Math.max(0, (celsius - ACCENT_NEUTRAL_C) / (ACCENT_HOT_C - ACCENT_NEUTRAL_C)));
   const target = cold ? ACCENT_COLD_HUE : ACCENT_HOT_HUE;
   const diff = ((target - base.h + 540) % 360) - 180;
-  const step = Math.min(Math.abs(diff), ACCENT_MAX_SHIFT_DEG * k);
-  const lightness = base.l + (cold ? ACCENT_COLD_LIGHTNESS : ACCENT_HOT_LIGHTNESS) * k;
-  return hslToHex({ h: (base.h + Math.sign(diff) * step + 360) % 360, s: base.s, l: Math.min(100, Math.max(0, lightness)) });
+  const step = Math.min(Math.abs(diff), params.maxShift * k);
+  let sat = base.s;
+  let lightness = base.l + (cold ? ACCENT_COLD_LIGHTNESS : ACCENT_HOT_LIGHTNESS) * k;
+  const { ramp } = params;
+  if (ramp) {
+    const t = Math.min(1, Math.max(0, (celsius - ramp.coldC) / (ramp.hotC - ramp.coldC)));
+    sat = Math.min(100, base.s * (ramp.satCold + (ramp.satHot - ramp.satCold) * t));
+    lightness = base.l + ramp.lightCold + (ramp.lightHot - ramp.lightCold) * t;
+  }
+  return hslToHex({ h: (base.h + Math.sign(diff) * step + 360) % 360, s: sat, l: Math.min(100, Math.max(0, lightness)) });
 }
 
 export interface BarGradientOptions {
   mode: Exclude<WeatherBarColors, 'current'>;
   accentGlow: string | null;
+  accentParams?: AccentParams;
 }
 
 // Gradient over one day's low..high (Celsius), sampled along the span.
-export function barGradient(lowC: number, highC: number, { mode, accentGlow }: BarGradientOptions): string | null {
+export function barGradient(lowC: number, highC: number, { mode, accentGlow, accentParams }: BarGradientOptions): string | null {
   const base = mode === 'accent' && accentGlow ? parseHsl(accentGlow) : null;
   if (mode === 'accent' && !base) return null;
   const stops: string[] = [];
   for (let i = 0; i <= GRADIENT_SAMPLES; i++) {
     const c = lowC + ((highC - lowC) * i) / GRADIENT_SAMPLES;
-    const color = base ? accentAt(base, c) : absoluteColor(c);
+    const color = base ? accentAt(base, c, accentParams) : absoluteColor(c);
     stops.push(`${color} ${((i / GRADIENT_SAMPLES) * 100).toFixed(1)}%`);
   }
   return `linear-gradient(90deg, ${stops.join(', ')})`;

@@ -65,6 +65,17 @@ describe('accent mode', () => {
   });
 });
 
+describe('accent variants', () => {
+  const blue = { h: 217, s: 91, l: 70 };
+  it('desaturates cold and saturates hot along the ramp', () => {
+    const ramp = { coldC: -6.7, hotC: 35, satCold: 0.1, satHot: 1.15, lightCold: 8, lightHot: -6 };
+    const cold = accentAt(blue, -10, { maxShift: 0, ramp });
+    const hot = accentAt(blue, 40, { maxShift: 0, ramp });
+    expect(cold).not.toBe(hot);
+    expect(hexHue(hot)).toBeCloseTo(hexHue(accentAt(blue, 18, { maxShift: 0, ramp })), 0);
+  });
+});
+
 describe('barGradient', () => {
   it('samples the span with the span end colors', () => {
     const g = barGradient(10, 25, { mode: 'absolute', accentGlow: null });

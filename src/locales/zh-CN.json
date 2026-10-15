@@ -4507,7 +4507,6 @@
   "panel.widget.weather.pressure": "气压",
   "panel.widget.weather.removeLocation": "移除{location}",
   "panel.widget.weather.settings.accentBars": "强调色条",
-  "panel.widget.weather.settings.accentBarsDescription": "使用随气温略微偏移的强调色为每日温度条着色，而不是固定的温度色阶。",
   "panel.widget.weather.settings.animatedSky": "动态天空",
   "panel.widget.weather.settings.animatedSkyDescription": "在小组件背后以动态天空呈现当前天气和时段。",
   "panel.widget.weather.settings.auto": "自动",

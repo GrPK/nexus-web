@@ -11,7 +11,7 @@ import { setForceLanMode } from '../api/service';
 import { I18nProvider } from '../lib/i18n';
 import { WeatherSettings } from '../panel/widgets/weather/WeatherSettings';
 import { WeatherWidget } from '../panel/widgets/weather/WeatherWidget';
-import type { WeatherBarColors } from '../panel/widgets/weather/weatherTempColors';
+import { DEFAULT_ACCENT_PARAMS, type AccentParams, type WeatherBarColors } from '../panel/widgets/weather/weatherTempColors';
 import type { WeatherSnapshot } from '../api/weather';
 import type { PanelWidget } from '../panel/types';
 
@@ -64,7 +64,7 @@ setForceLanMode(true);
 applyThemeMode('dark');
 localStorage.setItem('nexus_token', 'harness');
 
-function Card({ title, mode, accentBars, scenario, unit, accent, children }: { title: string; mode?: WeatherBarColors; accentBars?: boolean; scenario: number; unit: 'F' | 'C'; accent: string; children?: React.ReactNode }) {
+function Card({ title, mode, accentBars, accentParams, scenario, unit, accent, children }: { title: string; mode?: WeatherBarColors; accentParams?: AccentParams; accentBars?: boolean; scenario: number; unit: 'F' | 'C'; accent: string; children?: React.ReactNode }) {
   const vars = useMemo(() => buildEmbeddedPanelThemeVars(accent, 'dark'), [accent]);
   const widget: PanelWidget = {
     id: `w-${title}`, type: 'weather', size: '4x4', col: 0, row: 0,
@@ -75,10 +75,34 @@ function Card({ title, mode, accentBars, scenario, unit, accent, children }: { t
       <div style={{ font: '600 13px system-ui', color: '#bbb', margin: '0 0 8px' }}>{title}</div>
       <div className="panel-root" data-surface="desktop" style={{ ...vars, position: 'relative', width: 390, height: 390, '--panel-cell-size': '90px' } as React.CSSProperties}>
         <div className="panel-card" style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-          <I18nProvider initialLanguage="en"><WeatherWidget widget={widget} barColors={mode} /></I18nProvider>
+          <I18nProvider initialLanguage="en"><WeatherWidget widget={widget} barColors={mode} accentParams={accentParams} /></I18nProvider>
         </div>
         {children}
       </div>
+    </div>
+  );
+}
+
+const RAMP = { coldC: -6.7, hotC: 35, satCold: 0.1, satHot: 1.15, lightCold: 8, lightHot: -6 };
+const VARIANTS: Array<{ name: string; params: AccentParams }> = [
+  { name: 'Shipped: hue cap 45 deg', params: DEFAULT_ACCENT_PARAMS },
+  { name: 'A: hue cap 90 deg', params: { maxShift: 90 } },
+  { name: 'B: saturation only (hue fixed, sat x0.1 at 20F to x1.15 at 95F, lightness +8 to -6)', params: { maxShift: 0, ramp: RAMP } },
+  { name: 'C: B plus hue cap 20 deg', params: { maxShift: 20, ramp: RAMP } },
+];
+
+function Variants({ unit, accent }: { unit: 'F' | 'C'; accent: string }) {
+  return (
+    <div style={{ marginTop: 760 }}>
+      {VARIANTS.map(v => (
+        <div key={v.name} style={{ marginBottom: 24 }}>
+          <div style={{ font: '700 14px system-ui', margin: '0 0 8px' }}>{v.name}</div>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            <Card title="Hot summer" accentBars accentParams={v.params} scenario={0} unit={unit} accent={accent} />
+            <Card title="Cold winter" accentBars accentParams={v.params} scenario={2} unit={unit} accent={accent} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -125,6 +149,7 @@ function Harness() {
         <Card title="Setting on: accent" accentBars scenario={scenario} unit={unit} accent={accent} />
         <Live scenario={scenario} unit={unit} accent={accent} />
       </div>
+      <Variants unit={unit} accent={accent} />
     </div>
   );
 }
