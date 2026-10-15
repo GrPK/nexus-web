@@ -6,14 +6,14 @@ import { lightingDeviceNoticeKey } from './lightingDeviceNotices';
 const dev = (id: string): LightingDevice => ({ id } as LightingDevice);
 
 describe('lightingDeviceNoticeKey', () => {
-  it('returns the partial-streaming notice for Lian Li hubs, the HydroShift II ring and Kraken zones', () => {
-    for (const id of ['lianli-wireless:998D1DE566E1:inner', 'lianli-wireless:64F271E566E1:z0', 'lianli:port0', 'lianli:port2:inner', 'nzxt-kraken:abc', 'lianli-hydroshift2:ring']) {
+  it('returns the partial-streaming notice for Lian Li hubs, the HydroShift II ring Kraken zones and the MEK 4', () => {
+    for (const id of ['lianli-wireless:998D1DE566E1:inner', 'lianli-wireless:64F271E566E1:z0', 'lianli:port0', 'lianli:port2:inner', 'nzxt-kraken:abc', 'lianli-hydroshift2:ring', 'ibp:mek4-keyboard:MEK1:leds']) {
       expect(lightingDeviceNoticeKey(dev(id))).toBe('lighting.devices.partialStreaming');
     }
   });
 
   it('returns null for controllers that stream every frame', () => {
-    for (const id of ['openrgb-0', 'hue:bridge:rid:7', 'np50:abc']) {
+    for (const id of ['openrgb-0', 'hue:bridge:rid:7', 'np50:abc', 'ibp:km7-keyboard:KB1:leds']) {
       expect(lightingDeviceNoticeKey(dev(id))).toBeNull();
     }
   });
