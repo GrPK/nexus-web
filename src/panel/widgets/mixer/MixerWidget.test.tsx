@@ -150,6 +150,25 @@ describe('MixerWidget', () => {
     expect(screen.queryByText('Spotify')).toBeNull();
   });
 
+  it('shows idle apps, labels and the output menu by default', async () => {
+    renderWidget();
+    await waitFor(() => expect(screen.getByText('Helldivers 2')).toBeTruthy());
+    expect(screen.getByText('Spotify')).toBeTruthy();
+    expect(screen.getByLabelText(PICK_OUTPUT)).toBeTruthy();
+  });
+
+  it('drops the fader labels when showLabels is off', async () => {
+    renderWidget({ showLabels: false });
+    await waitFor(() => expect(screen.getAllByRole('button', { name: MUTE }).length).toBeGreaterThan(0));
+    expect(screen.queryByText('Helldivers 2')).toBeNull();
+  });
+
+  it('removes the output band when showOutput is off', async () => {
+    renderWidget({ showOutput: false });
+    await waitFor(() => expect(screen.getByText('Helldivers 2')).toBeTruthy());
+    expect(screen.queryByLabelText(PICK_OUTPUT)).toBeNull();
+  });
+
   it('applies a preset from its chip', async () => {
     fetchAudioMixer.mockResolvedValue(state({
       presets: [{ id: 'p1', name: 'Gaming', masterVolume: 0.7, apps: [] }],

@@ -34,7 +34,10 @@ export function MixerSettings({ widget, surface, desktopEditor, onUpdate }: Widg
   const nameTaken = presetNameTaken(mixer.presets, name);
 
   const showMaster = (widget.config?.showMaster as boolean | undefined) ?? true;
-  const hideIdle = (widget.config?.hideIdle as boolean | undefined) ?? false;
+  // Stored as hideIdle so a widget saved before the toggle turned positive keeps its choice.
+  const showIdle = !((widget.config?.hideIdle as boolean | undefined) ?? false);
+  const showLabels = (widget.config?.showLabels as boolean | undefined) ?? true;
+  const showOutput = (widget.config?.showOutput as boolean | undefined) ?? true;
   const showPresets = (widget.config?.showPresets as boolean | undefined) ?? true;
   // A preset needs a typed name, so creation is offered only where a keyboard
   // exists. Applying and deleting stay available on every surface. The shared
@@ -74,10 +77,20 @@ export function MixerSettings({ widget, surface, desktopEditor, onUpdate }: Widg
           onChange={value => onUpdate({ showMaster: value })}
         />
         <SettingsToggle
-          label={t('panel.widget.mixer.settings.hideIdle')}
-          description={t('panel.widget.mixer.settings.hideIdleHint')}
-          checked={hideIdle}
-          onChange={value => onUpdate({ hideIdle: value })}
+          label={t('panel.widget.mixer.settings.showIdle')}
+          description={t('panel.widget.mixer.settings.showIdleHint')}
+          checked={showIdle}
+          onChange={value => onUpdate({ hideIdle: !value })}
+        />
+        <SettingsToggle
+          label={t('panel.widget.mixer.settings.showLabels')}
+          checked={showLabels}
+          onChange={value => onUpdate({ showLabels: value })}
+        />
+        <SettingsToggle
+          label={t('panel.widget.mixer.settings.showOutput')}
+          checked={showOutput}
+          onChange={value => onUpdate({ showOutput: value })}
         />
         <SettingsToggle
           label={t('panel.widget.mixer.settings.showPresets')}
