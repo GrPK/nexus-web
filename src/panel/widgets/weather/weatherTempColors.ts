@@ -49,7 +49,7 @@ function mixOklch(a: Oklch, b: Oklch, t: number): Oklch {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (a[2] + dh * t + 360) % 360];
 }
 
-// Stops sampled from the iOS Weather range bars, in Fahrenheit.
+// Temperature color stops, in Fahrenheit.
 const SCALE_F: ReadonlyArray<readonly [number, string]> = [
   [10, '#5a8fe6'],
   [33, '#64b5f6'],

@@ -25,9 +25,12 @@ describe('absolute scale', () => {
     }
   });
 
-  it('only reaches red well above 90 F', () => {
-    expect(hexHue(absoluteColor(fahrenheitToCelsius(92)))).toBeGreaterThan(18);
-    expect(absoluteColor(100)).toBe(absoluteColor(fahrenheitToCelsius(104)));
+  it('is orange-red near 90 F and reddest at the top stop', () => {
+    const f = (v: number) => hexHue(absoluteColor(fahrenheitToCelsius(v)));
+    expect(f(90)).toBeLessThan(35);
+    expect(f(90)).toBeGreaterThan(20);
+    expect(f(104)).toBeLessThan(f(90));
+    expect(absoluteColor(fahrenheitToCelsius(120))).toBe(absoluteColor(fahrenheitToCelsius(104)));
   });
 
   it('clamps below the first stop', () => {

@@ -408,7 +408,7 @@ $row-seam: calc(
   height: 9px;
   margin: -4.5px 0 0 -4.5px;
   box-sizing: border-box;
-  border: 2px solid var(--bg-elevated);
+  border: 2px solid rgb(0 0 0 / var(--alpha-medium));
   border-radius: 50%;
   background: #fff;
 }

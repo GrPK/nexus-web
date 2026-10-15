@@ -172,7 +172,7 @@ export function WeatherWidget({ widget, surface }: WidgetProps) {
           barStyle.background = barGradient(toC(min), toC(max));
           barStyle.boxShadow = 'none';
         } else {
-          barStyle.background = 'var(--panel-accent-glow)';
+          barStyle.background = 'var(--accent-glow)';
         }
         const showDot = !accentBars && index === 0 && tempValue !== null && tempValue !== undefined;
         const dotLeft = Math.max(0, Math.min(100, (((tempValue ?? 0) - weekMin) / weekRange) * 100));
