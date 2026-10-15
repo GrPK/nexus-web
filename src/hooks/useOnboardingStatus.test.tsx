@@ -61,4 +61,18 @@ describe('useOnboardingStatus', () => {
 
     await waitFor(() => expect(result.current).toMatchObject({ status: 'pending', lightingStatus: 'completed', featuresStatus: 'completed' }));
   });
+
+  it('reopens the features gate on a replay, where the features flag stays set but welcome is pending', async () => {
+    vi.mocked(fetchOnboardingStatus).mockResolvedValue({ completed: false, lightingCompleted: true, featuresCompleted: true });
+    const { result } = renderHook(() => useOnboardingStatus());
+
+    await waitFor(() => expect(result.current).toMatchObject({ status: 'pending', lightingStatus: 'completed', featuresStatus: 'pending', featuresReplay: true }));
+  });
+
+  it('keeps the features gate completed once welcome is completed too', async () => {
+    vi.mocked(fetchOnboardingStatus).mockResolvedValue({ completed: true, lightingCompleted: true, featuresCompleted: true });
+    const { result } = renderHook(() => useOnboardingStatus());
+
+    await waitFor(() => expect(result.current).toMatchObject({ featuresStatus: 'completed', featuresReplay: false }));
+  });
 });

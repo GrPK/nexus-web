@@ -173,9 +173,7 @@ export function ThermalGuardSettingView({
     <>
       {/* Its own undimmed row, so the reason stays readable beside the dimmed controls. */}
       {coolingOff && (
-        <div data-settings-aside>
-          <SettingRow description={<span role="status">{t('cooling.guard.featureOff')}</span>} />
-        </div>
+        <SettingRow description={<span role="status">{t('cooling.guard.featureOff')}</span>} />
       )}
       <SettingToggle
         label={t('cooling.guard.label')}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Activity, Ban, Check, Fan, Lightbulb, SlidersHorizontal, Stethoscope, type LucideIcon } from 'lucide-react';
 import { SkipOnboardingButton } from '../SkipOnboardingButton/SkipOnboardingButton';
 import { useTranslation } from '../../../lib/i18n';
@@ -6,13 +6,15 @@ import { Overlay } from '../Overlay/Overlay';
 import { Button } from '../Button/Button';
 import { completeFeaturesOnboarding, completeLightingOnboarding } from '../../../api/onboarding';
 import { savePreferences } from '../../../api/profiles';
-import { useUiSettingsUpdateSafe, type FeatureFlags, type FeatureKey } from '../../../hooks/useUiSettings';
+import { useFeatureFlags, useUiSettingsUpdateSafe, type FeatureFlags, type FeatureKey } from '../../../hooks/useUiSettings';
 import styles from './FeaturesOnboardingScreen.module.scss';
 
 export interface FeaturesOnboardingScreenProps {
   /** Skips every remaining onboarding step; renders the top-right escape hatch when provided. */
   onSkipOnboarding?: () => void;
   open: boolean;
+  /** Replay of an already-decided install: start from the current pillars instead of all on. */
+  fromCurrent?: boolean;
   onComplete: (flags: FeatureFlags) => void;
   /** Steps back to the previous onboarding screen; the Back button only renders when provided. */
   onBack?: () => void;
@@ -38,16 +40,23 @@ const ALL_ON: FeatureFlags = { lighting: true, cooling: true, monitoring: true, 
  * write succeeds. Turning Lighting off here also completes the lighting
  * onboarding step, so Dashboard skips the device-selection screen.
  */
-export function FeaturesOnboardingScreen({ open, onComplete, onBack, onSkipOnboarding }: FeaturesOnboardingScreenProps) {
+export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack, onSkipOnboarding }: FeaturesOnboardingScreenProps) {
   const { t } = useTranslation();
   const [flags, setFlags] = useState<FeatureFlags>(ALL_ON);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
   const updateUiSettings = useUiSettingsUpdateSafe();
+  // A replay reads what the user has now, so Continue alone changes nothing; a fresh install stays all on.
+  const current = useFeatureFlags();
+  const touched = useRef(false);
+  useEffect(() => {
+    if (fromCurrent && !touched.current) setFlags({ lighting: current.lighting, cooling: current.cooling, monitoring: current.monitoring, diagnostics: current.diagnostics });
+  }, [open, fromCurrent, current.lighting, current.cooling, current.monitoring, current.diagnostics]);
 
   if (!open) return null;
 
   const togglePillar = (key: FeatureKey) => {
+    touched.current = true;
     setFlags(prev => ({ ...prev, [key]: !prev[key] }));
   };
 

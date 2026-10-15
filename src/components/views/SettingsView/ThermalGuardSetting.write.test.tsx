@@ -93,6 +93,18 @@ describe('ThermalGuardSetting writes', () => {
     await waitFor(() => { expect(bodies()).toEqual([{ limitOverrideC: 101 }]); });
   });
 
+  it('drops a keyed value that is flushed on unmount after Cooling went off', async () => {
+    const view = await mount();
+    fireEvent.change(slider(), { target: { value: '101' } });
+    fireEvent.keyUp(slider());
+    await tick();
+    flags.cooling = false;
+    view.rerender(<ThermalGuardSetting serviceOnline />);
+    view.unmount();
+    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
+    expect(api.setGuardConfig).not.toHaveBeenCalled();
+  });
+
   it('shows the error for a rejected request and the next action still writes', async () => {
     api.setGuardConfig.mockRejectedValueOnce(new Error('network'));
     await mount();

@@ -16,6 +16,8 @@ export interface OnboardingGates {
   lightingStatus: OnboardingStatus;
   /** Feature-pillars screen state, shown after the welcome screen and before the import gate. */
   featuresStatus: OnboardingStatus;
+  /** Onboarding is being replayed: the features choice already exists and the step starts from it. */
+  featuresReplay: boolean;
 }
 
 // GET /onboarding is a token-authed localhost call - getToken() pairs itself
@@ -38,7 +40,7 @@ const MAX_ATTEMPTS = 5;
  * 'completed' for the same reason.
  */
 export function useOnboardingStatus(reloadKey?: unknown): OnboardingGates {
-  const [gates, setGates] = useState<OnboardingGates>({ status: 'unknown', lightingStatus: 'unknown', featuresStatus: 'unknown', generation: 0, readAt: 0 });
+  const [gates, setGates] = useState<OnboardingGates>({ status: 'unknown', lightingStatus: 'unknown', featuresStatus: 'unknown', featuresReplay: false, generation: 0, readAt: 0 });
 
   useEffect(() => {
     let cancelled = false;
@@ -52,14 +54,16 @@ export function useOnboardingStatus(reloadKey?: unknown): OnboardingGates {
         setGates(prev => ({
           status: data.completed ? 'completed' : 'pending',
           lightingStatus: data.lightingCompleted === false ? 'pending' : 'completed',
-          featuresStatus: data.featuresCompleted === false ? 'pending' : 'completed',
+          // A replay leaves the features flag set but clears the welcome one: the step runs again.
+          featuresStatus: data.featuresCompleted === false || (data.featuresCompleted !== undefined && !data.completed) ? 'pending' : 'completed',
+          featuresReplay: data.featuresCompleted === true && !data.completed,
           generation: prev.generation + 1,
           readAt: issuedAt,
         }));
         return;
       }
       if (n >= MAX_ATTEMPTS) {
-        setGates(prev => ({ status: 'completed', lightingStatus: 'completed', featuresStatus: 'completed', generation: prev.generation + 1, readAt: issuedAt }));
+        setGates(prev => ({ status: 'completed', lightingStatus: 'completed', featuresStatus: 'completed', featuresReplay: false, generation: prev.generation + 1, readAt: issuedAt }));
         return;
       }
       timer = setTimeout(() => attempt(n + 1), RETRY_DELAY_MS);

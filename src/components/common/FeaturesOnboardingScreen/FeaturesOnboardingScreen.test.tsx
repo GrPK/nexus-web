@@ -12,8 +12,10 @@ vi.mock('../../../api/onboarding', () => ({
 vi.mock('../../../api/profiles', () => ({ savePreferences: vi.fn() }));
 
 const mockUpdate = vi.fn();
+const current = vi.hoisted(() => ({ lighting: true, cooling: true, monitoring: true, diagnostics: true }));
 vi.mock('../../../hooks/useUiSettings', () => ({
   useUiSettingsUpdateSafe: () => mockUpdate,
+  useFeatureFlags: () => ({ ...current }),
 }));
 
 vi.mock('../../../lib/i18n', () => ({
@@ -22,6 +24,7 @@ vi.mock('../../../lib/i18n', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Object.assign(current, { lighting: true, cooling: true, monitoring: true, diagnostics: true });
   vi.mocked(savePreferences).mockResolvedValue({} as never);
 });
 
@@ -131,5 +134,27 @@ describe('FeaturesOnboardingScreen', () => {
     await waitFor(() => expect(screen.getByText('featuresOnboarding.continue')).toBeInTheDocument());
     expect(completeFeaturesOnboarding).not.toHaveBeenCalled();
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('on a replay starts from the current pillars, so Continue alone keeps them', async () => {
+    Object.assign(current, { cooling: false, diagnostics: false });
+    vi.mocked(completeFeaturesOnboarding).mockResolvedValue({ completed: true, featuresCompleted: true });
+    const onComplete = vi.fn();
+    render(<FeaturesOnboardingScreen open fromCurrent onComplete={onComplete} />);
+
+    expect(screen.getByRole('checkbox', { name: /cooling.title/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('checkbox', { name: /lighting.title/ })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByText('featuresOnboarding.continue'));
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledWith({ lighting: true, cooling: false, monitoring: true, diagnostics: false }));
+    expect(savePreferences).toHaveBeenCalledWith({
+      features: { lighting: true, cooling: false, monitoring: true, diagnostics: false },
+    });
+  });
+
+  it('on a fresh install ignores the stored pillars and starts all on', () => {
+    Object.assign(current, { cooling: false });
+    render(<FeaturesOnboardingScreen open onComplete={vi.fn()} />);
+    for (const box of screen.getAllByRole('checkbox')) expect(box).toHaveAttribute('aria-checked', 'true');
   });
 });

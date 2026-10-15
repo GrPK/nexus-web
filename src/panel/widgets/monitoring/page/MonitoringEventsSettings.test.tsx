@@ -24,6 +24,7 @@ describe('MonitoringEventsSettings pillar dimming', () => {
 
   it('dims as a whole when Monitoring is off, without dimming the rows a second time', () => {
     state.monitoring = false;
+    state.eventsEnabled = false;
     render(<MonitoringEventsSettings />);
     expect(box()).toHaveAttribute('aria-disabled', 'true');
     const kindSwitches = screen.getAllByRole('switch', { hidden: true }).slice(1);

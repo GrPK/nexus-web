@@ -369,7 +369,7 @@ export function Dashboard() {
     if (online && !wasOnline.current) setReconnects(n => n + 1);
     wasOnline.current = online;
   }, [online]);
-  const { status: onboardingStatus, lightingStatus, featuresStatus, generation: onboardingGeneration, readAt }
+  const { status: onboardingStatus, lightingStatus, featuresStatus, featuresReplay, generation: onboardingGeneration, readAt }
     = useOnboardingStatus(reconnects);
   // Flips true once WelcomeScreen posts /onboarding/complete, so a later
   // reconnect (which re-derives onboardingStatus) can't reopen it mid-session.
@@ -1117,6 +1117,7 @@ export function Dashboard() {
             that sequence is still running. */}
         <FeaturesOnboardingScreen
           open={featuresOpen}
+          fromCurrent={featuresReplay}
           onComplete={(flags) => {
             latchedAt.current = Date.now();
             setFeaturesOnboardingDismissed(true);
