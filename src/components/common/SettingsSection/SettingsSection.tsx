@@ -9,12 +9,16 @@ import styles from './SettingsSection.module.scss';
  * device modal) so they read identically. Replaces the older
  * SectionHeader-with-underline-inside-a-card look.
  *
+ * Each section owns the gap below it (see `.section` in the stylesheet), so
+ * stacks need no gap or margin of their own between sections.
+ *
  * Renders correctly both in the dashboard and inside `.panel-root` (kiosk):
  * SectionHeader uses `--text-dim` and the box surface uses `--surface`.
  */
 export function SettingsSection({
   title,
   description,
+  footnote,
   titleStyle,
   action,
   children,
@@ -28,6 +32,9 @@ export function SettingsSection({
   // column, so each child becomes its own stacked line - a sentence with inline
   // markup must be wrapped in a single element or it breaks apart mid-sentence.
   description?: ReactNode;
+  // Optional short text under the box. Rendered inside the section so the
+  // enforced bottom gap applies after it.
+  footnote?: ReactNode;
   // Per-section title colour override (e.g. the danger zone red).
   titleStyle?: CSSProperties;
   // Optional trailing control next to the title (e.g. a section-wide "Sync
@@ -53,6 +60,7 @@ export function SettingsSection({
       <div className={boxClassName ? `${styles.box} ${boxClassName}` : styles.box}>
         {children}
       </div>
+      {footnote !== undefined && <div className={styles.footnote}>{footnote}</div>}
     </section>
   );
 }

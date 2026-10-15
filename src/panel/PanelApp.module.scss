@@ -1419,7 +1419,6 @@
 .panelSettingsStack {
   display: flex;
   flex-direction: column;
-  @include vgap(22px);
 }
 
 .editorActions {

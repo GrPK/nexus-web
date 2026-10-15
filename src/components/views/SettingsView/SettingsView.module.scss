@@ -19,10 +19,8 @@
 .tabPanel {
   display: flex;
   flex-direction: column;
-  // Spacing between the SettingsSection groups (each renders its own
-  // header-above-box). Width + centering come from the parent .tabContent's
-  // .pageBody (global.scss).
-  gap: 1.5rem;
+  // Width + centering come from the parent .tabContent's .pageBody
+  // (global.scss); SettingsSection owns the gap between groups.
   // Breathing room at the very bottom so the last section isn't flush against
   // the page edge when scrolled all the way down.
   padding-bottom: var(--space-xl);
