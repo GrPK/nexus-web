@@ -214,7 +214,10 @@ async function runSystem(a: DeckSystemAction): Promise<void> {
       return;
     case 'screenshot':
     case 'screenRecord':
-      // Host-side OS capture UI; only a physical deck's service handler runs it.
+      await postService(`/system/screen-capture?record=${a.op === 'screenRecord'}`, {});
+      return;
+    case 'taskManager':
+      await postService('/system/open-task-manager', {});
       return;
     case 'mediaPlayPause':
     case 'mediaNext':

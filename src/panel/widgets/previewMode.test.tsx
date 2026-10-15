@@ -92,7 +92,7 @@ const PREVIEW_CONTENT: Record<string, string[]> = {
   displays: ['Built-in Display', 'Studio Monitor', '#1', '#2'],
   cooling: ['cooling.mode.balanced'],
   'smart-lights': ['smartLights.onlineOfTotal'],
-  deck: ['CPU Total', '58 %'],
+  // deck: icon-only keys with no text; deckPreviewData.test.ts pins the fixture.
   twitch: ['nova_streams', 'pixel_kat', 'that last round was clean'],
   // The mocked t() returns keys, so each 4x2 block's domain name surfaces as
   // its raw 'diagnostics.kind.*' key.

@@ -1257,10 +1257,10 @@ describe('capture ops', () => {
     expect(screen.getByRole('option', { name: 'panel.settings.deck.system.screenRecord' })).toBeInTheDocument();
   });
 
-  it('a widget target hides them', async () => {
+  it('a widget target offers them too', async () => {
     renderWidgetInspector([{ action: capture }]);
     fireEvent.click(await screen.findByLabelText('panel.settings.deck.systemOp'));
-    await screen.findByRole('option', { name: 'panel.settings.deck.system.openSettings' });
-    expect(screen.queryByRole('option', { name: 'panel.settings.deck.system.screenshot' })).toBeNull();
+    expect(await screen.findByRole('option', { name: 'panel.settings.deck.system.screenshot' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'panel.settings.deck.system.screenRecord' })).toBeInTheDocument();
   });
 });
