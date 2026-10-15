@@ -1,0 +1,25 @@
+// Above every panel layer, the immersive overlay included.
+.layer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 100000;
+  background: transparent;
+  transition: background var(--ease) ease;
+  cursor: default;
+  touch-action: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+// Fade down to black once mounted.
+.layer[data-entered='true'] {
+  background: #000;
+}
+
+// The waking touch fades the black out; the layer keeps intercepting until it unmounts.
+.layer[data-waking='true'] {
+  background: transparent;
+}

@@ -52,6 +52,8 @@ import { useWidgetResizeMotion } from './engine/useWidgetResizeMotion';
 import { PanelPager } from './chrome/PanelPager';
 import { PanelPageIndicator } from './chrome/PanelPageIndicator';
 import { PanelActionsTray } from './chrome/PanelActionsTray';
+import { PanelControlCenter } from './chrome/PanelControlCenter';
+import { PanelScreenSleep } from './chrome/PanelScreenSleep';
 import { PanelSwipeHint } from './chrome/PanelSwipeHint';
 import { hasTouchInput, usePanelSwipeOnboarding } from './engine/usePanelSwipeOnboarding';
 import { PanelImmersiveOverlay } from './overlays/PanelImmersiveOverlay';
@@ -561,6 +563,11 @@ export function PanelContent({
   }, []);
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
   const [trayOpen, setTrayOpen] = useState(false);
+  const [controlCenterOpen, setControlCenterOpen] = useState(false);
+  // The layer fades in over the panel, which is hidden once the fade ends and
+  // shown again as the wake starts.
+  const [screenAsleep, setScreenAsleep] = useState(false);
+  const [screenHidden, setScreenHidden] = useState(false);
   const [sentrySupported, setSentrySupported] = useState(false);
   const [sentryOpenRequest, setSentryOpenRequest] = useState(0);
   const { t } = useTranslation();
@@ -1094,9 +1101,11 @@ export function PanelContent({
   const contextMenuWidgetId = surface === 'phone' && !sheetMode
     ? touch.ctxMenu?.widget.id ?? null
     : null;
+  const closeControlCenter = useCallback(() => setControlCenterOpen(false), []);
   const connectionIntroBlocked = Boolean(
     sheetMode
       || trayOpen
+      || controlCenterOpen
       || touch.rearranging
       || touch.ctxMenu
       || dragArmedId
@@ -1154,6 +1163,7 @@ export function PanelContent({
   const backgroundPressBlocked = !kioskBehavior
     || !surfaceSupportsTouch(surface, deviceTouch)
     || trayOpen
+    || controlCenterOpen
     || Boolean(sheetMode)
     || Boolean(immersiveWidgetId)
     || Boolean(activeDragId)
@@ -1774,6 +1784,7 @@ export function PanelContent({
         className={`panel-root ${styles.panelRoot}`}
         data-theme={resolvedThemeMode}
         data-surface={surface}
+        data-screen-sleep={screenHidden ? 'true' : undefined}
         data-simulator={simulator ? 'true' : undefined}
         data-show-widget-labels={effectiveTheme.widgetLabels ? 'true' : 'false'}
         data-immersive-see-through={immersiveSeeThrough ? 'true' : undefined}
@@ -1977,10 +1988,32 @@ export function PanelContent({
                 pairSheetAvailable={localPairAvailable || pairedPcsAvailable}
                 surfaceRef={rootRef}
                 surface={surface}
-                disabled={Boolean(sheetMode) || isOffline || touch.rearranging || !!dragArmedId}
+                disabled={Boolean(sheetMode) || isOffline || touch.rearranging || !!dragArmedId || controlCenterOpen}
                 machineName={machineName}
                 remotePaired={connectionIdentityVisible}
                 onSentry={surface === 'phone' && sentrySupported ? () => setSentryOpenRequest((n) => n + 1) : undefined}
+              />
+            )}
+            {kioskBehavior && (
+              <PanelControlCenter
+                open={controlCenterOpen}
+                onOpen={() => setControlCenterOpen(true)}
+                onClose={closeControlCenter}
+                surface={surface}
+                deviceTouch={deviceTouch}
+                kioskBehavior={kioskBehavior}
+                surfaceRef={rootRef}
+                displayId={recordState.record?.displayId}
+                isLandscape={isLandscape}
+                resolvedThemeMode={resolvedThemeMode}
+                onSetThemeMode={panelTheme.commitThemeModePinned}
+                onScreenSleep={() => setScreenAsleep(true)}
+                sheetOpen={Boolean(sheetMode)}
+                trayOpen={trayOpen}
+                offline={isOffline}
+                rearranging={touch.rearranging}
+                dragArmed={dragInProgress}
+                asleep={screenAsleep}
               />
             )}
             {swipeOnboarding.hintVisible && <PanelSwipeHint />}
@@ -2136,6 +2169,8 @@ export function PanelContent({
           </PanelImmersiveOverlay>
         );
       })()}
+
+      <PanelScreenSleep asleep={screenAsleep} onSleepFaded={() => setScreenHidden(true)} onWakeStart={() => setScreenHidden(false)} onWake={() => setScreenAsleep(false)} />
 
       {sheetMode && (
         <PanelEditorSheet

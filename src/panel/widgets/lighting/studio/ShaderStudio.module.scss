@@ -1,0 +1,291 @@
+@use '../../../../styles/text' as *;
+
+// The strip under the modal header: creation controls on the left, history and
+// save/publish pushed to the right.
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+}
+
+.toolbarEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-left: auto;
+}
+
+.historyBtns {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-right: var(--space-md);
+}
+
+.liveError {
+  position: absolute;
+  left: var(--space-sm);
+  right: var(--space-sm);
+  bottom: var(--space-sm);
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: var(--space-md);
+  padding: 0 var(--space-md) var(--space-md);
+}
+
+.viewPane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.previewFrame {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #000;
+}
+
+.previewCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.previewError {
+  position: absolute;
+  left: var(--space-sm);
+  right: var(--space-sm);
+  bottom: var(--space-sm);
+}
+
+.fill {
+  flex: 1;
+  min-height: 0;
+}
+
+// The box holds a full-bleed preview or tile grid, so it drops the settings box's padding and fill.
+.bareBox {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.myEffects {
+  flex: 0 0 38%;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.variationGrid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.variationTile {
+  display: flex;
+  padding: 0;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-lg);
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--ease-fast);
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--accent);
+  }
+}
+
+.stackPane {
+  width: 360px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  overflow-y: auto;
+  padding-right: var(--space-xs);
+}
+
+// Blocks are cards of their own, so the stage box drops the settings box's padding and fill.
+.stageBox {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.locked {
+  opacity: var(--alpha-medium);
+  pointer-events: none;
+}
+
+.addSelect {
+  min-width: 120px;
+}
+
+.blockList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.blockCard {
+  width: 100%;
+}
+
+.blockHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.blockType {
+  flex: 1;
+  min-width: 0;
+}
+
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-dim);
+  cursor: grab;
+  touch-action: none;
+}
+
+.blockParams {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.paramBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.enumRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.enumLabel {
+  font-size: var(--type-small);
+  color: var(--text-dim);
+}
+
+.modToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+
+  &:hover { color: var(--text); }
+}
+
+.paramActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.modToggleOn {
+  color: var(--accent);
+  background: var(--accent-soft);
+
+  &:hover { color: var(--accent); }
+}
+
+.modRow {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+// The Rate or Threshold slider takes a full row under the source and amount.
+.modShape {
+  grid-column: 1 / -1;
+}
+
+// Create tile: the lighting rail's dashed add affordance (.addSmartLights),
+// shaped like an effect card's thumbnail.
+.createTile {
+  aspect-ratio: 16 / 9;
+}
+
+.caption {
+  @include text-label;
+  color: var(--text-dim);
+}
+
+.publishFields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+// Top left: the delete button holds the top right corner.
+.publishedBadge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  display: flex;
+  pointer-events: auto;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: #fff;
+    filter: drop-shadow(var(--shadow-sm));
+  }
+}
+
+// Chromium 83 (the Q60 panel floor) has no flex `gap`.
+.previewActions {
+  display: flex;
+  align-items: center;
+
+  > * + * {
+    margin-left: var(--space-md);
+  }
+}
+
+.toggleItem {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--type-small);
+  color: var(--text-dim);
+
+  > span:last-child {
+    margin-left: var(--space-sm);
+  }
+}

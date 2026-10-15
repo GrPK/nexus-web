@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Maximize2, Music, Pause, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Maximize2, Music, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
   startAnimate, startStatic, startScreenMirror, stopLighting, startGameSync,
   fetchStaticSettings,
@@ -17,6 +17,7 @@ import {
 } from '../../../api/lighting';
 import { groupNamesOf, type DeviceGroup } from '../../../lib/deviceGroups';
 import { matchesAllWords } from '../../../search/match';
+import { takeLightingEffect } from '../../../lib/lightingIntent';
 import { RailSearchButton, RailSearchField, useRailSearch } from '../../../components/common/RailSearch/RailSearch';
 import { useUndoRedo } from '../../../hooks/useUndoRedo';
 import { useLayoutPresets, devicesToLayouts, devicesToPower } from './page/useLayoutPresets';
@@ -59,15 +60,19 @@ import { canvasLabelName } from '../../../lib/canvasLabelName';
 import { SCENE_3D } from '../../../lib/scene/sceneFeature';
 import { useLightingScene } from './scene/useLightingScene';
 import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
+import { SearchInput } from '../../../components/common/SearchInput/SearchInput';
 import { usePersistentState } from '../../../hooks/usePersistentState';
 import {
-  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex,
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, pinGridKey, pinHex, pinSignature, type Pins,
   pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, pressReach, engineReaches, selectAllEligible, tabPressChangesNothing, clearLegacyLightingKeys,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
+  customEffectDef, customEffectId, customEffectKey, customEffectsLoaded, isCustomEffectKey, refreshCustomEffects, useCustomEffects,
+} from '../../../api/customEffects';
+import {
   EFFECTS, ANIMATE_EFFECTS, STATIC_EFFECTS, STATIC_PATTERN_EFFECTS, DEFAULT_STATIC_EFFECT, MODES,
-  defaultStateFor, isStaticEffect,
+  TEMPLATE_COUNT, defaultStateFor, isStaticEffect,
   type EffectState, type EffectTemplateBundle, type LightingMode,
 } from '../../../types/lighting';
 import {
@@ -86,6 +91,7 @@ import { EffectCard } from '../../../components/common/EffectCard/EffectCard';
 import { FullscreenShader } from './page/FullscreenShader';
 import { ModeControls } from './page/ModeControls';
 import { MediaCanvasNotice } from './page/MediaCanvasNotice';
+import { MediaBackdrop } from './page/MediaBackdrop';
 import { DevicePanel } from './page/DevicePanel';
 import { type DiscoveryState } from './page/DeviceDiscoveryCard';
 import { zoneCardSelectable, zoneCardSelectionHoldable, zoneCardUnavailable } from './page/ZoneCard';
@@ -123,6 +129,8 @@ interface LightingViewProps {
   platform?: string;
   /** Navigate to a sibling dashboard section (e.g. the smart-lights app). */
   onSectionNavigate?: DashboardSectionNavigate;
+  /** Signed-in cloud account, which tells the user's own Studio effects from Marketplace downloads. */
+  accountUsername?: string | null;
 }
 
 const DEFAULT_POST_PROCESS: PostProcessState = { hue: 0, colorize: 0, saturation: 1, contrast: 1 };
@@ -134,6 +142,14 @@ interface LayoutHistorySnapshot {
   /** Device ids whose power this action changed; empty for layout-only edits.
    *  Scopes power reconciliation on undo/redo to exactly the touched devices. */
   powerIds: string[];
+}
+
+// The modes a tab press can pin selected cards to; Off and Game Sync always change the global mode.
+const PINNABLE_MODES: ReadonlySet<string> = new Set(['static', 'animate', 'screen', 'gif']);
+
+/** The selected cards a press on `mode` pins: cards already pinned to that mode keep their own looks. */
+function tabPressPins(pins: Pins, selected: ReadonlySet<string>, mode: string): string[] {
+  return [...selected].filter(id => !(pins[id] && pinMode(pins[id].kind) === mode));
 }
 
 /** What the effect grid and dock are pointed at - see the `scoped` memo. */
@@ -193,9 +209,11 @@ function loadDeviceOrder(): string[] {
 
 // three.js loads only when someone turns the 3D view on.
 const LightingScene3D = lazy(() => import('./scene/LightingScene3D'));
+const ShaderStudio = lazy(() => import('./studio/ShaderStudio').then(m => ({ default: m.ShaderStudio })));
+const SavedEffectSections = lazy(() => import('./studio/CustomEffectsGrid').then(m => ({ default: m.SavedEffectSections })));
 const VIEW_2D = '2d';
 const VIEW_3D = '3d';
-export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate }: LightingViewProps) {
+export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate, accountUsername = null }: LightingViewProps) {
   const { t, language } = useTranslation();
   const { mode, setMode, rawSync, setRawSync, synced, paused: syncedPaused } = useLightingSync(serviceOnline, activeProfileId);
   // gpuCanSwitch comes from the same enumeration the Settings picker gates on,
@@ -409,6 +427,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // frame (effectTemplates churns during drag for the live RGB preview).
   const [committedTemplates, setCommittedTemplates] = useState<Record<string, EffectTemplateBundle>>({});
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  // Saved effect to open in the studio; id null starts a new one.
+  const [studioTarget, setStudioTarget] = useState<{ id: string | null } | null>(null);
+  const [effectQuery, setEffectQuery] = useState('');
   const sceneApi = useLightingScene(SCENE_3D);
   const [sceneEditorOpen, setSceneEditorOpen] = useState(false);
   const scene3d = SCENE_3D && !!sceneApi.scene?.view.enabled;
@@ -635,6 +656,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     for (const fx of EFFECTS) {
       merged[fx.key] = mergeTemplates(fx.key, savedTemplates[fx.key], defaults);
     }
+    for (const key of Object.keys(savedTemplates)) {
+      if (isCustomEffectKey(key)) merged[key] = mergeTemplates(key, savedTemplates[key], defaults);
+    }
     if (!data.templates) {
       // Pre-templates service: fold the legacy per-effect states into slot 0
       // and persist, but only when there is something to migrate - the service
@@ -659,16 +683,17 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
     setEffectTemplates(merged);
     setCommittedTemplates(merged);
-    if (ANIMATE_EFFECTS.some(e => e.key === data.effect)) {
+    const runnable = ANIMATE_EFFECTS.some(e => e.key === data.effect) || isCustomEffectKey(data.effect);
+    if (runnable) {
       animateEffectRef.current = data.effect;
     }
-    if (!keepSelection && ANIMATE_EFFECTS.some(e => e.key === data.effect)) {
+    if (!keepSelection && runnable) {
       setActiveEffect(data.effect);
     }
   }, []);
 
   const applyExternalEffectState = useCallback((effect: string, state?: EffectState, templateIndex?: number) => {
-    if (!EFFECTS.some(e => e.key === effect)) return;
+    if (!EFFECTS.some(e => e.key === effect) && !isCustomEffectKey(effect)) return;
     setActiveEffect(effect);
     if (state === undefined && templateIndex === undefined) return;
 
@@ -781,7 +806,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       // cell in the advanced grid, so leaving the last catalogue key selected
       // would mark that cell and draw its shader over a canvas running this.
       setActiveEffect('');
-    } else if (EFFECTS.some(e => e.key === rawSync)) {
+    } else if (EFFECTS.some(e => e.key === rawSync) || isCustomEffectKey(rawSync)) {
       setActiveEffect(rawSync);
       fetchAnimateSettings().then(data => {
         if (cancelled || !data) return;
@@ -841,6 +866,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         setActiveEffect(data.effect);
       }).catch(() => {});
     }
+    // Custom effects are added, renamed or deleted from any client; follow once the list is in use.
+    if (customEffectsLoaded() || isCustomEffectKey(activeEffect)) void refreshCustomEffects();
     // Static edits the same template slots, so both modes follow a remote edit.
     if (mode === 'animate' || mode === 'static') {
       if (Date.now() < localAnimateEditUntilRef.current) return;
@@ -900,6 +927,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     return () => { cancelled = true; };
   }, [effectiveMode, serviceOnline]);
 
+  // The Marketplace's "Open in Lighting" effect, taken on mount so it never fires on a later visit.
+  // Kept when StrictMode's second mount finds nothing left to take.
+  const openIntentRef = useRef<string | null>(null);
+  useEffect(() => {
+    const key = takeLightingEffect();
+    if (key) openIntentRef.current = key;
+  }, []);
+
   const restartedProfileRef = useRef<string | null>(null);
   useEffect(() => {
     restartedProfileRef.current = null;
@@ -912,8 +947,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (restartedProfileRef.current === key) return;
     if (!sync || sync === 'none') { return; }
     restartedProfileRef.current = key;
+    // A requested effect starts instead; restoring the profile's would race it to the LEDs.
+    if (openIntentRef.current) return;
     (async () => {
-      if (EFFECTS.some(e => e.key === sync)) {
+      if (EFFECTS.some(e => e.key === sync) || isCustomEffectKey(sync)) {
         const state = stateFor(sync);
         await startAnimate(sync, state.speed, state.intensity, state.hue,
           state.colorize, state.saturation, state.contrast, state.params, false);
@@ -999,18 +1036,37 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     return Promise.resolve();
   }, [applyAnimate]);
 
-  // What the effect grid, the dock and the preview are pointed at. Devices
-  // selected and all wearing one pin: that pin's target (identity includes the
-  // preset slot, so the same effect on two presets is a disagreement). Devices
-  // wearing different pins, or a mix of pinned and following, have no single
-  // value for the controls to edit, so the dock locks. Nothing selected, or
-  // every selected device following the global mode: the global source.
+  // What the effect grid, the dock and the preview are pointed at. The open
+  // tab never follows a selection: a card wears its pin's mode or else the
+  // global one, and a selection reaching outside the tab shows no effect, so
+  // the dock locks. Inside the tab, the first-selected card is in focus: its
+  // pin's target, or the global source when it follows the global mode.
   const selectionIds = useMemo(() => [...selectedDeviceIds], [selectedDeviceIds]);
+  // The tab a press opened for a selection, null for the global mode's tab. Selecting and
+  // deselecting cards never moves it.
+  const [selectionTab, setSelectionTab] = useState<LightingMode | null>(null);
+  const [tabBaseMode, setTabBaseMode] = useState(effectiveMode);
+  if (tabBaseMode !== effectiveMode) {
+    // A global mode change from anywhere (a press, Off, simple mode, another client) reopens the global tab.
+    setTabBaseMode(effectiveMode);
+    setSelectionTab(null);
+  }
+  const viewMode: LightingMode = selectionTab ?? effectiveMode;
+  // Nothing selected on a tab other than the running mode: its picks reach no card until a
+  // selection gives them one (or a press of the tab starts the mode), so they flash the scope chip.
+  const detachedTab = selectedDeviceIds.size === 0 && viewMode !== effectiveMode;
+  const [scopeFlash, setScopeFlash] = useState(0);
+  const flashScope = useCallback(() => setScopeFlash(n => n + 1), []);
+  const cardMode = useCallback((id: string): LightingMode => {
+    const p = pins[id];
+    return p ? pinMode(p.kind) : effectiveMode;
+  }, [pins, effectiveMode]);
   const scoped: ScopedTarget = useMemo(() => {
-    const sel = selectionPin(pins, selectionIds);
-    if (sel.kind === 'none') return { kind: 'none' };
-    if (sel.kind === 'mixed') return { kind: 'mixed' };
-    const pin = sel.pin;
+    // A detached tab reaches outside the running mode just as a selection can.
+    if (selectionIds.length === 0) return detachedTab ? { kind: 'mixed' } : { kind: 'none' };
+    if (selectionIds.some(id => cardMode(id) !== viewMode)) return { kind: 'mixed' };
+    const pin = pins[selectionIds[0]];
+    if (!pin) return { kind: 'none' };
     return {
       kind: 'pin',
       pin,
@@ -1019,12 +1075,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       slot: pin.kind === 'static' ? (pin.slot ?? 0) : slotOf(pin.effect ?? ''),
       hex: pin.kind === 'static' ? pinHex(pin) : '',
     };
-  }, [pins, selectionIds, slotOf]);
-  // The tabs and the views under them show what the selection wears, so a
-  // card pinned to Mirror opens on Mirror whatever the global mode is. Nothing
-  // selected, a selection following the global mode, or one wearing different
-  // pins shows the global mode.
-  const viewMode: LightingMode = scoped.kind === 'pin' ? pinMode(scoped.pin.kind) : effectiveMode;
+  }, [pins, selectionIds, slotOf, cardMode, viewMode, detachedTab]);
+  // The cards the focused look belongs to: the first-selected card and every selected card wearing
+  // the same pin (or following the global mode with it). Dock edits reach only these.
+  const focusIds = useMemo(() => {
+    const sigOf = (id: string) => (pins[id] ? pinSignature(pins[id]) : '');
+    const first = selectionIds[0];
+    return first === undefined ? [] : selectionIds.filter(id => sigOf(id) === sigOf(first));
+  }, [pins, selectionIds]);
 
   // Pins the selection to a static look: the whole look travels, so the service
   // renders THIS effect for the device rather than approximating it with a
@@ -1039,6 +1097,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // wore; the running effect is untouched. Unselected pinned devices are
     // never reached.
     const ids = [...selectedDeviceIds];
+    if (detachedTab) { flashScope(); return; }
     if (ids.length > 0 && (viewMode === 'animate' || viewMode === 'static')) {
       if (viewMode === 'static') {
         if (isStaticEffect(key)) pinStaticLook(key, slotOf(key), ids);
@@ -1064,13 +1123,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       rawSync: selectMode === 'static' ? 'static' : key,
       effect: key,
     });
-  }, [activeEffect, applyAnimate, applyPins, viewMode, pinStaticLook, selectedDeviceIds, setGlobalColor, slotOf, stateFor]);
+  }, [activeEffect, applyAnimate, applyPins, viewMode, pinStaticLook, selectedDeviceIds, setGlobalColor, slotOf, stateFor, detachedTab, flashScope]);
 
   // Paces the pin writes a color drag produces; the local copy is recorded
   // per move, the write follows when the previous one lands.
   const queueColorWrite = useColorWriteQueue(useCallback((ids: string[], pin: Pin) => applyPins(ids, pin, false), [applyPins]));
 
   const handleCustomSelect = useCallback((hex: string) => {
+    if (detachedTab) { flashScope(); return; }
     setCustomStaticColor(hex);
     const ids = [...selectedDeviceIds];
     // Nothing selected: the color is the exact global flat color.
@@ -1083,7 +1143,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const pin = colorPin(hex);
     recordPins(ids, pin);
     queueColorWrite(pin, ids);
-  }, [queueColorWrite, recordPins, selectedDeviceIds, setCustomStaticColor, setGlobalColor]);
+  }, [queueColorWrite, recordPins, selectedDeviceIds, setCustomStaticColor, setGlobalColor, detachedTab, flashScope]);
 
   // Records as well as writes: the marks and the device cards read the pin, so
   // a drag has to move them with the pointer, not on release.
@@ -1138,7 +1198,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The preview renders client-side from these, not from the service canvas, so
   // a selection held on a pinned shader previews that shader with the look the
   // drawer is editing; otherwise it previews the running effect.
-  const previewEffect = pinTarget && !isPaletteKey(dockEffect) ? dockEffect : activeEffect;
+  // A selection reaching outside the open tab shows no effect: the running one may belong to another mode.
+  const previewEffect = scoped.kind === 'mixed' ? '' : pinTarget && !isPaletteKey(dockEffect) ? dockEffect : activeEffect;
   const previewShaderState = pinTarget && !isPaletteKey(dockEffect) ? dockState : previewState;
   // The slot strip highlights what the dock edits, so a scoped bundle carries
   // the pin's slot rather than the effect's shared pointer.
@@ -1148,8 +1209,33 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // A palette pin is a color: the dock shows which one, and there is nothing
   // to edit or reset.
   const dockPalette = paletteColorForKey(dockEffect);
+  // A custom effect's default is the neutral state, which renders its saved recipe.
+  const resetDefaults = isCustomEffectKey(dockEffect)
+    ? { [dockEffect]: defaultTemplatesFor(dockEffect, null) }
+    : animateDefaults;
   const dockCanReset = !!(dockEffect && dockState && !dockPalette
-    && !slotMatchesDefault(dockEffect, dockSlot, dockState, animateDefaults));
+    && !slotMatchesDefault(dockEffect, dockSlot, dockState, resetDefaults));
+
+  // Custom (Shader Studio) effects: their name, knobs and audio flag come from the service list.
+  const customEffects = useCustomEffects(isCustomEffectKey(activeEffect) || isCustomEffectKey(dockEffect));
+  const customEntryFor = (key: string | null) =>
+    (isCustomEffectKey(key) ? customEffects.find(e => e.id === customEffectId(key)) : undefined);
+  const activeCustom = customEntryFor(activeEffect);
+  // A saved effect matching the search keeps the browser's no-matches hint away.
+  const savedMatch = viewMode === 'animate' && effectQuery.trim() !== ''
+    && customEffects.some(e => matchesAllWords(effectQuery, [e.name]));
+  const dockCustom = customEntryFor(dockEffect);
+  const dockCustomDef = useMemo(() => (dockCustom ? customEffectDef(dockCustom, t) : undefined), [dockCustom, t]);
+  // A custom effect has no service-authored presets; seed default slots so the dock can edit it.
+  useEffect(() => {
+    if (!isCustomEffectKey(activeEffect) || effectTemplates[activeEffect]) return;
+    const seeded: EffectTemplateBundle = {
+      selected: 0,
+      slots: Array.from({ length: TEMPLATE_COUNT }, () => defaultStateFor(activeEffect)),
+    };
+    setEffectTemplates(prev => (prev[activeEffect] ? prev : { ...prev, [activeEffect]: seeded }));
+    setCommittedTemplates(prev => (prev[activeEffect] ? prev : { ...prev, [activeEffect]: seeded }));
+  }, [activeEffect, effectTemplates]);
 
   const handleTemplateSelect = useCallback((idx: number) => {
     // A static pin repoints only the selected devices at this preset. The
@@ -1159,7 +1245,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       if (idx === pinTarget.slot) return;
       const bundle = effectTemplates[pinTarget.key];
       const clampedIdx = bundle ? Math.min(Math.max(idx, 0), bundle.slots.length - 1) : idx;
-      pinStaticLook(pinTarget.key, clampedIdx, selectionIds, stateOf(pinTarget.key, clampedIdx));
+      pinStaticLook(pinTarget.key, clampedIdx, focusIds, stateOf(pinTarget.key, clampedIdx));
       return;
     }
     // A selection pinned to a shader edits that shader's preset.
@@ -1188,7 +1274,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       templateIndex: clamped,
       effectState: nextBundle.slots[clamped],
     });
-  }, [activeEffect, effectTemplates, pinStaticLook, pinTarget, selectionIds, stateOf, writeTemplates]);
+  }, [activeEffect, effectTemplates, pinStaticLook, pinTarget, focusIds, stateOf, writeTemplates]);
 
   const handleStatePatch = useCallback((patch: Partial<EffectState>, commit = false) => {
     if (!dockEffect || !dockState) return;
@@ -1212,8 +1298,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (pinnedElsewhere) return;
     if (staticPinEdit) {
       const pin = staticLookPin(dockEffect, idx, nextSlot);
-      recordPins(selectionIds, pin);
-      if (commit) void applyPins(selectionIds, pin, false);
+      recordPins(focusIds, pin);
+      if (commit) void applyPins(focusIds, pin, false);
       return;
     }
     publishControlSync({
@@ -1227,7 +1313,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       templateIndex: idx,
       effectState: nextSlot,
     });
-  }, [applyPins, dockEffect, dockSlot, dockState, effectTemplates, pinnedElsewhere, recordPins, selectionIds, staticPinEdit, writeTemplates]);
+  }, [applyPins, dockEffect, dockSlot, dockState, effectTemplates, pinnedElsewhere, recordPins, focusIds, staticPinEdit, writeTemplates]);
 
   const handleStateCommit = useCallback(() => {
     if (!dockEffect) return;
@@ -1246,12 +1332,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // running on the canvas - restarting the global effect here would swap it
     // out from under every unselected device.
     if (staticPinEdit) {
-      pinStaticLook(dockEffect, idx, selectionIds, latest);
+      pinStaticLook(dockEffect, idx, focusIds, latest);
       return;
     }
     if (pinnedElsewhere) return;
     applyAnimate(dockEffect, latest, true);
-  }, [applyAnimate, dockEffect, dockSlot, pinStaticLook, pinnedElsewhere, selectionIds, staticPinEdit]);
+  }, [applyAnimate, dockEffect, dockSlot, pinStaticLook, pinnedElsewhere, focusIds, staticPinEdit]);
 
   const handleStateReset = useCallback(() => {
     if (!dockEffect) return;
@@ -1266,9 +1352,26 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     writeTemplates(nextTemplates, staticPinEdit || pinnedElsewhere ? null : dockEffect, true)
       .then(() => {
         setCommittedTemplates(nextTemplates);
-        if (staticPinEdit) pinStaticLook(dockEffect, idx, selectionIds, nextBundle.slots[idx]);
+        if (staticPinEdit) pinStaticLook(dockEffect, idx, focusIds, nextBundle.slots[idx]);
       });
-  }, [animateDefaults, dockEffect, dockSlot, effectTemplates, pinStaticLook, pinnedElsewhere, selectionIds, staticPinEdit, writeTemplates]);
+  }, [animateDefaults, dockEffect, dockSlot, effectTemplates, pinStaticLook, pinnedElsewhere, focusIds, staticPinEdit, writeTemplates]);
+
+  // After a studio save, slot values for params the save changed or unpinned are
+  // dropped so the LEDs show the saved look; untouched knob tweaks stay.
+  const activeEffectRef = useRef(activeEffect);
+  activeEffectRef.current = activeEffect;
+  const handleCustomSaved = useCallback((id: string, staleParams: readonly string[]) => {
+    if (staleParams.length === 0) return;
+    const key = customEffectKey(id);
+    const templates = effectTemplatesRef.current;
+    const bundle = templates[key];
+    if (!bundle) return;
+    const strip = (params: Record<string, number>) =>
+      Object.fromEntries(Object.entries(params).filter(([name]) => !staleParams.includes(name)));
+    const next = { ...templates, [key]: { ...bundle, slots: bundle.slots.map(slot => ({ ...slot, params: strip(slot.params) })) } };
+    localAnimateEditUntilRef.current = Date.now() + 1500;
+    void writeTemplates(next, activeEffectRef.current === key ? key : null, true).then(() => setCommittedTemplates(next));
+  }, [writeTemplates]);
 
   // Cross-panel usage drives the "used by a panel" badge. No exclusion: the
   // desktop page isn't a panel, so every panel background counts.
@@ -1768,10 +1871,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     reset: resetLayoutHistory,
   } = useUndoRedo<LayoutHistorySnapshot>({
     maxDepth: 50,
-    // Off while the LED map editor is open: it has its own undo/redo on the same
-    // Cmd/Ctrl+Z, and both listen on window, so an enabled layout history would
-    // also fire and undo the canvas underneath the modal.
-    enabled: editorTarget === null,
+    // Off while the LED map editor or Shader Studio is open: each has its own
+    // undo/redo on the same Cmd/Ctrl+Z, and all listen on window, so an enabled
+    // layout history would also fire and undo the canvas underneath the modal.
+    enabled: editorTarget === null && studioTarget === null,
     onUndo: handleUndoLayout,
     onRedo: handleRedoLayout,
     store: layoutHistoryStore,
@@ -1894,7 +1997,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (presetId) { await updateLayoutPreset(presetId, { saveCurrent: true }); await loadPresets(); }
   }, [loadPresets]);
 
-  const handleModeChange = useCallback(async (m: LightingMode) => {
+  /** `effectKey` names the effect Animation starts with instead of the remembered one. */
+  const handleModeChange = useCallback(async (m: LightingMode, effectKey?: string) => {
     setMode(m);
     // Starting any mode is never paused - reset optimistically so a stale
     // "paused" trailing glyph can't flash on the newly active tab while the
@@ -1906,9 +2010,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     try {
       switch (m) {
         case 'animate': {
-          const key = ANIMATE_EFFECTS.some(e => e.key === activeEffect)
+          const runnable = (k: string) => ANIMATE_EFFECTS.some(e => e.key === k) || isCustomEffectKey(k);
+          const key = effectKey ?? (runnable(activeEffect)
             ? activeEffect
-            : (ANIMATE_EFFECTS.some(e => e.key === rawSync) ? rawSync : animateEffectRef.current);
+            : (runnable(rawSync) ? rawSync : animateEffectRef.current));
           setActiveEffect(key);
           setRawSync(key);
           const state = stateFor(key);
@@ -1947,6 +2052,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       }
     } catch { /* best-effort; backend state becomes source of truth */ }
   }, [activeEffect, globalColor, rawSync, setMode, setRawSync, screenPP, stateFor, setPausedState]);
+
+  // Once the profile's lighting has loaded, the requested effect becomes the Animation effect.
+  useEffect(() => {
+    const key = openIntentRef.current;
+    if (!serviceOnline || !loadedProfileLighting || !key) return;
+    openIntentRef.current = null;
+    void handleModeChange('animate', key);
+  }, [serviceOnline, loadedProfileLighting, handleModeChange]);
 
   // Simple mode has no device rail, so a color is the exact global flat color.
   // Static has to own the output first.
@@ -2140,6 +2253,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // lives on. Every other mode still marks its own tab.
   const activeTabKey = !synced ? undefined
     : (viewMode === 'none' ? MODE_MENU_TAB_KEY : viewMode);
+  const globalTabKey = !synced ? undefined
+    : (effectiveMode === 'none' ? MODE_MENU_TAB_KEY : effectiveMode);
   // What a tab press gives the selected cards: that mode's global look, or the
   // one shared Mirror or Media. Game Sync and Off cannot be pinned, so they
   // always change everything.
@@ -2171,6 +2286,17 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     setScopeHovered(false);
     setPickHovered(false);
   }
+  // The cards a press on `key` changes, outlined on hover and pulsed on press: with a selection
+  // and a pinnable mode, the cards it pins; otherwise the global reach.
+  const tabPressReach = useCallback((key: string): Set<string> | undefined => {
+    if (selectedDeviceIds.size > 0 && PINNABLE_MODES.has(key)) {
+      const ids = tabPressPins(pins, selectedDeviceIds, key);
+      return ids.length ? pressReach(visibleDevices, pins, new Set(ids)) : undefined;
+    }
+    // With nothing selected a press changes the running mode, which a detached open tab is not.
+    if (tabPressChangesNothing(key, detachedTab ? globalTabKey : activeTabKey, selectedDeviceIds.size, false)) return undefined;
+    return pressReach(visibleDevices, pins, selectedDeviceIds, key === 'gamesync');
+  }, [activeTabKey, globalTabKey, detachedTab, pins, selectedDeviceIds, visibleDevices]);
   // A tab press either opens the mode menu or applies a mode: to the selected
   // cards when there are any, else to every unpinned one. A mode switch also
   // drops the menu, which the tab row keeps "inside" its anchor.
@@ -2181,15 +2307,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       return;
     }
     closeModeMenu();
-    if (!tabPressChangesNothing(key, activeTabKey, selectedDeviceIds.size, scoped.kind === 'pin')) {
-      pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds, key === 'gamesync'));
-    }
+    const reach = tabPressReach(key);
+    if (reach) pulseCards(reach);
     const pin = selectedDeviceIds.size > 0 ? tabPinFor(key as LightingMode) : null;
     if (pin) {
-      // Cards already pinned to this mode keep their own look.
-      if (!(scoped.kind === 'pin' && key === viewMode)) void applyPins([...selectedDeviceIds], pin);
+      setSelectionTab(key as LightingMode);
+      const ids = tabPressPins(pins, selectedDeviceIds, key);
+      if (ids.length > 0) void applyPins(ids, pin);
       return;
     }
+    setSelectionTab(null);
     void handleModeChange(key as LightingMode);
   };
 
@@ -2197,15 +2324,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The cards a hovered press or pick reaches, outlined. Off and Game Sync have no picks.
   const pickTargetIds = useMemo(() => {
     if (scopeHovered || pickHovered) {
-      return viewMode === 'none' || viewMode === 'gamesync' ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
+      return viewMode === 'none' || viewMode === 'gamesync' || detachedTab ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
     }
     if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
-    if (tabPressChangesNothing(hoveredTab, activeTabKey, selectedDeviceIds.size, scoped.kind === 'pin')) return undefined;
-    return pressReach(visibleDevices, pins, selectedDeviceIds, hoveredTab === 'gamesync');
-  }, [scopeHovered, pickHovered, viewMode, hoveredTab, activeTabKey, scoped.kind, pins, selectedDeviceIds, visibleDevices]);
+    return tabPressReach(hoveredTab);
+  }, [scopeHovered, pickHovered, viewMode, detachedTab, hoveredTab, tabPressReach, pins, selectedDeviceIds, visibleDevices]);
   const pinnedNames = useMemo(() => visibleDevices.filter(d => d.id in pins).map(canvasLabelName), [visibleDevices, pins]);
   // How many cards the next pick changes; with none, the way to reach any is a selection.
-  const reachCount = pressReach(visibleDevices, pins, selectedDeviceIds).size;
+  const reachCount = detachedTab ? 0 : pressReach(visibleDevices, pins, selectedDeviceIds).size;
   const previewBadgeLabel = selectedDeviceIds.size > 0
     ? t(pluralKey('lighting.pane.appliesSelected', language, reachCount), { count: reachCount })
     : reachCount > 0 ? t(pluralKey('lighting.pane.appliesDevices', language, reachCount), { count: reachCount })
@@ -2221,7 +2347,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   );
   const scopeChip = (
     <span
-      className={styles.scopeChip}
+      key={scopeFlash}
+      className={`${styles.scopeChip} ${scopeFlash > 0 ? styles.scopeFlash : ''}`}
       onPointerEnter={e => { if (e.pointerType === 'mouse') setScopeHovered(true); }}
       onPointerLeave={e => { if (e.pointerType === 'mouse') setScopeHovered(false); }}
     >
@@ -2250,6 +2377,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Selected devices wearing different pins have no single value for the
   // controls to edit, so the dock locks until the selection agrees. Mirror's
   // and Media's controls are shared, so their dock never locks.
+  // A detached tab locks it too: the dock would edit the running mode's effect.
   const mixedSelection = scoped.kind === 'mixed' && viewMode !== 'screen' && viewMode !== 'gif';
   const allSelected = selectAllIds.length > 0 && selectAllIds.every(id => selectedDeviceIds.has(id));
   // The canvas previews the shared effect canvas, which Static does not sample
@@ -2263,6 +2391,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     () => selectedDeviceIds.size === 0 ? visibleDevices : visibleDevices.filter(d => selectedDeviceIds.has(d.id)),
     [visibleDevices, selectedDeviceIds],
   );
+  // Cards lit by another mode than the open tab, captioned with that mode: their frames are not part of this canvas.
+  const foreignFrames = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const d of canvasDevices) {
+      const mode = cardMode(d.id);
+      if (mode !== viewMode) out.set(d.id, t(`lighting.mode.${mode === 'none' ? 'off' : mode}`));
+    }
+    return out;
+  }, [canvasDevices, cardMode, viewMode, t]);
 
   // Static's canvas is the color picker. A pattern replaces the field with the
   // effect's own render: a selection's pattern pin, or with nothing selected
@@ -2708,12 +2845,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     />
                   </Suspense>
                 ) : (
-                  <DeviceCanvas devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
+                  <DeviceCanvas backdrop={viewMode === 'gif' && effectiveMode !== 'gif' ? <MediaBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} foreignFrames={foreignFrames} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
                 )}
                 {viewMode === 'gif' && <MediaCanvasNotice />}
                 {shaderMode && dockEffect && dockState && !mixedSelection && (
                   <>
-                    {EFFECTS.find(e => e.key === dockEffect)?.audio && (
+                    {(EFFECTS.find(e => e.key === dockEffect)?.audio || dockCustom?.audio) && (
                       <div className={styles.musicReactive}>
                         <HoverTooltip body={t('lighting.musicReactive')} side="left">
                           <button
@@ -2750,18 +2887,44 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   effect pool; Screen and Media get their source controls. */}
               {(viewMode === 'animate' || viewMode === 'static') ? (
                 <>
+                <div className={styles.effectToolbar}>
+                  <SearchInput
+                    className={styles.effectSearch}
+                    value={effectQuery}
+                    onChange={setEffectQuery}
+                    placeholder={t('lighting.effects.search')}
+                    ariaLabel={t('lighting.effects.search')}
+                  />
+                  {viewMode === 'animate' && (
+                    <Button size="sm" icon={<SprayCan size={14} />} onClick={() => setStudioTarget({ id: activeCustom?.id ?? null })}>
+                      {t('lighting.studio.title')}
+                    </Button>
+                  )}
+                </div>
                 <div className={styles.browserWrap}>
                 <AnimateGrid
                   effect={gridEffect}
                   onSelect={handleEffectPick}
                   effects={viewMode === 'static' ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
+                  query={effectQuery}
                   frozen={viewMode === 'static'}
                   slotFor={gridSlotFor}
                   versionFor={gridVersionFor}
                   panelEffects={panelUsage.effects}
                   pinnedDevices={pinnedDevices}
                   gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
-                  leading={viewMode === 'static' ? (
+                  leadingMatches={savedMatch}
+                  leading={viewMode === 'animate' ? (
+                    <Suspense fallback={null}>
+                      <SavedEffectSections
+                        effect={gridEffect}
+                        query={effectQuery}
+                        username={accountUsername}
+                        gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
+                        onSelect={handleEffectPick}
+                      />
+                    </Suspense>
+                  ) : viewMode === 'static' ? (
                     <CollapsibleSection
                       compact
                       title={t('lighting.static.pickerGroup')}
@@ -2797,8 +2960,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                     mode={viewMode}
                     screenPP={screenPP}
                     onScreenPPChange={setScreenPP}
-                    keepMode={selectedDeviceIds.size > 0 && viewMode !== effectiveMode}
+                    keepMode={viewMode !== effectiveMode}
                     onSelectionPick={handleSharedPick}
+                    onBlockedPick={detachedTab ? flashScope : undefined}
                   />
                 </div>
               )}
@@ -2835,6 +2999,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 onAnimateCommit={handleStateCommit}
                 onAnimateReset={handleStateReset}
                 panelSlots={panelUsage.slotsByEffect.get(dockEffect)}
+                customDef={dockCustomDef}
+                customTitle={dockCustom?.name}
                 postProcess={postProcess}
                 onPostProcessChange={handlePostProcessChange}
                 onPostProcessCommit={handlePostProcessCommit}
@@ -2866,6 +3032,19 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           gpuState={serviceState.lighting?.gpuState}
           paused={paused}
         />
+      )}
+      {studioTarget && (
+        <Suspense fallback={null}>
+          <ShaderStudio
+            open
+            effectId={studioTarget.id}
+            username={accountUsername}
+            gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
+            onSaved={handleCustomSaved}
+            onViewListing={id => onSectionNavigate?.('store', { tab: `effects/${id}` })}
+            onClose={() => setStudioTarget(null)}
+          />
+        </Suspense>
       )}
       {editorTarget && (
         <LedMapEditor

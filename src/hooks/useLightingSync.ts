@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isCustomEffectKey } from '../api/customEffects';
 import { fetchCurrentSync } from '../api/lighting';
 import { isStaticEffect } from '../types/lighting';
 import { subscribeControlSync } from '../lib/controlSync';
@@ -81,6 +82,8 @@ export function useLightingSync(enabled: boolean, refreshKey?: string) {
 
 export function normalizeSync(sync: string): LightingMode {
   if (sync === 'none' || !sync) return 'none';
+  // Custom ids are random base36, so the substring rules below could misread one.
+  if (isCustomEffectKey(sync)) return 'animate';
   // Exact catalog match first: the pattern key 'mirror' would otherwise be
   // caught by the includes('mirror') screen rule below.
   if (sync === 'static' || isStaticEffect(sync)) return 'static';

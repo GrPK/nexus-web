@@ -19,6 +19,8 @@ import { canvasLabelName } from '../../../lib/canvasLabelName';
 import styles from './DeviceCanvas.module.scss';
 
 interface DeviceCanvasProps {
+  /** Drawn over the canvas stream and under the shader canvas and frames; it must not take pointer events. */
+  backdrop?: React.ReactNode;
   devices: LightingDevice[];
   /** Draw only the preview: no frames, names or frame gestures. */
   hideFrames?: boolean;
@@ -50,6 +52,8 @@ interface DeviceCanvasProps {
   /** Device ids whose rectangle outline should be hidden on the canvas. View-only flag -
    *  the device still samples its rect for lighting; only the visual overlay is skipped. */
   hiddenFrameIds?: Set<string>;
+  /** Devices lit by another mode than this canvas shows, with that mode's name: their frames are dimmed, captioned and draw no LED dots. */
+  foreignFrames?: ReadonlyMap<string, string>;
   /** LED positions by device id; every selected frame draws the dots of each shown member it stands for. */
   selectedDeviceLeds?: Record<string, LedMapEntry[]> | null;
   /** Called when the user clicks the settings button on a device frame. */
@@ -298,11 +302,12 @@ export const CanvasBackground = memo(function CanvasBackground() {
   return <canvas ref={bgRef} className={styles.bgCanvas} />;
 });
 
-const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, selectedIds, primaryDeviceId, onSelectDevice, onSetSelection, containerRef, selectedDeviceLeds, onOpenSettings, onOpenKeyReactions, keyReactiveIds, onDragActiveChange, onBeforeLayoutSave, onLayoutCommit, onSetDevicesPower, stacks, stackActionsFor }: {
+const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, foreignFrames, selectedIds, primaryDeviceId, onSelectDevice, onSetSelection, containerRef, selectedDeviceLeds, onOpenSettings, onOpenKeyReactions, keyReactiveIds, onDragActiveChange, onBeforeLayoutSave, onLayoutCommit, onSetDevicesPower, stacks, stackActionsFor }: {
   /** Every device, hidden frames included: a hidden stack member still moves with its frame. */
   devices: LightingDevice[];
   /** Frames the eye is hiding: never drawn, never hit, but stacked ones follow their frame. */
   hiddenIds: Set<string>;
+  foreignFrames?: ReadonlyMap<string, string>;
   selectedIds: Set<string>;
   primaryDeviceId: string | null;
   onSelectDevice: (id: string | null) => void;
@@ -885,12 +890,15 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, select
         // Unfocused frames stay drawn and recede. An empty focus set recedes
         // every one of them - that is the "clicked empty canvas" state.
         const deemphasized = !selected;
+        const shownMembers = stackedWith(dev.id).filter(id => !hiddenIds.has(id));
+        const foreign = !!foreignFrames && shownMembers.length > 0 && shownMembers.every(id => foreignFrames.has(id));
         // The canvas is held at the unit space's 5:3, so a turn in units is a
         // plain rotation on screen.
         const rot = normDeg(dev.canvasRotation ?? 0);
         return (
           <div key={dev.id}
-            className={`${styles.device} ${drag?.id === dev.id ? styles.dragging : ''} ${selected ? styles.selected : ''} ${deemphasized ? styles.deemphasized : ''} ${hoveredLabelId === dev.id ? styles.labelHover : ''}`}
+            data-foreign={foreign || undefined}
+            className={`${styles.device} ${drag?.id === dev.id ? styles.dragging : ''} ${selected ? styles.selected : ''} ${deemphasized ? styles.deemphasized : ''} ${foreign ? styles.foreign : ''} ${hoveredLabelId === dev.id ? styles.labelHover : ''}`}
             style={{
               left: `${(dev.canvasX / CW) * 100}%`, top: `${(dev.canvasY / CH) * 100}%`,
               width: `${(dev.canvasW / CW) * 100}%`, height: `${(dev.canvasH / CH) * 100}%`,
@@ -902,8 +910,9 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, select
             <div className={styles.rotateHandle} title={t('lighting.devices.rotateHandle')} onPointerDown={e => startDrag(e, dev, 'rotate')}>
               <RotateCw size={10} aria-hidden />
             </div>
-            {selected && selectedDeviceLeds && stackedWith(dev.id)
-              .filter(id => !hiddenIds.has(id))
+            {foreign && <span className={styles.foreignCaption}>{foreignFrames.get(dev.id) ?? foreignFrames.get(shownMembers[0])}</span>}
+            {selected && selectedDeviceLeds && shownMembers
+              .filter(id => !foreignFrames?.has(id))
               .flatMap(id => {
                 // Stack members share one rect and turn with the frame, each
                 // inside the slot the stack layout cuts for it - the engine
@@ -1055,7 +1064,7 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, select
   );
 });
 
-export function DeviceCanvas({ devices, hideFrames, selectedIds, primaryDeviceId, onSelectDevice, onSetSelection, shaderEffect, shaderState, shaderPaused, audioRef, hiddenFrameIds, selectedDeviceLeds, onOpenSettings, onOpenKeyReactions, keyReactiveIds, onDragActiveChange, onBeforeLayoutSave, onLayoutCommit, onSetDevicesPower, gpuAvailable, gpuState, onPickRenderGpu, stacks, stackActionsFor }: DeviceCanvasProps) {
+export function DeviceCanvas({ backdrop, devices, hideFrames, selectedIds, primaryDeviceId, onSelectDevice, onSetSelection, shaderEffect, shaderState, shaderPaused, audioRef, hiddenFrameIds, foreignFrames, selectedDeviceLeds, onOpenSettings, onOpenKeyReactions, keyReactiveIds, onDragActiveChange, onBeforeLayoutSave, onLayoutCommit, onSetDevicesPower, gpuAvailable, gpuState, onPickRenderGpu, stacks, stackActionsFor }: DeviceCanvasProps) {
   const notice = gpuNotice(gpuState, gpuAvailable);
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1071,8 +1080,9 @@ export function DeviceCanvas({ devices, hideFrames, selectedIds, primaryDeviceId
   return (
     <div ref={containerRef} className={styles.canvas}>
       <CanvasBackground />
+      {backdrop}
       <canvas ref={glCanvasRef} className={`${styles.glCanvas} ${ready ? styles.glCanvasReady : ''}`} />
-      {!hideFrames && <DeviceOverlays devices={devices} hiddenIds={hiddenIds} selectedIds={selectedIds} primaryDeviceId={primaryDeviceId} onSelectDevice={onSelectDevice} onSetSelection={onSetSelection} containerRef={containerRef} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={onOpenSettings} onOpenKeyReactions={onOpenKeyReactions} keyReactiveIds={keyReactiveIds} onDragActiveChange={onDragActiveChange} onBeforeLayoutSave={onBeforeLayoutSave} onLayoutCommit={onLayoutCommit} onSetDevicesPower={onSetDevicesPower} stacks={stacks} stackActionsFor={stackActionsFor} />}
+      {!hideFrames && <DeviceOverlays devices={devices} hiddenIds={hiddenIds} foreignFrames={foreignFrames} selectedIds={selectedIds} primaryDeviceId={primaryDeviceId} onSelectDevice={onSelectDevice} onSetSelection={onSetSelection} containerRef={containerRef} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={onOpenSettings} onOpenKeyReactions={onOpenKeyReactions} keyReactiveIds={keyReactiveIds} onDragActiveChange={onDragActiveChange} onBeforeLayoutSave={onBeforeLayoutSave} onLayoutCommit={onLayoutCommit} onSetDevicesPower={onSetDevicesPower} stacks={stacks} stackActionsFor={stackActionsFor} />}
       <CanvasNoticeBar
         visible={notice != null && shaderEffect != null}
         message={notice ? t(notice.key) : ''}

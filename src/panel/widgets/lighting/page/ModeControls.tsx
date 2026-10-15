@@ -37,7 +37,7 @@ import styles from '../LightingPage.module.scss';
  * the under-canvas rows: mirror monitor picker + filter presets,
  * media library, off message.
  */
-export const ModeControls = memo(function ModeControls({ mode, screenPP, onScreenPPChange, keepMode = false, onSelectionPick }: {
+export const ModeControls = memo(function ModeControls({ mode, screenPP, onScreenPPChange, keepMode = false, onSelectionPick, onBlockedPick }: {
   mode: LightingMode;
   screenPP: PostProcessSettings;
   onScreenPPChange: (pp: PostProcessSettings) => void;
@@ -45,21 +45,24 @@ export const ModeControls = memo(function ModeControls({ mode, screenPP, onScree
   keepMode?: boolean;
   /** Called after every capture or media pick. */
   onSelectionPick?: () => void;
+  /** When set, a capture or media pick reaches no card: it calls this and applies nothing. */
+  onBlockedPick?: () => void;
 }) {
   switch (mode) {
     case 'animate': return null;
-    case 'screen': return <ScreenControls screenPP={screenPP} onScreenPPChange={onScreenPPChange} keepMode={keepMode} onSelectionPick={onSelectionPick} />;
-    case 'gif': return <MediaControls keepMode={keepMode} onSelectionPick={onSelectionPick} />;
+    case 'screen': return <ScreenControls screenPP={screenPP} onScreenPPChange={onScreenPPChange} keepMode={keepMode} onSelectionPick={onSelectionPick} onBlockedPick={onBlockedPick} />;
+    case 'gif': return <MediaControls keepMode={keepMode} onSelectionPick={onSelectionPick} onBlockedPick={onBlockedPick} />;
     case 'none': return <OffControls />;
     case 'gamesync': return null;
   }
 });
 
-export function ScreenControls({ screenPP, onScreenPPChange, keepMode = false, onSelectionPick }: {
+export function ScreenControls({ screenPP, onScreenPPChange, keepMode = false, onSelectionPick, onBlockedPick }: {
   screenPP: PostProcessSettings;
   onScreenPPChange: (pp: PostProcessSettings) => void;
   keepMode?: boolean;
   onSelectionPick?: () => void;
+  onBlockedPick?: () => void;
 }) {
   const { t } = useTranslation();
   const [monitors, setMonitors] = useState<ScreenMonitor[]>([]);
@@ -82,6 +85,7 @@ export function ScreenControls({ screenPP, onScreenPPChange, keepMode = false, o
   }, []);
 
   const handleMonitorChange = async (id: string) => {
+    if (onBlockedPick) { onBlockedPick(); return; }
     setSelectedMonitor(id);
     setPickedMonitor(id);
     const effect = await fetchScreenEffect();
@@ -97,6 +101,7 @@ export function ScreenControls({ screenPP, onScreenPPChange, keepMode = false, o
   };
 
   const applyReactive = async (reactive: boolean) => {
+    if (onBlockedPick) { onBlockedPick(); return; }
     const nextPP: PostProcessSettings = { ...screenPP, reactive };
     onScreenPPChange(nextPP);
     await setScreenEffect(nextPP, true);
@@ -168,13 +173,14 @@ export function ScreenControls({ screenPP, onScreenPPChange, keepMode = false, o
 
 const LIGHTING_CROP_ASPECT = 160 / 90;
 
-function MediaControls({ keepMode, onSelectionPick }: { keepMode: boolean; onSelectionPick?: () => void }) {
+function MediaControls({ keepMode, onSelectionPick, onBlockedPick }: { keepMode: boolean; onSelectionPick?: () => void; onBlockedPick?: () => void }) {
   const { t } = useTranslation();
   const { items, activeId, thumbs, refresh, play: playShared, removeLocal } = useMediaLibrary();
   const play = useCallback(async (id: string) => {
+    if (onBlockedPick) { onBlockedPick(); return; }
     await playShared(id, keepMode);
     onSelectionPick?.();
-  }, [keepMode, onSelectionPick, playShared]);
+  }, [keepMode, onSelectionPick, onBlockedPick, playShared]);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importingName, setImportingName] = useState<string | null>(null);

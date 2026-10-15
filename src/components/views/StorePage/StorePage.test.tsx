@@ -108,7 +108,7 @@ describe('StorePage storefront', () => {
 
     expect(await screen.findByText('store.banner.title')).toBeInTheDocument();
     expect(screen.getByText('store.featured')).toBeInTheDocument();
-    expect(screen.queryByText('store.section.apps')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'store.section.apps' })).not.toBeInTheDocument();
   });
 
   it('lets an app icon fill its box and draws a tile only behind the placeholder', async () => {
@@ -151,7 +151,7 @@ describe('StorePage storefront', () => {
     fetchStoreApps.mockResolvedValue([app, { ...app, id: 'com.example.clock', name: 'Clock' }]);
     render(<StorePage />);
 
-    expect(await screen.findByText('store.section.apps')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'store.section.apps' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Aquarium' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clock' })).toBeInTheDocument();
   });

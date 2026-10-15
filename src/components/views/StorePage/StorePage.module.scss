@@ -18,6 +18,11 @@
   font-size: var(--type-small);
 }
 
+.sectionTabs {
+  flex-shrink: 0;
+  padding: 0 1rem;
+}
+
 .body {
   display: flex;
   flex-direction: column;

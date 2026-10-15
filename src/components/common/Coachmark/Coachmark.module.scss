@@ -1,0 +1,88 @@
+@use '../../../styles/text' as *;
+@use '../../../panel/styles/flexGap' as *;
+
+// Below dropdowns, popovers and modals, so any of them covers the bubble.
+.bubble {
+  position: fixed;
+  z-index: var(--z-floating);
+  box-sizing: border-box;
+  width: 300px;
+  max-width: calc(100vw - var(--space-sm) * 2);
+  display: flex;
+  align-items: flex-start;
+  padding: var(--space-md) var(--space-sm) var(--space-md) var(--space-lg);
+  background: var(--bg-elevated);
+  border: var(--border-width) solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+
+  @include hgap(var(--space-sm));
+}
+
+.text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.title {
+  @include text-body;
+
+  font-weight: var(--weight-heading);
+  color: var(--text);
+}
+
+.body {
+  @include text-body;
+
+  margin-top: var(--space-xs);
+  font-size: var(--type-small);
+  color: var(--text-dim);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+// A rotated square whose two outer borders continue the bubble's border.
+.arrow {
+  position: absolute;
+  width: var(--space-md);
+  height: var(--space-md);
+  background: var(--bg-elevated);
+  border: var(--border-width) solid var(--accent);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.bottom .arrow { top: 0; border-right: 0; border-bottom: 0; }
+.top .arrow { top: 100%; border-left: 0; border-top: 0; }
+.right .arrow { left: 0; border-top: 0; border-right: 0; }
+.left .arrow { left: 100%; border-bottom: 0; border-left: 0; }
+
+// Sits exactly on the target; the outline supplies the inset around it.
+.ring {
+  position: fixed;
+  z-index: var(--z-floating);
+  box-sizing: border-box;
+  border-radius: var(--radius);
+  outline: var(--border-width) solid var(--accent);
+  outline-offset: var(--space-xs);
+  pointer-events: none;
+  animation: coachmarkPulse 1.8s ease-out infinite;
+}
+
+@keyframes coachmarkPulse {
+  0% { box-shadow: 0 0 0 0 var(--accent-glow-shadow); }
+  100% { box-shadow: 0 0 0 var(--space-sm) transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring {
+    animation: none;
+    box-shadow: 0 0 0 var(--space-xs) var(--accent-soft);
+  }
+}

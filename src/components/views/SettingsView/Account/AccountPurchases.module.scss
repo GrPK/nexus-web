@@ -79,3 +79,15 @@
   gap: 0.4rem;
   flex-shrink: 0;
 }
+
+.effectThumb {
+  flex-shrink: 0;
+  width: 112px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.removed {
+  color: var(--warn);
+}

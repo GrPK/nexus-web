@@ -60,6 +60,8 @@ export interface MonitoringSettings {
 export interface PanelSettings {
   autoLaunch: boolean;
   reserveMonitor: boolean;
+  /** Absent on a service that predates the setting. */
+  alwaysOnTop?: boolean;
   themeSyncWithDesktop: boolean;
   themeMode: string;
   accentSyncWithDesktop: boolean;

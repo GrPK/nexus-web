@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { useTranslation } from '../../../../lib/i18n';
-import { EFFECTS, categoryOf, type EffectState, type EffectTemplateBundle } from '../../../../types/lighting';
+import { EFFECTS, categoryOf, type EffectDef, type EffectState, type EffectTemplateBundle } from '../../../../types/lighting';
 import { useShaderParams } from '../../../../hooks/useShaderParams';
 import { clampToSpec } from '../../../../lib/shaderParams';
 import { Slider } from '../../../../components/common/Slider/Slider';
@@ -27,9 +27,11 @@ export const EffectControls = memo(function EffectControls({
   effect, state, bundle,
   onTemplateSelect, canReset,
   onChange, onCommit, onReset,
-  rgbActiveSlot, panelSlots, staticMode,
+  rgbActiveSlot, panelSlots, staticMode, customDef, noPresets,
 }: {
   effect: string;
+  /** Definition for a custom (Shader Studio) effect, which is not in EFFECTS. */
+  customDef?: EffectDef;
   state: EffectState;
   bundle: EffectTemplateBundle;
   onTemplateSelect: (idx: number) => void;
@@ -43,9 +45,11 @@ export const EffectControls = memo(function EffectControls({
   panelSlots?: Set<number> | null;
   /** Static mode: no speed control, and patterns gain a hex colour entry. */
   staticMode?: boolean;
+  /** Hides the preset row, for an effect with no saved presets (a Marketplace preview). */
+  noPresets?: boolean;
 }) {
   const { t } = useTranslation();
-  const def = EFFECTS.find(e => e.key === effect);
+  const def = customDef ?? EFFECTS.find(e => e.key === effect);
   const { specs, loaded } = useShaderParams(effect);
   if (!def) return null;
   const selected = bundle.selected;
@@ -73,7 +77,7 @@ export const EffectControls = memo(function EffectControls({
   );
   return (
     <div className={styles.effectControls}>
-      {!isSimple && (
+      {!isSimple && !noPresets && (
         <EffectTemplateSelector
           className={styles.drawerTemplates}
           effect={effect}
@@ -154,9 +158,11 @@ export const EffectControls = memo(function EffectControls({
       </div>
       <div className={styles.drawerFooter}>
         <HoverTooltip
-          body={canReset
-            ? `${t('lighting.controls.reset')} preset ${selected + 1}`
-            : `Preset ${selected + 1} is unchanged`}
+          body={noPresets
+            ? t(canReset ? 'lighting.controls.reset' : 'lighting.controls.resetAlready')
+            : canReset
+              ? `${t('lighting.controls.reset')} preset ${selected + 1}`
+              : `Preset ${selected + 1} is unchanged`}
           side="top"
         >
           <button
@@ -164,7 +170,7 @@ export const EffectControls = memo(function EffectControls({
             className={styles.drawerReset}
             onClick={onReset}
             disabled={!canReset}
-            aria-label={`${t('lighting.controls.reset')} preset ${selected + 1}`}
+            aria-label={noPresets ? t('lighting.controls.reset') : `${t('lighting.controls.reset')} preset ${selected + 1}`}
           >{t('lighting.controls.reset')}</button>
         </HoverTooltip>
       </div>

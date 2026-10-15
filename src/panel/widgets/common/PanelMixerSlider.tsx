@@ -1,6 +1,9 @@
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef } from 'react';
+import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useRef } from 'react';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
 import styles from './PanelMixerSlider.module.scss';
+
+// How far a press on the icon may drift and still be a tap.
+const ICON_TAP_SLOP_PX = 12;
 
 export interface PanelMixerSliderProps {
   value: number;
@@ -54,6 +57,14 @@ export function PanelMixerSlider({
 }: PanelMixerSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+  const iconTapHandledRef = useRef(false);
+  const iconTapTimerRef = useRef<number | null>(null);
+  const iconPressRef = useRef<{ id: number; x: number; y: number } | null>(null);
+  useEffect(() => () => { if (iconTapTimerRef.current) window.clearTimeout(iconTapTimerRef.current); }, []);
+  // Last value handed to onChange, seeded by the press. A cancel commits this so
+  // a consumer's drag bookkeeping always closes, and never a value recomputed
+  // from the cancel event, whose coordinates are not a finger position.
+  const lastEmittedRef = useRef(0);
   const clampedValue = clamp(value, min, max);
   const pct = max === min ? 0 : (clampedValue - min) / (max - min);
 
@@ -86,14 +97,18 @@ export function PanelMixerSlider({
     event.currentTarget.setPointerCapture(event.pointerId);
     draggingRef.current = true;
     startInteraction();
-    updateValue(valueFromY(event.clientY));
+    const first = valueFromY(event.clientY);
+    lastEmittedRef.current = first;
+    updateValue(first);
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (!draggingRef.current || disabled) return;
     event.preventDefault();
     event.stopPropagation();
-    updateValue(valueFromY(event.clientY));
+    const next = valueFromY(event.clientY);
+    lastEmittedRef.current = next;
+    updateValue(next);
   };
 
   const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
@@ -105,6 +120,10 @@ export function PanelMixerSlider({
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {
       // The browser may release capture first when a touch is cancelled.
+    }
+    if (event.type === 'pointercancel') {
+      commitValue(lastEmittedRef.current);
+      return;
     }
     commitValue(valueFromY(event.clientY));
   };
@@ -155,9 +174,33 @@ export function PanelMixerSlider({
       disabled={disabled}
       onPointerDown={(event) => {
         event.stopPropagation();
+        // A new press ends the previous tap's click suppression.
+        iconTapHandledRef.current = false;
+        if (iconTapTimerRef.current) { window.clearTimeout(iconTapTimerRef.current); iconTapTimerRef.current = null; }
+        iconPressRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      }}
+      // Acts on the release: a tap that follows a scroll fling loses its click. The release
+      // must belong to this button's own press: same pointer, barely moved. A drag released
+      // over the icon, a press that began elsewhere, or a cancelled touch is not a tap. The
+      // click that follows any matched release is ignored.
+      onPointerCancel={() => { iconPressRef.current = null; }}
+      onPointerUp={(event) => {
+        const press = iconPressRef.current;
+        iconPressRef.current = null;
+        if (disabled || !press || press.id !== event.pointerId) return;
+        // A release that matched its press owns the click the browser synthesizes from it,
+        // whether it was accepted as a tap or rejected as a drag: that click must not act.
+        iconTapHandledRef.current = true;
+        if (iconTapTimerRef.current) window.clearTimeout(iconTapTimerRef.current);
+        iconTapTimerRef.current = window.setTimeout(() => { iconTapHandledRef.current = false; }, 400);
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > ICON_TAP_SLOP_PX) return;
+        event.stopPropagation();
+        iconButton.onClick();
       }}
       onClick={(event) => {
         event.stopPropagation();
+        if (iconTapHandledRef.current) { iconTapHandledRef.current = false; return; }
         iconButton.onClick();
       }}
     >

@@ -28,6 +28,16 @@ interface PromptModalProps {
    */
   onConfirm: (value: string) => void | string | null | undefined | Promise<void | string | null | undefined>;
   onCancel: () => void;
+  /**
+   * Extra button between Cancel and the primary. Shares `validate` and the
+   * error slot with the primary; `disabled` adds its own rule over the current
+   * value. Enter never triggers it.
+   */
+  secondary?: {
+    label: string;
+    onClick: (value: string) => void | string | null | undefined | Promise<void | string | null | undefined>;
+    disabled?: (value: string) => boolean;
+  };
 }
 
 /**
@@ -49,6 +59,7 @@ export function PromptModal({
   validate,
   onConfirm,
   onCancel,
+  secondary,
 }: PromptModalProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -81,7 +92,7 @@ export function PromptModal({
 
   if (!open) return null;
 
-  const submit = () => {
+  const submit = (commit: typeof onConfirm = onConfirm) => {
     if (submitting) return;
     const trimmed = value;
     if (validate) {
@@ -97,7 +108,7 @@ export function PromptModal({
       onCancel();
       return;
     }
-    const result = onConfirm(trimmed);
+    const result = commit(trimmed);
     if (result instanceof Promise) {
       const attempt = attemptRef.current;
       setSubmitting(true);
@@ -125,7 +136,7 @@ export function PromptModal({
   const submitDisabled = isInvalid || !value.trim() || submitting;
 
   return (
-    <Overlay open={open} onClose={onCancel} variant="alert" onEnter={submit}
+    <Overlay open={open} onClose={onCancel} variant="alert" onEnter={() => submit()}
       className={styles.modal} ariaLabel={title}>
       <h2 id={inputId + '-title'} className={styles.title}>{title}</h2>
       <div className={styles.fieldWrap}>
@@ -150,7 +161,13 @@ export function PromptModal({
         <Button tone="neutral" size="md" onClick={onCancel}>
           {cancelLabel ?? t('confirm.cancel')}
         </Button>
-        <Button tone="accent" size="md" onClick={submit} disabled={submitDisabled}>
+        {secondary && (
+          <Button tone="neutral" size="md" onClick={() => submit(secondary.onClick)}
+            disabled={submitDisabled || !!secondary.disabled?.(value)}>
+            {secondary.label}
+          </Button>
+        )}
+        <Button tone="accent" size="md" onClick={() => submit()} disabled={submitDisabled}>
           {confirmLabel ?? t('confirm.ok')}
         </Button>
       </div>

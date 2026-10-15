@@ -49,6 +49,8 @@ import { publishControlSync, subscribeControlSync } from '../../../lib/controlSy
 import { ViewHeader } from '../../../components/common/ViewHeader/ViewHeader';
 import { PresetToolbar } from '../../../components/common/PresetToolbar/PresetToolbar';
 import { IconLabelButton } from '../../../components/common/IconLabelButton/IconLabelButton';
+import { Coachmark } from '../../../components/common/Coachmark/Coachmark';
+import { useOnboardingHint } from '../../../hooks/useOnboardingHint';
 import { AdvancedModeCta } from '../../../components/common/AdvancedModeCta/AdvancedModeCta';
 import { ModeMenu, MODE_MENU_TAB_KEY } from '../../../components/common/ModeMenu/ModeMenu';
 import { usePageModeMenu } from '../../../components/common/ModeMenu/usePageModeMenu';
@@ -115,6 +117,9 @@ interface CoolingHistorySnapshot {
   offsets: Record<string, number>;
   mode: CoolingModeKey | null;
 }
+
+const CALIBRATE_HINT_ID = 'cooling-calibrate';
+const CALIBRATE_HINT_SELECTOR = `[data-coachmark="${CALIBRATE_HINT_ID}"]`;
 
 // Module scope so the history survives CoolingPage's unmount on navigation.
 // Session-only; assumes one mounted CoolingPage, as the lighting page does.
@@ -1109,6 +1114,32 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
   const curveManaged = isManagedCurve(selectedCurve?.id);
 
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  // The calibrate bubble: advanced mode, hint not yet dismissed, fans loaded
+  // and none calibrated, and nothing else on top. A calibration that already
+  // ran by any other path closes the hint for good.
+  const calibrateHint = useOnboardingHint(CALIBRATE_HINT_ID);
+  const controllableFans = useMemo(
+    () => channels.filter(c => c.controlled !== false && !c.readOnly
+      && c.classification !== 'Fixed' && !isFanDisconnected(c)),
+    [channels],
+  );
+  const anyFanCalibrated = controllableFans.some(c => c.calibrated);
+  const { dismissed: hintDismissed, dismiss: dismissHint } = calibrateHint;
+  useEffect(() => {
+    if (hintDismissed === false && anyFanCalibrated) dismissHint();
+  }, [hintDismissed, dismissHint, anyFanCalibrated]);
+  // The bubble may not cover the tab and preset row, so it stays inside the content below it.
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const topRowRef = useRef<HTMLDivElement | null>(null);
+  const contentBelowTabs = useCallback(() => {
+    const body = bodyRef.current?.getBoundingClientRect();
+    const tabs = topRowRef.current?.getBoundingClientRect();
+    return body && tabs ? new DOMRect(body.left, tabs.bottom, body.width, body.bottom - tabs.bottom) : null;
+  }, []);
+  const showCalibrateHint = !simpleDashboard && calibrateHint.dismissed === false
+    && controllableFans.length > 0 && !anyFanCalibrated && !calibrating
+    && !calConfirmOpen && !importDialogOpen && !modeMenuOpen;
   // Cooling offers only the apps that carry a cooling setup; Nexus 2's import
   // is panel personalization, so it belongs to the Settings entry, not here.
   const importSources = useMemo(() => availableImportSources(platform, ['fancontrol']), [platform]);
@@ -1467,10 +1498,10 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
           lighting page. The rail header shares grid row 1 with the tabs so both
           columns start at the same line. Capped at --page-max (pageBody) so the
           page matches every other view's width. */}
-      <div className={`${styles.body} pageBody`}>
+      <div className={`${styles.body} pageBody`} ref={bodyRef}>
         {/* Mode tabs and saved presets share one flex row: the presets keep
             their column width until the tab bar needs the space. */}
-        <div className={styles.topRow}>
+        <div className={styles.topRow} ref={topRowRef}>
           <div className={`${styles.tabsCell} ${styles.tabsAnchor}`} ref={modeMenuAnchorRef}>
             <ViewHeader
               title={t('cooling.title')}
@@ -1561,7 +1592,8 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                 icon={<Gauge />}
                 aria-label={t('cooling.calibrate.button')}
                 disabled={calibrating}
-                onClick={() => setCalConfirmOpen(true)}
+                data-coachmark={CALIBRATE_HINT_ID}
+                onClick={() => { calibrateHint.dismiss(); setCalConfirmOpen(true); }}
               />
             </HoverTooltip>
           </div>
@@ -2009,6 +2041,17 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
         sources={importSources}
         onImported={() => { void refreshCoolingConfig(); }}
       />
+      {showCalibrateHint && (
+        <Coachmark
+          hintId={CALIBRATE_HINT_ID}
+          target={CALIBRATE_HINT_SELECTOR}
+          boundary={contentBelowTabs}
+          title={t('cooling.calibrateHint.title')}
+          body={t('cooling.calibrateHint.body')}
+          dismissLabel={t('onboarding.hint.dismiss')}
+          onDismiss={calibrateHint.dismiss}
+        />
+      )}
       <ConfirmModal
         open={calConfirmOpen && !calibrating}
         destructive={false}

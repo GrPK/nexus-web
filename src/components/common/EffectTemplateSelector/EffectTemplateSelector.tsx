@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Lightbulb, Monitor } from 'lucide-react';
 import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 import { useEffectThumbnail } from '../../../hooks/useEffectThumbnail';
@@ -44,6 +45,8 @@ function PresetThumbButton({
 }) {
   const { t } = useTranslation();
   const url = useEffectThumbnail(effect, slot, slotThumbSignature(state));
+  // An image that fails to load leaves the skeleton until a new one arrives, never a broken-image glyph.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   // Badge meaning rides the existing preset tooltip: label becomes the bold
   // title, the live/panel hints the body (so hovering explains the icons).
   const hints = [live && t('lighting.badge.liveOnLeds'), panel && t('lighting.badge.usedByPanel')].filter(Boolean) as string[];
@@ -60,8 +63,8 @@ function PresetThumbButton({
         onClick={onSelect}
       >
         <span className={styles.preview}>
-          {url
-            ? <img className={styles.thumb} src={url} alt="" draggable={false} />
+          {url && url !== failedUrl
+            ? <img className={styles.thumb} src={url} alt="" draggable={false} onError={() => setFailedUrl(url)} />
             : <span className={styles.skeleton} aria-hidden="true" />}
           {(live || panel) && (
             <span className={styles.badges}>

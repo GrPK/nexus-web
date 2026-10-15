@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties, type PointerEventHandler, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type CSSProperties, type PointerEventHandler, type ReactNode } from 'react';
 import { EditableNumber } from '../Editable/EditableNumber';
 import { InfoTooltip } from '../InfoTooltip/InfoTooltip';
 import styles from './Slider.module.scss';
@@ -57,6 +57,8 @@ export interface SliderProps {
       secondary level such as the master-brightness cap. Omit to draw no
       pointer. */
   marker?: number;
+  /** A [from, to] span of the scale drawn on the track, e.g. how far audio modulation can move the value. */
+  band?: readonly [number, number];
   /** Optional node stacked directly above the marker caret (e.g. an info
       affordance). Interactive; only rendered when `marker` is set. */
   markerLabel?: ReactNode;
@@ -79,8 +81,9 @@ export function Slider({
   label = '', info, value, min, max, step = 1,
   orientation = 'inline', editable = false, zeroMarker = false, showRange = false,
   formatValue, onChange, onCommit, onPointerDown, onPointerCancel,
-  disabled, trackFill, marker, markerLabel, fillCap, ariaLabel, className, labelAction, mixed = false, mixedLabel,
+  disabled, trackFill, marker, markerLabel, band, fillCap, ariaLabel, className, labelAction, mixed = false, mixedLabel,
 }: SliderProps) {
+  const rangeId = useId();
   const latestInputValueRef = useRef(value);
   const onCommitRef = useRef(onCommit);
   const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,6 +115,10 @@ export function Slider({
     ...(capPct != null ? { '--slider-fill-cap': `${capPct}%` } : {}),
   } as CSSProperties;
   const markerPct = marker != null ? clamp(((marker - min) / (max - min)) * 100) : null;
+  const bandPct = band ? band.map(v => clamp(((v - min) / (max - min)) * 100)).sort((a, b) => a - b) : null;
+  const bandNode = bandPct ? (
+    <span className={styles.band} style={{ left: `${bandPct[0]}%`, width: `${bandPct[1] - bandPct[0]}%` }} aria-hidden />
+  ) : null;
   const markerNode = markerPct != null ? (
     <span className={styles.marker} style={{ left: `${markerPct}%` }}>
       {markerLabel != null && <span className={styles.markerLabel}>{markerLabel}</span>}
@@ -228,6 +235,7 @@ export function Slider({
 
   const range = (
     <input type="range" min={min} max={max} step={step} value={value}
+      id={rangeId}
       disabled={disabled}
       aria-label={ariaLabel}
       data-fill=""
@@ -258,6 +266,7 @@ export function Slider({
         <div className={styles.track}>
           {range}
           {showZero && <span className={styles.zeroTick} style={{ left: `${zeroPct}%` }} />}
+          {bandNode}
           {markerNode}
         </div>
       </div>
@@ -266,14 +275,17 @@ export function Slider({
 
   if (orientation === 'stacked') {
     return (
-      <label className={`${styles.root} ${styles.stacked} ${className ?? ''}`}>
+      // A div with a label on the name only: a wrapping label forwards a click on
+      // the value or name to its first labelable descendant, a labelAction button.
+      <div className={`${styles.root} ${styles.stacked} ${className ?? ''}`}>
         <div className={styles.head}>
-          <span className={styles.label}>{label}{info && <InfoTooltip message={info} side="top" />}{labelAction}</span>
+          <span className={styles.label}>{label && <label htmlFor={rangeId}>{label}</label>}{info && <InfoTooltip message={info} side="top" />}{labelAction}</span>
           {valueNode}
         </div>
         <div className={styles.track}>
           {range}
           {showZero && <span className={styles.zeroTick} style={{ left: `${zeroPct}%` }} />}
+          {bandNode}
           {markerNode}
         </div>
         {showRange && (
@@ -282,7 +294,7 @@ export function Slider({
             <span>{formatValue ? formatValue(max) : max}</span>
           </div>
         )}
-      </label>
+      </div>
     );
   }
 
@@ -296,6 +308,7 @@ export function Slider({
       <div className={styles.track}>
         {range}
         {showZero && <span className={styles.zeroTick} style={{ left: `${zeroPct}%` }} />}
+        {bandNode}
         {markerNode}
       </div>
       {inlineValueNode}

@@ -10,6 +10,7 @@ import { useTranslation } from '../../../lib/i18n';
 import { useConflictAutostart } from '../../../hooks/useConflictAutostart';
 import { useConflictAutoKillExclusions } from '../../../hooks/useUiSettings';
 import { useConflictDevices } from '../../../hooks/useConflictDevices';
+import { alwaysAlerts, useConflictOverlap } from '../../../hooks/useConflictOverlap';
 import { useConflictResolveAll } from '../../../hooks/useConflictResolveAll';
 import { useConflictRoster } from '../../../hooks/useConflictRoster';
 import styles from './ConflictWarning.module.scss';
@@ -35,7 +36,7 @@ interface ConflictWarningProps {
 
 /**
  * Top-bar amber button that opens the conflict modal. The button is hidden
- * when there are no conflicts (or alerts are suppressed), but the modal stays
+ * when there are no conflicts that share a device with Nexus (or alerts are suppressed), but the modal stays
  * mounted as long as the user has it open - so it doesn't auto-close mid-read
  * when the watcher clears the last conflict or the user ticks "don't show
  * again". Rows are sticky for as long as it stays open: an app that ends stays
@@ -50,9 +51,12 @@ export function ConflictWarningBadge({ conflicts, ready, suppressed, open, onOpe
     () => new Set(exclusions.filter(id => id !== HYTE_NEXUS2_CONFLICT_ID)),
     [exclusions],
   );
-  // A whitelisted app never alerts: the button reflects only what the user
-  // has not already told Nexus to leave alone.
-  const showButton = conflicts.some(c => !whitelisted.has(c.id)) && !suppressed;
+  const overlapsControlledDevice = useConflictOverlap(
+    !suppressed && conflicts.some(c => !whitelisted.has(c.id) && !alwaysAlerts(c)),
+  );
+  // A whitelisted app never alerts, nor does one that shares no device with
+  // what Nexus controls: the button reflects only real contention.
+  const showButton = conflicts.some(c => !whitelisted.has(c.id) && overlapsControlledDevice(c)) && !suppressed;
 
   // No button and no open modal → render nothing.
   if (!showButton && !open) return null;

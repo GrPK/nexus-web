@@ -85,10 +85,10 @@ describe('AnimateGrid category sections', () => {
     expect(has(container, 'spectrumbars')).toBe(true); // audio
   });
 
-  it('orders sections simple, organic, then the rest with audio last', () => {
+  it('orders sections simple, organic, pattern, then the rest with audio last', () => {
     const { container } = render(<AnimateGrid effect="" onSelect={() => {}} />);
     const text = container.textContent || '';
-    const order = ['simple', 'organic', 'cosmic', 'geometric', 'pattern', 'audio'];
+    const order = ['simple', 'organic', 'pattern', 'cosmic', 'geometric', 'audio'];
     const idxs = order.map(c => text.indexOf(`lighting.category.${c}`));
     expect(idxs.every(i => i >= 0)).toBe(true);
     expect(idxs).toEqual([...idxs].sort((a, b) => a - b));
@@ -103,6 +103,37 @@ describe('AnimateGrid category sections', () => {
     expect(has(container, 'fire')).toBe(false);
     fireEvent.click(header);
     expect(has(container, 'fire')).toBe(true);
+  });
+});
+
+describe('AnimateGrid search', () => {
+  const keys = (container: HTMLElement) =>
+    [...container.querySelectorAll('[data-effect-key]')].map(el => el.getAttribute('data-effect-key'));
+
+  it('shows only effects whose name matches every word', () => {
+    const { container } = render(<AnimateGrid effect="plasma" onSelect={() => {}} query="plasma" />);
+    const shown = keys(container);
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.every(k => k?.includes('plasma'))).toBe(true);
+  });
+
+  it('treats a whitespace-only query as no search', () => {
+    const all = keys(render(<AnimateGrid effect="plasma" onSelect={() => {}} />).container);
+    const spaced = keys(render(<AnimateGrid effect="plasma" onSelect={() => {}} query="   " />).container);
+    expect(spaced).toEqual(all);
+    expect(screen.queryByText('lighting.effects.noMatches')).not.toBeInTheDocument();
+  });
+
+  it('says so when nothing matches', () => {
+    const { container } = render(<AnimateGrid effect="plasma" onSelect={() => {}} query="zzzz-no-such-effect" />);
+    expect(keys(container)).toEqual([]);
+    expect(screen.getByText('lighting.effects.noMatches')).toBeInTheDocument();
+  });
+
+  it('keeps the hint away when the leading saved effects match', () => {
+    render(<AnimateGrid effect="plasma" onSelect={() => {}} query="zzzz-no-such-effect" leading={<span>Mine</span>} leadingMatches />);
+    expect(screen.getByText('Mine')).toBeInTheDocument();
+    expect(screen.queryByText('lighting.effects.noMatches')).not.toBeInTheDocument();
   });
 });
 
