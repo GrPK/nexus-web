@@ -12,6 +12,7 @@ import styles from './ManualRgbDevicesSection.module.scss';
 
 interface ManualRgbDevicesSectionProps {
   serviceOnline: boolean;
+  disabled?: boolean;
 }
 
 const EMPTY: ManualDevicesResponse = {
@@ -28,7 +29,7 @@ const EMPTY: ManualDevicesResponse = {
  * Each change restarts the RGB subprocess service-side, so lighting drops for a
  * moment; the copy says so.
  */
-export function ManualRgbDevicesSection({ serviceOnline }: ManualRgbDevicesSectionProps) {
+export function ManualRgbDevicesSection({ serviceOnline, disabled }: ManualRgbDevicesSectionProps) {
   const { t } = useTranslation();
   const [data, setData] = useState<ManualDevicesResponse>(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -88,6 +89,7 @@ export function ManualRgbDevicesSection({ serviceOnline }: ManualRgbDevicesSecti
     <SettingsSection
       title={t('settings.manualRgb.title')}
       description={t('settings.manualRgb.description')}
+      disabled={disabled}
     >
       <SettingRow
         label={t('settings.manualRgb.import.label')}

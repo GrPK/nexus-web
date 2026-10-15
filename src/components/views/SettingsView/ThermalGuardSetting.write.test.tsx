@@ -12,6 +12,11 @@ vi.mock('../../../api/cooling', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/cooling')>()),
   ...api,
 }));
+const flags = vi.hoisted(() => ({ cooling: true }));
+vi.mock('../../../hooks/useUiSettings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../hooks/useUiSettings')>()),
+  useFeatureFlags: () => ({ lighting: true, cooling: flags.cooling, monitoring: true, diagnostics: true }),
+}));
 vi.mock('../../../hooks/useMultiplexSocket', () => ({ useTopicCallback: () => {} }));
 
 const guard = (over: Partial<GuardResponse> = {}): GuardResponse => ({
@@ -51,6 +56,7 @@ async function mount() {
 describe('ThermalGuardSetting writes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    flags.cooling = true;
     api.fetchGuard.mockResolvedValue(guard());
     api.setGuardConfig.mockImplementation(async (body: Record<string, unknown>) => guard({
       ...(body.limitOverrideC ? { limitOverrideC: body.limitOverrideC as number, limitC: body.limitOverrideC as number, limitSource: 'user' as const } : {}),
@@ -138,5 +144,20 @@ describe('ThermalGuardSetting writes', () => {
     fireEvent.change(slider(), { target: { value: '102' } });
     fireEvent.pointerCancel(document.body);
     await waitFor(() => { expect(bodies()).toEqual([{ limitOverrideC: 102 }]); });
+  });
+
+  it('with Cooling off, disables every control, writes nothing, and names the feature rather than the sensor', async () => {
+    flags.cooling = false;
+    await mount();
+    const sw = screen.getByRole('switch', { name: 'cooling.guard.label' });
+    expect(sw).toBeDisabled();
+    expect(sw.getAttribute('aria-checked')).toBe('false');
+    expect(slider()).toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'cooling.guard.lintWarnings.label' })).toBeDisabled();
+    expect(screen.getByText('cooling.guard.featureOff')).toBeInTheDocument();
+    expect(screen.queryByText('cooling.guard.inactive')).toBeNull();
+    fireEvent.click(sw);
+    await tick();
+    expect(api.setGuardConfig).not.toHaveBeenCalled();
   });
 });

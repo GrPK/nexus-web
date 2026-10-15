@@ -2,11 +2,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FeaturesOnboardingScreen } from './FeaturesOnboardingScreen';
 import { completeFeaturesOnboarding, completeLightingOnboarding } from '../../../api/onboarding';
+import { savePreferences } from '../../../api/profiles';
 
 vi.mock('../../../api/onboarding', () => ({
   completeFeaturesOnboarding: vi.fn(),
   completeLightingOnboarding: vi.fn(),
 }));
+
+vi.mock('../../../api/profiles', () => ({ savePreferences: vi.fn() }));
 
 const mockUpdate = vi.fn();
 vi.mock('../../../hooks/useUiSettings', () => ({
@@ -19,6 +22,7 @@ vi.mock('../../../lib/i18n', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(savePreferences).mockResolvedValue(undefined as never);
 });
 
 describe('FeaturesOnboardingScreen', () => {
@@ -97,5 +101,22 @@ describe('FeaturesOnboardingScreen', () => {
   it('renders nothing when closed', () => {
     const { container } = render(<FeaturesOnboardingScreen open={false} onComplete={vi.fn()} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('sends the chosen pillars to the service, and waits for that write, before completing features onboarding', async () => {
+    let finishSave!: () => void;
+    vi.mocked(savePreferences).mockReturnValue(new Promise<void>(r => { finishSave = r; }) as never);
+    vi.mocked(completeFeaturesOnboarding).mockResolvedValue({ completed: true, featuresCompleted: true });
+    render(<FeaturesOnboardingScreen open onComplete={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /cooling.title/ }));
+    fireEvent.click(screen.getByText('featuresOnboarding.continue'));
+
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({
+      features: { lighting: true, cooling: false, monitoring: true, diagnostics: true },
+    }));
+    expect(completeFeaturesOnboarding).not.toHaveBeenCalled();
+    finishSave();
+    await waitFor(() => expect(completeFeaturesOnboarding).toHaveBeenCalled());
   });
 });

@@ -21,6 +21,7 @@ vi.mock('../../../hooks/useUiSettings', () => ({
     reload: vi.fn(),
   }),
   useUnitPrefs: () => ({ monitoringTempUnit: prefs.monitoringTempUnit, timeFormat: '24h', numberFormat: 'dot' }),
+  useFeatureFlags: () => ({ lighting: true, cooling: true, monitoring: true, diagnostics: true }),
 }));
 
 const tempSensor = (id: string, name: string, value: number) => ({

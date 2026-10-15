@@ -1,7 +1,7 @@
 import { SettingsSection } from '../../../../components/common/SettingsSection/SettingsSection';
 import { SettingToggle } from '../../../../components/common/SettingRow/SettingRow';
 import { useTranslation } from '../../../../lib/i18n';
-import { useUiSettings } from '../../../../hooks/useUiSettings';
+import { useFeatureFlags, useUiSettings } from '../../../../hooks/useUiSettings';
 import { MONITORING_EVENT_KINDS } from '../../../../api/monitoringEvents';
 import { CHART_EVENT_ICONS } from '../../../../components/common/TimeSeriesChart/TimeSeriesChart';
 import { useEventKindVisibility } from './useEventKindVisibility';
@@ -19,11 +19,13 @@ export function MonitoringEventsSettings() {
   const { settings, update } = useUiSettings();
   const { isHidden, setKindHidden } = useEventKindVisibility();
   const enabled = settings.monitoringEventsEnabled;
+  const monitoringOn = useFeatureFlags().monitoring;
 
   return (
     <SettingsSection
       title={t('monitoring.events.settingsTitle')}
       description={t('monitoring.events.settingsDescription')}
+      disabled={!monitoringOn}
     >
       <SettingToggle
         label={t('monitoring.events.enableLabel')}

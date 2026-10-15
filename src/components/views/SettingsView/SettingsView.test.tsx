@@ -38,6 +38,7 @@ vi.mock('../../../hooks/useUiSettings', () => ({
     update: vi.fn(),
     reload: vi.fn(),
   }),
+  useFeatureFlags: () => ({ lighting: true, cooling: true, monitoring: true, diagnostics: true }),
 }));
 
 vi.mock('../../../hooks/useSensors', () => ({

@@ -1,4 +1,5 @@
 import { Fan, Lightbulb } from 'lucide-react';
+import { Badge } from '../../common/Badge/Badge';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { SettingToggle } from '../../common/SettingRow/SettingRow';
 import { LightingCoolingSection } from './LightingCoolingSection';
@@ -22,6 +23,7 @@ export function LightingCoolingTab({ settings, updateGeneral, serviceOnline, pla
       <SettingsSection title={t('settings.features.title')}>
         <SettingToggle
           label={t('settings.features.lighting.label')}
+          labelSuffix={<Badge label={t('settings.features.master')} color="var(--accent)" uppercase />}
           description={t('settings.features.lighting.description')}
           icon={<Lightbulb />}
           iconLeading="subtle"
@@ -31,6 +33,7 @@ export function LightingCoolingTab({ settings, updateGeneral, serviceOnline, pla
         />
         <SettingToggle
           label={t('settings.features.cooling.label')}
+          labelSuffix={<Badge label={t('settings.features.master')} color="var(--accent)" uppercase />}
           description={t('settings.features.cooling.description')}
           icon={<Fan />}
           iconLeading="subtle"
@@ -42,7 +45,7 @@ export function LightingCoolingTab({ settings, updateGeneral, serviceOnline, pla
 
       <LightingCoolingSection serviceOnline={serviceOnline} platform={platform} />
 
-      <ManualRgbDevicesSection serviceOnline={serviceOnline} />
+      <ManualRgbDevicesSection serviceOnline={serviceOnline} disabled={!settings.general.featureLightingEnabled} />
     </div>
   );
 }

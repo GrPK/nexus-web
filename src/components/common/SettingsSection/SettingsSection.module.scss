@@ -82,3 +82,9 @@
     border-top: none;
   }
 }
+
+// Same dimming as SettingRow.disabled; inert (set in the component) also drops the contents from the tab order.
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

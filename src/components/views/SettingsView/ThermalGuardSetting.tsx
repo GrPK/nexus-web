@@ -5,6 +5,7 @@ import { InlineError } from '../../common/InlineError/InlineError';
 import { InfoTooltip } from '../../common/InfoTooltip/InfoTooltip';
 import { Slider } from '../../common/Slider/Slider';
 import { SettingRow, SettingToggle } from '../../common/SettingRow/SettingRow';
+import { useFeatureFlags } from '../../../hooks/useUiSettings';
 import { useThermalGuard } from '../../../hooks/useThermalGuard';
 import { useTranslation } from '../../../lib/i18n';
 import type { GuardResponse } from '../../../api/cooling';
@@ -149,6 +150,8 @@ interface ThermalGuardSettingViewProps {
   pendingLintWarnings?: boolean | null;
   /** The limit asked for but not yet confirmed by the service; the slider shows it meanwhile. */
   pendingLimit?: number | 'reset' | null;
+  /** The Cooling feature is off: the guard cannot act and the service refuses its writes. */
+  coolingOff?: boolean;
   error: string | null;
   /** A failed limit write, shown on the limit row apart from the switch's error. */
   limitError?: string | null;
@@ -162,10 +165,10 @@ interface ThermalGuardSettingViewProps {
 
 /** The settings rows themselves, apart from the service wiring. */
 export function ThermalGuardSettingView({
-  guard, pendingEnabled = null, pendingLintWarnings = null, pendingLimit = null, error, limitError = null, lintWarningsError = null, onLintWarningsChange = () => {}, onToggle, onSetLimit, onClearLimit,
+  guard, pendingEnabled = null, pendingLintWarnings = null, pendingLimit = null, coolingOff = false, error, limitError = null, lintWarningsError = null, onLintWarningsChange = () => {}, onToggle, onSetLimit, onClearLimit,
 }: ThermalGuardSettingViewProps) {
   const { t } = useTranslation();
-  const on = pendingEnabled ?? guardEnabled(guard);
+  const on = !coolingOff && (pendingEnabled ?? guardEnabled(guard));
   return (
     <>
       <SettingToggle
@@ -173,7 +176,9 @@ export function ThermalGuardSettingView({
         description={(
           <>
             {t('cooling.guard.description')}
-            {guard.state === 'inactive' && <span role="status">{` ${t('cooling.guard.inactive')}`}</span>}
+            {coolingOff
+              ? <span role="status">{` ${t('cooling.guard.featureOff')}`}</span>
+              : guard.state === 'inactive' && <span role="status">{` ${t('cooling.guard.inactive')}`}</span>}
             {error && <> <InlineError>{error}</InlineError></>}
           </>
         )}
@@ -182,6 +187,7 @@ export function ThermalGuardSettingView({
         anchorId="set-thermal-guard"
         checked={on}
         onChange={onToggle}
+        disabled={coolingOff}
       />
       {guard.detectedLimitSource && (
         <LimitRow guard={guard} pendingLimit={pendingLimit} disabled={!on} error={limitError} onCommit={onSetLimit} onReset={onClearLimit} />
@@ -200,6 +206,7 @@ export function ThermalGuardSettingView({
         anchorId="set-thermal-guard-lint"
         checked={pendingLintWarnings ?? guard.lintWarnings !== false}
         onChange={onLintWarningsChange}
+        disabled={coolingOff}
       />
     </>
   );
@@ -215,6 +222,7 @@ export function ThermalGuardSetting({ serviceOnline }: { serviceOnline: boolean 
   const {
     guard, pendingEnabled, pendingLintWarnings, pendingLimit, toggleError, limitError, lintWarningsError, toggle, setLimit, clearLimit, setLintWarnings,
   } = useThermalGuard(serviceOnline);
+  const coolingOff = !useFeatureFlags().cooling;
   if (!guard) return null;
   return (
     <ThermalGuardSettingView
@@ -222,13 +230,14 @@ export function ThermalGuardSetting({ serviceOnline }: { serviceOnline: boolean 
       pendingEnabled={pendingEnabled}
       pendingLintWarnings={pendingLintWarnings}
       pendingLimit={pendingLimit}
+      coolingOff={coolingOff}
       error={toggleError?.message ?? null}
       limitError={limitError?.message ?? null}
       lintWarningsError={lintWarningsError?.message ?? null}
-      onLintWarningsChange={enabled => setLintWarnings(enabled)}
-      onToggle={next => { void toggle(next); }}
-      onSetLimit={c => setLimit(c)}
-      onClearLimit={() => { void clearLimit(); }}
+      onLintWarningsChange={enabled => { if (!coolingOff) setLintWarnings(enabled); }}
+      onToggle={next => { if (!coolingOff) void toggle(next); }}
+      onSetLimit={c => { if (!coolingOff) setLimit(c); }}
+      onClearLimit={() => { if (!coolingOff) void clearLimit(); }}
     />
   );
 }

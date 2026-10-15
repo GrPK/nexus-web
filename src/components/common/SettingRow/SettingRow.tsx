@@ -156,6 +156,7 @@ export function SettingToggle({
   ariaLabel,
   stackOnNarrow,
   mixed,
+  labelSuffix,
 }: {
   label: string;
   description?: ReactNode;
@@ -169,10 +170,12 @@ export function SettingToggle({
   stackOnNarrow?: boolean;
   /** The controlled targets disagree; see Toggle. */
   mixed?: boolean;
+  labelSuffix?: ReactNode;
 }) {
   return (
     <SettingRow
       label={label}
+      labelSuffix={labelSuffix}
       description={description}
       icon={icon}
       iconLeading={iconLeading}

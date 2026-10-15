@@ -5,6 +5,7 @@ import { useTranslation } from '../../../lib/i18n';
 import { Overlay } from '../Overlay/Overlay';
 import { Button } from '../Button/Button';
 import { completeFeaturesOnboarding, completeLightingOnboarding } from '../../../api/onboarding';
+import { savePreferences } from '../../../api/profiles';
 import { useUiSettingsUpdateSafe, type FeatureFlags, type FeatureKey } from '../../../hooks/useUiSettings';
 import styles from './FeaturesOnboardingScreen.module.scss';
 
@@ -66,6 +67,10 @@ export function FeaturesOnboardingScreen({ open, onComplete, onBack, onSkipOnboa
         featureMonitoringEnabled: flags.monitoring,
         featureDiagnosticsEnabled: flags.diagnostics,
       });
+      // updateUiSettings debounces its server write, so completion could land
+      // first and the service would treat Lighting and Cooling as off until
+      // the choice arrives. Send the choice now and wait for it.
+      await savePreferences({ features: flags });
 
       const result = await completeFeaturesOnboarding();
       if (!result?.featuresCompleted) {

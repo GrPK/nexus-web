@@ -15,7 +15,7 @@ import { useBrightnessSchedule } from '../../../hooks/useBrightnessSchedule';
 import { useIdleDim } from '../../../hooks/useIdleDim';
 import { useLightingAudioOutput } from '../../../hooks/useLightingAudioOutput';
 import { useSensors, type HardwareSensor } from '../../../hooks/useSensors';
-import { useUiSettings } from '../../../hooks/useUiSettings';
+import { useFeatureFlags, useUiSettings } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import {
   defaultCpuTempSensor, defaultGpuTempSensor, listTempSensors,
@@ -40,6 +40,7 @@ interface LightingCoolingSectionProps {
 export function LightingCoolingSection({ serviceOnline, platform }: LightingCoolingSectionProps) {
   const { t } = useTranslation();
   const { settings, update } = useUiSettings();
+  const features = useFeatureFlags();
   const sensors = useSensors(serviceOnline);
   const gpus = sensors.gpuComponents;
 
@@ -163,7 +164,7 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
 
   return (
     <>
-      <SettingsSection title={t('lighting.title')}>
+      <SettingsSection title={t('lighting.title')} disabled={!features.lighting}>
         {showGpuPicker && (
           <SettingSelect
             label={t('lighting.renderGpu.label')}
@@ -229,7 +230,7 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
       {scheduleOpen && (
         <BrightnessScheduleModal open onClose={() => setScheduleOpen(false)} state={brightnessSchedule} />
       )}
-      <SettingsSection title={t('cooling.title')} action={resetAction}>
+      <SettingsSection title={t('cooling.title')} action={resetAction} disabled={!features.cooling}>
         <SensorRow
           icon={<Cpu />}
           label={t('cooling.settings.cpuLabel')}
