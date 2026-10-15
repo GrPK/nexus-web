@@ -179,4 +179,25 @@ describe('FeaturesOnboardingScreen', () => {
       features: { lighting: true, cooling: true, monitoring: false, diagnostics: true },
     }));
   });
+
+  it('on a replay ignores Enter until the preferences are hydrated', () => {
+    Object.assign(current, { hydrated: false });
+    render(<FeaturesOnboardingScreen open fromCurrent onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(document, { key: 'Enter' });
+
+    expect(savePreferences).not.toHaveBeenCalled();
+  });
+
+  it('keeps untouched pillars following the current values after another is toggled', () => {
+    Object.assign(current, { cooling: false });
+    const { rerender } = render(<FeaturesOnboardingScreen open fromCurrent onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: /lighting.title/ }));
+
+    Object.assign(current, { cooling: true });
+    rerender(<FeaturesOnboardingScreen open fromCurrent onComplete={vi.fn()} />);
+
+    expect(screen.getByRole('checkbox', { name: /lighting.title/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('checkbox', { name: /cooling.title/ })).toHaveAttribute('aria-checked', 'true');
+  });
 });

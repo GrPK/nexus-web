@@ -42,8 +42,8 @@ const ALL_ON: FeatureFlags = { lighting: true, cooling: true, monitoring: true, 
  */
 export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack, onSkipOnboarding }: FeaturesOnboardingScreenProps) {
   const { t } = useTranslation();
-  // Set once the user touches a switch; until then the switches follow the base values.
-  const [picked, setPicked] = useState<FeatureFlags | null>(null);
+  // Only the switches the user touched; the rest keep following the base values.
+  const [picked, setPicked] = useState<Partial<FeatureFlags>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
   const updateUiSettings = useUiSettingsUpdateSafe();
@@ -52,12 +52,12 @@ export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack
   // Before the server preferences arrive, current is only the local cache and could save a pillar back on.
   const hydrated = useUiSettingsHydrated();
   const waiting = !!fromCurrent && !hydrated;
-  const flags = picked ?? (fromCurrent ? current : ALL_ON);
+  const flags: FeatureFlags = { ...(fromCurrent ? current : ALL_ON), ...picked };
 
   if (!open) return null;
 
   const togglePillar = (key: FeatureKey) => {
-    setPicked({ ...flags, [key]: !flags[key] });
+    setPicked(prev => ({ ...prev, [key]: !flags[key] }));
   };
 
   const handleContinue = async () => {
@@ -161,9 +161,8 @@ export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack
           tone="accent"
           size="lg"
           onClick={handleContinue}
-          loading={submitting}
+          loading={submitting || waiting}
           loadingHidesLabel
-          disabled={waiting}
           className={styles.continueButton}
         >
           {t('featuresOnboarding.continue')}

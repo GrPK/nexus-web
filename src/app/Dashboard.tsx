@@ -1117,7 +1117,7 @@ export function Dashboard() {
         {/* Feature-pillars gate: lets the user turn off whole functional
             areas up front. Back only steps into first-run onboarding while
             that sequence is still running. */}
-        <LightingFeatureSeed active={featuresStatus === 'completed'} onLightingOff={markLightingFeatureOff} />
+        <LightingFeatureSeed active={featuresStatus === 'completed'} lightingPending={lightingStatus === 'pending'} onLightingOff={markLightingFeatureOff} />
         <FeaturesOnboardingScreen
           open={featuresOpen}
           fromCurrent={featuresReplay}
