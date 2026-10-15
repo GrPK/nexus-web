@@ -71,10 +71,27 @@ export function segmentCellFor(x: number, y: number): { col: number; row: number
   return { col, row };
 }
 
+/**
+ * The cell a press lands in. The grid is painted as even rows and columns, so a
+ * press resolves by the drawn geometry, never by lightness stop.
+ */
+export function segmentCellAt(x: number, y: number): { col: number; row: number } {
+  return {
+    col: Math.min(PICKER_SEGMENT_COLS - 1, Math.floor(clamp01(x) * PICKER_SEGMENT_COLS)),
+    row: Math.min(PICKER_SEGMENT_ROWS - 1, Math.floor(clamp01(y) * PICKER_SEGMENT_ROWS)),
+  };
+}
+
 /** Snaps a point to its cell's swatch, so a segmented press lands on one. */
 export function snapToSegment(x: number, y: number): { x: number; y: number } {
   const { col, row } = segmentCellFor(x, y);
   return { x: (col + 0.5) / PICKER_SEGMENT_COLS, y: 1 - SEGMENT_ROW_L[row] };
+}
+
+/** The swatch drawn under a press at this point of the field. */
+export function segmentHexAt(x: number, y: number): string {
+  const { col, row } = segmentCellAt(x, y);
+  return SEGMENT_SWATCHES[row * PICKER_SEGMENT_COLS + col];
 }
 
 /** Every segmented swatch, row-major. */

@@ -1,6 +1,9 @@
 @use '../../../styles/text' as *;
 @use '../../../styles/onboarding' as *;
 
+// lucide-react does not forward pathLength, so the dash must be sized to the real length.
+$activity-path-length: 50;
+
 // Neutralizes Overlay's dimmed/blurred backdropDialog fill - same treatment
 // as the other full-viewport onboarding screens.
 .backdrop {
@@ -62,11 +65,15 @@
 .pillarGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(240px, 320px));
+  grid-auto-rows: 1fr;
   gap: 1rem;
-  width: min(680px, 100%);
+  width: min(720px, calc(100% + 40px));
   flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
+  // Room inside the scroller for the hover lift, which it would clip; capped by the surface gap so it never overlaps the next row.
+  padding: 4px 20px 12px;
+  margin: -4px -20px -12px;
 }
 
 .pillarCard {
@@ -75,13 +82,14 @@
   flex-direction: column;
   align-items: center;
   gap: 0.6rem;
-  padding: 1.5rem 1.25rem;
+  padding: 1.75rem 1.5rem 1.5rem;
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
   text-align: center;
   cursor: pointer;
+  transition: border-color var(--ease), transform var(--ease), box-shadow var(--ease);
 
   &:hover { border-color: var(--border-strong); }
 }
@@ -110,8 +118,112 @@
 }
 
 .pillarIcon {
+  position: relative;
   display: flex;
+  margin: 0.25rem 0;
   color: var(--accent);
+  transition: color var(--ease), opacity var(--ease);
+
+  svg { overflow: visible; }
+}
+
+.pillarCard:not(.pillarCardOn) .pillarIcon {
+  color: var(--text-dim);
+  opacity: 0.55;
+}
+
+.rays {
+  position: absolute;
+  top: 0;
+  left: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--ease);
+}
+
+.icon_cooling svg { transform-origin: 50% 50%; }
+.icon_diagnostics svg { transform-origin: 30% 5%; }
+.icon_diagnostics circle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (hover: hover) {
+  // :where(:hover) opts out of the app's click-clears-hover guard, so a card switched on under the pointer lifts at once.
+  .pillarCard.pillarCardOn:not(:disabled):where(:hover) {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px -10px var(--accent-glow-shadow);
+
+    .icon_lighting > svg:first-child { animation: bulbGlow calc(var(--ease-slow) * 5) ease-in-out infinite; }
+    .icon_lighting .rays { animation: rays calc(var(--ease-slow) * 5) ease-in-out infinite; }
+    // Quadratic ease-in ends at twice its average speed, which equals the cruise speed here, so the hand-off has no speed jump.
+    .icon_cooling svg {
+      animation:
+        fanSpinUp calc(var(--ease-slow) * 2) cubic-bezier(0.333, 0, 0.667, 0.333),
+        fanCruise calc(var(--ease-slow) * 4) linear calc(var(--ease-slow) * 2) infinite;
+    }
+    .icon_monitoring path {
+      stroke-dasharray: $activity-path-length;
+      animation: trace calc(var(--ease-slow) * 4) ease-in-out infinite;
+    }
+    .icon_diagnostics svg { animation: swing calc(var(--ease-slow) * 4) ease-in-out infinite; }
+    .icon_diagnostics circle { animation: beat calc(var(--ease-slow) * 2) ease-in-out infinite; }
+  }
+}
+
+@keyframes bulbGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 0 transparent);
+    color: var(--accent);
+  }
+  50% {
+    filter: drop-shadow(0 0 10px var(--warn));
+    color: var(--warn);
+  }
+}
+
+@keyframes rays {
+  0%, 100% { opacity: 0.2; color: var(--accent); }
+  50% { opacity: 1; color: var(--warn); }
+}
+
+@keyframes fanSpinUp {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(90deg); }
+}
+
+@keyframes fanCruise {
+  from { transform: rotate(90deg); }
+  to { transform: rotate(450deg); }
+}
+
+@keyframes trace {
+  0% { stroke-dashoffset: $activity-path-length; }
+  60%, 100% { stroke-dashoffset: 0; }
+}
+
+@keyframes swing {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+
+@keyframes beat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pillarCard,
+  .pillarCard * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .pillarCard.pillarCardOn:not(:disabled):where(:hover) { transform: none; }
 }
 
 .pillarTitle {
@@ -121,6 +233,8 @@
 
 .pillarDescription {
   font-size: var(--type-small);
+  line-height: var(--leading-tight);
+  min-height: calc(var(--leading-tight) * 2em);
   color: var(--text-dim);
 }
 
