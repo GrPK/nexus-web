@@ -29,12 +29,17 @@ export function launchPathLabel(path: string): string {
   return stem || name;
 }
 
-/** What the service will actually launch: a drive-letter path (no UNC share),
- *  an http, https or steam URI, or, on a Mac, an absolute POSIX path. Anything
- *  else looksLikeLaunchPath accepts would save but silently never run. */
+/** What the service will actually launch: on Windows a drive-letter path (no UNC
+ *  share), on a Mac an absolute POSIX path (drive paths are refused there), and
+ *  on both an http, https or steam URI. A path with text after its executable
+ *  extension is rejected, since the service launches a file and passes no
+ *  arguments. Anything else looksLikeLaunchPath accepts would save but silently
+ *  never run. */
 export function isLaunchablePath(text: string, posix: boolean = isMacAppShell()): boolean {
-  const s = text.trim();
-  return /^[a-zA-Z]:[\\/]/.test(s) || /^(https?|steam):\/\/\S/i.test(s) || (posix && /^\/[^/\s]/.test(s));
+  const s = normalizeLaunchPath(text);
+  if (/^(https?|steam):\/\/\S/i.test(s)) return true;
+  if (posix) return /^\/[^/\s]/.test(s) && !/\.app\s+\S/i.test(s);
+  return /^[a-zA-Z]:[\\/]/.test(s) && !/\.(exe|lnk|bat|cmd|com|url|appref-ms)\s+\S/i.test(s);
 }
 
 /** Shape of an id the service launches directly (URI, path separator, drive

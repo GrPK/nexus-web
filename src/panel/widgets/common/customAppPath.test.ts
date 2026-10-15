@@ -34,9 +34,15 @@ describe('launchPathLabel', () => {
 describe('isLaunchablePath', () => {
   it.each(['C:\\Games\\a.exe', 'D:/x.lnk', 'https://example.com', 'steam://rungameid/1'])('accepts %s', t => expect(isLaunchablePath(t)).toBe(true));
   it.each(['\\\\host\\share\\a.exe', 'ftp://x/y', 'file:///C:/a.exe', 'javascript://x', '/usr/bin/x', '~/x'])('rejects %s', t => expect(isLaunchablePath(t)).toBe(false));
+  it.each(['C:\\Program Files\\App\\app.exe', '"C:\\Program Files\\App\\app.exe"', 'C:\\Games\\Once Human\\launcher.exe'])('accepts spaces and quotes in %s', t => expect(isLaunchablePath(t)).toBe(true));
+  it.each(['C:\\Games\\game.exe -windowed', 'C:\\Games\\a.lnk /x', 'D:/x/y.BAT arg'])('rejects arguments in %s', t => expect(isLaunchablePath(t)).toBe(false));
 });
 
 describe('isLaunchablePath on a Mac', () => {
   it.each(['/Applications/Foo.app', '/usr/local/bin/tool'])('accepts %s', t => expect(isLaunchablePath(t, true)).toBe(true));
-  it.each(['/', '//host/x', '~/x', 'Foo.app'])('rejects %s', t => expect(isLaunchablePath(t, true)).toBe(false));
+  it.each(['/', '//host/x', '~/x', 'Foo.app', 'C:\\Games\\a.exe', 'D:/x.lnk', '/Applications/Foo.app --flag'])('rejects %s', t => expect(isLaunchablePath(t, true)).toBe(false));
+  it('accepts a spaced app name and URIs', () => {
+    expect(isLaunchablePath('/Applications/Google Chrome.app', true)).toBe(true);
+    expect(isLaunchablePath('https://example.com', true)).toBe(true);
+  });
 });
