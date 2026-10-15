@@ -152,7 +152,6 @@ describe('WeatherWidget', () => {
     it('positions from the Celsius reading in a Celsius widget', async () => {
       const { container } = render(<WeatherWidget widget={weatherWidget('4x4', { unit: 'C' })} />);
       await screen.findByText('Today');
-      // Week 14..24 C, current 22 C.
       expect(parseFloat(dots(container)[0].style.left)).toBeCloseTo(80, 5);
     });
   });
