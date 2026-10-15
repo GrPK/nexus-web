@@ -2778,15 +2778,6 @@ function SettingsPanel({
             />
           )}
 
-          {keepCursorOff !== undefined && (
-            <SettingToggle
-              label={t('devices.y70.keepCursorOff')}
-              description={t('devices.y70.keepCursorOffHint')}
-              checked={keepCursorOff}
-              onChange={onKeepCursorOffToggle}
-            />
-          )}
-
           <SettingRow
             label={t('devices.y70.touchRepair')}
             description={t('devices.y70.touchRepairHint')}
@@ -2837,6 +2828,15 @@ function SettingsPanel({
             checked={reserveMonitor}
             onChange={onReserveMonitorToggle}
           />
+
+          {keepCursorOff !== undefined && (
+            <SettingToggle
+              label={t('devices.y70.keepCursorOff')}
+              description={t('devices.y70.keepCursorOffHint')}
+              checked={keepCursorOff}
+              onChange={onKeepCursorOffToggle}
+            />
+          )}
         </SettingsSection>
       )}
 
