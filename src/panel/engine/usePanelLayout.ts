@@ -36,6 +36,7 @@ const SIZE_AREA: Record<PanelWidgetSize, number> = {
   '1x1': 1,
   '2x2': 4,
   '2x4': 8,
+  '4x1': 4,
   '4x2': 8,
   '4x4': 16,
   // Same cell footprint as 2x2; only the mask differs.
@@ -53,8 +54,8 @@ function nearestAllowedSize(
   if (allowed.includes(requested)) return requested;
   if (allowed.length === 0) return fallback;
   const target = SIZE_AREA[requested];
-  // A 4-wide widget (4x2 or 4x4) becomes a square tile, never the tall 2x4 strip.
-  const squares = requested === '4x2' || requested === '4x4' ? allowed.filter(s => s !== '2x4') : allowed;
+  // A 4-wide widget (4x1, 4x2 or 4x4) becomes a square tile, never the tall 2x4 strip.
+  const squares = requested === '4x1' || requested === '4x2' || requested === '4x4' ? allowed.filter(s => s !== '2x4') : allowed;
   return (squares.length > 0 ? squares : allowed).slice().sort((a, b) => {
     const da = Math.abs(SIZE_AREA[a] - target);
     const db = Math.abs(SIZE_AREA[b] - target);

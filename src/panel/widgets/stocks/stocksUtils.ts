@@ -93,6 +93,7 @@ const LIST_LAYOUT: Record<PanelWidgetSize, StockListLayout> = {
   '1x1': { columns: 1, rows: 3 },
   '2x2': { columns: 1, rows: 3 },
   '2x4': { columns: 1, rows: 6 },
+  '4x1': { columns: 2, rows: 1 },
   '4x2': { columns: 2, rows: 3 },
   '4x4': { columns: 2, rows: 4 },
   // Corners are clipped away, so the round tile fits fewer rows than a square 2x2.
@@ -103,6 +104,7 @@ const GRAPH_ROWS: Record<PanelWidgetSize, number> = {
   '1x1': 2,
   '2x2': 2,
   '2x4': 6,
+  '4x1': 1,
   '4x2': 3,
   '4x4': 6,
   '2x2round': 2,
