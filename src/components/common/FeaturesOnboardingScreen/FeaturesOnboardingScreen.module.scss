@@ -160,10 +160,11 @@ $activity-path-length: 50;
 
     .icon_lighting > svg:first-child { animation: bulbGlow calc(var(--ease-slow) * 5) ease-in-out infinite; }
     .icon_lighting .rays { animation: rays calc(var(--ease-slow) * 5) ease-in-out infinite; }
-    // Same coast-to-stop turn as the Cooling widget's preset spin, looped.
+    // Quadratic ease-in ends at twice its average speed, which equals the cruise speed here, so the hand-off has no speed jump.
     .icon_cooling svg {
-      --spin-duration: 1s;
-      animation: fanSpin var(--spin-duration) cubic-bezier(0.25, 1, 0.5, 1) infinite;
+      animation:
+        fanSpinUp calc(var(--ease-slow) * 2) cubic-bezier(0.333, 0, 0.667, 0.333),
+        fanCruise calc(var(--ease-slow) * 4) linear calc(var(--ease-slow) * 2) infinite;
     }
     .icon_monitoring path {
       stroke-dasharray: $activity-path-length;
@@ -190,8 +191,14 @@ $activity-path-length: 50;
   50% { opacity: 1; color: var(--warn); }
 }
 
-@keyframes fanSpin {
-  to { transform: rotate(360deg); }
+@keyframes fanSpinUp {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(90deg); }
+}
+
+@keyframes fanCruise {
+  from { transform: rotate(90deg); }
+  to { transform: rotate(450deg); }
 }
 
 @keyframes trace {
