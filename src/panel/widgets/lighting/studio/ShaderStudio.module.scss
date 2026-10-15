@@ -44,7 +44,6 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
 }
 
 .previewFrame {
@@ -67,11 +66,6 @@
   left: var(--space-sm);
   right: var(--space-sm);
   bottom: var(--space-sm);
-}
-
-.fill {
-  flex: 1;
-  min-height: 0;
 }
 
 // The box holds a full-bleed preview or tile grid, so it drops the settings box's padding and fill.
@@ -120,7 +114,6 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
   overflow-y: auto;
   padding-right: var(--space-xs);
 }

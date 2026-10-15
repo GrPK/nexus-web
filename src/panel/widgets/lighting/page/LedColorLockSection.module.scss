@@ -1,7 +1,3 @@
-.section {
-  margin-top: var(--space-lg);
-}
-
 // The editor modal is itself --surface, so the box needs its own edge.
 // Scoped under .section to outrank SettingsSection's own .box.
 .section .box {

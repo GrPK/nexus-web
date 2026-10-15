@@ -1,10 +1,8 @@
 .root {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 
-  // headerRail in custom mode renders no child; an empty box would still take
-  // a gap in the host's column.
+  // headerRail in custom mode renders no child; keep the empty root out of the column.
   &:empty {
     display: none;
   }

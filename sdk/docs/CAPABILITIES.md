@@ -756,8 +756,13 @@ Uppercase section header for grouping a page. Host renders `src/components/commo
 | `title` | `string` |
 | `grow` | `boolean` |
 
-`grow` fills the parent's main axis and stretches the box with it, so Sections
-side by side in an `align="stretch"` row share the taller one's height.
+Every Section carries the standard gap below it, so a `Stack` with its own
+`gap` between Sections adds a second gap: leave the Stack gap off between
+Sections and keep it only between a Section and non-Section content. `grow`
+fills the parent's main axis, stretches the box with it, and drops the gap below
+the Section so it ends flush with its parent; grow Sections side by side in an
+`align="stretch"` row share the taller one's height. A non-grow Section as the
+last child leaves the standard gap under it.
 
 ### Data visualization
 

@@ -3,7 +3,6 @@ import { ArrowDown, ArrowUp, Plus, Trash2, X } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { Button } from '../../../components/common/Button/Button';
 import { CollapsibleSection } from '../../../components/common/CollapsibleSection/CollapsibleSection';
-import { EmptyState } from '../../../components/common/EmptyState/EmptyState';
 import { Select } from '../../../components/common/Select/Select';
 import { Slider } from '../../../components/common/Slider/Slider';
 import { useTranslation } from '../../../lib/i18n';
@@ -305,7 +304,7 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
 
   if (part === 'picker') {
     return (
-      <SettingsSection title={t('panel.settings.deck.actionType')} action={pickerHeaderAction} className={keyStyles.pickerFill} boxClassName={keyStyles.pickerFillBox}>
+      <SettingsSection title={t('panel.settings.deck.actionType')} action={pickerHeaderAction} fill flush boxClassName={keyStyles.pickerFillBox}>
         <div className={keyStyles.categoryList}>
           {DIAL_PICKER_CATEGORIES.map(cat => (
             <CollapsibleSection key={cat.key} title={t(cat.labelKey)} open={openKeys.has(cat.key)} onToggle={() => toggleOpen(cat.key)} compact>
@@ -327,7 +326,10 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
   }
 
   const stackSection: ReactNode = (
-    <SettingsSection title={t('panel.settings.deck.dial.stack.title')}>
+    <SettingsSection
+      title={t('panel.settings.deck.dial.stack.title')}
+      footnote={entry.action ? undefined : t('panel.settings.deck.dial.emptyHint')}
+    >
       {stacked ? (
         <div className={styles.stackList}>
           {dial.stack!.map((e, i) => (
@@ -364,14 +366,12 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
     <div className={keyStyles.root}>
       {stackSection}
 
-      {action ? (
+      {action && (
         <SettingsSection title={t(`panel.settings.deck.dial.action.${action.type}`)}>
           <div className={keyStyles.fieldStack}>
             <DialActionFields action={action} onChange={a => writeEntry({ ...entry, action: a })} target={target} surface={surface} desktopEditor={desktopEditor} inherited={inherited} />
           </div>
         </SettingsSection>
-      ) : (
-        <EmptyState compact title={t('panel.settings.deck.dial.emptyHint')} />
       )}
 
       <SettingsSection title={t('panel.settings.icon')}>

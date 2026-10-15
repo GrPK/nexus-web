@@ -10,7 +10,6 @@
 
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
 // The device page's split layout (part='picker'): the Action section fills its
@@ -21,8 +20,6 @@
 }
 
 .pickerFillBox {
-  flex: 1;
-  min-height: 0;
   overflow-y: auto;
 }
 

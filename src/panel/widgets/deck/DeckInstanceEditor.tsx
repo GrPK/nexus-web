@@ -12,6 +12,7 @@ import { StarterPresetsModal } from '../../../components/views/DevicePage/Starte
 import type { UseDeckInstanceResult } from './useDeckInstance';
 import type { DeckInstanceMode } from '../../../api/deck';
 import type { PanelSurface } from '../../types';
+import { SettingsBlock } from '../../../components/common/SettingsSection/SettingsSection';
 import styles from './DeckInstanceEditor.module.scss';
 
 export interface DeckInstanceEditorProps {
@@ -105,7 +106,7 @@ export function DeckInstanceEditor({
   return (
     <div className={styles.root}>
       {bodyMode === 'full' && (
-        <DeckPresetToolbar
+        <SettingsBlock><DeckPresetToolbar
           deck={deck}
           desktopActions={desktopActions}
           activatePreset={activatePreset}
@@ -119,7 +120,7 @@ export function DeckInstanceEditor({
           onReset={deck.reset}
           onImport={desktopActions ? () => setImportOpen(true) : undefined}
           onImportStarters={desktopActions ? () => setStartersOpen(true) : undefined}
-        />
+        /></SettingsBlock>
       )}
       {bodyMode === 'full' && desktopActions && (
         <>
@@ -142,7 +143,7 @@ export function DeckInstanceEditor({
       )}
 
       {mode === 'recentApps' && <DeckRecentAppsSection showPreviewNote={bodyMode === 'full'} desktopActions={desktopActions} />}
-      {mode !== 'recentApps' && fitNote && <p className={styles.fitNote}>{fitNote}</p>}
+      {mode !== 'recentApps' && fitNote && <SettingsBlock><p className={styles.fitNote}>{fitNote}</p></SettingsBlock>}
 
       {bodyMode === 'full' && mode !== 'recentApps' && (
         deck.target ? (
@@ -158,15 +159,15 @@ export function DeckInstanceEditor({
             desktopEditor={desktopEditor}
           />
         ) : deck.error ? (
-          <Notice
+          <SettingsBlock><Notice
             tone="critical"
             role="alert"
             actions={<Button type="button" size="sm" tone="neutral" onClick={deck.retry}>{t('panel.settings.deck.rail.retry')}</Button>}
           >
             {t('panel.settings.deck.rail.loadFailed')}
-          </Notice>
+          </Notice></SettingsBlock>
         ) : (
-          <div className={styles.loading}>{t('panel.settings.deck.rail.loadingConfig')}</div>
+          <SettingsBlock><div className={styles.loading}>{t('panel.settings.deck.rail.loadingConfig')}</div></SettingsBlock>
         )
       )}
     </div>

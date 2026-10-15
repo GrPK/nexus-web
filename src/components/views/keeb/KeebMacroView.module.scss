@@ -83,11 +83,6 @@
 // The recorded press/release stream, rendered as standard setting rows inside
 // a surface box (SettingsSection). Fills the editor's remaining height and
 // scrolls internally.
-.recordSection {
-  flex: 1;
-  min-height: 0;
-}
-
 .recordBox {
   flex: 1;
   min-height: 0;

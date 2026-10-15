@@ -38,6 +38,7 @@ import {
   SAME_POSITION_EPSILON, type BaselineEntry, type EditorHistory, type EditorLed, type EditorSnapshot, type ReceivedLed, type StagedPartition,
 } from './zoneUtils';
 import { shouldConsumeEditorEscape } from './ledMapEscape';
+import { SettingsBlock } from '../../../../components/common/SettingsSection/SettingsSection';
 import styles from './LedMapEditor.module.scss';
 
 const isMac = isApplePlatform();
@@ -2163,7 +2164,7 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
           {/* The zone list is also the port's wiring: on a chainable port each
               row picks what sits at that position, so there is no separate
               assign row or LED count field. */}
-          <ZoneChainList
+          <SettingsBlock><ZoneChainList
             rows={chainRows}
             chainable={chainable}
             selectedZoneId={selectedZoneId}
@@ -2255,7 +2256,7 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
                 )}
               </>
             ) : undefined}
-          />
+          /></SettingsBlock>
           {!mappingUnavailable && (
             <LedColorLockSection
               selectedCount={selected.size}

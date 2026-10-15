@@ -18,7 +18,7 @@
   display: grid;
   // Titled surface boxes, two-up on a wide window and one-up when narrow.
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: var(--space-md);
+  column-gap: var(--space-md);
   align-items: start;
 }
 

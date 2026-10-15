@@ -9,12 +9,19 @@ import styles from './SettingsSection.module.scss';
  * device modal) so they read identically. Replaces the older
  * SectionHeader-with-underline-inside-a-card look.
  *
+ * Each section owns the gap below it, so stacks need no gap or margin of their own
+ * between sections; a non-section child of a stack is wrapped in SettingsBlock.
+ *
  * Renders correctly both in the dashboard and inside `.panel-root` (kiosk):
  * SectionHeader uses `--text-dim` and the box surface uses `--surface`.
  */
 export function SettingsSection({
   title,
   description,
+  footer,
+  footnote,
+  fill,
+  flush,
   titleStyle,
   action,
   children,
@@ -28,6 +35,14 @@ export function SettingsSection({
   // column, so each child becomes its own stacked line - a sentence with inline
   // markup must be wrapped in a single element or it breaks apart mid-sentence.
   description?: ReactNode;
+  // Controls bound to the box (a pager strip under a preview), directly under it.
+  footer?: ReactNode;
+  // Short text under the box.
+  footnote?: ReactNode;
+  // Grow to fill the parent column and end flush with its bottom.
+  fill?: boolean;
+  // Drop the gap below, for a section that ends its column or row.
+  flush?: boolean;
   // Per-section title colour override (e.g. the danger zone red).
   titleStyle?: CSSProperties;
   // Optional trailing control next to the title (e.g. a section-wide "Sync
@@ -40,7 +55,7 @@ export function SettingsSection({
 }) {
   const hasHeader = title !== undefined || description !== undefined || action !== undefined;
   return (
-    <section className={className ? `${styles.section} ${className}` : styles.section} aria-label={ariaLabel}>
+    <section className={[styles.section, fill ? styles.fill : '', flush ? styles.flush : '', className ?? ''].filter(Boolean).join(' ')} aria-label={ariaLabel}>
       {hasHeader && (
         <div className={styles.header}>
           <div className={styles.titleRow}>
@@ -53,6 +68,13 @@ export function SettingsSection({
       <div className={boxClassName ? `${styles.box} ${boxClassName}` : styles.box}>
         {children}
       </div>
+      {footer ? <div className={styles.footer}>{footer}</div> : null}
+      {footnote ? <div className={styles.footnote}>{footnote}</div> : null}
     </section>
   );
+}
+
+/** A non-section child of a section stack (a notice, a card) carrying the same gap below. */
+export function SettingsBlock({ children }: { children: ReactNode }) {
+  return <div className={styles.block}>{children}</div>;
 }

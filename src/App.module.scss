@@ -437,7 +437,6 @@
 .phonePairCol {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
   min-width: 0;
 }
 
@@ -598,31 +597,14 @@
 }
 
 .phonePairQrPanel,
-.phonePairSessionsPanel {
-  min-width: 0;
-}
-
-// Header-above-box wrapper for the authorized-devices list, mirroring the
-// SettingsSection layout used by the Connection options group.
+.phonePairSessionsPanel,
 .phonePairSessions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
   min-width: 0;
 }
 
 .phonePairQrPanel {
   display: flex;
   flex-direction: column;
-}
-
-.phonePairSessionsHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  // Align with the box content edge (matches SettingsSection's header inset).
-  padding: 0 1.1rem;
 }
 
 .phonePairQrBox {
@@ -814,21 +796,6 @@
   @extend %phonePairCodeBtn;
   background: var(--surface-raised, var(--surface));
   color: var(--text);
-}
-
-.phonePairSessionsHeader {
-  h3 {
-    @include text-body;
-    margin: 0;
-    color: var(--text-dim);
-  }
-
-  span {
-    @include text-button;
-    display: block;
-    margin-top: 0.2rem;
-    color: var(--text-dim);
-  }
 }
 
 .phonePairEmpty {
