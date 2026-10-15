@@ -562,6 +562,9 @@ interface UiSettingsProviderProps {
   manageDom?: boolean;
 }
 
+// Local read; this only bounds a service that never answers.
+const PREFERENCES_READ_TIMEOUT_MS = 8000;
+
 export function UiSettingsProvider({
   children, serviceOnline, activeProfileId, manageDom = true,
 }: UiSettingsProviderProps) {
@@ -665,7 +668,10 @@ export function UiSettingsProvider({
     // still pending; that write's echo reloads once it flushes, when the
     // server is consistent. (Mount / profile-switch reloads pass false.)
     if (coalesceWithPendingWrite && writeTimer.current) return;
-    fetchPreferences().then(prefs => {
+    // Network I/O bound by AbortSignal (as for the Nexus 2 preview): a request the service accepted and never answers counts as a failed read.
+    const abort = new AbortController();
+    const bound = setTimeout(() => abort.abort(), PREFERENCES_READ_TIMEOUT_MS);
+    fetchPreferences(abort.signal).finally(() => clearTimeout(bound)).then(prefs => {
       if (!prefs) { setHydrationFailed(true); return; }
       setSettings(prev => {
         const next = { ...applyServerToLocal(prefs, prev), ...pendingLocalRef.current };

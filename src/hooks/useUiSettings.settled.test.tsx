@@ -47,4 +47,19 @@ describe('settings provider settled semantics', () => {
     await act(async () => { mount(true); });
     expect(seen).toEqual({ settled: true, hydrated: false });
   });
+
+  it('counts a read the service never answers as failed once the bound aborts it', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(fetchPreferences).mockImplementation(((signal?: AbortSignal) => new Promise((_, reject) => {
+        signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      })) as never);
+      await act(async () => { mount(true); });
+      expect(seen.settled).toBe(false);
+      await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
+      expect(seen).toEqual({ settled: true, hydrated: false });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -568,8 +568,8 @@ export async function authFetchWithStatus(path: string, opts: RequestOptions = {
   }
 }
 
-export async function fetchService<T>(path: string): Promise<T | null> {
-  const r = await authFetch(path, { cache: 'no-store' });
+export async function fetchService<T>(path: string, signal?: AbortSignal): Promise<T | null> {
+  const r = await authFetch(path, { cache: 'no-store', signal });
   return r ? (await r.json()) as T : null;
 }
 

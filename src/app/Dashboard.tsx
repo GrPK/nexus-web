@@ -62,6 +62,7 @@ import { LightingFeatureSeed } from './LightingFeatureSeed';
 import { PillarsReporter } from './PillarsReporter';
 import { importStepOffered } from './importStep';
 import { usePillarsLatch } from './usePillarsLatch';
+import { deriveOnboardingGates } from './onboardingGates';
 import { useConsumeSkippedOffers } from './useConsumeSkippedOffers';
 import { useNexus2NonCoolingContent } from './useNexus2NonCoolingContent';
 import { useTranslation } from '../lib/i18n';
@@ -445,10 +446,6 @@ export function Dashboard() {
   const fanControlOffered = fanControl.status === 'pending' && coolingOn;
   // FanControl is a cooling import, so with Cooling off it is not offered here (the Cooling page still has it).
   const importOffered = importStepOffered(nexus2.status === 'pending', nexus2NonCooling !== false, fanControl.status === 'pending', coolingOn);
-  const importOpen = pillarsReady && !importUndecided && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
-    && fanControl.status !== 'unknown'
-    && (onboardingStatus === 'completed' || onboardingDismissed)
-    && !welcomeOpen && !featuresOpen && importOffered && !importDismissed;
   // Third gate: conflicting apps, before device selection - they hold the
   // hardware that gate enumerates, and this is where they get ended. Opens
   // only when the sequence actually ran (a returning user with nothing
@@ -469,19 +466,6 @@ export function Dashboard() {
   // Live from the moment the gates before it close until the step is spent
   // or completed; the gates behind it (and the dashboard) wait on it, so the
   // snapshot read cannot flash them open before the decision.
-  const conflictStepPending = pillarsReady && !importUndecided && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
-    && fanControl.status !== 'unknown'
-    && ranEarlierGate && !welcomeOpen && !featuresOpen && !importOpen && !conflictStepDone;
-  // Last gate: device selection, against the fullest device list. Waits on
-  // nexus2.status resolving so it cannot flash open before the heavier
-  // Nexus 2 detection read decides whether the import gate comes first.
-  // Skipped entirely when the features gate already turned Lighting off.
-  const lightingOnboardingOpen = pillarsReady && !importUndecided && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
-    && fanControl.status !== 'unknown'
-    && !welcomeOpen && !importOpen && !featuresOpen && !conflictStepPending && !lightingFeatureOff
-    && lightingStatus === 'pending' && !lightingOnboardingDismissed;
-
-
   // Skips every remaining step at once. Marks the same server flags the
   // screens themselves would, so a reload does not reopen them. Leaves all
   // four feature switches enabled - skip means "stop asking", not "turn
@@ -519,9 +503,24 @@ export function Dashboard() {
   // from a local flag, but the service's Nexus 2 detection ladder is a
   // heavier read - without this the dashboard would flash before
   // Nexus2WelcomeScreen pops in on top of it.
-  const showDashboard = pillarsReady && !importUndecided && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
-    && fanControl.status !== 'unknown'
-    && !welcomeOpen && !featuresOpen && !lightingOnboardingOpen && !importOpen && !conflictStepPending;
+  const { importOpen, conflictStepPending, lightingOnboardingOpen, showDashboard } = deriveOnboardingGates({
+    stickyReady: pillarsReady,
+    liveReady: pillars !== null || serviceDown,
+    importUndecided,
+    statusKnown: onboardingStatus !== 'unknown',
+    nexus2Known: nexus2.status !== 'unknown',
+    fanControlKnown: fanControl.status !== 'unknown',
+    welcomeOpen,
+    featuresOpen,
+    welcomeDone: onboardingStatus === 'completed' || onboardingDismissed,
+    importOffered,
+    importDismissed,
+    ranEarlierGate,
+    conflictStepDone,
+    lightingFeatureOff,
+    lightingPending: lightingStatus === 'pending',
+    lightingDismissed: lightingOnboardingDismissed,
+  });
   // An import offer skipped because its pillar is off is consumed when the whole
   // onboarding run is over, so it is never asked again (the Cooling page and
   // the Settings Nexus 2 entry import it on demand).
