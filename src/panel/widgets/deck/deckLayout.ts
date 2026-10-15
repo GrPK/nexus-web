@@ -8,6 +8,7 @@ export interface InnerGrid { cols: number; rows: number; count: number; }
 export function innerGridForSize(size: PanelWidgetSize | string): InnerGrid {
   switch (size) {
     case '4x4': return { cols: 4, rows: 4, count: 16 };
+    case '4x1': return { cols: 4, rows: 1, count: 4 };
     case '4x2': return { cols: 4, rows: 2, count: 8 };
     case '2x4': return { cols: 2, rows: 4, count: 8 };
     case '2x2':

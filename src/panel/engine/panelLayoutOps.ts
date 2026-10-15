@@ -1,6 +1,6 @@
 import type { PanelLayout, PanelPage, PanelWidget, PanelWidgetSize } from '../types';
 import { firstFreeRect, rectsOverlap, type PaginateCapacity } from './paginate';
-import { sizeToSpan, strideScanSteps } from './grid';
+import { sizeToSpan, snapStride, strideScanSteps } from './grid';
 import { createUuid } from '../../lib/uuid';
 
 interface WidgetRect { col: number; row: number; colSpan: number; rowSpan: number; }
@@ -537,8 +537,12 @@ export function tryResizeWidget(
   // Hard refusal: the size itself doesn't fit on any page.
   if (newRowSpan > rows) return null;
   // Slide left / up so the resized rect stays in bounds.
-  const placedCol = Math.max(0, Math.min(source.col, cols - newColSpan));
-  const placedRow = Math.max(0, Math.min(source.row, rows - newRowSpan));
+  // The 4x1 is the only multi-cell size with a single-row stride; growing it
+  // returns the widget to the coarser grid the larger size snaps to.
+  const fromRowStrip = source.size === '4x1';
+  const snapDown = (value: number, span: number) => fromRowStrip ? value - (value % snapStride(span)) : value;
+  const placedCol = Math.max(0, Math.min(snapDown(source.col, newColSpan), cols - newColSpan));
+  const placedRow = Math.max(0, Math.min(snapDown(source.row, newRowSpan), rows - newRowSpan));
   const placed: PanelWidget = { ...source, size: newSize, col: placedCol, row: placedRow };
   const placedRect: WidgetRect = { col: placedCol, row: placedRow, colSpan: newColSpan, rowSpan: newRowSpan };
 

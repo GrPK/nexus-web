@@ -8,7 +8,7 @@ export const deckApp: AppManifest = {
     type: 'deck',
     i18nKey: 'panel.widget.deck',
     icon: LayoutGrid,
-    sizes: ['2x2', '4x2', '4x4'],
+    sizes: ['2x2', '4x1', '4x2', '4x4'],
     defaultSize: '4x2',
     supportsImmersive: { portrait: false, landscape: false },
     hasConfig: true,

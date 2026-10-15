@@ -35,6 +35,16 @@ function FourByTwo(props: IconProps) {
   );
 }
 
+function FourByOne(props: IconProps) {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <rect x="2" y="10.5" width="28" height="11" rx="3.5" stroke="currentColor" strokeWidth="2.5"/>
+      <circle cx="9" cy="16" r="2" fill="currentColor"/>
+      <rect x="14" y="14.75" width="10" height="2.5" rx="1.25" fill="currentColor"/>
+    </svg>
+  );
+}
+
 function TwoByFour(props: IconProps) {
   return (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -62,6 +72,7 @@ export const SIZE_ICONS: Record<string, React.FC<IconProps>> = {
   '1x1': OneByOne,
   '2x2': TwoByTwo,
   '2x4': TwoByFour,
+  '4x1': FourByOne,
   '4x2': FourByTwo,
   '4x4': FourByFour,
 };

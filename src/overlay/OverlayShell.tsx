@@ -59,7 +59,7 @@ const WIDGET_INSET_PX = 6;
 const DRAG_THRESHOLD_PX = 5;
 // Drag positioning grid is 4x finer than the widget sizing grid - users
 // can place a widget at quarter-cell increments while widget sizes
-// remain whole-cell (1x1, 2x2, 4x2, 4x4).
+// remain whole-cell.
 const DRAG_STEP = 0.25;
 
 interface MonitorParams {
@@ -84,10 +84,11 @@ function clampCell(value: number, max: number): number {
 }
 
 function widthCells(size: string): number {
-  return size === '4x2' || size === '4x4' ? 4 : size === '1x1' ? 1 : 2;
+  return size === '4x1' || size === '4x2' || size === '4x4' ? 4 : size === '1x1' ? 1 : 2;
 }
 
 function heightCells(size: string): number {
+  if (size === '4x1') return 1;
   return size === '4x4' || size === '2x4' ? 4 : size === '1x1' ? 1 : 2;
 }
 

@@ -3,7 +3,7 @@
 
 // '2x2round' occupies a 2x2 cell block but is masked to a circle. It exists for
 // round glass (the Kraken LCD) and is reserved to those surfaces.
-export const PANEL_WIDGET_SIZES = ['1x1', '2x2', '2x4', '4x2', '4x4', '2x2round'] as const;
+export const PANEL_WIDGET_SIZES = ['1x1', '2x2', '2x4', '4x1', '4x2', '4x4', '2x2round'] as const;
 export type PanelWidgetSize = typeof PANEL_WIDGET_SIZES[number];
 // 'monitor' = a user-promoted OS monitor hosting a fullscreen kiosk
 // (service-stamped surface; see PanelSurfaces.Monitor in nexus-service).
