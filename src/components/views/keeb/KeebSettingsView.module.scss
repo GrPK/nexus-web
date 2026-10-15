@@ -8,7 +8,7 @@
   // Sections size to their own content; differing description wrap must not
   // stretch the sibling boxes.
   align-items: start;
-  gap: var(--space-lg);
+  column-gap: var(--space-lg);
   padding: var(--space-sm);
 }
 

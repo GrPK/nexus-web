@@ -8,12 +8,10 @@
   gap: 0.4rem;
 
   // The gap before whatever follows a section (the next title) is part of the
-  // component, always larger than the title-to-box gap above so a title reads
-  // as heading the box below it, never as a caption of the box above. The last
-  // section adds nothing, so scroll containers get no trailing dead space.
-  &:not(:last-child) {
-    margin-bottom: var(--space-xl);
-  }
+  // component and always applies, so wrappers and fragments cannot defeat it.
+  // It is larger than the title-to-box gap above, so a title reads as heading
+  // the box below it, never as a caption of the box above.
+  margin-bottom: var(--space-xl);
 }
 
 .header {
@@ -50,6 +48,12 @@
   p {
     margin: 0;
   }
+}
+
+// Controls bound to the box sit directly under it, inside the section.
+.actions {
+  display: flex;
+  flex-direction: column;
 }
 
 // Short text under the box. Same indent and type as the header description;

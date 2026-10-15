@@ -20,10 +20,8 @@
   display: flex;
   flex-direction: column;
   // Width + centering come from the parent .tabContent's .pageBody
-  // (global.scss); SettingsSection owns the gap between groups.
-  // Breathing room at the very bottom so the last section isn't flush against
-  // the page edge when scrolled all the way down.
-  padding-bottom: var(--space-xl);
+  // (global.scss); SettingsSection owns the gap between groups, including the
+  // breathing room under the last one.
 }
 
 // ── Telemetry section ────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
 import type { WidgetSettingsProps } from '../types';
-import { SettingsRow, SettingsSelect, SettingsSection, SettingsToggle, SettingsHint } from '../common/SettingsRow/SettingsRow';
+import { SettingsRow, SettingsSelect, SettingsSection, SettingsToggle } from '../common/SettingsRow/SettingsRow';
 import { Button } from '../../../components/common/Button/Button';
 import { useTranslation } from '../../../lib/i18n';
 import { DEFAULT_GALLERY_INTERVAL, galleryWidgetItems, readGalleryMediaFilter, readGalleryPlaylist, useGalleryItems } from './useGallery';
@@ -37,7 +37,17 @@ export function GallerySettings({ widget, onUpdate, onSectionNavigate }: WidgetS
 
   return (
     <div className={styles.settings}>
-      <SettingsSection title={t('gallery.settings.title')}>
+      <SettingsSection
+        title={t('gallery.settings.title')}
+        // Desktop editor: jump straight to the gallery page. On device the nav
+        // callback is absent, so the text explanation stays.
+        actions={onSectionNavigate ? (
+          <Button size="sm" icon={<ImageIcon size={14} />} onClick={() => onSectionNavigate('gallery')}>
+            {t('gallery.manage')}
+          </Button>
+        ) : undefined}
+        footnote={onSectionNavigate ? undefined : t('gallery.settings.manageHint')}
+      >
         {/* Offered only once a playlist exists; until then every widget
             plays the whole library and there is nothing to choose. */}
         {playlists.length > 0 && (
@@ -133,15 +143,6 @@ export function GallerySettings({ widget, onUpdate, onSectionNavigate }: WidgetS
           onChange={v => onUpdate({ fit: v })}
         />
       </SettingsSection>
-      {onSectionNavigate ? (
-        // Desktop editor: jump straight to the gallery page. On device the nav
-        // callback is absent, so the text explanation stays.
-        <Button size="sm" icon={<ImageIcon size={14} />} onClick={() => onSectionNavigate('gallery')}>
-          {t('gallery.manage')}
-        </Button>
-      ) : (
-        <SettingsHint>{t('gallery.settings.manageHint')}</SettingsHint>
-      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import styles from './SettingsSection.module.scss';
 export function SettingsSection({
   title,
   description,
+  actions,
   footnote,
   titleStyle,
   action,
@@ -32,6 +33,10 @@ export function SettingsSection({
   // column, so each child becomes its own stacked line - a sentence with inline
   // markup must be wrapped in a single element or it breaks apart mid-sentence.
   description?: ReactNode;
+  // Optional controls bound to the box (a pager strip under a preview). Rendered
+  // inside the section directly under the box. Controls that stand apart from
+  // the section are plain siblings and sit one section gap below it.
+  actions?: ReactNode;
   // Optional short text under the box. Rendered inside the section so the
   // enforced bottom gap applies after it.
   footnote?: ReactNode;
@@ -60,7 +65,8 @@ export function SettingsSection({
       <div className={boxClassName ? `${styles.box} ${boxClassName}` : styles.box}>
         {children}
       </div>
-      {footnote !== undefined && <div className={styles.footnote}>{footnote}</div>}
+      {actions ? <div className={styles.actions}>{actions}</div> : null}
+      {footnote ? <div className={styles.footnote}>{footnote}</div> : null}
     </section>
   );
 }

@@ -46,11 +46,15 @@ function tsxFiles(dir: string): string[] {
 }
 
 describe('SectionHeader usage', () => {
+  const users = tsxFiles(SRC)
+    .filter((f) => /<SectionHeader\b/.test(readFileSync(f, 'utf8')))
+    .map((f) => relative(SRC, f).split('\\').join('/'));
+
   it('is confined to the allowlisted files', () => {
-    const users = tsxFiles(SRC)
-      .filter((f) => /<SectionHeader\b/.test(readFileSync(f, 'utf8')))
-      .map((f) => relative(SRC, f).split('\\').join('/'));
-    const extra = users.filter((f) => !ALLOWED.has(f));
-    expect(extra).toEqual([]);
+    expect(users.filter((f) => !ALLOWED.has(f))).toEqual([]);
+  });
+
+  it('has no stale allowlist entries', () => {
+    expect([...ALLOWED].filter((f) => !users.includes(f))).toEqual([]);
   });
 });
