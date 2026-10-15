@@ -505,7 +505,7 @@ export function Dashboard() {
   // from a local flag, but the service's Nexus 2 detection ladder is a
   // heavier read - without this the dashboard would flash before
   // Nexus2WelcomeScreen pops in on top of it.
-  const { importOpen, conflictStepPending, lightingOnboardingOpen, showDashboard } = deriveOnboardingGates({
+  const { importOpen, conflictStepPending, lightingOnboardingOpen, showDashboard, gateOpened } = deriveOnboardingGates({
     stickyReady: pillarsReady,
     liveReady: pillars !== null || serviceDown,
     importUndecided,
@@ -523,7 +523,8 @@ export function Dashboard() {
     lightingPending: lightingStatus === 'pending',
     lightingDismissed: lightingOnboardingDismissed,
   });
-  if (welcomeOpen || featuresOpen || importOpen || conflictStepPending || lightingOnboardingOpen) gateEverOpened.current = true;
+  // A late server read must never open a gate over a dashboard that is already showing.
+  if (gateOpened) gateEverOpened.current = true;
   // An import offer skipped because its pillar is off is consumed when the whole
   // onboarding run is over, so it is never asked again (the Cooling page and
   // the Settings Nexus 2 entry import it on demand).

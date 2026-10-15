@@ -38,7 +38,7 @@ describe('deriveOnboardingGates', () => {
 
   it('holds the dashboard and every gate while the Nexus 2 preview decides the import step', () => {
     const g = gates({ importUndecided: true, importOffered: true, lightingPending: true });
-    expect(g).toEqual({ importOpen: false, conflictStepPending: false, lightingOnboardingOpen: false, showDashboard: false });
+    expect(g).toMatchObject({ importOpen: false, conflictStepPending: false, lightingOnboardingOpen: false, showDashboard: false, gateOpened: false });
   });
 
   it('opens the lighting step last, once the import and conflict steps are past', () => {
@@ -66,5 +66,11 @@ describe('deriveOnboardingGates', () => {
   it('waits for the status reads', () => {
     expect(gates({ statusKnown: false }).showDashboard).toBe(false);
     expect(gates({ fanControlKnown: false, importOffered: true }).importOpen).toBe(false);
+  });
+
+  it('reports a gate as opened once the dashboard shows, so the pillar values freeze', () => {
+    expect(gates()).toMatchObject({ showDashboard: true, gateOpened: true });
+    expect(gates({ liveReady: false, stickyReady: false }).gateOpened).toBe(false);
+    expect(gates({ importOffered: true }).gateOpened).toBe(true);
   });
 });

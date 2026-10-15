@@ -580,6 +580,9 @@ export function UiSettingsProvider({
   );
   const [hydrated, setHydrated] = useState(false);
   const [hydrationFailed, setHydrationFailed] = useState(false);
+  // Newest read wins: an older one resolving late must not overwrite newer server values.
+  const readGeneration = useRef(0);
+  const readsInFlight = useRef(0);
   // Failed reads in a row, to space the retries.
   const [failedReads, setFailedReads] = useState(0);
 
@@ -673,10 +676,13 @@ export function UiSettingsProvider({
     // server is consistent. (Mount / profile-switch reloads pass false.)
     if (coalesceWithPendingWrite && writeTimer.current) return;
     // Bounds the local HTTP request with an AbortSignal (network I/O, as for the Nexus 2 preview); a relay-tunneled read ignores the signal and is not covered.
-    const markFailed = () => { setHydrationFailed(true); setFailedReads(n => n + 1); };
+    const mine = ++readGeneration.current;
+    readsInFlight.current += 1;
+    const markFailed = () => { if (mine === readGeneration.current) { setHydrationFailed(true); setFailedReads(n => n + 1); } };
     const abort = new AbortController();
     const bound = setTimeout(() => abort.abort(), PREFERENCES_READ_TIMEOUT_MS);
-    fetchPreferences(abort.signal).finally(() => clearTimeout(bound)).then(prefs => {
+    fetchPreferences(abort.signal).finally(() => { clearTimeout(bound); readsInFlight.current -= 1; }).then(prefs => {
+      if (mine !== readGeneration.current) return;
       if (!prefs) { markFailed(); return; }
       setSettings(prev => {
         const next = { ...applyServerToLocal(prefs, prev), ...pendingLocalRef.current };
@@ -731,7 +737,8 @@ export function UiSettingsProvider({
   useEffect(() => {
     if (!serviceOnline || hydrated || failedReads === 0) return undefined;
     const delay = Math.min(PREFERENCES_RETRY_BASE_MS * 2 ** (failedReads - 1), PREFERENCES_RETRY_MAX_MS);
-    const timer = setTimeout(() => reload(), delay);
+    // A read already running (a reconnect, a topic ping) is the next attempt.
+    const timer = setTimeout(() => { if (readsInFlight.current === 0) reload(); }, delay);
     return () => clearTimeout(timer);
   }, [serviceOnline, hydrated, failedReads, reload]);
 

@@ -26,6 +26,8 @@ export interface OnboardingGates {
   conflictStepPending: boolean;
   lightingOnboardingOpen: boolean;
   showDashboard: boolean;
+  /** Any step or the dashboard is showing: from here the pillar values stay frozen. */
+  gateOpened: boolean;
 }
 
 /**
@@ -45,5 +47,6 @@ export function deriveOnboardingGates(i: OnboardingGateInputs): OnboardingGates 
     && i.lightingPending && !i.lightingDismissed;
   const showDashboard = i.stickyReady && !i.importUndecided && known
     && !i.welcomeOpen && !i.featuresOpen && !lightingOnboardingOpen && !importOpen && !conflictStepPending;
-  return { importOpen, conflictStepPending, lightingOnboardingOpen, showDashboard };
+  const gateOpened = i.welcomeOpen || i.featuresOpen || importOpen || conflictStepPending || lightingOnboardingOpen || showDashboard;
+  return { importOpen, conflictStepPending, lightingOnboardingOpen, showDashboard, gateOpened };
 }
