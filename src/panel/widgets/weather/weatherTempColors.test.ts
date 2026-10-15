@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  ACCENT_MAX_SHIFT_DEG, absoluteColor, accentAt, barGradient, fahrenheitToCelsius, parseHsl,
-} from './weatherTempColors';
+import { absoluteColor, barGradient, fahrenheitToCelsius } from './weatherTempColors';
 
 function hexHue(hex: string) {
   const n = parseInt(hex.slice(1), 16);
@@ -42,54 +40,10 @@ describe('absolute scale', () => {
   });
 });
 
-describe('accent mode', () => {
-  const blue = { h: 217, s: 91, l: 70 };
-
-  it('leaves the accent unshifted at the neutral temperature', () => {
-    expect(hexHue(accentAt(blue, 18))).toBeCloseTo(hexHue(accentAt(blue, 18)), 5);
-    expect(accentAt(blue, 18)).toBe(accentAt({ ...blue }, 18));
-  });
-
-  it('caps the hue shift and never passes the target', () => {
-    const hot = hexHue(accentAt({ h: 25, s: 80, l: 60 }, 40));
-    expect(hot).toBeGreaterThan(20);
-    expect(hot).toBeLessThan(40);
-    const cold = hexHue(accentAt({ h: 215, s: 80, l: 60 }, -20));
-    expect(Math.abs(cold - 230)).toBeLessThan(ACCENT_MAX_SHIFT_DEG);
-  });
-
-  it('shifts a hot blue accent by the shorter way, by at most the cap', () => {
-    const h = hexHue(accentAt(blue, 40));
-    expect(h - hexHue(accentAt(blue, 18))).toBeGreaterThan(20);
-    expect(h - 217).toBeLessThanOrEqual(ACCENT_MAX_SHIFT_DEG + 2);
-  });
-});
-
-describe('accent variants', () => {
-  const blue = { h: 217, s: 91, l: 70 };
-  it('desaturates cold and saturates hot along the ramp', () => {
-    const ramp = { coldC: -6.7, hotC: 35, satCold: 0.1, satHot: 1.15, lightCold: 8, lightHot: -6 };
-    const cold = accentAt(blue, -10, { maxShift: 0, ramp });
-    const hot = accentAt(blue, 40, { maxShift: 0, ramp });
-    expect(cold).not.toBe(hot);
-    expect(hexHue(hot)).toBeCloseTo(hexHue(accentAt(blue, 18, { maxShift: 0, ramp })), 0);
-  });
-});
-
 describe('barGradient', () => {
   it('samples the span with the span end colors', () => {
-    const g = barGradient(10, 25, { mode: 'absolute', accentGlow: null });
+    const g = barGradient(10, 25);
     expect(g).toContain(absoluteColor(10));
     expect(g).toContain(absoluteColor(25));
   });
-
-  it('needs a parseable accent in accent mode', () => {
-    expect(barGradient(10, 25, { mode: 'accent', accentGlow: null })).toBeNull();
-    expect(barGradient(10, 25, { mode: 'accent', accentGlow: 'hsl(217.0, 91.0%, 70.0%)' })).toContain('linear-gradient');
-    expect(parseHsl('hsl(217.0, 91.0%, 70.0%)')).toEqual(blueHsl());
-  });
 });
-
-function blueHsl() {
-  return { h: 217, s: 91, l: 70 };
-}

@@ -101,6 +101,13 @@ describe('WeatherWidget', () => {
     expect(fills[0].style.background).toMatch(/rgb\(\d+, \d+, \d+\)/);
   });
 
+  it('uses the flat accent color for the daily bars when accent bars is on', async () => {
+    const { container } = render(<WeatherWidget widget={weatherWidget('4x4', { accentBars: true })} />);
+    await screen.findByText('Today');
+    expect(container.querySelectorAll('[style*="linear-gradient"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[style*="--panel-accent-glow"]')).toHaveLength(2);
+  });
+
   it('shows only the glyph and temperature on a 1x1', async () => {
     render(<WeatherWidget widget={weatherWidget('1x1')} />);
     expect(await screen.findByText('72°')).toBeInTheDocument();

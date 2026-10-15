@@ -1,19 +1,9 @@
 // Range-bar colors for the weather widget, computed in JS: the Chromium 83
 // floor has no oklch() or color-mix(), so every output is a hex string.
 
-export type WeatherBarColors = 'current' | 'absolute' | 'accent';
-
 type Oklch = [number, number, number];
 
 const GRADIENT_SAMPLES = 12;
-const ACCENT_NEUTRAL_C = 18;
-const ACCENT_COLD_C = -10;
-const ACCENT_HOT_C = 35;
-const ACCENT_COLD_HUE = 230;
-const ACCENT_HOT_HUE = 30;
-export const ACCENT_MAX_SHIFT_DEG = 45;
-const ACCENT_COLD_LIGHTNESS = 4;
-const ACCENT_HOT_LIGHTNESS = -2;
 
 function toLinear(c: number) {
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -105,67 +95,12 @@ export function fahrenheitToCelsius(f: number) {
   return ((f - 32) * 5) / 9;
 }
 
-interface Hsl { h: number; s: number; l: number }
-
-// Parses the hsl(h, s%, l%) the panel's --panel-accent-glow resolves to.
-export function parseHsl(css: string): Hsl | null {
-  const m = /hsla?\(\s*([\d.]+)[ ,]+([\d.]+)%[ ,]+([\d.]+)%/.exec(css);
-  return m ? { h: Number(m[1]), s: Number(m[2]), l: Number(m[3]) } : null;
-}
-
-function hslToHex({ h, s, l }: Hsl): string {
-  const sat = s / 100;
-  const light = l / 100;
-  const k = (n: number) => (n + h / 30) % 12;
-  const a = sat * Math.min(light, 1 - light);
-  const f = (n: number) => light - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-  return `#${[f(0), f(8), f(4)].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('')}`;
-}
-
-export interface AccentParams {
-  maxShift: number;
-  // Saturation and lightness ramp across [coldC, hotC]; absent keeps the hue-only behavior.
-  ramp?: { coldC: number; hotC: number; satCold: number; satHot: number; lightCold: number; lightHot: number };
-}
-
-export const DEFAULT_ACCENT_PARAMS: AccentParams = { maxShift: ACCENT_MAX_SHIFT_DEG };
-
-// Hue moves toward blue when cold and orange when hot by the shorter way
-// round the wheel, and stops at the target.
-export function accentAt(base: Hsl, celsius: number, params: AccentParams = DEFAULT_ACCENT_PARAMS): string {
-  const cold = celsius < ACCENT_NEUTRAL_C;
-  const k = cold
-    ? Math.min(1, (ACCENT_NEUTRAL_C - celsius) / (ACCENT_NEUTRAL_C - ACCENT_COLD_C))
-    : Math.min(1, Math.max(0, (celsius - ACCENT_NEUTRAL_C) / (ACCENT_HOT_C - ACCENT_NEUTRAL_C)));
-  const target = cold ? ACCENT_COLD_HUE : ACCENT_HOT_HUE;
-  const diff = ((target - base.h + 540) % 360) - 180;
-  const step = Math.min(Math.abs(diff), params.maxShift * k);
-  let sat = base.s;
-  let lightness = base.l + (cold ? ACCENT_COLD_LIGHTNESS : ACCENT_HOT_LIGHTNESS) * k;
-  const { ramp } = params;
-  if (ramp) {
-    const t = Math.min(1, Math.max(0, (celsius - ramp.coldC) / (ramp.hotC - ramp.coldC)));
-    sat = Math.min(100, base.s * (ramp.satCold + (ramp.satHot - ramp.satCold) * t));
-    lightness = base.l + ramp.lightCold + (ramp.lightHot - ramp.lightCold) * t;
-  }
-  return hslToHex({ h: (base.h + Math.sign(diff) * step + 360) % 360, s: sat, l: Math.min(100, Math.max(0, lightness)) });
-}
-
-export interface BarGradientOptions {
-  mode: Exclude<WeatherBarColors, 'current'>;
-  accentGlow: string | null;
-  accentParams?: AccentParams;
-}
-
 // Gradient over one day's low..high (Celsius), sampled along the span.
-export function barGradient(lowC: number, highC: number, { mode, accentGlow, accentParams }: BarGradientOptions): string | null {
-  const base = mode === 'accent' && accentGlow ? parseHsl(accentGlow) : null;
-  if (mode === 'accent' && !base) return null;
+export function barGradient(lowC: number, highC: number): string {
   const stops: string[] = [];
   for (let i = 0; i <= GRADIENT_SAMPLES; i++) {
     const c = lowC + ((highC - lowC) * i) / GRADIENT_SAMPLES;
-    const color = base ? accentAt(base, c, accentParams) : absoluteColor(c);
-    stops.push(`${color} ${((i / GRADIENT_SAMPLES) * 100).toFixed(1)}%`);
+    stops.push(`${absoluteColor(c)} ${((i / GRADIENT_SAMPLES) * 100).toFixed(1)}%`);
   }
   return `linear-gradient(90deg, ${stops.join(', ')})`;
 }

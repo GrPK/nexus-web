@@ -119,15 +119,15 @@ export function WeatherSettings({ widget, surface, desktopEditor, onUpdate }: Wi
           onChange={checked => onUpdate({ showDetails: checked })}
         />
         <SettingsToggle
+          label={t('panel.widget.weather.settings.accentBars')}
+          checked={accentBars}
+          onChange={checked => onUpdate({ accentBars: checked })}
+        />
+        <SettingsToggle
           label={t('panel.widget.weather.settings.animatedSky')}
           description={t('panel.widget.weather.settings.animatedSkyDescription')}
           checked={animatedSky}
           onChange={checked => onUpdate({ animatedSky: checked })}
-        />
-        <SettingsToggle
-          label={t('panel.widget.weather.settings.accentBars')}
-          checked={accentBars}
-          onChange={checked => onUpdate({ accentBars: checked })}
         />
       </SettingsSection>
     </div>
