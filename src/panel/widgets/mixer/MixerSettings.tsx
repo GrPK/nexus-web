@@ -142,10 +142,10 @@ export function MixerSettings({ widget, surface, desktopEditor, onUpdate }: Widg
         </SettingsSection>
       )}
 
-      <SettingsSection title={t('panel.widget.mixer.settings.presets')}>
-        {mixer.presets.length === 0 && (
-          <SettingsHint>{t('panel.widget.mixer.settings.noPresets')}</SettingsHint>
-        )}
+      <SettingsSection
+        title={t('panel.widget.mixer.settings.presets')}
+        description={mixer.presets.length === 0 ? t('panel.widget.mixer.settings.noPresets') : undefined}
+      >
         {renameCollision.length > 0 && (
           <SettingsHint tone="warning">
             {t('panel.widget.mixer.settings.duplicateName', { name: renameCollision })}

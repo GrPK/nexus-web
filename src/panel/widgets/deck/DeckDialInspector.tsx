@@ -304,7 +304,7 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
 
   if (part === 'picker') {
     return (
-      <SettingsSection title={t('panel.settings.deck.actionType')} action={pickerHeaderAction} fill flush boxClassName={keyStyles.pickerFillBox}>
+      <SettingsSection title={t('panel.settings.deck.actionType')} description={t('panel.settings.deck.dial.emptyHint')} action={pickerHeaderAction} fill flush boxClassName={keyStyles.pickerFillBox}>
         <div className={keyStyles.categoryList}>
           {DIAL_PICKER_CATEGORIES.map(cat => (
             <CollapsibleSection key={cat.key} title={t(cat.labelKey)} open={openKeys.has(cat.key)} onToggle={() => toggleOpen(cat.key)} compact>
@@ -328,9 +328,9 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
   const stackSection: ReactNode = (
     <SettingsSection
       title={t('panel.settings.deck.dial.stack.title')}
-      description={entry.action ? undefined : t('panel.settings.deck.dial.emptyHint')}
+      description={t('panel.settings.deck.dial.stack.hint')}
     >
-      {stacked ? (
+      {stacked && (
         <div className={styles.stackList}>
           {dial.stack!.map((e, i) => (
             <div className={`${styles.stackRow} ${i === entryAt ? styles.stackRowActive : ''}`} key={i}>
@@ -344,8 +344,6 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
             </div>
           ))}
         </div>
-      ) : (
-        <p className={keyStyles.description}>{t('panel.settings.deck.dial.stack.hint')}</p>
       )}
       <Button
         type="button"

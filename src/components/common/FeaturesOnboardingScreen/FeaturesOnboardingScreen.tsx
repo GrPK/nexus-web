@@ -7,6 +7,7 @@ import { Button } from '../Button/Button';
 import { completeFeaturesOnboarding, completeLightingOnboarding } from '../../../api/onboarding';
 import { savePreferences } from '../../../api/profiles';
 import { useFeatureFlags, useUiSettingsHydrated, useUiSettingsUpdateSafe, type FeatureFlags, type FeatureKey } from '../../../hooks/useUiSettings';
+import { OnboardingNote } from '../OnboardingNote/OnboardingNote';
 import styles from './FeaturesOnboardingScreen.module.scss';
 
 export interface FeaturesOnboardingScreenProps {
@@ -152,7 +153,7 @@ export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack
         ))}
       </div>
 
-      <p className={styles.hint}>{t('welcome.preferences.hint')}</p>
+      <OnboardingNote>{t('welcome.preferences.hint')}</OnboardingNote>
 
       {error && <p className={styles.error}>{t('welcome.error')}</p>}
 

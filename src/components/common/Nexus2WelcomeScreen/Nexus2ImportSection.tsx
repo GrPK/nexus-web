@@ -225,11 +225,8 @@ export function Nexus2ImportSection({
       // so the section repeating one just says it twice.
       title={wide ? undefined : t(titleKey)}
       ariaLabel={t(titleKey)}
-      description={wide ? undefined : <p>{t(descriptionKey)}</p>}
+      description={<p>{t(descriptionKey)}</p>}
     >
-      {wide && (
-        <p className={styles.replaceNotice} data-settings-aside>{t(descriptionKey)}</p>
-      )}
       {previewStatus === 'loading' && (
         <div className={styles.previewLoading} data-settings-aside>
           <Spinner size={20} />

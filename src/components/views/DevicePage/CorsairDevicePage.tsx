@@ -172,9 +172,15 @@ export function CorsairDevicePage({ onSectionNavigate }: CorsairDevicePageProps)
         })}
 
         {onSectionNavigate && (
-          <SettingsSection boxClassName={styles.sectionBox} title={null}>
-            <p className={styles.hintNote} data-settings-aside="true">{t('devices.corsair.coolingHint')}</p>
-            <p className={styles.hintNote} data-settings-aside="true">{t('devices.corsair.lightingHint')}</p>
+          <SettingsSection
+            boxClassName={styles.sectionBox}
+            description={(
+              <>
+                <p>{t('devices.corsair.coolingHint')}</p>
+                <p>{t('devices.corsair.lightingHint')}</p>
+              </>
+            )}
+          >
             <div className={styles.hintActions} data-settings-aside="true">
               <Button
                 size="sm"

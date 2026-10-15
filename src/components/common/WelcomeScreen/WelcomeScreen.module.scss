@@ -1,16 +1,6 @@
 @use '../../../styles/text' as *;
 @use '../../../styles/onboarding' as *;
 
-// Shared secondary text treatment for this screen: matches SettingRow's
-// .desc (the telemetry description's own style) so Version and the tagline
-// read as one consistent small muted body size instead of three.
-@mixin small-muted {
-  font-size: var(--type-small);
-  font-weight: var(--weight-body);
-  line-height: 1.4;
-  color: var(--text-dim);
-}
-
 // Neutralizes Overlay's dimmed/blurred backdropDialog fill - the welcome
 // screen occludes the dashboard via its own opaque .surface, not a scrim.
 .backdrop {
@@ -126,8 +116,15 @@ $group-gap: 0.75rem;
 .section {
   width: min($onboarding-content-width, 100%);
   flex: 0 1 auto;
-  // Room for one row and the hint; below it the surface scrolls.
+  // Room for one row; below it the surface scrolls.
   min-height: 12rem;
+}
+
+// Closes the page under the box, with the standard gap before what follows.
+.note {
+  width: min($onboarding-content-width, 100%);
+  margin-top: 0.4rem;
+  margin-bottom: var(--space-xl);
 }
 
 // Shrinks and scrolls before anything else.

@@ -15,6 +15,7 @@ import { fetchTelemetryConsent } from '../../../api/telemetry';
 import { completeOnboarding } from '../../../api/onboarding';
 import { setAutoStart } from '../../../api/autoStart';
 import { getUpdateStatus } from '../../../api/update';
+import { OnboardingNote } from '../OnboardingNote/OnboardingNote';
 import styles from './WelcomeScreen.module.scss';
 
 export interface WelcomeScreenProps {
@@ -141,7 +142,7 @@ export function WelcomeScreen({ open, platform, onComplete }: WelcomeScreenProps
         </div>
       </div>
 
-      <SettingsSection className={styles.section} boxClassName={styles.sectionBox} description={<p>{t('welcome.preferences.hint')}</p>}>
+      <SettingsSection flush className={styles.section} boxClassName={styles.sectionBox}>
         {showStartWithOs && (
           <SettingToggle
             label={startLabel}
@@ -168,6 +169,7 @@ export function WelcomeScreen({ open, platform, onComplete }: WelcomeScreenProps
           </div>
         )}
       </SettingsSection>
+      <OnboardingNote className={styles.note}>{t('welcome.preferences.hint')}</OnboardingNote>
 
       {error && <p className={styles.error}>{t('welcome.error')}</p>}
 

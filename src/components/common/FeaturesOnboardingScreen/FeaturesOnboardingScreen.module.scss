@@ -124,15 +124,6 @@
   color: var(--text-dim);
 }
 
-.hint {
-  flex-shrink: 0;
-  font-size: var(--type-small);
-  font-weight: var(--weight-body);
-  color: var(--text-dim);
-  margin: 0;
-  text-align: center;
-}
-
 .error {
   @include text-caption;
   margin: -0.75rem 0 0;

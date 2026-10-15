@@ -1,8 +1,7 @@
 @use '../../../styles/text' as *;
 @use '../../../styles/onboarding' as *;
 
-// Shared secondary text treatment, matching WelcomeScreen's small-muted so
-// both onboarding surfaces read as one family.
+// Secondary text treatment for this screen.
 @mixin small-muted {
   font-size: var(--type-small);
   font-weight: var(--weight-body);
@@ -119,12 +118,6 @@
 @keyframes scanSpin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-}
-
-.hint {
-  @include small-muted;
-  margin: 0;
-  text-align: center;
 }
 
 .error {

@@ -96,14 +96,6 @@
   padding-top: 0.5rem;
 }
 
-// The import always replaces the current personalization; the column title
-// cannot say so, so the flow does.
-.replaceNotice {
-  @include text-caption;
-  margin: 0 0 0.25rem;
-  color: var(--text-dim);
-}
-
 // One line per thing a group brings over, under the toggle's label.
 .detailBullets {
   display: flex;

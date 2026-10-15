@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
 import { DndContext } from '@dnd-kit/core';
 import { describe, it, expect, vi } from 'vitest';
 import { makePresetDeckTarget } from './deckTarget';
@@ -96,9 +96,12 @@ describe('DeckDialInspector picker', () => {
 });
 
 describe('DeckDialInspector editor', () => {
-  it('shows the empty hint for a dial without an action', () => {
-    render(<Harness dials={[{}]} part="editor" />);
+  it('explains the action picker and the stack through section descriptions', () => {
+    render(<Harness dials={[{}]} part="picker" />);
     expect(screen.getByText('panel.settings.deck.dial.emptyHint')).toBeInTheDocument();
+    cleanup();
+    render(<Harness dials={[{}]} part="editor" />);
+    expect(screen.getByText('panel.settings.deck.dial.stack.hint')).toBeInTheDocument();
   });
 
   it('volume offers the output devices plus the default and a step slider', async () => {

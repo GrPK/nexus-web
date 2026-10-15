@@ -80,6 +80,7 @@ import { InlineError } from '../components/common/InlineError/InlineError';
 import { EndTaskButton } from '../components/common/EndTaskButton/EndTaskButton';
 import { ConflictAllClear } from '../components/common/ConflictAllClear/ConflictAllClear';
 import { ConflictAppCard } from '../components/common/ConflictAppCard/ConflictAppCard';
+import { OnboardingNote } from '../components/common/OnboardingNote/OnboardingNote';
 import { SkipOnboardingButton } from '../components/common/SkipOnboardingButton/SkipOnboardingButton';
 import { ToastProvider, useToast } from '../components/common/Toast/Toast';
 import { WidgetHeader } from '../components/common/WidgetHeader/WidgetHeader';
@@ -1333,6 +1334,14 @@ function PreviewSkipOnboardingButton() {
       <div style={{ position: 'relative', minHeight: 64 }}>
         <SkipOnboardingButton onSkip={() => { /* preview only */ }} />
       </div>
+    </div>
+  );
+}
+
+function PreviewOnboardingNote() {
+  return (
+    <div className={styles.previewStack}>
+      <OnboardingNote>You can change these settings any time.</OnboardingNote>
     </div>
   );
 }
@@ -2717,6 +2726,12 @@ export const REGISTRY: StorybookEntry[] = [
     filePath: 'src/components/common/SkipOnboardingButton/SkipOnboardingButton.tsx',
     description: 'Low-emphasis escape hatch pinned to the top-right of every onboarding screen after the welcome step, where there is finally something to skip. Absolutely positioned, so its host needs position: relative.',
     Preview: PreviewSkipOnboardingButton,
+  },
+  {
+    name: 'OnboardingNote', category: 'inputs',
+    filePath: 'src/components/common/OnboardingNote/OnboardingNote.tsx',
+    description: 'The closing "you can change this any time" line of an onboarding page, centered and muted at the bottom below the content. Onboarding-only: a settings section explains itself with its description prop instead.',
+    Preview: PreviewOnboardingNote,
   },
 
   {

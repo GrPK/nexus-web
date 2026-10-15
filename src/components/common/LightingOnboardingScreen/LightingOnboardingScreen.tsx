@@ -20,6 +20,7 @@ import { SIMPLE_ANIMATION_KEYS, simpleAnimationState } from '../../../panel/widg
 import { ZoneCard, zoneCardUnavailable } from '../../../panel/widgets/lighting/page/ZoneCard';
 import { visibleCards } from '../../../panel/widgets/lighting/page/zoneUtils';
 import { useUiSettingsUpdateSafe } from '../../../hooks/useUiSettings';
+import { OnboardingNote } from '../OnboardingNote/OnboardingNote';
 import styles from './LightingOnboardingScreen.module.scss';
 
 export interface LightingOnboardingScreenProps {
@@ -408,7 +409,7 @@ export function LightingOnboardingScreen({ open, onComplete, onBack, onSkipOnboa
         </div>
       )}
 
-      <p className={styles.hint}>{t('lightingOnboarding.hint')}</p>
+      <OnboardingNote>{t('lightingOnboarding.hint')}</OnboardingNote>
 
       {error && <p className={styles.error}>{t('welcome.error')}</p>}
 
