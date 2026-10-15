@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { mergeDeviceOrder } from '../panel/widgets/mixer/deviceOrder';
 import {
   fetchAudioDevices,
   setDefaultInput,
+  setAudioDeviceOrder,
   setDefaultOutput,
   setSpatialSound,
   type AudioDevice,
@@ -19,6 +21,8 @@ export interface AudioDeviceController {
   activeInput: AudioDevice | null;
   /** Null until the list arrives, and on a service without the switch. */
   spatial: AudioSpatialState | null;
+  /** Takes the new order of the visible devices of one direction. */
+  reorderDevices: (direction: 'output' | 'input', orderedIds: string[]) => void;
   selectOutput: (deviceId: string) => void;
   selectInput: (deviceId: string) => void;
   /** Empty turns spatial sound off. */
@@ -30,6 +34,8 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
   const [outputs, setOutputs] = useState<AudioDevice[]>([]);
   const [inputs, setInputs] = useState<AudioDevice[]>([]);
   const [spatial, setSpatial] = useState<AudioSpatialState | null>(null);
+  const [outputOrder, setOutputOrder] = useState<string[]>([]);
+  const [inputOrder, setInputOrder] = useState<string[]>([]);
   const mounted = useRef(true);
 
   const refresh = useCallback(async () => {
@@ -37,6 +43,8 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
     if (!list || !mounted.current) return;
     setOutputs(list.outputs ?? []);
     setInputs(list.inputs ?? []);
+    setOutputOrder(list.outputOrder ?? []);
+    setInputOrder(list.inputOrder ?? []);
     setSpatial(list.spatial?.supported ? list.spatial : null);
   }, []);
 
@@ -50,6 +58,19 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
       window.clearInterval(timer);
     };
   }, [enabled, refresh]);
+
+  // The list reorders at once; the re-read after the POST confirms it.
+  const reorderDevices = useCallback((direction: 'output' | 'input', orderedIds: string[]) => {
+    const isOutput = direction === 'output';
+    const next = mergeDeviceOrder(isOutput ? outputOrder : inputOrder, orderedIds);
+    const sortBy = (prev: AudioDevice[]) => {
+      const byId = new Map(prev.map(d => [d.id, d]));
+      return orderedIds.flatMap(id => byId.get(id) ?? []);
+    };
+    if (isOutput) { setOutputOrder(next); setOutputs(sortBy); }
+    else { setInputOrder(next); setInputs(sortBy); }
+    void setAudioDeviceOrder(direction, next).then(() => refresh());
+  }, [refresh, outputOrder, inputOrder]);
 
   // Mark the pick locally so the row reads as selected immediately, then
   // re-read once the POST resolves - the service returns after the endpoint
@@ -84,6 +105,7 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
     activeOutput: outputs.find(d => d.isDefault) ?? null,
     activeInput: inputs.find(d => d.isDefault) ?? null,
     spatial,
+    reorderDevices,
     selectOutput,
     selectInput,
     selectSpatial,

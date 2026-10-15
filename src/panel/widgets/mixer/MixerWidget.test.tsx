@@ -16,6 +16,7 @@ const setDefaultInput = vi.fn(() => Promise.resolve(null));
 const setSpatialSound = vi.fn(() => Promise.resolve(null));
 
 vi.mock('../../../api/mixer', () => ({
+  setAudioDeviceOrder: vi.fn(() => Promise.resolve(null)),
   fetchAudioMixer: () => fetchAudioMixer(),
   setSessionVolume: (id: string, volume: number, commit: boolean) => setSessionVolume(id, volume, commit),
   setSessionMuted: (id: string, muted: boolean) => setSessionMuted(id, muted),
@@ -317,6 +318,19 @@ describe('MixerWidget', () => {
 
     fireEvent.click(screen.getByLabelText(BACK));
     expect(screen.getByText('Helldivers 2')).toBeTruthy();
+  });
+
+  it('reorder mode swaps selection rows for drag handles and exits again', async () => {
+    renderWidget();
+    await waitFor(() => expect(screen.getByText('Helldivers 2')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText(PICK_OUTPUT));
+
+    fireEvent.click(screen.getByLabelText('panel.widget.mixer.aria.reorder'));
+    expect(screen.getAllByLabelText('panel.widget.mixer.aria.moveDevice')).toHaveLength(2);
+    expect(setDefaultOutput).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText('panel.widget.mixer.aria.reorderDone'));
+    expect(screen.queryByLabelText('panel.widget.mixer.aria.moveDevice')).toBeNull();
   });
 
   it('picking an output switches the default and leaves the list open', async () => {

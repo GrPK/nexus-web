@@ -56,6 +56,7 @@ interface OutputHeader {
   inputs: AudioDevice[];
   /** Null where the platform has no spatial sound switch. */
   spatial: AudioSpatialState | null;
+  reorderDevices: (direction: 'output' | 'input', orderedIds: string[]) => void;
   selectOutput: (deviceId: string) => void;
   selectInput: (deviceId: string) => void;
   selectSpatial: (formatId: string) => void;
@@ -108,6 +109,7 @@ export function useMixerView(
         outputs: MIXER_PREVIEW.outputs,
         inputs: MIXER_PREVIEW.inputs,
         spatial: MIXER_PREVIEW.spatial,
+        reorderDevices: () => {},
         selectOutput: () => {},
         selectInput: () => {},
         selectSpatial: () => {},
@@ -117,6 +119,7 @@ export function useMixerView(
         outputs: devices.outputs,
         inputs: devices.inputs,
         spatial: devices.spatial,
+        reorderDevices: devices.reorderDevices,
         selectOutput: devices.selectOutput,
         selectInput: devices.selectInput,
         selectSpatial: devices.selectSpatial,
@@ -166,6 +169,7 @@ export function MixerBody({
           outputs={output.outputs}
           inputs={output.inputs}
           spatial={output.spatial}
+          onReorder={output.reorderDevices}
           onSelectOutput={output.selectOutput}
           onSelectInput={output.selectInput}
           onSelectSpatial={output.selectSpatial}
