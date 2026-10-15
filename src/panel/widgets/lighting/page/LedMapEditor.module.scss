@@ -406,6 +406,12 @@
   color: var(--text-dim);
 }
 
+.rateCapField {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .brightnessIcon {
   flex-shrink: 0;
   color: var(--text-dim);

@@ -26,6 +26,7 @@ import { isApplePlatform, isMultiSelectModifier } from '../../../../lib/platform
 import { CommunityMappingsPanel } from './CommunityMappingsPanel';
 import { ZoneChainList, type ChainRow } from './ZoneChainList';
 import { LedColorLockSection } from './LedColorLockSection';
+import { RateCapSelect } from './RateCapSelect';
 import {
   baselineFrom, buildSavePlan, checkMerge, defaultPartitionGuess, emptyHistory,
   flattenDeviceMap, isStagedZoneId, mergeStagedZones, orderZones,
@@ -2291,6 +2292,16 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
                   </button>
                 ))}
               </div>
+              {zoneCard?.rateCapSupported && (
+                <>
+                  <div className={styles.separator} />
+                  <RateCapSelect
+                    id={zoneCard.id}
+                    value={zoneCard.maxRateHz ?? null}
+                    onFail={() => push({ title: t('lighting.ledMap.rateCapFailed') })}
+                  />
+                </>
+              )}
               {isSmartLightId(selectedZoneId) && (
                 <>
                   <div className={styles.separator} />
