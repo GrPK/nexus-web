@@ -126,7 +126,7 @@ $group-gap: 0.75rem;
 .section {
   width: min($onboarding-content-width, 100%);
   flex: 0 1 auto;
-  // Room for the title, one row and the hint; below it the surface scrolls.
+  // Room for one row and the hint; below it the surface scrolls.
   min-height: 12rem;
 }
 

@@ -20,9 +20,11 @@ const section = (grow?: boolean) => {
 describe('ui-section grow', () => {
   it('fills the parent', () => {
     expect(section(true).section.className).toContain(styles.fill);
+    expect(section(true).section.className).toContain(styles.flush);
   });
 
   it('keeps the natural size by default', () => {
     expect(section().section.className).not.toContain(styles.fill);
+    expect(section().section.className).not.toContain(styles.flush);
   });
 });

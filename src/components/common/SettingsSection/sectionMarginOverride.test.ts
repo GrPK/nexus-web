@@ -16,28 +16,59 @@ function tsxFiles(dir: string): string[] {
   });
 }
 
-function classBody(scss: string, cls: string): string {
-  const m = new RegExp(`^\\.${cls}\\b[^{]*\\{([^}]*)\\}`, 'm').exec(scss);
-  return m ? m[1] : '';
-}
-
-// The attributes of the opening tag that sit outside any `{...}` expression, so
-// a class on an element nested inside a footer or footnote is not counted.
-function topLevelAttributes(src: string, from: number): string {
-  let depth = 0;
+// Own declarations of the rule whose selector is exactly `.cls`: nested blocks
+// are dropped, and `.cls-foo` or `.cls .box` rules never match.
+export function classBody(scss: string, cls: string): string {
   let out = '';
-  for (let i = from; i < src.length; i += 1) {
-    const ch = src[i];
-    if (ch === '{') depth += 1;
-    if (depth === 0) {
-      if (ch === '>' && src[i - 1] !== '=') break;
-      out += ch;
-    } else if (depth === 1 && ch !== '}') {
-      out += src[i - 1] === '{' || /\w|\./.test(ch) ? ch : '';
+  let depth = 0;
+  let selector = '';
+  let start = 0;
+  for (let i = 0; i < scss.length; i += 1) {
+    const ch = scss[i];
+    if (ch === '{') {
+      if (depth === 0) {
+        selector = scss.slice(start, i).replace(/\/\/[^\n]*/g, '').trim();
+        start = i + 1;
+      }
+      depth += 1;
+    } else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        if (selector.split(',').some((part) => part.trim() === `.${cls}`)) {
+          out += scss.slice(start, i).replace(/\{[^{}]*\}/g, '');
+        }
+        start = i + 1;
+      }
     }
-    if (ch === '}') depth -= 1;
   }
   return out;
+}
+
+// Every `styles.xxx` reference inside the className / boxClassName attributes
+// of the opening tag at `from`, ternaries and template literals included.
+// Classes on elements nested in other props (footer, footnote) are not counted.
+export function classRefs(src: string, from: number): Array<[string, string]> {
+  const refs: Array<[string, string]> = [];
+  let depth = 0;
+  for (let i = from; i < src.length; i += 1) {
+    const ch = src[i];
+    if (depth === 0 && ch === '>' && src[i - 1] !== '=') break;
+    if (depth === 0 && /^(?:className|boxClassName)=\{/.test(src.slice(i, i + 20))) {
+      const open = src.indexOf('{', i);
+      let d = 0;
+      let j = open;
+      for (; j < src.length; j += 1) {
+        if (src[j] === '{') d += 1;
+        if (src[j] === '}') { d -= 1; if (d === 0) break; }
+      }
+      for (const m of src.slice(open, j).matchAll(/(\w+)\.(\w+)/g)) refs.push([m[1], m[2]]);
+      i = j;
+      continue;
+    }
+    if (ch === '{') depth += 1;
+    if (ch === '}') depth -= 1;
+  }
+  return refs;
 }
 
 describe('SettingsSection class overrides', () => {
@@ -49,16 +80,32 @@ describe('SettingsSection class overrides', () => {
       const scssPath = join(dirname(file), file.replace(/^.*[\\/]/, '').replace(/\.tsx$/, '.module.scss'));
       const imports = [...src.matchAll(/import (\w+) from '(\.\/[^']+\.module\.scss)'/g)];
       for (const tag of src.matchAll(/<Settings(?:Section|Block)\b/g)) {
-        for (const m of topLevelAttributes(src, tag.index ?? 0).matchAll(/(?:className|boxClassName)=\{?(\w+)\.(\w+)\}?/g)) {
-          const imp = imports.find((i) => i[1] === m[1]);
+        for (const m of classRefs(src, tag.index ?? 0)) {
+          const imp = imports.find((i) => i[1] === m[0]);
           const path = imp ? join(dirname(file), imp[2]) : scssPath;
           if (!existsSync(path)) continue;
-          if (/\bmargin(-[a-z]+)?\s*:/.test(classBody(readFileSync(path, 'utf8'), m[2]))) {
-            offences.push(`${relative(SRC, file)}: .${m[2]}`);
+          if (/\bmargin(-[a-z]+)?\s*:/.test(classBody(readFileSync(path, 'utf8'), m[1]))) {
+            offences.push(`${relative(SRC, file)}: .${m[1]}`);
           }
         }
       }
     }
     expect(offences).toEqual([]);
+  });
+});
+
+describe('guard helpers', () => {
+  it('classBody matches the exact selector and survives nested blocks', () => {
+    const scss = '.a-b { margin: 1px; }\n.a .box { margin: 1px; }\n.a { color: red; &:hover { margin: 2px; } padding: 0; }\n.c, .a { margin-top: 1px; }';
+    const body = classBody(scss, 'a');
+    expect(body).toContain('padding: 0');
+    expect(body).toContain('margin-top: 1px');
+    expect(body).not.toContain('margin: 1px;');
+    expect(body).not.toContain('margin: 2px');
+  });
+
+  it('classRefs finds every class in a ternary and skips nested elements', () => {
+    const src = '<SettingsSection className={on ? styles.a : styles.b} boxClassName={`${styles.c} x`} footer={<i className={styles.nested} />}>';
+    expect(classRefs(src, 0).map((r) => r[1])).toEqual(['a', 'b', 'c']);
   });
 });
