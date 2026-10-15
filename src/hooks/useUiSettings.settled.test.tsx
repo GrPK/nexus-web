@@ -112,16 +112,20 @@ describe('settings provider settled semantics', () => {
     }
   });
 
-  it('skips the scheduled retry while another read is already running', async () => {
+  it('still retries and hydrates when a slow read was overtaken by a read that failed fast', async () => {
     vi.useFakeTimers();
     try {
-      vi.mocked(fetchPreferences).mockReset().mockResolvedValueOnce(null as never);
+      const answers: Array<(v: unknown) => void> = [];
+      vi.mocked(fetchPreferences).mockReset().mockImplementationOnce((() => new Promise(r => { answers.push(r); })) as never);
       await act(async () => { mount(true); });
-      vi.mocked(fetchPreferences).mockImplementation((() => new Promise(() => {})) as never);
-      act(() => topic.cb?.());
-      expect(fetchPreferences).toHaveBeenCalledTimes(2);
+      vi.mocked(fetchPreferences).mockResolvedValueOnce(null as never);
+      await act(async () => { topic.cb?.(); });
+      expect(seen).toMatchObject({ settled: true, hydrated: false });
+      vi.mocked(fetchPreferences).mockResolvedValue({ theme: { themeMode: 'dark', accentColor: '#2563eb', language: 'en' } } as never);
       await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-      expect(fetchPreferences).toHaveBeenCalledTimes(2);
+      expect(seen).toMatchObject({ settled: true, hydrated: true });
+      await act(async () => { answers[0](null); });
+      expect(seen.hydrated).toBe(true);
     } finally {
       vi.useRealTimers();
     }
