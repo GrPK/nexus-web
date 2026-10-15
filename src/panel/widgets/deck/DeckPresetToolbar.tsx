@@ -12,6 +12,18 @@ import type { UseDeckInstanceResult } from './useDeckInstance';
 
 export const DECK_PRESET_CAP = 50;
 
+const DEFAULT_PRESET_KEYS: Record<string, { name: string; key: string }> = {
+  'default-essentials': { name: 'Essentials', key: 'panel.settings.deck.defaultPreset.essentials' },
+  'default-media': { name: 'Media', key: 'panel.settings.deck.defaultPreset.media' },
+  'default-system': { name: 'System', key: 'panel.settings.deck.defaultPreset.system' },
+};
+
+/** The service seeds the three starter presets with English names; a seeded preset still carrying its seeded name shows translated, a renamed one shows the user's name. */
+export function deckPresetDisplayName(preset: { name: string; templateId?: string }, t: (key: string) => string): string {
+  const seeded = preset.templateId ? DEFAULT_PRESET_KEYS[preset.templateId] : undefined;
+  return seeded && preset.name === seeded.name ? t(seeded.key) : preset.name;
+}
+
 /** Mode to send with a preset activation: picking a preset leaves Recent Apps. */
 export function modeOnPick(deck: Pick<UseDeckInstanceResult, 'instance'>): DeckInstanceMode | undefined {
   return deck.instance?.mode === 'recentApps' ? 'custom' : undefined;
@@ -118,7 +130,7 @@ export function DeckPresetToolbar({
         rail={rail}
         cap={DECK_PRESET_CAP}
         allowDelete={desktopActions}
-        presets={deck.presets.map(p => ({ id: p.id, name: p.name, hasApps: !!p.apps?.length }))}
+        presets={deck.presets.map(p => ({ id: p.id, name: deckPresetDisplayName(p, t), hasApps: !!p.apps?.length }))}
         activeId={activeId}
         presetCount={deck.presets.length}
         builtins={[{ id: RECENT_APPS_ID, label: t('panel.settings.deck.mode.recentApps'), icon: <History size={14} aria-hidden /> }]}
@@ -128,7 +140,7 @@ export function DeckPresetToolbar({
         onCreate={name => deck.createPreset(name, pick)}
         onRename={deck.renamePreset}
         onDelete={onDelete}
-        onManageApps={desktopActions ? () => { if (activeSummary) setAppsTarget({ id: activeSummary.id, name: activeSummary.name, apps: activeSummary.apps ?? [] }); } : undefined}
+        onManageApps={desktopActions ? () => { if (activeSummary) setAppsTarget({ id: activeSummary.id, name: deckPresetDisplayName(activeSummary, t), apps: activeSummary.apps ?? [] }); } : undefined}
         onImport={onImport}
         onImportStarters={onImportStarters}
         onExport={desktopActions ? id => void exportDeckPreset(id) : undefined}

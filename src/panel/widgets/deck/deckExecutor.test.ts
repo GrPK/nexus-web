@@ -54,6 +54,14 @@ describe('parseHotkey', () => {
 describe('executeDeckAction → REST', () => {
   beforeEach(() => { postService.mockClear(); fetchService.mockClear(); });
 
+  it('screenshot, screen recording and task manager reach the host from a widget press', async () => {
+    await executeDeckAction({ type: 'system', action: { op: 'screenshot' } });
+    expect(postService).toHaveBeenLastCalledWith('/system/screen-capture?record=false', {});
+    await executeDeckAction({ type: 'system', action: { op: 'screenRecord' } });
+    expect(postService).toHaveBeenLastCalledWith('/system/screen-capture?record=true', {});
+    await executeDeckAction({ type: 'system', action: { op: 'taskManager' } });
+    expect(postService).toHaveBeenLastCalledWith('/system/open-task-manager', {});
+  });
   it('open URL', async () => {
     await executeDeckAction({ type: 'openUrl', url: 'https://x.com' });
     expect(postService).toHaveBeenCalledWith('/system/open-url', { url: 'https://x.com' });

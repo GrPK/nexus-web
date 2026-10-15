@@ -1,6 +1,6 @@
 import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DeckPresetToolbar, modeOnPick } from './DeckPresetToolbar';
+import { DeckPresetToolbar, deckPresetDisplayName, modeOnPick } from './DeckPresetToolbar';
 import type { UseDeckInstanceResult } from './useDeckInstance';
 import type { ImportDeckPresetResult, SetDeckPresetAppsResult } from '../../../api/deck';
 
@@ -271,5 +271,21 @@ describe('DeckPresetToolbar - import file flow', () => {
     setup();
     pickFile();
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith({ title: 'panel.settings.deck.presets.importFailed' }));
+  });
+});
+
+describe('deckPresetDisplayName', () => {
+  const t = (key: string) => `t:${key}`;
+
+  it('translates a seeded default that still carries its seeded name', () => {
+    expect(deckPresetDisplayName({ name: 'Essentials', templateId: 'default-essentials' }, t)).toBe('t:panel.settings.deck.defaultPreset.essentials');
+    expect(deckPresetDisplayName({ name: 'Media', templateId: 'default-media' }, t)).toBe('t:panel.settings.deck.defaultPreset.media');
+    expect(deckPresetDisplayName({ name: 'System', templateId: 'default-system' }, t)).toBe('t:panel.settings.deck.defaultPreset.system');
+  });
+
+  it('shows the user name once a default was renamed, and any other preset as is', () => {
+    expect(deckPresetDisplayName({ name: 'My keys', templateId: 'default-media' }, t)).toBe('My keys');
+    expect(deckPresetDisplayName({ name: 'Media', templateId: 'zoom' }, t)).toBe('Media');
+    expect(deckPresetDisplayName({ name: 'Media' }, t)).toBe('Media');
   });
 });

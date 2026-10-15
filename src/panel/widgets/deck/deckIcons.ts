@@ -5,7 +5,7 @@ import {
   Monitor, Gamepad2, ChevronRight, ChevronLeft, Undo2, Layers, ListOrdered, ToggleLeft,
   Plus, Zap, Music, Wifi, Bluetooth, Camera, Image, Mail, MessageSquare,
   Calendar, Clock, Settings, Terminal, Search, Star, Heart, Home, Trash2,
-  Download, Upload, Link, Bell, Sliders, Cpu, RefreshCw, Disc, Tv, Speaker,
+  Download, Upload, Link, Bell, Sliders, Cpu, RefreshCw, Disc, Video, Tv, Speaker,
   ArrowUp, ArrowDown, Command, MousePointer, Clipboard, Save, Copy, Eye,
   Sparkles, Flame, Snowflake, Wind, Battery, Plug, Rocket, Coffee, Briefcase,
   Activity, CloudSun,
@@ -21,7 +21,7 @@ export const DECK_ICONS: Record<string, LucideIcon> = {
   Monitor, Gamepad2, ChevronRight, ChevronLeft, Undo2, Layers, ListOrdered, ToggleLeft,
   Plus, Zap, Music, Wifi, Bluetooth, Camera, Image, Mail, MessageSquare,
   Calendar, Clock, Settings, Terminal, Search, Star, Heart, Home, Trash2,
-  Download, Upload, Link, Bell, Sliders, Cpu, RefreshCw, Disc, Tv, Speaker,
+  Download, Upload, Link, Bell, Sliders, Cpu, RefreshCw, Disc, Video, Tv, Speaker,
   ArrowUp, ArrowDown, Command, MousePointer, Clipboard, Save, Copy, Eye,
   Sparkles, Flame, Snowflake, Wind, Battery, Plug, Rocket, Coffee, Briefcase,
   Activity, CloudSun,
@@ -74,7 +74,7 @@ export function deckCategory(action: DeckAction | undefined): DeckCategory {
     case 'openFolder':
     case 'openUrl': return 'open';
     case 'system':
-      if (action.action.op === 'openSettings' || action.action.op === 'screenshot' || action.action.op === 'screenRecord') return 'open';
+      if (action.action.op === 'openSettings' || action.action.op === 'screenshot' || action.action.op === 'screenRecord' || action.action.op === 'taskManager') return 'open';
       if (action.action.op.startsWith('volume') || action.action.op === 'muteToggle') return 'volume';
       if (action.action.op.startsWith('media')) return 'media';
       return 'brightness';
@@ -165,7 +165,8 @@ export function autoIconName(action: DeckAction | undefined, isFolder = false): 
         case 'brightnessSet': return 'Sun';
         case 'openSettings': return 'Settings';
         case 'screenshot': return 'Camera';
-        case 'screenRecord': return 'Disc';
+        case 'screenRecord': return 'Video';
+        case 'taskManager': return 'Activity';
         default: return 'Sliders';
       }
     case 'hotkey': return 'Keyboard';
