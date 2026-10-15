@@ -30,3 +30,8 @@ export function webViewHostName(url: string): string {
     return url;
   }
 }
+
+/** The site name shown on surfaces with no native view: the host without a leading "www.". */
+export function webViewSiteName(url: string): string {
+  return webViewHostName(url).replace(/^www\./i, '');
+}

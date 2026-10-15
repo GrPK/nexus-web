@@ -125,3 +125,12 @@ export function parseInbound(raw: unknown): WebViewInbound | null {
   }
   return null;
 }
+
+// Only the panel runtime page can sit under a native host: the editor canvas
+// iframe (simulator flag), the desktop dashboard and the device page preview
+// never talk to one by design.
+export function isLivePanelPage(loc: Pick<Location, 'pathname' | 'search'> = window.location): boolean {
+  const path = loc.pathname;
+  const panelPath = path === '/panel' || path === '/touch' || path.startsWith('/panel/');
+  return panelPath && new URLSearchParams(loc.search).get('simulator') !== '1';
+}

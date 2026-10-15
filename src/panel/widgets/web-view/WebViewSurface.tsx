@@ -2,9 +2,10 @@ import { Globe, RotateCw } from 'lucide-react';
 import { Button } from '../../../components/common/Button/Button';
 import { useTranslation } from '../../../lib/i18n';
 import { webViewHost } from '../../webview/webViewHost';
+import { isLivePanelPage } from '../../webview/webViewProtocol';
 import { usePanelPreview } from '../common/PanelPreviewContext';
 import type { WidgetProps } from '../types';
-import { normalizeWebViewUrl, webViewHostName } from './webViewUrl';
+import { normalizeWebViewUrl, webViewHostName, webViewSiteName } from './webViewUrl';
 import { useWebViewClaim } from './useWebViewClaim';
 import styles from './WebViewWidget.module.scss';
 
@@ -21,8 +22,8 @@ export function WebViewSurface({ widget, surface, editorPreview, immersive }: We
   const { t } = useTranslation();
   const preview = usePanelPreview();
   const url = normalizeWebViewUrl(widget.config?.url);
-  // The catalog, the editor canvas and the embedded desktop dashboard never talk to a native host.
-  const native = !preview && !editorPreview && surface !== 'desktop' && url !== null;
+  // The catalog, the editor canvas, the device page preview and the desktop dashboard never talk to a native host.
+  const native = !preview && !editorPreview && surface !== 'desktop' && url !== null && isLivePanelPage();
   const { ref, snapshot } = useWebViewClaim({ id: widget.id, url, immersive, enabled: native });
 
   const view = snapshot.views[widget.id];
@@ -33,6 +34,10 @@ export function WebViewSurface({ widget, surface, editorPreview, immersive }: We
   let hint: string | undefined;
   if (url === null) {
     title = t('panel.widget.web-view.setUrl');
+  } else if (!native) {
+    // Name only, no message. The site favicon is not drawn: the panel CSP
+    // img-src does not allow arbitrary hosts, so the globe stands in.
+    title = webViewSiteName(url);
   } else if (unsupported) {
     title = t('panel.widget.web-view.unsupported');
     hint = webViewHostName(url);
