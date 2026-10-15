@@ -50,7 +50,7 @@ import styles from './DeckKeyInspector.module.scss';
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 export interface DeckEditContextValue {
-  /** The editing target is a physical deck, so host-side ops (screenshot, screen recording) are offered. */
+  /** The editing target is a physical deck. */
   physical: boolean;
   /** Fields must not write seed values on view (an inherited dial would copy its enclosing level into the folder). */
   freezeSeed: boolean;
@@ -288,7 +288,6 @@ function ActionFields({ action, onChange, allowed, surface, desktopEditor, pageC
   action: DeckAction; onChange: (a: DeckAction) => void; allowed: DeckPickerKind[]; surface?: PanelSurface; desktopEditor?: boolean; pageCount?: number;
 }) {
   const { t } = useTranslation();
-  const { physical } = useContext(DeckEditContext);
   const audioOut = useServiceOptions('/system/audio/devices', d => ((d as { outputs?: { id: string; name: string }[] })?.outputs ?? []).map(x => ({ value: x.id, label: x.name })));
   const audioIn = useServiceOptions('/system/audio/devices', d => ((d as { inputs?: { id: string; name: string }[] })?.inputs ?? []).map(x => ({ value: x.id, label: x.name })));
   const displays = useDisplayOptions();
@@ -361,9 +360,7 @@ function ActionFields({ action, onChange, allowed, surface, desktopEditor, pageC
     }
     case 'system': {
       const a = action.action;
-      // Capture ops open the host's own capture UI; a widget target offers them only when a key already uses one.
-      const ops = ['volumeUp', 'volumeDown', 'volumeSet', 'muteToggle', 'mediaPlayPause', 'mediaNext', 'mediaPrev', 'brightnessUp', 'brightnessDown', 'brightnessSet', 'openSettings', 'taskManager']
-        .concat(physical || a.op === 'screenshot' || a.op === 'screenRecord' ? ['screenshot', 'screenRecord'] : []);
+      const ops = ['volumeUp', 'volumeDown', 'volumeSet', 'muteToggle', 'mediaPlayPause', 'mediaNext', 'mediaPrev', 'brightnessUp', 'brightnessDown', 'brightnessSet', 'openSettings', 'taskManager', 'screenshot', 'screenRecord'];
       return (
         <>
           <SelectField label={t('panel.settings.deck.systemOp')} value={a.op} options={ops.map(o => ({ value: o, label: t(`panel.settings.deck.system.${o}`) }))} onChange={op => onChange({ type: 'system', action: { ...a, op: op as typeof a.op } })} />
