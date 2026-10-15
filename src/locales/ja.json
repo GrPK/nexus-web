@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "縦",
   "devices.y70.orientation.PortraitFlipped": "縦 (反転)",
   "devices.y70.panel": "パネル",
+  "devices.y70.panelAlwaysOnTop": "常に最前面に表示",
+  "devices.y70.panelAlwaysOnTopHint": "オフにすると、他のウィンドウをパネルの上に表示できます。",
   "devices.y70.panelAutoLaunch": "パネルを表示",
   "devices.y70.panelAutoLaunchHint": "オフの場合、パネルは非表示になり、代わりにデスクトップが表示されます。",
   "devices.y70.reserveMonitor": "パネル上に他のウィンドウを表示しない",

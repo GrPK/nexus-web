@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "Verticale",
   "devices.y70.orientation.PortraitFlipped": "Verticale (capovolto)",
   "devices.y70.panel": "Pannello",
+  "devices.y70.panelAlwaysOnTop": "Sempre in primo piano",
+  "devices.y70.panelAlwaysOnTopHint": "Disattivandolo, le altre finestre possono comparire sopra il pannello.",
   "devices.y70.panelAutoLaunch": "Mostra pannello",
   "devices.y70.panelAutoLaunchHint": "Quando è disattivato, il pannello è nascosto e viene mostrato il desktop.",
   "devices.y70.reserveMonitor": "Mantieni il pannello libero da altre finestre",

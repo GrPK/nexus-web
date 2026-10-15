@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "Verticâl",
   "devices.y70.orientation.PortraitFlipped": "Verticâl (zirât)",
   "devices.y70.panel": "Panel",
+  "devices.y70.panelAlwaysOnTop": "Simpri denant",
+  "devices.y70.panelAlwaysOnTopHint": "Distudant cheste opzion, altris barcons a puedin comparî sore dal panel.",
   "devices.y70.panelAutoLaunch": "Mostre panel",
   "devices.y70.panelAutoLaunchHint": "Cuant che al è distudât, il panel al è platât e al ven mostrât invezit il desktop.",
   "devices.y70.reserveMonitor": "Ten il panel libar di altris barcons",

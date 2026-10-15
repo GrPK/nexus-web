@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "Vertical",
   "devices.y70.orientation.PortraitFlipped": "Vertical (invertido)",
   "devices.y70.panel": "Panel",
+  "devices.y70.panelAlwaysOnTop": "Siempre visible",
+  "devices.y70.panelAlwaysOnTopHint": "Al desactivarlo, otras ventanas pueden aparecer sobre el panel.",
   "devices.y70.panelAutoLaunch": "Mostrar panel",
   "devices.y70.panelAutoLaunchHint": "Cuando está desactivado, el panel se oculta y se muestra el escritorio en su lugar.",
   "devices.y70.reserveMonitor": "Mantener el panel libre de otras ventanas",

@@ -1456,6 +1456,8 @@
   "devices.y70.orientation.Portrait": "Книжная",
   "devices.y70.orientation.PortraitFlipped": "Книжная (перевёрнутая)",
   "devices.y70.panel": "Панель",
+  "devices.y70.panelAlwaysOnTop": "Поверх всех окон",
+  "devices.y70.panelAlwaysOnTopHint": "Если выключено, другие окна могут отображаться поверх панели.",
   "devices.y70.panelAutoLaunch": "Показывать панель",
   "devices.y70.panelAutoLaunchHint": "Когда выключено, панель скрыта и вместо неё показывается рабочий стол.",
   "devices.y70.reserveMonitor": "Не допускать другие окна на панель",

@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "Dikey",
   "devices.y70.orientation.PortraitFlipped": "Dikey (ters)",
   "devices.y70.panel": "Panel",
+  "devices.y70.panelAlwaysOnTop": "Her zaman üstte",
+  "devices.y70.panelAlwaysOnTopHint": "Kapatıldığında diğer pencereler panelin üzerinde görünebilir.",
   "devices.y70.panelAutoLaunch": "Paneli Göster",
   "devices.y70.panelAutoLaunchHint": "Kapalı olduğunda panel gizlenir ve onun yerine masaüstü gösterilir.",
   "devices.y70.reserveMonitor": "Paneli diğer pencerelerden uzak tut",

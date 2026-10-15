@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "纵向",
   "devices.y70.orientation.PortraitFlipped": "纵向（翻转）",
   "devices.y70.panel": "面板",
+  "devices.y70.panelAlwaysOnTop": "始终置顶",
+  "devices.y70.panelAlwaysOnTopHint": "关闭后，其他窗口可以显示在面板上方。",
   "devices.y70.panelAutoLaunch": "显示面板",
   "devices.y70.panelAutoLaunchHint": "关闭后，面板将被隐藏，转而显示桌面。",
   "devices.y70.reserveMonitor": "保持面板不被其他窗口占用",

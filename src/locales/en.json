@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "Portrait",
   "devices.y70.orientation.PortraitFlipped": "Portrait (flipped)",
   "devices.y70.panel": "Panel",
+  "devices.y70.panelAlwaysOnTop": "Always on top",
+  "devices.y70.panelAlwaysOnTopHint": "Disabling this lets other windows appear over the panel.",
   "devices.y70.panelAutoLaunch": "Show Panel",
   "devices.y70.panelAutoLaunchHint": "When off, the panel is hidden and the desktop is shown instead.",
   "devices.y70.reserveMonitor": "Keep panel clear of other windows",

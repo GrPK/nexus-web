@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "Hochformat",
   "devices.y70.orientation.PortraitFlipped": "Hochformat (gedreht)",
   "devices.y70.panel": "Panel",
+  "devices.y70.panelAlwaysOnTop": "Immer im Vordergrund",
+  "devices.y70.panelAlwaysOnTopHint": "Wenn aus, können andere Fenster über dem Panel erscheinen.",
   "devices.y70.panelAutoLaunch": "Panel anzeigen",
   "devices.y70.panelAutoLaunchHint": "Wenn aus, wird das Panel ausgeblendet und stattdessen der Desktop angezeigt.",
   "devices.y70.reserveMonitor": "Panel frei von anderen Fenstern halten",

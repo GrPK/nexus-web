@@ -309,6 +309,7 @@ export function PanelDevicePage({ device, onOpenFirmware, onSectionNavigate }: P
   const [screenOn, setScreenOn] = useState(true);
   const [autoLaunch, setAutoLaunch] = useState(true);
   const [reserveMonitor, setReserveMonitor] = useState(true);
+  const [panelAlwaysOnTop, setPanelAlwaysOnTop] = useState<boolean | undefined>(undefined);
   const [qSeriesBrightness, setQSeriesBrightness] = useState(100);
   const [qSeriesScreenOff, setQSeriesScreenOff] = useState(false);
   const [qSeriesSleepWithHost, setQSeriesSleepWithHost] = useState(true);
@@ -679,6 +680,7 @@ export function PanelDevicePage({ device, onOpenFirmware, onSectionNavigate }: P
       if (prefs) {
         setAutoLaunch(prefs.panel?.autoLaunch ?? true);
         setReserveMonitor(prefs.panel?.reserveMonitor ?? true);
+        setPanelAlwaysOnTop(prefs.panel?.alwaysOnTop);
       }
       setLoaded(true);
       // Non-Xeneon panels re-enable the hardware-reset button once these
@@ -1736,6 +1738,14 @@ export function PanelDevicePage({ device, onOpenFirmware, onSectionNavigate }: P
                         if (!supportsAutoLaunch) return;
                         savePreferences({ panel: { reserveMonitor: next } }).catch(() => {});
                       }}
+                      alwaysOnTop={panelAlwaysOnTop}
+                      onAlwaysOnTopToggle={() => {
+                        if (panelAlwaysOnTop === undefined) return;
+                        const next = !panelAlwaysOnTop;
+                        setPanelAlwaysOnTop(next);
+                        if (!supportsAutoLaunch) return;
+                        savePreferences({ panel: { alwaysOnTop: next } }).catch(() => {});
+                      }}
                       showDisplayControls={supportsDisplayControls}
                       showAutoLaunch={supportsAutoLaunch}
                       usbDisconnected={usbDisconnected}
@@ -2651,6 +2661,9 @@ interface SettingsPanelProps {
   onAutoLaunchToggle: () => void;
   reserveMonitor: boolean;
   onReserveMonitorToggle: () => void;
+  // Undefined hides the toggle: the host predates the setting.
+  alwaysOnTop?: boolean;
+  onAlwaysOnTopToggle: () => void;
   showDisplayControls: boolean;
   showAutoLaunch: boolean;
   // Y70 connected as a monitor only (no USB serial channel): brightness and
@@ -2671,6 +2684,7 @@ function SettingsPanel({
   screenOn, onScreenToggle,
   autoLaunch, onAutoLaunchToggle,
   reserveMonitor, onReserveMonitorToggle,
+  alwaysOnTop, onAlwaysOnTopToggle,
   showDisplayControls,
   showAutoLaunch,
   usbDisconnected,
@@ -2807,6 +2821,15 @@ function SettingsPanel({
             checked={autoLaunch}
             onChange={onAutoLaunchToggle}
           />
+
+          {alwaysOnTop !== undefined && (
+            <SettingToggle
+              label={t('devices.y70.panelAlwaysOnTop')}
+              description={t('devices.y70.panelAlwaysOnTopHint')}
+              checked={alwaysOnTop}
+              onChange={onAlwaysOnTopToggle}
+            />
+          )}
 
           <SettingToggle
             label={t('devices.y70.reserveMonitor')}

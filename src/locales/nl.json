@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "Staand",
   "devices.y70.orientation.PortraitFlipped": "Staand (omgekeerd)",
   "devices.y70.panel": "Paneel",
+  "devices.y70.panelAlwaysOnTop": "Altijd bovenop",
+  "devices.y70.panelAlwaysOnTopHint": "Als dit uit staat, kunnen andere vensters boven het paneel verschijnen.",
   "devices.y70.panelAutoLaunch": "Paneel tonen",
   "devices.y70.panelAutoLaunchHint": "Wanneer uit, wordt het paneel verborgen en wordt in plaats daarvan het bureaublad getoond.",
   "devices.y70.reserveMonitor": "Paneel vrijhouden van andere vensters",

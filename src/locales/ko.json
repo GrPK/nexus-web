@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "세로",
   "devices.y70.orientation.PortraitFlipped": "세로 (뒤집힘)",
   "devices.y70.panel": "패널",
+  "devices.y70.panelAlwaysOnTop": "항상 위에 표시",
+  "devices.y70.panelAlwaysOnTopHint": "끄면 다른 창이 패널 위에 표시될 수 있습니다.",
   "devices.y70.panelAutoLaunch": "패널 표시",
   "devices.y70.panelAutoLaunchHint": "끄면 패널이 숨겨지고 대신 바탕화면이 표시됩니다.",
   "devices.y70.reserveMonitor": "다른 창이 패널을 가리지 않도록 유지",

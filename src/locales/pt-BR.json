@@ -1449,6 +1449,8 @@
   "devices.y70.orientation.Portrait": "Retrato",
   "devices.y70.orientation.PortraitFlipped": "Retrato (invertido)",
   "devices.y70.panel": "Painel",
+  "devices.y70.panelAlwaysOnTop": "Sempre visível",
+  "devices.y70.panelAlwaysOnTopHint": "Desativar isso permite que outras janelas apareçam sobre o painel.",
   "devices.y70.panelAutoLaunch": "Mostrar painel",
   "devices.y70.panelAutoLaunchHint": "Quando desativado, o painel fica oculto e a área de trabalho é exibida.",
   "devices.y70.reserveMonitor": "Manter o painel livre de outras janelas",
