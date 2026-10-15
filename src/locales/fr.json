@@ -1450,7 +1450,7 @@
   "devices.y70.orientation.PortraitFlipped": "Portrait (inversé)",
   "devices.y70.panel": "Panneau",
   "devices.y70.panelAlwaysOnTop": "Toujours au premier plan",
-  "devices.y70.panelAlwaysOnTopHint": "Désactivez cette option pour que d'autres fenêtres puissent s'afficher par-dessus le panneau.",
+  "devices.y70.panelAlwaysOnTopHint": "Lorsque désactivé, d'autres fenêtres peuvent s'afficher par-dessus le panneau.",
   "devices.y70.panelAutoLaunch": "Afficher le panneau",
   "devices.y70.panelAutoLaunchHint": "Lorsque désactivé, le panneau est masqué et le bureau est affiché à la place.",
   "devices.y70.reserveMonitor": "Garder le panneau libre des autres fenêtres",
