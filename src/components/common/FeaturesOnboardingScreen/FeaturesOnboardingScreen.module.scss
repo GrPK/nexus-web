@@ -160,7 +160,11 @@ $activity-path-length: 50;
 
     .icon_lighting > svg:first-child { animation: bulbGlow calc(var(--ease-slow) * 5) ease-in-out infinite; }
     .icon_lighting .rays { animation: rays calc(var(--ease-slow) * 5) ease-in-out infinite; }
-    .icon_cooling svg { animation: fanSpin calc(var(--ease-slow) * 3) linear infinite; }
+    // Same coast-to-stop turn as the Cooling widget's preset spin, looped.
+    .icon_cooling svg {
+      --spin-duration: 1s;
+      animation: fanSpin var(--spin-duration) cubic-bezier(0.25, 1, 0.5, 1) infinite;
+    }
     .icon_monitoring path {
       stroke-dasharray: $activity-path-length;
       animation: trace calc(var(--ease-slow) * 4) ease-in-out infinite;
