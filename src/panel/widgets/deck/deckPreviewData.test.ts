@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DECK_PREVIEW_CONFIG, ESSENTIALS_PREVIEW_OPS } from './deckPreviewData';
-import { autoIconName, categoryColor, deckCategory } from './deckIcons';
+import { DECK_ICONS, autoIconName, categoryColor, deckCategory } from './deckIcons';
 import type { DeckAction } from './types';
 
 describe('DECK_PREVIEW_CONFIG', () => {
@@ -18,5 +18,13 @@ describe('DECK_PREVIEW_CONFIG', () => {
     });
     expect(slots).toHaveLength(8);
     slots.slice(ESSENTIALS_PREVIEW_OPS.length).forEach(s => expect(s).toEqual({}));
+  });
+});
+
+describe('screen record default icon', () => {
+  it('is the camcorder, and it is in the icon set (mirrors DeckIconDefaults.cs and data/deck-icons/Video.png)', () => {
+    const name = autoIconName({ type: 'system', action: { op: 'screenRecord' } });
+    expect(name).toBe('Video');
+    expect(DECK_ICONS[name]).toBeDefined();
   });
 });
