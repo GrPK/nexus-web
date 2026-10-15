@@ -68,11 +68,6 @@
   bottom: var(--space-sm);
 }
 
-.fill {
-  flex: 1;
-  min-height: 0;
-}
-
 // The box holds a full-bleed preview or tile grid, so it drops the settings box's padding and fill.
 .bareBox {
   flex: 1;
@@ -82,7 +77,9 @@
   background: none;
 }
 
+// The fill section above ends flush, so this block carries the gap above it.
 .myEffects {
+  margin-top: var(--space-xl);
   flex: 0 0 38%;
   min-height: 200px;
   display: flex;

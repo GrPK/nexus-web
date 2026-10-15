@@ -1958,7 +1958,7 @@ export function PanelDevicePage({ device, onOpenFirmware, onSectionNavigate }: P
                       panel page's first load, Reboot panel takes no record id,
                       and the record-bound resets disable until one binds. */}
                   {activeTab === 'settings' && !isSimulated && (
-                    <div className={`${styles.settingsContent}`}>
+                    <div className={styles.settingsContent}>
                       {/* eslint-disable-next-line i18next/no-literal-string -- CSS variable token */}
                       <SettingsSection title={t('settings.dangerZone')} titleStyle={{ color: 'var(--bad)' }}>
                         <SettingRow

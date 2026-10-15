@@ -16,11 +16,9 @@
 .tabContent {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding-bottom: var(--space-xl);
   @include scrollbar-visible;
 }
 

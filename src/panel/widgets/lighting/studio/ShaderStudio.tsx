@@ -560,7 +560,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
         <div className={styles.viewPane}>
           {variations ? (
             <SettingsSection title={t('lighting.studio.variations')} description={t('lighting.studio.variationsHint')}
-              className={styles.fill} boxClassName={styles.bareBox}>
+              fill boxClassName={styles.bareBox}>
               <div className={styles.variationGrid}>
                 {variations.map((v, i) => (
                   <VariationTile key={i} recipe={v} label={`${t('lighting.studio.variations')} ${i + 1}`} onPick={() => pickVariation(v)} />
@@ -569,7 +569,7 @@ export function ShaderStudio({ open, effectId, username, gpuAvailable = true, on
             </SettingsSection>
           ) : (
             <>
-              <SettingsSection title={t('lighting.studio.preview')} className={styles.fill} boxClassName={styles.bareBox}
+              <SettingsSection title={t('lighting.studio.preview')} fill boxClassName={styles.bareBox}
                 action={(
                   <span className={styles.previewActions}>
                     {usesAudio && (

@@ -141,7 +141,7 @@ export function WelcomeScreen({ open, platform, onComplete }: WelcomeScreenProps
         </div>
       </div>
 
-      <SettingsSection className={styles.section} footnote={<p className={styles.hint}>{t('welcome.preferences.hint')}</p>}>
+      <SettingsSection className={styles.section} boxClassName={styles.sectionBox} footnote={<p className={styles.hint}>{t('welcome.preferences.hint')}</p>}>
         {showStartWithOs && (
           <SettingToggle
             label={startLabel}

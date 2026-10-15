@@ -9,6 +9,7 @@ import { Slider } from '../../../components/common/Slider/Slider';
 import { useTranslation } from '../../../lib/i18n';
 import { fetchAudioMixer } from '../../../api/mixer';
 import { SettingsRow, SettingsSection } from '../common/SettingsRow/SettingsRow';
+import { SettingsBlock } from '../../../components/common/SettingsSection/SettingsSection';
 import { IconPicker } from '../common/IconPicker';
 import { canEditFreeText } from '../../types';
 import type { PanelSurface } from '../../types';
@@ -305,7 +306,7 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
 
   if (part === 'picker') {
     return (
-      <SettingsSection title={t('panel.settings.deck.actionType')} action={pickerHeaderAction} className={keyStyles.pickerFill} boxClassName={keyStyles.pickerFillBox}>
+      <SettingsSection title={t('panel.settings.deck.actionType')} action={pickerHeaderAction} fill boxClassName={keyStyles.pickerFillBox}>
         <div className={keyStyles.categoryList}>
           {DIAL_PICKER_CATEGORIES.map(cat => (
             <CollapsibleSection key={cat.key} title={t(cat.labelKey)} open={openKeys.has(cat.key)} onToggle={() => toggleOpen(cat.key)} compact>
@@ -371,7 +372,7 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
           </div>
         </SettingsSection>
       ) : (
-        <EmptyState compact title={t('panel.settings.deck.dial.emptyHint')} />
+        <SettingsBlock><EmptyState compact title={t('panel.settings.deck.dial.emptyHint')} /></SettingsBlock>
       )}
 
       <SettingsSection title={t('panel.settings.icon')}>

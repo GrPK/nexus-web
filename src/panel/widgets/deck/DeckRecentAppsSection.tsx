@@ -84,7 +84,7 @@ export function DeckRecentAppsSection({ showPreviewNote, desktopActions = true }
     <div className={styles.root}>
       <SettingsSection
         description={t('panel.settings.deck.mode.recentAppsDescription')}
-        actions={showPreviewNote ? <Notice tone="info">{t('panel.settings.deck.recentApps.previewNote')}</Notice> : undefined}
+        footer={showPreviewNote ? <Notice tone="info">{t('panel.settings.deck.recentApps.previewNote')}</Notice> : undefined}
       >
         <SettingRow label={t('panel.settings.deck.recentApps.excludedTitle')} wrapControl stackOnNarrow>
           <div className={styles.chipRow}>

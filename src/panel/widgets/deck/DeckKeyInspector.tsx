@@ -1439,7 +1439,7 @@ export function DeckKeyInspector({ target, page, folderPath, onFolderPathChange,
         <SettingsSection
           title={t('panel.settings.deck.actionType')}
           action={part === 'picker' ? pickerHeaderAction : undefined}
-          className={part === 'picker' ? styles.pickerFill : undefined}
+          fill={part === 'picker'}
           boxClassName={part === 'picker' ? styles.pickerFillBox : undefined}
         >
           {pickerExpanded ? (

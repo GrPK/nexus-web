@@ -36,7 +36,7 @@ import type { TabDef } from '../../common/Tabs/Tabs';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { EditableText } from '../../common/Editable/EditableText';
 import { SettingRow, SettingSelect, SettingSlider, SettingToggle } from '../../common/SettingRow/SettingRow';
-import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
+import { SettingsBlock, SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
 import { ConflictAppCard } from '../../common/ConflictAppCard/ConflictAppCard';
 import { Button } from '../../common/Button/Button';
@@ -523,9 +523,11 @@ export function StreamDeckDevicePage({ device }: StreamDeckDevicePageProps) {
       />
       <div className={`${styles.pageBody} pageBody`}>
         {deck.warning && (
-          <Notice tone="warning" role="status">{t('devices.streamdeck.elgatoConflict')}</Notice>
+          <SettingsBlock>
+            <Notice tone="warning" role="status">{t('devices.streamdeck.elgatoConflict')}</Notice>
+          </SettingsBlock>
         )}
-        {activeConflict && <ConflictAppCard conflict={activeConflict} />}
+        {activeConflict && <SettingsBlock><ConflictAppCard conflict={activeConflict} /></SettingsBlock>}
 
         {tab === 'customize' ? (
           // One DndContext and one split for every mode (inert in Recent Apps,
@@ -539,18 +541,18 @@ export function StreamDeckDevicePage({ device }: StreamDeckDevicePageProps) {
                     <SettingsSection
                       title={t('devices.streamdeck.preview')}
                       className={styles.previewSection}
-                      actions={(
-<div className={styles.pageRow}>
-                      <div className={styles.pageRowSide} />
-                      <DeckPageStrip
-                        numbered
-                        readOnly
-                        pageCount={recentPages.length}
-                        currentPage={recentPage}
-                        onSelectPage={goToRecentPage}
-                      />
-                      <div className={`${styles.pageRowSide} ${styles.pageRowRight}`} />
-                    </div>
+                      footer={(
+                        <div className={styles.pageRow}>
+                          <div className={styles.pageRowSide} />
+                          <DeckPageStrip
+                            numbered
+                            readOnly
+                            pageCount={recentPages.length}
+                            currentPage={recentPage}
+                            onSelectPage={goToRecentPage}
+                          />
+                          <div className={`${styles.pageRowSide} ${styles.pageRowRight}`} />
+                        </div>
                       )}
                     >
                       <div className={styles.previewStage}>
@@ -579,28 +581,28 @@ export function StreamDeckDevicePage({ device }: StreamDeckDevicePageProps) {
                   <SettingsSection
                     title={t('devices.streamdeck.preview')}
                     className={styles.previewSection}
-                    actions={target ? (
-                    <div className={styles.pageRow}>
-                      <div className={styles.pageRowSide} />
-                      <DeckPageStrip
-                        numbered
-                        pageCount={pageCount}
-                        currentPage={page}
-                        onSelectPage={onSelectPage}
-                        onAddPage={() => { if (pageCount >= MAX_DECK_PAGES) return; target.addPage(); onSelectPage(pageCount); }}
-                        onRemoveCurrentPage={() => onSelectPage(target.removePage(page))}
-                        currentPageHasContent={pageHasContent(target.config.pages[page] ?? { slots: [] })}
-                        removeCount={target.removePageKeyCount(page)}
-                        canRemove={target.authoredPageCount > 1}
-                      />
-                      <div className={`${styles.pageRowSide} ${styles.pageRowRight}`}>
-                        {selectedBound && (
-                          <button type="button" className={styles.pageRowBtn} onClick={() => requestDelete(selSlot)} aria-label={t('common.delete')}>
-                            <Trash2 size={16} />
-                          </button>
-                        )}
+                    footer={target ? (
+                      <div className={styles.pageRow}>
+                        <div className={styles.pageRowSide} />
+                        <DeckPageStrip
+                          numbered
+                          pageCount={pageCount}
+                          currentPage={page}
+                          onSelectPage={onSelectPage}
+                          onAddPage={() => { if (pageCount >= MAX_DECK_PAGES) return; target.addPage(); onSelectPage(pageCount); }}
+                          onRemoveCurrentPage={() => onSelectPage(target.removePage(page))}
+                          currentPageHasContent={pageHasContent(target.config.pages[page] ?? { slots: [] })}
+                          removeCount={target.removePageKeyCount(page)}
+                          canRemove={target.authoredPageCount > 1}
+                        />
+                        <div className={`${styles.pageRowSide} ${styles.pageRowRight}`}>
+                          {selectedBound && (
+                            <button type="button" className={styles.pageRowBtn} onClick={() => requestDelete(selSlot)} aria-label={t('common.delete')}>
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
                     ) : undefined}
                   >
                     <div className={styles.previewStage} ref={previewStageRef}>

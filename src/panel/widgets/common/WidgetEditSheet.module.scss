@@ -1,8 +1,6 @@
 @use '../../../styles/icon-buttons' as *;
 
 .sheet {
-  --edit-sheet-section-gap: 16px;
-
   position: fixed;
   z-index: var(--z-dropdown);
   width: min(440px, 92vw);
@@ -114,7 +112,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--edit-sheet-section-gap, 16px) 2px 16px 0;
+  padding: var(--space-lg) 2px var(--space-lg) 0;
   overscroll-behavior: contain;
 }
 

@@ -10,6 +10,7 @@ import { DeckGrid } from './DeckGrid';
 import { DeckKeyInspector } from './DeckKeyInspector';
 import { DeckPageStrip } from './DeckPageStrip';
 import type { PanelSurface } from '../../types';
+import { SettingsBlock } from '../../../components/common/SettingsSection/SettingsSection';
 import styles from './DeckEditor.module.scss';
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -84,7 +85,7 @@ export function DeckEditor({ target, page: pageProp, onPageChange, folderPath, o
 
   return (
     <div className={styles.root}>
-      <DeckPageStrip
+      <SettingsBlock><DeckPageStrip
         pageCount={pageCount}
         currentPage={page}
         onSelectPage={onSelectPage}
@@ -93,19 +94,19 @@ export function DeckEditor({ target, page: pageProp, onPageChange, folderPath, o
         currentPageHasContent={pageHasContent(target.config.pages[page] ?? { slots: [] })}
         removeCount={target.removePageKeyCount(page)}
         canRemove={target.authoredPageCount > 1}
-      />
+      /></SettingsBlock>
 
       {inFolder && (
-        <div className={styles.breadcrumb}>
+        <SettingsBlock><div className={styles.breadcrumb}>
           <button onClick={onBack}>
             <ChevronLeft size={14} /> {t('panel.settings.deck.back')}
           </button>
-        </div>
+        </div></SettingsBlock>
       )}
 
       {target.kind === 'physical' && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <div className={styles.gridBox}>
+          <SettingsBlock><div className={styles.gridBox}>
             <DeckGrid
               slots={viewSlots}
               cols={target.cols}
@@ -117,7 +118,7 @@ export function DeckEditor({ target, page: pageProp, onPageChange, folderPath, o
               onCell={i => onSelectedSlotChange?.(i)}
               backCell={inFolder ? { onBack, ariaLabel: t('panel.settings.deck.back') } : undefined}
             />
-          </div>
+          </div></SettingsBlock>
         </DndContext>
       )}
 

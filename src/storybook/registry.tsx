@@ -1847,7 +1847,7 @@ function PreviewSettingsSection() {
         title="General"
         description="Optional muted description under the title."
         footnote="Optional short note under the box."
-        actions={<span style={{ color: 'var(--text-dim)', fontSize: 12 }}>Optional controls under the box</span>}
+        footer={<span style={{ color: 'var(--text-dim)', fontSize: 12 }}>Optional controls under the box</span>}
       >
         <div style={{ color: 'var(--text)', fontSize: 14, padding: '0.4rem 0' }}>Language</div>
         <div style={{ color: 'var(--text)', fontSize: 14, padding: '0.4rem 0' }}>Show conflict warnings</div>
@@ -3440,7 +3440,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'SettingsSection', category: 'panel-kit',
     filePath: 'src/components/common/SettingsSection/SettingsSection.tsx',
-    description: 'Canonical settings group: a muted body-type header (optional description) sitting outside/above a surface-filled, subtly-bordered box that holds the section rows. The one header-outside-box pattern every settings surface uses (dashboard Settings, panel editor, widget settings, device pages, pairing modal). footnote adds short text under the box; actions adds controls bound to the box (a pager strip, a Manage button) directly under it, and anything else that follows a section is a sibling that sits one section gap below. The gap below every section (before the next title) is built in and larger than the title-to-box gap; stacks add none. titleStyle recolours the header (e.g. the danger zone); boxClassName tunes the box (per-surface row gap).',
+    description: 'Canonical settings group: a muted body-type header (optional description) sitting outside/above a surface-filled, subtly-bordered box that holds the section rows. The one header-outside-box pattern every settings surface uses (dashboard Settings, panel editor, widget settings, device pages, pairing modal). footnote adds short text under the box; footer adds controls bound to the box (a pager strip, a Manage button) directly under it, and anything else that follows a section is a sibling that sits one section gap below. The gap below every section (before the next title) is built in and larger than the title-to-box gap; stacks add none. titleStyle recolors the header (e.g. the danger zone); boxClassName tunes the box (per-surface row gap).',
     Preview: PreviewSettingsSection,
   },
   {

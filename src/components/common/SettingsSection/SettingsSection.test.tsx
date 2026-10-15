@@ -1,14 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { SettingsSection } from './SettingsSection';
+import { SettingsBlock, SettingsSection } from './SettingsSection';
 
 // The gap below a section is CSS (jsdom applies none), so it is verified by
 // measuring a real render, not here. These tests pin the slots the component
 // owns inside the section, so the enforced gap always follows them.
 describe('SettingsSection slots', () => {
-  it('renders actions then footnote inside the section, after the box', () => {
+  it('renders footer then footnote inside the section, after the box', () => {
     const { container } = render(
-      <SettingsSection title="Levels" actions={<button type="button">Manage</button>} footnote="Short note">
+      <SettingsSection title="Levels" footer={<button type="button">Manage</button>} footnote="Short note">
         <div>row</div>
       </SettingsSection>,
     );
@@ -21,10 +23,26 @@ describe('SettingsSection slots', () => {
 
   it('omits the slots when they are empty', () => {
     const { container } = render(
-      <SettingsSection title="Levels" actions={undefined} footnote="">
+      <SettingsSection title="Levels" footer={undefined} footnote="">
         <div>row</div>
       </SettingsSection>,
     );
     expect(container.querySelector('section')?.children).toHaveLength(2);
+  });
+});
+
+// jsdom applies no CSS, so the always-on gap is guarded on the stylesheet source.
+describe('SettingsSection gap', () => {
+  const css = readFileSync(join(__dirname, 'SettingsSection.module.scss'), 'utf8');
+  const rule = (name: string) => new RegExp(`\\.${name}\\s*\\{[^}]*margin-bottom:\\s*var\\(--space-[a-z]+\\)`);
+
+  it('puts a token margin-bottom on the section and the block', () => {
+    expect(css).toMatch(rule('section'));
+    expect(css).toMatch(rule('block'));
+  });
+
+  it('wraps a non-section child in the block class', () => {
+    const { container } = render(<SettingsBlock><span>note</span></SettingsBlock>);
+    expect(container.firstElementChild?.className).toBeTruthy();
   });
 });
