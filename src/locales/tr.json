@@ -4506,6 +4506,8 @@
   "panel.widget.weather.precipitation": "Yağış",
   "panel.widget.weather.pressure": "Basınç",
   "panel.widget.weather.removeLocation": "{location} konumunu kaldır",
+  "panel.widget.weather.settings.accentBars": "Vurgu rengi çubukları",
+  "panel.widget.weather.settings.accentBarsDescription": "Günlük çubukları sabit sıcaklık ölçeği yerine, sıcaklığa göre hafifçe kaydırılmış vurgu renginizle boyar.",
   "panel.widget.weather.settings.animatedSky": "Hareketli gökyüzü",
   "panel.widget.weather.settings.animatedSkyDescription": "Güncel hava durumunu ve günün saatini widget'ın arkasında hareketli bir gökyüzü olarak gösterir.",
   "panel.widget.weather.settings.auto": "Otomatik",

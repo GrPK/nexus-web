@@ -93,6 +93,14 @@ describe('WeatherWidget', () => {
     expect(screen.getByText('Today')).toBeInTheDocument();
   });
 
+  it('colors the daily bars from the absolute temperature scale by default', async () => {
+    const { container } = render(<WeatherWidget widget={weatherWidget('4x4')} />);
+    await screen.findByText('Today');
+    const fills = Array.from(container.querySelectorAll<HTMLElement>('[style*="linear-gradient"]'));
+    expect(fills).toHaveLength(2);
+    expect(fills[0].style.background).toMatch(/rgb\(\d+, \d+, \d+\)/);
+  });
+
   it('shows only the glyph and temperature on a 1x1', async () => {
     render(<WeatherWidget widget={weatherWidget('1x1')} />);
     expect(await screen.findByText('72°')).toBeInTheDocument();

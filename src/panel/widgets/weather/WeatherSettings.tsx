@@ -29,6 +29,7 @@ export function WeatherSettings({ widget, surface, desktopEditor, onUpdate }: Wi
   const showLocation = (widget.config?.showLocation as boolean | undefined) ?? true;
   const showDetails = (widget.config?.showDetails as boolean | undefined) ?? true;
   const animatedSky = widget.config?.animatedSky === true;
+  const accentBars = widget.config?.accentBars === true;
   const location = (widget.config?.location as WeatherLocation | null | undefined) ?? null;
 
   const hasKeyboard = canEditFreeText(surface, desktopEditor);
@@ -122,6 +123,12 @@ export function WeatherSettings({ widget, surface, desktopEditor, onUpdate }: Wi
           description={t('panel.widget.weather.settings.animatedSkyDescription')}
           checked={animatedSky}
           onChange={checked => onUpdate({ animatedSky: checked })}
+        />
+        <SettingsToggle
+          label={t('panel.widget.weather.settings.accentBars')}
+          description={t('panel.widget.weather.settings.accentBarsDescription')}
+          checked={accentBars}
+          onChange={checked => onUpdate({ accentBars: checked })}
         />
       </SettingsSection>
     </div>

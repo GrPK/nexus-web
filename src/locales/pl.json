@@ -4552,6 +4552,8 @@
   "panel.widget.weather.precipitation": "Opady",
   "panel.widget.weather.pressure": "Ciśnienie",
   "panel.widget.weather.removeLocation": "Usuń {location}",
+  "panel.widget.weather.settings.accentBars": "Paski w kolorze akcentu",
+  "panel.widget.weather.settings.accentBarsDescription": "Koloruje paski dzienne kolorem akcentu, lekko przesuniętym zależnie od temperatury, zamiast stałej skali temperatur.",
   "panel.widget.weather.settings.animatedSky": "Animowane niebo",
   "panel.widget.weather.settings.animatedSkyDescription": "Pokazuje bieżącą pogodę i porę dnia jako ruchome niebo za widżetem.",
   "panel.widget.weather.settings.auto": "Automatycznie",

@@ -4506,6 +4506,8 @@
   "panel.widget.weather.precipitation": "Precipitação",
   "panel.widget.weather.pressure": "Pressão",
   "panel.widget.weather.removeLocation": "Remover {location}",
+  "panel.widget.weather.settings.accentBars": "Barras na cor de destaque",
+  "panel.widget.weather.settings.accentBarsDescription": "Colore as barras diárias com a sua cor de destaque, levemente ajustada pela temperatura, em vez da escala de temperatura fixa.",
   "panel.widget.weather.settings.animatedSky": "Céu animado",
   "panel.widget.weather.settings.animatedSkyDescription": "Mostra o clima atual e o período do dia como um céu em movimento atrás do widget.",
   "panel.widget.weather.settings.auto": "Automático",

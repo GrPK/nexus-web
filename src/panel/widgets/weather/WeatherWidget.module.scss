@@ -397,6 +397,22 @@ $row-seam: calc(
   text-align: right;
 }
 
+.dailyBarCell {
+  position: relative;
+}
+
+.dailyBarDot {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  box-sizing: border-box;
+  border: 2px solid var(--bg-elevated);
+  border-radius: 50%;
+  background: #fff;
+}
+
 .dailyBarTrack {
   position: relative;
   height: 5px;

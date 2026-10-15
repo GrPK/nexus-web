@@ -1,4 +1,4 @@
-import { Fragment, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { widgetLayoutSize } from '../../types';
 import { Droplet, Wind } from 'lucide-react';
 import { type WeatherLocation } from '../../../api/weather';
@@ -14,12 +14,17 @@ import { WeatherIcon } from './WeatherIcon';
 import { DAY_LABEL_KEYS, dailyMax, dailyMin, formatTemp, hourlyTemp, resolveUnit, upcomingHours } from './weatherFormat';
 import { useWeatherSnapshot } from './useWeatherSnapshot';
 import { WeatherSky } from './sky/WeatherSky';
+import { barGradient, fahrenheitToCelsius, type WeatherBarColors } from './weatherTempColors';
 import styles from './WeatherWidget.module.scss';
 
 // Deck cells import the tile's glyph + formatting through here.
 export { WeatherIcon, formatTemp, resolveUnit };
 
-export function WeatherWidget({ widget, surface }: WidgetProps) {
+export interface WeatherWidgetProps extends WidgetProps {
+  barColors?: WeatherBarColors;
+}
+
+export function WeatherWidget({ widget, surface, barColors: barColorsOverride }: WeatherWidgetProps) {
   const { t } = useTranslation();
   const { timeFormat } = useUnitPrefs();
   const location = (widget.config?.location as WeatherLocation | null | undefined) ?? null;
@@ -28,6 +33,16 @@ export function WeatherWidget({ widget, surface }: WidgetProps) {
   // picked location loads, instead of dropping out behind the spinner.
   const [skySnap, setSkySnap] = useState(snap?.asOf ? snap : null);
   if (snap?.asOf && snap !== skySnap) setSkySnap(snap);
+
+  const barColors: WeatherBarColors = barColorsOverride ?? (widget.config?.accentBars === true ? 'accent' : 'absolute');
+  const largeRef = useRef<HTMLDivElement>(null);
+  const [accentGlow, setAccentGlow] = useState<string | null>(null);
+  // Runs every render: an accent change reaches this tile as CSS variables only, with no prop to key on.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (barColors !== 'accent' || !largeRef.current) return;
+    setAccentGlow(getComputedStyle(largeRef.current).getPropertyValue('--panel-accent-glow').trim() || null);
+  });
 
   const hour12 = resolveHour12(timeFormat);
   function hourLabel(time: string) {
@@ -165,6 +180,16 @@ export function WeatherWidget({ widget, surface }: WidgetProps) {
           '--weather-bar-left': `${barLeft}%`,
           '--weather-bar-right': `${barRight}%`,
         } as CSSProperties;
+        if (barColors !== 'current') {
+          const toC = (v: number) => (unit === 'F' ? fahrenheitToCelsius(v) : v);
+          const gradient = barGradient(toC(min), toC(max), { mode: barColors, accentGlow });
+          if (gradient) {
+            barStyle.background = gradient;
+            barStyle.boxShadow = 'none';
+          }
+        }
+        const showDot = barColors === 'absolute' && index === 0 && tempValue !== null && tempValue !== undefined;
+        const dotLeft = Math.max(0, Math.min(100, (((tempValue ?? 0) - weekMin) / weekRange) * 100));
         return (
           <Fragment key={`${item.date}-${index}`}>
             <span className={styles.dailyDay}>{dayLabel(item.date, index)}</span>
@@ -173,8 +198,11 @@ export function WeatherWidget({ widget, surface }: WidgetProps) {
             </div>
             <span className={styles.dailyLo}>{formatTemp(min)}</span>
             {showBars ? (
-              <div className={styles.dailyBarTrack}>
-                <div className={styles.dailyBarFill} style={barStyle} />
+              <div className={styles.dailyBarCell}>
+                <div className={styles.dailyBarTrack}>
+                  <div className={styles.dailyBarFill} style={barStyle} />
+                </div>
+                {showDot && <span className={styles.dailyBarDot} style={{ left: `${dotLeft}%` }} />}
               </div>
             ) : (
               <span className={styles.dailySpacer} />
@@ -207,7 +235,7 @@ export function WeatherWidget({ widget, surface }: WidgetProps) {
 
   if (large) {
     return withSky(
-      <div className={`${styles.large} ${styles.largeTall}`}>
+      <div ref={largeRef} className={`${styles.large} ${styles.largeTall}`}>
         <div className={styles.topSection}>
           {renderTop()}
           {renderHourly()}
