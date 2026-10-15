@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Check, GripVertical, Pencil } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { Button } from '../../../components/common/Button/Button';
 import { Tabs, type TabDef } from '../../../components/common/Tabs/Tabs';
-import { SortableList } from '../../../components/common/SortableList/SortableList';
 import { PanelArrowButton } from '../../chrome/PanelArrowButton';
 import type { AudioDevice, AudioSpatialState } from '../../../api/mixer';
 import styles from './MixerWidget.module.scss';
@@ -27,8 +26,6 @@ export interface MixerOutputPickerProps {
   inputs: AudioDevice[];
   /** Spatial sound on the default output; null hides its tab. */
   spatial: AudioSpatialState | null;
-  /** Takes the new order of the visible devices of one direction. */
-  onReorder: (direction: 'output' | 'input', orderedIds: string[]) => void;
   onSelectOutput: (deviceId: string) => void;
   onSelectInput: (deviceId: string) => void;
   onSelectSpatial: (formatId: string) => void;
@@ -41,7 +38,6 @@ export function MixerOutputPicker({
   outputs,
   inputs,
   spatial,
-  onReorder,
   onSelectOutput,
   onSelectInput,
   onSelectSpatial,
@@ -50,8 +46,6 @@ export function MixerOutputPicker({
   const { t } = useTranslation();
   const [page, setPage] = useState(0);
   const [picked, setPicked] = useState<Tab | null>(null);
-  // Dragging needs rows that do not also select, so ordering is its own mode.
-  const [editing, setEditing] = useState(false);
 
   // A category earns a tab only when it has something to list.
   const rowsByTab: Record<Tab, Row[]> = {
@@ -72,8 +66,6 @@ export function MixerOutputPicker({
   const tabs = TAB_ORDER.filter(entry => rowsByTab[entry].length > 0);
   const tab = picked && tabs.includes(picked) ? picked : tabs[0] ?? null;
   const rows = tab ? rowsByTab[tab] : [];
-  const reorderDirection = tab === 'output' || tab === 'input' ? tab : null;
-  const reordering = editing && reorderDirection !== null && rows.length > 1;
 
   // A pick whose tab has gone (the default output moved to one without
   // spatial sound) is dropped, so the tab does not spring back on its own
@@ -90,7 +82,6 @@ export function MixerOutputPicker({
     if (!isTab(key)) return;
     setPicked(key);
     setPage(0);
-    setEditing(false);
   };
   const tabDefs: TabDef[] = tabs.map(entry => ({ key: entry, label: t(TAB_LABEL[entry]) }));
 
@@ -114,47 +105,7 @@ export function MixerOutputPicker({
           ariaLabel={t('panel.widget.mixer.aria.pickOutput')}
         />
       )}
-      {tab && (
-        // Always mounted so the tab bar beside it keeps its width.
-        <Button
-          tone="ghost"
-          disabled={!reorderDirection || rows.length < 2}
-          icon={reordering ? <Check size={18} strokeWidth={2.2} /> : <Pencil size={18} strokeWidth={2.2} />}
-          aria-pressed={reordering}
-          aria-label={t(reordering ? 'panel.widget.mixer.aria.reorderDone' : 'panel.widget.mixer.aria.reorder')}
-          onClick={() => setEditing(!reordering)}
-        />
-      )}
     </div>
-    {reordering && reorderDirection ? (
-      <div className={styles.pickerReorder}>
-        <SortableList
-          opaqueOverlay
-          ids={rows.map(r => r.id)}
-          onReorder={ids => onReorder(reorderDirection, ids)}
-          renderRow={(id, a) => {
-            const label = rows.find(r => r.id === id)?.label ?? '';
-            return (
-              <div
-                ref={a.ref}
-                style={a.style}
-                className={`${styles.pickerReorderRow} ${a.isDragging ? a.placeholderClassName : ''}`}
-              >
-                <span
-                  className={styles.pickerHandle}
-                  {...a.attributes}
-                  {...a.listeners}
-                  aria-label={t('panel.widget.mixer.aria.moveDevice', { name: label })}
-                >
-                  <GripVertical size={18} strokeWidth={2} />
-                </span>
-                <span className={styles.pickerRowName}>{label}</span>
-              </div>
-            );
-          }}
-        />
-      </div>
-    ) : (
     <div className={styles.pickerStage} data-paged={pages > 1 ? 'true' : 'false'}>
       {pages > 1 && (
         <PanelArrowButton
@@ -189,7 +140,6 @@ export function MixerOutputPicker({
         />
       )}
     </div>
-    )}
     </>
   );
 }

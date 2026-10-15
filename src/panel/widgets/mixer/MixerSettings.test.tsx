@@ -31,9 +31,12 @@ vi.mock('../../../hooks/useAudioMixer', () => ({
   }),
 }));
 
+let deviceOutputs: Array<{ id: string; name: string; isDefault: boolean; direction: string }> = [];
+const dev = (id: string, direction = 'output') => ({ id, name: id, isDefault: false, direction });
+
 vi.mock('../../../hooks/useAudioDevices', () => ({
   useAudioDevices: () => ({
-    outputs: [], inputs: [], activeOutput: null, activeInput: null,
+    outputs: deviceOutputs, inputs: [], reorderDevices: vi.fn(), activeOutput: null, activeInput: null,
     selectOutput: vi.fn(), selectInput: vi.fn(), refresh: refreshDevices,
   }),
 }));
@@ -90,6 +93,7 @@ function openRename(name: string): HTMLElement {
 beforeEach(() => {
   vi.clearAllMocks();
   presets = [makePreset('p1', 'Gaming')];
+  deviceOutputs = [];
 });
 
 describe('preset name helpers', () => {
@@ -269,5 +273,31 @@ describe('display toggles', () => {
     fireEvent.click(toggle(SHOW_OUTPUT));
     expect(onUpdate).toHaveBeenCalledWith({ showLabels: false });
     expect(onUpdate).toHaveBeenCalledWith({ showOutput: false });
+  });
+});
+
+describe('device order', () => {
+  const MOVE = 'panel.widget.mixer.aria.moveDevice';
+
+  it('lists detected outputs with a drag handle each', () => {
+    deviceOutputs = [dev('a'), dev('b')];
+    renderSettings();
+    expect(screen.getByText('panel.widget.mixer.settings.outputOrder')).toBeTruthy();
+    expect(screen.getAllByLabelText(MOVE)).toHaveLength(2);
+    expect(screen.getByText('panel.widget.mixer.settings.orderHint')).toBeTruthy();
+  });
+
+  it('shows a lone device as a plain row without a handle or hint', () => {
+    deviceOutputs = [dev('a')];
+    renderSettings();
+    expect(screen.getByText('a')).toBeTruthy();
+    expect(screen.queryByLabelText(MOVE)).toBeNull();
+    expect(screen.queryByText('panel.widget.mixer.settings.orderHint')).toBeNull();
+  });
+
+  it('shows no section for a direction without devices', () => {
+    renderSettings();
+    expect(screen.queryByText('panel.widget.mixer.settings.outputOrder')).toBeNull();
+    expect(screen.queryByText('panel.widget.mixer.settings.inputOrder')).toBeNull();
   });
 });

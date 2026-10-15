@@ -202,33 +202,6 @@
   min-width: 0;
 }
 
-.pickerReorder {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.pickerReorderRow {
-  display: flex;
-  align-items: center;
-  @include hgap(8px);
-  min-height: 44px;
-  padding: 0 12px;
-  color: var(--text);
-}
-
-// The handle alone starts a drag, so a touch on the name still scrolls the list.
-.pickerHandle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 auto;
-  cursor: grab;
-  touch-action: none;
-}
-
 .pickerRow {
   display: flex;
   align-items: center;
