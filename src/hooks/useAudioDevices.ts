@@ -38,14 +38,18 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
   const [inputOrder, setInputOrder] = useState<string[]>([]);
   const mounted = useRef(true);
 
-  // Only the newest read may land: a poll that left before a drop or a pick
-  // must not put the old order or default back when it returns late.
+  // Only the newest read may land, and none while a write is in flight: a poll
+  // that reaches the service before the write is processed would put the old
+  // order or default back. The re-read after the write settles the view.
   const requestSeq = useRef(0);
+  const pendingWrites = useRef(0);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
 
   const refresh = useCallback(async () => {
     const seq = ++requestSeq.current;
     const list = await fetchAudioDevices();
-    if (!list || !mounted.current || seq !== requestSeq.current) return;
+    if (!list || !mounted.current || seq !== requestSeq.current || pendingWrites.current > 0) return;
     setOutputs(list.outputs ?? []);
     setInputs(list.inputs ?? []);
     setOutputOrder(list.outputOrder ?? []);
@@ -64,6 +68,13 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
     };
   }, [enabled, refresh]);
 
+  const settleAfter = useCallback((write: Promise<unknown>) => {
+    pendingWrites.current++;
+    requestSeq.current++;
+    const settle = () => { pendingWrites.current--; return refresh(); };
+    void write.then(settle, settle);
+  }, [refresh]);
+
   // The list reorders at once; the re-read after the POST confirms it.
   const reorderDevices = useCallback((direction: 'output' | 'input', orderedIds: string[]) => {
     const isOutput = direction === 'output';
@@ -72,24 +83,23 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
       const byId = new Map(prev.map(d => [d.id, d]));
       return orderedIds.flatMap(id => byId.get(id) ?? []);
     };
-    requestSeq.current++;
     if (isOutput) { setOutputOrder(next); setOutputs(sortBy); }
     else { setInputOrder(next); setInputs(sortBy); }
-    void setAudioDeviceOrder(direction, next).then(() => refresh());
-  }, [refresh, outputOrder, inputOrder]);
+    settleAfter(setAudioDeviceOrder(direction, next));
+  }, [settleAfter, outputOrder, inputOrder]);
 
   // Mark the pick locally so the row reads as selected immediately, then
   // re-read once the POST resolves - the service returns after the endpoint
   // switch, so that is the real signal, not a timer.
   const selectOutput = useCallback((deviceId: string) => {
     setOutputs(prev => prev.map(d => ({ ...d, isDefault: d.id === deviceId })));
-    void setDefaultOutput(deviceId).then(() => refresh());
-  }, [refresh]);
+    settleAfter(setDefaultOutput(deviceId));
+  }, [settleAfter]);
 
   const selectInput = useCallback((deviceId: string) => {
     setInputs(prev => prev.map(d => ({ ...d, isDefault: d.id === deviceId })));
-    void setDefaultInput(deviceId).then(() => refresh());
-  }, [refresh]);
+    settleAfter(setDefaultInput(deviceId));
+  }, [settleAfter]);
 
   // Mark it, then let the re-read settle it: the service only answers ok once
   // audiosrv reports the switch, so a refused pick snaps back on that refresh.
@@ -98,12 +108,12 @@ export function useAudioDevices(enabled: boolean): AudioDeviceController {
   const selectSpatial = useCallback((formatId: string) => {
     setSpatial(prev => (prev ? { ...prev, activeId: formatId } : prev));
     const deviceId = outputs.find(d => d.isDefault)?.id ?? spatial?.deviceId ?? '';
-    void setSpatialSound(deviceId, formatId).then(() => refresh());
-  }, [refresh, outputs, spatial?.deviceId]);
+    settleAfter(setSpatialSound(deviceId, formatId));
+  }, [settleAfter, outputs, spatial?.deviceId]);
 
   // Stable identity: callers hand this to useAudioMixer as its config-changed
   // callback, and a new function every render would churn that subscription.
-  const refreshNow = useCallback(() => { void refresh(); }, [refresh]);
+  const refreshNow = useCallback(() => { if (enabledRef.current) void refresh(); }, [refresh]);
 
   return {
     outputs,

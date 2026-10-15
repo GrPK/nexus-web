@@ -75,7 +75,9 @@ export function useMixerView(
 ): MixerView {
   const preview = usePanelPreview();
   const live = !preview;
-  const devices = useAudioDevices(live);
+  const showOutput = (config?.showOutput as boolean | undefined) ?? true;
+  // The list feeds only the output band and its picker, so a hidden band polls nothing.
+  const devices = useAudioDevices(live && showOutput);
   // The endpoints ride the mixer's config revision, so a switch made anywhere
   // re-reads the device list instead of waiting out its 5s poll.
   const mixer = useAudioMixer(live, devices.refresh);
@@ -85,7 +87,6 @@ export function useMixerView(
   const hideIdle = (config?.hideIdle as boolean | undefined) ?? false;
   const showPresets = (config?.showPresets as boolean | undefined) ?? true;
   const showLabels = (config?.showLabels as boolean | undefined) ?? true;
-  const showOutput = (config?.showOutput as boolean | undefined) ?? true;
 
   const sessions = preview ? MIXER_PREVIEW.sessions : mixer.sessions;
   const visible = hideIdle ? sessions.filter(s => s.active) : sessions;
@@ -172,7 +173,7 @@ export function MixerBody({
     arrowReserve: PRESET_ARROW_RESERVE,
   });
 
-  if (pickerOpen) {
+  if (pickerOpen && showOutput) {
     return (
       <div className={styles.mixer} data-immersive={immersive ? 'true' : 'false'}>
         <MixerOutputPicker

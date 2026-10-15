@@ -61,4 +61,32 @@ describe('useAudioDevices reorderDevices', () => {
 
     expect(result.current.outputs.map(d => d.id)).toEqual(['b', 'a']);
   });
+
+  it('ignores a poll that lands while the order write is still pending', async () => {
+    const fresh = {
+      error: false, msg: '', outputs: [dev('a', 'output'), dev('b', 'output')], inputs: [], outputOrder: ['a', 'b'],
+    };
+    fetchAudioDevices.mockReset();
+    fetchAudioDevices.mockResolvedValue(fresh);
+    let finishWrite: () => void = () => {};
+    setAudioDeviceOrder.mockReturnValueOnce(new Promise<null>(resolve => { finishWrite = () => resolve(null); }));
+    const { result } = renderHook(() => useAudioDevices(true));
+    await waitFor(() => expect(result.current.outputs).toHaveLength(2));
+
+    act(() => result.current.reorderDevices('output', ['b', 'a']));
+    // The service has not processed the write yet, so this read still has the old order.
+    await act(async () => { result.current.refresh(); });
+    expect(result.current.outputs.map(d => d.id)).toEqual(['b', 'a']);
+
+    fetchAudioDevices.mockResolvedValue({ ...fresh, outputs: [dev('b', 'output'), dev('a', 'output')], outputOrder: ['b', 'a'] });
+    await act(async () => { finishWrite(); });
+    await waitFor(() => expect(fetchAudioDevices).toHaveBeenCalledTimes(3));
+    expect(result.current.outputs.map(d => d.id)).toEqual(['b', 'a']);
+  });
+
+  it('does not read the list while disabled', async () => {
+    const { result } = renderHook(() => useAudioDevices(false));
+    act(() => result.current.refresh());
+    expect(fetchAudioDevices).not.toHaveBeenCalled();
+  });
 });
