@@ -1,7 +1,9 @@
 @use '../../../styles/text' as *;
 @use '../../../styles/onboarding' as *;
 
-$description-line-height: 1.45;
+// Length of the Activity icon's trace path.
+// lucide-react does not forward pathLength, so the dash must be sized to the real length.
+$activity-path-length: 50;
 
 // Neutralizes Overlay's dimmed/blurred backdropDialog fill - same treatment
 // as the other full-viewport onboarding screens.
@@ -66,13 +68,13 @@ $description-line-height: 1.45;
   grid-template-columns: repeat(2, minmax(240px, 320px));
   grid-auto-rows: 1fr;
   gap: 1rem;
-  width: min(680px, 100%);
+  width: min(720px, calc(100% + 40px));
   flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
-  // Room inside the scroller for the hover lift and its shadow, which it would clip.
-  padding: 4px 0 12px;
-  margin: -4px 0 -12px;
+  // Room inside the scroller for the hover lift and its shadow tail, which it would clip.
+  padding: 4px 20px 28px;
+  margin: -4px -20px -28px;
 }
 
 .pillarCard {
@@ -96,11 +98,6 @@ $description-line-height: 1.45;
 .pillarCard.pillarCardOn {
   border-color: var(--accent);
   background: var(--accent-soft);
-
-  &:not(:disabled):hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 28px -10px var(--accent-glow-shadow);
-  }
 }
 
 .pillarIndicator {
@@ -156,33 +153,37 @@ $description-line-height: 1.45;
   transform-origin: center;
 }
 
-.pillarCard.pillarCardOn:not(:disabled):hover {
-  .icon_lighting > svg:first-child { animation: bulbGlow 1.4s ease-in-out infinite; }
-  .icon_lighting .rays { animation: rays 1.4s ease-in-out infinite; }
-  .icon_cooling svg { animation: fanSpin calc(var(--ease-slow) * 3) linear infinite; }
-  // 50 is the Activity trace's measured path length; lucide-react does not forward pathLength.
-  .icon_monitoring path {
-    stroke-dasharray: 50;
-    animation: trace 1.3s ease-in-out infinite;
+@media (hover: hover) {
+  .pillarCard.pillarCardOn:not(:disabled):hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px -10px var(--accent-glow-shadow);
+
+    .icon_lighting > svg:first-child { animation: bulbGlow calc(var(--ease-slow) * 5) ease-in-out infinite; }
+    .icon_lighting .rays { animation: rays calc(var(--ease-slow) * 5) ease-in-out infinite; }
+    .icon_cooling svg { animation: fanSpin calc(var(--ease-slow) * 3) linear infinite; }
+    .icon_monitoring path {
+      stroke-dasharray: $activity-path-length;
+      animation: trace calc(var(--ease-slow) * 4) ease-in-out infinite;
+    }
+    .icon_diagnostics svg { animation: swing calc(var(--ease-slow) * 4) ease-in-out infinite; }
+    .icon_diagnostics circle { animation: beat calc(var(--ease-slow) * 2) ease-in-out infinite; }
   }
-  .icon_diagnostics svg { animation: swing 1.2s ease-in-out infinite; }
-  .icon_diagnostics circle { animation: beat calc(var(--ease-slow) * 2) ease-in-out infinite; }
 }
 
 @keyframes bulbGlow {
   0%, 100% {
-    filter: drop-shadow(0 0 0 #ffd66600);
+    filter: drop-shadow(0 0 0 transparent);
     color: var(--accent);
   }
   50% {
-    filter: drop-shadow(0 0 10px #ffd666bf);
-    color: #ffd666;
+    filter: drop-shadow(0 0 10px var(--warn));
+    color: var(--warn);
   }
 }
 
 @keyframes rays {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.2; color: var(--accent); }
+  50% { opacity: 1; color: var(--warn); }
 }
 
 @keyframes fanSpin {
@@ -190,7 +191,7 @@ $description-line-height: 1.45;
 }
 
 @keyframes trace {
-  0% { stroke-dashoffset: 50; }
+  0% { stroke-dashoffset: $activity-path-length; }
   60%, 100% { stroke-dashoffset: 0; }
 }
 
@@ -221,8 +222,8 @@ $description-line-height: 1.45;
 
 .pillarDescription {
   font-size: var(--type-small);
-  line-height: $description-line-height;
-  min-height: calc(#{$description-line-height} * 1em * 2);
+  line-height: var(--leading-tight);
+  min-height: calc(var(--leading-tight) * 2em);
   color: var(--text-dim);
 }
 
