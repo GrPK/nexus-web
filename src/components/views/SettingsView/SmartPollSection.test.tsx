@@ -139,4 +139,18 @@ describe('SmartPollSection', () => {
     topic.cbs['smart-poll']();
     expect(await screen.findByText('settings.pillarOff.smartPoll')).toBeInTheDocument();
   });
+
+  it('lets only the latest read land when pings overlap', async () => {
+    const answers: Array<(v: Awaited<ReturnType<typeof fetchSmartPoll>>) => void> = [];
+    vi.mocked(fetchSmartPoll).mockImplementation(() => new Promise(r => { answers.push(r); }));
+    render(<SmartPollSection serviceOnline />);
+    topic.cbs.prefs();
+    const reply = (active: boolean) => ({ defaultSeconds: 30, perDrive: true, choices: SMART_POLL_CHOICES, drives: [], active });
+    await waitFor(() => expect(answers).toHaveLength(2));
+    answers[1](reply(true));
+    await waitFor(() => expect(screen.getByLabelText('settings.smartPoll.defaultLabel')).toBeInTheDocument());
+    answers[0](reply(false));
+    await Promise.resolve();
+    expect(screen.queryByText('settings.pillarOff.smartPoll')).toBeNull();
+  });
 });

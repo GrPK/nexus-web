@@ -62,6 +62,7 @@ import { LightingFeatureSeed } from './LightingFeatureSeed';
 import { PillarsReporter } from './PillarsReporter';
 import { importStepOffered } from './importStep';
 import { usePillarsLatch } from './usePillarsLatch';
+import { useConsumeSkippedOffers } from './useConsumeSkippedOffers';
 import { useNexus2NonCoolingContent } from './useNexus2NonCoolingContent';
 import { useTranslation } from '../lib/i18n';
 import { applyThemeMode, applyAccentColor, cachePreferencesLocally, loadSettings } from '../lib/settings';
@@ -431,11 +432,11 @@ export function Dashboard() {
   // Decided once per page load (see usePillarsLatch). Unknown only until the
   // preferences read has an outcome; a service that is down for good is an
   // outcome too, so the app is never held blank behind it.
-  const { pillars, report: reportPillars } = usePillarsLatch(
-    onboardingStatus === 'unknown' || welcomeOpen || featuresOpen,
-  );
   const serviceDown = status.state === 'offline' || status.state === 'offline-installed';
-  const pillarsReady = pillars !== null || serviceDown;
+  const { pillars, hydrated: pillarsHydrated, ready: pillarsReady, report: reportPillars } = usePillarsLatch(
+    onboardingStatus === 'unknown' || welcomeOpen || featuresOpen,
+    serviceDown,
+  );
   const coolingOn = pillars?.cooling ?? true;
   const nexus2NonCooling = useNexus2NonCoolingContent(pillars !== null && !coolingOn && nexus2.status === 'pending');
   // Only the import gate waits on this answer, not the dashboard.
@@ -480,23 +481,6 @@ export function Dashboard() {
     && !welcomeOpen && !importOpen && !featuresOpen && !conflictStepPending && !lightingFeatureOff
     && lightingStatus === 'pending' && !lightingOnboardingDismissed;
 
-  // An import offer skipped because its pillar is off is consumed once the
-  // onboarding steps that choose pillars are past, so it is never asked again
-  // (the Cooling page and the Settings Nexus 2 entry import it on demand).
-  const fanControlConsumed = useRef(false);
-  const nexus2Consumed = useRef(false);
-  const choosingPillars = onboardingStatus === 'unknown' || welcomeOpen || featuresOpen;
-  useEffect(() => {
-    if (pillars === null || choosingPillars || coolingOn) return;
-    if (fanControl.status === 'pending' && !fanControlConsumed.current) {
-      fanControlConsumed.current = true;
-      void dismissFanControlImport().catch(() => null);
-    }
-    if (nexus2.status === 'pending' && nexus2NonCooling === false && !nexus2Consumed.current) {
-      nexus2Consumed.current = true;
-      void dismissNexus2Welcome().catch(() => null);
-    }
-  }, [pillars, choosingPillars, coolingOn, fanControl.status, nexus2.status, nexus2NonCooling]);
 
   // Skips every remaining step at once. Marks the same server flags the
   // screens themselves would, so a reload does not reopen them. Leaves all
@@ -535,9 +519,20 @@ export function Dashboard() {
   // from a local flag, but the service's Nexus 2 detection ladder is a
   // heavier read - without this the dashboard would flash before
   // Nexus2WelcomeScreen pops in on top of it.
-  const showDashboard = pillarsReady && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
+  const showDashboard = pillarsReady && !importUndecided && onboardingStatus !== 'unknown' && nexus2.status !== 'unknown'
     && fanControl.status !== 'unknown'
     && !welcomeOpen && !featuresOpen && !lightingOnboardingOpen && !importOpen && !conflictStepPending;
+  // An import offer skipped because its pillar is off is consumed when the whole
+  // onboarding run is over, so it is never asked again (the Cooling page and
+  // the Settings Nexus 2 entry import it on demand).
+  useConsumeSkippedOffers({
+    runOver: showDashboard,
+    decidedFromServer: pillarsHydrated,
+    coolingOn,
+    fanControlPending: fanControl.status === 'pending',
+    nexus2Pending: nexus2.status === 'pending',
+    nexus2NonCooling,
+  });
   const multiplex = useMultiplexConnection(online);
   const serviceState = useServiceState(online, multiplex);
   const profilesHook = useProfiles(online);

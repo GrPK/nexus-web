@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useNexus2NonCoolingContent } from './useNexus2NonCoolingContent';
 import { previewNexus2Import } from '../api/migration';
@@ -36,14 +36,19 @@ describe('useNexus2NonCoolingContent', () => {
     await waitFor(() => expect(result.current).toBe(true));
   });
 
-  it('is true when the preview request is aborted', async () => {
-    vi.mocked(previewNexus2Import).mockImplementation(signal => new Promise((_, reject) => {
-      signal?.addEventListener('abort', () => reject(new Error('aborted')));
-    }));
-    const { result, unmount } = renderHook(() => useNexus2NonCoolingContent(true));
-    expect(vi.mocked(previewNexus2Import).mock.calls[0][0]).toBeInstanceOf(AbortSignal);
-    unmount();
-    expect(result.current).toBeNull();
+  it('aborts the request after the bound and answers true', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(previewNexus2Import).mockImplementation(signal => new Promise((_, reject) => {
+        signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      }));
+      const { result } = renderHook(() => useNexus2NonCoolingContent(true));
+      expect(result.current).toBeNull();
+      await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
+      expect(result.current).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('forgets the previous answer when asked again', async () => {
