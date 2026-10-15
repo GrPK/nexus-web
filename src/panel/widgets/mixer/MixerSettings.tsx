@@ -1,12 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { GripVertical } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { useAudioDevices } from '../../../hooks/useAudioDevices';
 import { useAudioMixer } from '../../../hooks/useAudioMixer';
 import { useSystemVolume } from '../../../hooks/useSystemVolume';
-import { MAX_PRESETS, MAX_PRESET_NAME, presetNameTaken } from '../../../api/mixer';
-import { GripVertical } from 'lucide-react';
+import { MAX_PRESETS, MAX_PRESET_NAME, presetNameTaken, type AudioDevice } from '../../../api/mixer';
 import { SortableList } from '../../../components/common/SortableList/SortableList';
-import type { AudioDevice } from '../../../api/mixer';
 import { MixerPresetRow } from './MixerPresetRow';
 import styles from './MixerSettings.module.scss';
 import { canEditFreeText } from '../../types';
@@ -213,33 +212,34 @@ export function MixerSettings({ widget, surface, desktopEditor, onUpdate }: Widg
   );
 }
 
-/**
- * The picker lists devices in this order. Only plugged-in devices show; a
- * single device has nothing to reorder, so it gets a plain row.
- */
+/** Drag order of the plugged-in devices; a lone device keeps the row layout with an inert handle slot. */
 function DeviceOrder({ title, devices, onReorder }: {
   title: string;
   devices: AudioDevice[];
   onReorder: (ids: string[]) => void;
 }) {
   const { t } = useTranslation();
+  // A device unplugged mid-drag keeps its name on the overlay and the aria label.
+  const names = useRef(new Map<string, string>());
+  for (const d of devices) names.current.set(d.id, d.name);
   if (devices.length === 0) return null;
-  const nameOf = (id: string) => devices.find(d => d.id === id)?.name ?? '';
+  const nameOf = (id: string) => names.current.get(id) ?? '';
+  const draggable = devices.length > 1;
   return (
     <SettingsSection title={title}>
-      {devices.length > 1 && <SettingsHint>{t('panel.widget.mixer.settings.orderHint')}</SettingsHint>}
-      {devices.length > 1 ? (
-        <SortableList
-          opaqueOverlay
-          ariaLabel={title}
-          ids={devices.map(d => d.id)}
-          onReorder={onReorder}
-          renderRow={(id, a) => (
-            <div
-              ref={a.ref}
-              style={a.style}
-              className={`${styles.orderRow} ${a.isDragging ? a.placeholderClassName : ''}`}
-            >
+      <SettingsHint>{t('panel.widget.mixer.settings.orderHint')}</SettingsHint>
+      <SortableList
+        opaqueOverlay
+        ariaLabel={title}
+        ids={devices.map(d => d.id)}
+        onReorder={onReorder}
+        renderRow={(id, a) => (
+          <div
+            ref={a.ref}
+            style={a.style}
+            className={`${styles.orderRow} ${a.isDragging ? a.placeholderClassName : ''}`}
+          >
+            {draggable ? (
               <span
                 className={styles.orderHandle}
                 {...a.attributes}
@@ -248,15 +248,13 @@ function DeviceOrder({ title, devices, onReorder }: {
               >
                 <GripVertical size={18} strokeWidth={2} />
               </span>
-              <span className={styles.orderName}>{nameOf(id)}</span>
-            </div>
-          )}
-        />
-      ) : (
-        <div className={styles.orderRow}>
-          <span className={styles.orderName}>{devices[0].name}</span>
-        </div>
-      )}
+            ) : (
+              <span className={styles.orderHandle} aria-hidden />
+            )}
+            <span className={styles.orderName}>{nameOf(id)}</span>
+          </div>
+        )}
+      />
     </SettingsSection>
   );
 }

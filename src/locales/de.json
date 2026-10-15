@@ -4313,7 +4313,7 @@
   "panel.widget.mixer.settings.inputOrder": "Reihenfolge der Eingänge",
   "panel.widget.mixer.settings.memory": "Pegel",
   "panel.widget.mixer.settings.noPresets": "Noch keine Voreinstellungen",
-  "panel.widget.mixer.settings.orderHint": "Zum Sortieren ziehen. So erscheinen die Geräte in der Auswahl.",
+  "panel.widget.mixer.settings.orderHint": "Zum Sortieren ziehen. So erscheinen die Geräte im Menü.",
   "panel.widget.mixer.settings.outputOrder": "Reihenfolge der Ausgänge",
   "panel.widget.mixer.settings.presetLimit": "Maximale Anzahl erreicht. Löschen Sie eine, um eine neue hinzuzufügen.",
   "panel.widget.mixer.settings.presetName": "Neues Preset",

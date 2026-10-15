@@ -4313,7 +4313,7 @@
   "panel.widget.mixer.settings.inputOrder": "輸入順序",
   "panel.widget.mixer.settings.memory": "音量等級",
   "panel.widget.mixer.settings.noPresets": "尚無預設集",
-  "panel.widget.mixer.settings.orderHint": "拖曳以設定裝置在選擇清單中的順序。",
+  "panel.widget.mixer.settings.orderHint": "拖曳以設定裝置在選單中的順序。",
   "panel.widget.mixer.settings.outputOrder": "輸出順序",
   "panel.widget.mixer.settings.presetLimit": "已達上限。刪除一個後可再新增。",
   "panel.widget.mixer.settings.presetName": "新增預設",

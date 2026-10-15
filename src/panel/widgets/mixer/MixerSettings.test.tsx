@@ -32,11 +32,28 @@ vi.mock('../../../hooks/useAudioMixer', () => ({
 }));
 
 let deviceOutputs: Array<{ id: string; name: string; isDefault: boolean; direction: string }> = [];
+let deviceInputs: typeof deviceOutputs = [];
+const reorderDevices = vi.fn();
 const dev = (id: string, direction = 'output') => ({ id, name: id, isDefault: false, direction });
+
+// jsdom cannot drive dnd-kit, so the list is a stand-in whose button reverses the ids.
+vi.mock('../../../components/common/SortableList/SortableList', () => ({
+  SortableList: ({ ids, onReorder, renderRow, ariaLabel }: {
+    ids: string[]; onReorder: (ids: string[]) => void; ariaLabel?: string;
+    renderRow: (id: string, a: unknown) => React.ReactNode;
+  }) => (
+    <div>
+      <button type="button" data-testid={`reverse-${ariaLabel}`} onClick={() => onReorder([...ids].reverse())} />
+      {ids.map(id => (
+        <div key={id}>{renderRow(id, { ref: () => {}, style: {}, attributes: {}, listeners: {}, isDragging: false, placeholderClassName: '' })}</div>
+      ))}
+    </div>
+  ),
+}));
 
 vi.mock('../../../hooks/useAudioDevices', () => ({
   useAudioDevices: () => ({
-    outputs: deviceOutputs, inputs: [], reorderDevices: vi.fn(), activeOutput: null, activeInput: null,
+    outputs: deviceOutputs, inputs: deviceInputs, reorderDevices, activeOutput: null, activeInput: null,
     selectOutput: vi.fn(), selectInput: vi.fn(), refresh: refreshDevices,
   }),
 }));
@@ -94,6 +111,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   presets = [makePreset('p1', 'Gaming')];
   deviceOutputs = [];
+  deviceInputs = [];
 });
 
 describe('preset name helpers', () => {
@@ -287,12 +305,22 @@ describe('device order', () => {
     expect(screen.getByText('panel.widget.mixer.settings.orderHint')).toBeTruthy();
   });
 
-  it('shows a lone device as a plain row without a handle or hint', () => {
+  it('reorders each direction through reorderDevices', () => {
+    deviceOutputs = [dev('a'), dev('b')];
+    deviceInputs = [dev('m1', 'input'), dev('m2', 'input')];
+    renderSettings();
+    fireEvent.click(screen.getByTestId('reverse-panel.widget.mixer.settings.outputOrder'));
+    fireEvent.click(screen.getByTestId('reverse-panel.widget.mixer.settings.inputOrder'));
+    expect(reorderDevices).toHaveBeenCalledWith('output', ['b', 'a']);
+    expect(reorderDevices).toHaveBeenCalledWith('input', ['m2', 'm1']);
+  });
+
+  it('shows a lone device as an inert row with the same hint', () => {
     deviceOutputs = [dev('a')];
     renderSettings();
     expect(screen.getByText('a')).toBeTruthy();
     expect(screen.queryByLabelText(MOVE)).toBeNull();
-    expect(screen.queryByText('panel.widget.mixer.settings.orderHint')).toBeNull();
+    expect(screen.getByText('panel.widget.mixer.settings.orderHint')).toBeTruthy();
   });
 
   it('shows no section for a direction without devices', () => {

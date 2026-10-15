@@ -4313,7 +4313,7 @@
   "panel.widget.mixer.settings.inputOrder": "Orden de las entradas",
   "panel.widget.mixer.settings.memory": "Niveles",
   "panel.widget.mixer.settings.noPresets": "Aún no hay preajustes",
-  "panel.widget.mixer.settings.orderHint": "Arrastra para definir el orden de los dispositivos en el selector.",
+  "panel.widget.mixer.settings.orderHint": "Arrastra para definir el orden de los dispositivos en el menú.",
   "panel.widget.mixer.settings.outputOrder": "Orden de las salidas",
   "panel.widget.mixer.settings.presetLimit": "Límite alcanzado. Elimina uno para añadir otro.",
   "panel.widget.mixer.settings.presetName": "Nuevo preajuste",

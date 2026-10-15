@@ -4359,7 +4359,7 @@
   "panel.widget.mixer.settings.inputOrder": "Порядок входов",
   "panel.widget.mixer.settings.memory": "Уровни",
   "panel.widget.mixer.settings.noPresets": "Пресетов пока нет",
-  "panel.widget.mixer.settings.orderHint": "Перетаскивайте, чтобы задать порядок устройств в списке выбора.",
+  "panel.widget.mixer.settings.orderHint": "Перетаскивайте, чтобы задать порядок устройств в меню.",
   "panel.widget.mixer.settings.outputOrder": "Порядок выходов",
   "panel.widget.mixer.settings.presetLimit": "Достигнут предел. Удалите один, чтобы добавить новый.",
   "panel.widget.mixer.settings.presetName": "Новый пресет",

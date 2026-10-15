@@ -4313,7 +4313,7 @@
   "panel.widget.mixer.settings.inputOrder": "入力の順序",
   "panel.widget.mixer.settings.memory": "レベル",
   "panel.widget.mixer.settings.noPresets": "プリセットはまだありません",
-  "panel.widget.mixer.settings.orderHint": "ドラッグして、選択リストでのデバイスの並び順を設定します。",
+  "panel.widget.mixer.settings.orderHint": "ドラッグして、メニューでのデバイスの並び順を設定します。",
   "panel.widget.mixer.settings.outputOrder": "出力の順序",
   "panel.widget.mixer.settings.presetLimit": "上限に達しました。追加するには 1 つ削除してください。",
   "panel.widget.mixer.settings.presetName": "新しいプリセット",

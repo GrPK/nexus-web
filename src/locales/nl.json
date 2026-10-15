@@ -4313,7 +4313,7 @@
   "panel.widget.mixer.settings.inputOrder": "Volgorde van ingangen",
   "panel.widget.mixer.settings.memory": "Niveaus",
   "panel.widget.mixer.settings.noPresets": "Nog geen voorinstellingen",
-  "panel.widget.mixer.settings.orderHint": "Sleep om de volgorde van de apparaten in de keuzelijst te bepalen.",
+  "panel.widget.mixer.settings.orderHint": "Sleep om de volgorde van de apparaten in het menu te bepalen.",
   "panel.widget.mixer.settings.outputOrder": "Volgorde van uitgangen",
   "panel.widget.mixer.settings.presetLimit": "Limiet bereikt. Verwijder er een om een nieuwe toe te voegen.",
   "panel.widget.mixer.settings.presetName": "Nieuwe voorinstelling",

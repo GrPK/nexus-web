@@ -4313,7 +4313,7 @@
   "panel.widget.mixer.settings.inputOrder": "Ordine degli ingressi",
   "panel.widget.mixer.settings.memory": "Livelli",
   "panel.widget.mixer.settings.noPresets": "Nessun preset",
-  "panel.widget.mixer.settings.orderHint": "Trascina per impostare l'ordine dei dispositivi nel selettore.",
+  "panel.widget.mixer.settings.orderHint": "Trascina per impostare l'ordine dei dispositivi nel menu.",
   "panel.widget.mixer.settings.outputOrder": "Ordine delle uscite",
   "panel.widget.mixer.settings.presetLimit": "Limite raggiunto. Eliminane uno per aggiungerne un altro.",
   "panel.widget.mixer.settings.presetName": "Nuovo preset",

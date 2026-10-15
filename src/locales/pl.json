@@ -4359,7 +4359,7 @@
   "panel.widget.mixer.settings.inputOrder": "Kolejność wejść",
   "panel.widget.mixer.settings.memory": "Poziomy",
   "panel.widget.mixer.settings.noPresets": "Brak ustawień wstępnych",
-  "panel.widget.mixer.settings.orderHint": "Przeciągnij, aby ustawić kolejność urządzeń na liście wyboru.",
+  "panel.widget.mixer.settings.orderHint": "Przeciągnij, aby ustawić kolejność urządzeń w menu.",
   "panel.widget.mixer.settings.outputOrder": "Kolejność wyjść",
   "panel.widget.mixer.settings.presetLimit": "Osiągnięto limit. Usuń jedno, aby dodać kolejne.",
   "panel.widget.mixer.settings.presetName": "Nowe ustawienie",

@@ -4313,7 +4313,7 @@
   "panel.widget.mixer.settings.inputOrder": "Ordre des entrées",
   "panel.widget.mixer.settings.memory": "Niveaux",
   "panel.widget.mixer.settings.noPresets": "Aucun préréglage",
-  "panel.widget.mixer.settings.orderHint": "Faites glisser pour définir l'ordre des appareils dans le sélecteur.",
+  "panel.widget.mixer.settings.orderHint": "Faites glisser pour définir l'ordre des appareils dans le menu.",
   "panel.widget.mixer.settings.outputOrder": "Ordre des sorties",
   "panel.widget.mixer.settings.presetLimit": "Limite atteinte. Supprimez-en un pour en ajouter un autre.",
   "panel.widget.mixer.settings.presetName": "Nouveau préréglage",

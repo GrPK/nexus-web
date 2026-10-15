@@ -4313,7 +4313,7 @@
   "panel.widget.mixer.settings.inputOrder": "Giriş sırası",
   "panel.widget.mixer.settings.memory": "Seviyeler",
   "panel.widget.mixer.settings.noPresets": "Henüz hazır ayar yok",
-  "panel.widget.mixer.settings.orderHint": "Aygıtların seçicideki sırasını belirlemek için sürükleyin.",
+  "panel.widget.mixer.settings.orderHint": "Aygıtların menüdeki sırasını belirlemek için sürükleyin.",
   "panel.widget.mixer.settings.outputOrder": "Çıkış sırası",
   "panel.widget.mixer.settings.presetLimit": "Sınıra ulaşıldı. Yenisini eklemek için birini silin.",
   "panel.widget.mixer.settings.presetName": "Yeni ön ayar",
