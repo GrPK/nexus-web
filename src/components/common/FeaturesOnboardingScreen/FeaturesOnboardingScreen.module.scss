@@ -71,7 +71,7 @@ $activity-path-length: 50;
   flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
-  // Room inside the scroller for the hover lift and its shadow tail, which it would clip.
+  // Room inside the scroller for the hover lift, which it would clip; capped by the surface gap so it never overlaps the next row.
   padding: 4px 20px 12px;
   margin: -4px -20px -12px;
 }
