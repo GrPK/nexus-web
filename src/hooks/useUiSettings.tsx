@@ -564,6 +564,8 @@ interface UiSettingsProviderProps {
 
 // Local read; this only bounds a service that never answers.
 const PREFERENCES_READ_TIMEOUT_MS = 8000;
+const PREFERENCES_RETRY_BASE_MS = 2000;
+const PREFERENCES_RETRY_MAX_MS = 30000;
 
 export function UiSettingsProvider({
   children, serviceOnline, activeProfileId, manageDom = true,
@@ -578,6 +580,8 @@ export function UiSettingsProvider({
   );
   const [hydrated, setHydrated] = useState(false);
   const [hydrationFailed, setHydrationFailed] = useState(false);
+  // Failed reads in a row, to space the retries.
+  const [failedReads, setFailedReads] = useState(0);
 
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingWriteRef = useRef<PreferencesPatch | null>(null);
@@ -668,11 +672,12 @@ export function UiSettingsProvider({
     // still pending; that write's echo reloads once it flushes, when the
     // server is consistent. (Mount / profile-switch reloads pass false.)
     if (coalesceWithPendingWrite && writeTimer.current) return;
-    // Network I/O bound by AbortSignal (as for the Nexus 2 preview): a request the service accepted and never answers counts as a failed read.
+    // Bounds the local HTTP request with an AbortSignal (network I/O, as for the Nexus 2 preview); a relay-tunneled read ignores the signal and is not covered.
+    const markFailed = () => { setHydrationFailed(true); setFailedReads(n => n + 1); };
     const abort = new AbortController();
     const bound = setTimeout(() => abort.abort(), PREFERENCES_READ_TIMEOUT_MS);
     fetchPreferences(abort.signal).finally(() => clearTimeout(bound)).then(prefs => {
-      if (!prefs) { setHydrationFailed(true); return; }
+      if (!prefs) { markFailed(); return; }
       setSettings(prev => {
         const next = { ...applyServerToLocal(prefs, prev), ...pendingLocalRef.current };
         persistLocal(next);
@@ -701,6 +706,7 @@ export function UiSettingsProvider({
       }
       setHydrated(true);
       setHydrationFailed(false);
+      setFailedReads(0);
       // Mirror to the legacy cache so code paths still reading via
       // loadSettings() see refreshed values. Removable once every view
       // goes through this hook.
@@ -716,8 +722,18 @@ export function UiSettingsProvider({
         pinnedSidebarApps: prefs.ui?.pinnedSidebarApps,
         sidebarAppOrder: prefs.ui?.sidebarAppOrder,
       });
-    }).catch(() => { setHydrationFailed(true); });
+    }).catch(markFailed);
   }, [serviceOnline, persistLocal, setLanguage, manageDom, scheduleServerWrite]);
+
+  // A failed or aborted first read is retried with a growing delay while the
+  // service is online, so the gates and the replayed features step get real
+  // values. Stops on success, on going offline and on unmount.
+  useEffect(() => {
+    if (!serviceOnline || hydrated || failedReads === 0) return undefined;
+    const delay = Math.min(PREFERENCES_RETRY_BASE_MS * 2 ** (failedReads - 1), PREFERENCES_RETRY_MAX_MS);
+    const timer = setTimeout(() => reload(), delay);
+    return () => clearTimeout(timer);
+  }, [serviceOnline, hydrated, failedReads, reload]);
 
   // Hydrate from server when online or when the profile changes.
   useEffect(() => {

@@ -434,9 +434,11 @@ export function Dashboard() {
   // preferences read has an outcome; a service that is down for good is an
   // outcome too, so the app is never held blank behind it.
   const serviceDown = status.state === 'offline' || status.state === 'offline-installed';
+  const gateEverOpened = useRef(false);
   const { pillars, hydrated: pillarsHydrated, ready: pillarsReady, report: reportPillars } = usePillarsLatch(
     onboardingStatus === 'unknown' || welcomeOpen || featuresOpen,
     serviceDown,
+    gateEverOpened,
   );
   const coolingOn = pillars?.cooling ?? true;
   const nexus2NonCooling = useNexus2NonCoolingContent(pillars !== null && !coolingOn && nexus2.status === 'pending');
@@ -521,6 +523,7 @@ export function Dashboard() {
     lightingPending: lightingStatus === 'pending',
     lightingDismissed: lightingOnboardingDismissed,
   });
+  if (welcomeOpen || featuresOpen || importOpen || conflictStepPending || lightingOnboardingOpen) gateEverOpened.current = true;
   // An import offer skipped because its pillar is off is consumed when the whole
   // onboarding run is over, so it is never asked again (the Cooling page and
   // the Settings Nexus 2 entry import it on demand).

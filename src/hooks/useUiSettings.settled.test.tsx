@@ -62,4 +62,38 @@ describe('settings provider settled semantics', () => {
       vi.useRealTimers();
     }
   });
+
+  it('retries after an aborted read and hydrates when the retry succeeds', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(fetchPreferences)
+        .mockImplementationOnce(((signal?: AbortSignal) => new Promise((_, reject) => {
+          signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        })) as never)
+        .mockResolvedValue({ theme: { themeMode: 'dark', accentColor: '#2563eb', language: 'en' } } as never);
+      await act(async () => { mount(true); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
+      expect(seen).toEqual({ settled: true, hydrated: false });
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(fetchPreferences).toHaveBeenCalledTimes(2);
+      expect(seen).toEqual({ settled: true, hydrated: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not retry while the service is offline', async () => {
+    vi.useFakeTimers();
+    try {
+      const view = mount(true);
+      vi.mocked(fetchPreferences).mockResolvedValue(null as never);
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      view.rerender(<UiSettingsProvider serviceOnline={false} manageDom={false}><Probe /></UiSettingsProvider>);
+      const calls = vi.mocked(fetchPreferences).mock.calls.length;
+      await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+      expect(vi.mocked(fetchPreferences).mock.calls.length).toBe(calls);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
