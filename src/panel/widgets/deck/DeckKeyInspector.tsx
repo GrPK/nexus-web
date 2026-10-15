@@ -50,13 +50,11 @@ import styles from './DeckKeyInspector.module.scss';
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 export interface DeckEditContextValue {
-  /** The editing target is a physical deck. */
-  physical: boolean;
   /** Fields must not write seed values on view (an inherited dial would copy its enclosing level into the folder). */
   freezeSeed: boolean;
 }
 
-export const DeckEditContext = createContext<DeckEditContextValue>({ physical: false, freezeSeed: false });
+export const DeckEditContext = createContext<DeckEditContextValue>({ freezeSeed: false });
 
 // A phone-companion session gets 403 from the service when it saves a layout
 // introducing one of these action types (PanelRoutes' DeckLayoutPolicy) -
@@ -1435,7 +1433,7 @@ export function DeckKeyInspector({ target, page, folderPath, onFolderPathChange,
   }
 
   return (
-    <DeckEditContext.Provider value={{ physical: target.kind === 'physical', freezeSeed: false }}>
+    <DeckEditContext.Provider value={{ freezeSeed: false }}>
     <div className={part === 'picker' ? `${styles.root} ${styles.pickerFill}` : styles.root}>
       {showPicker && (
         <SettingsSection

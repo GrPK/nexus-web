@@ -360,7 +360,7 @@ export function DeckDialInspector({ target, page, folderPath, selectedDial, entr
 
   const action = entry.action;
   return (
-    <DeckEditContext.Provider value={{ physical: target.kind === 'physical', freezeSeed: inherited }}>
+    <DeckEditContext.Provider value={{ freezeSeed: inherited }}>
     <div className={keyStyles.root}>
       {stackSection}
 
