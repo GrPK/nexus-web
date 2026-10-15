@@ -149,6 +149,39 @@ describe('MixerWidget', () => {
     expect(screen.queryByText('Spotify')).toBeNull();
   });
 
+  it('shows idle apps, labels and the output menu by default', async () => {
+    renderWidget();
+    await waitFor(() => expect(screen.getByText('Helldivers 2')).toBeTruthy());
+    expect(screen.getByText('Spotify')).toBeTruthy();
+    expect(screen.getByLabelText(PICK_OUTPUT)).toBeTruthy();
+  });
+
+  it('drops the fader labels when showLabels is off', async () => {
+    renderWidget({ showLabels: false });
+    await waitFor(() => expect(screen.getAllByRole('button', { name: MUTE }).length).toBeGreaterThan(0));
+    expect(screen.queryByText('Helldivers 2')).toBeNull();
+  });
+
+  it('does not reopen the picker when the output band comes back', async () => {
+    const { rerender } = renderWidget();
+    await waitFor(() => expect(screen.getByText('Helldivers 2')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText(PICK_OUTPUT));
+    expect(screen.getByLabelText(BACK)).toBeTruthy();
+
+    rerender(<MixerWidget widget={{ id: 'mixer-1', type: 'mixer', size: '4x4', col: 0, row: 0, config: { showOutput: false } }} surface="y70" />);
+    await waitFor(() => expect(screen.queryByLabelText(BACK)).toBeNull());
+    rerender(<MixerWidget widget={{ id: 'mixer-1', type: 'mixer', size: '4x4', col: 0, row: 0, config: { showOutput: true } }} surface="y70" />);
+
+    await waitFor(() => expect(screen.getByLabelText(PICK_OUTPUT)).toBeTruthy());
+    expect(screen.queryByLabelText(BACK)).toBeNull();
+  });
+
+  it('removes the output band when showOutput is off', async () => {
+    renderWidget({ showOutput: false });
+    await waitFor(() => expect(screen.getByText('Helldivers 2')).toBeTruthy());
+    expect(screen.queryByLabelText(PICK_OUTPUT)).toBeNull();
+  });
+
   it('applies a preset from its chip', async () => {
     fetchAudioMixer.mockResolvedValue(state({
       presets: [{ id: 'p1', name: 'Gaming', masterVolume: 0.7, apps: [] }],

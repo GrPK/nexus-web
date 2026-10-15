@@ -10,6 +10,8 @@ export interface MixerStripProps {
   /** Strip id, or undefined for the system output strip. */
   id?: string;
   name: string;
+  /** False leaves the name off the fader; it stays on the aria labels. */
+  showLabel?: boolean;
   /** 0-1. */
   volume: number;
   muted: boolean;
@@ -25,6 +27,7 @@ export interface MixerStripProps {
 export function MixerStrip({
   id,
   name,
+  showLabel = true,
   volume,
   muted,
   peak,
@@ -49,7 +52,7 @@ export function MixerStrip({
         meter={peak}
         showValue
         disabled={disabled}
-        topLabel={name}
+        topLabel={showLabel ? name : undefined}
         valueLabel={`${percent}`}
         icon={<StripIcon id={id} name={name} muted={muted} />}
         iconButton={{

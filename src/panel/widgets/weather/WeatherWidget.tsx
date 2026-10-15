@@ -14,6 +14,7 @@ import { WeatherIcon } from './WeatherIcon';
 import { DAY_LABEL_KEYS, dailyMax, dailyMin, formatTemp, hourlyTemp, resolveUnit, upcomingHours } from './weatherFormat';
 import { useWeatherSnapshot } from './useWeatherSnapshot';
 import { WeatherSky } from './sky/WeatherSky';
+import { barGradient, fahrenheitToCelsius } from './weatherTempColors';
 import styles from './WeatherWidget.module.scss';
 
 // Deck cells import the tile's glyph + formatting through here.
@@ -29,6 +30,7 @@ export function WeatherWidget({ widget, surface }: WidgetProps) {
   const [skySnap, setSkySnap] = useState(snap?.asOf ? snap : null);
   if (snap?.asOf && snap !== skySnap) setSkySnap(snap);
 
+  const accentBars = widget.config?.accentBars === true;
   const hour12 = resolveHour12(timeFormat);
   function hourLabel(time: string) {
     return formatWeatherHour(
@@ -165,6 +167,15 @@ export function WeatherWidget({ widget, surface }: WidgetProps) {
           '--weather-bar-left': `${barLeft}%`,
           '--weather-bar-right': `${barRight}%`,
         } as CSSProperties;
+        if (!accentBars) {
+          const toC = (v: number) => (unit === 'F' ? fahrenheitToCelsius(v) : v);
+          barStyle.background = barGradient(toC(min), toC(max));
+          barStyle.boxShadow = 'none';
+        } else {
+          barStyle.background = 'var(--accent-glow)';
+        }
+        const showDot = !accentBars && index === 0 && tempValue !== null && tempValue !== undefined;
+        const dotLeft = Math.max(0, Math.min(100, (((tempValue ?? 0) - weekMin) / weekRange) * 100));
         return (
           <Fragment key={`${item.date}-${index}`}>
             <span className={styles.dailyDay}>{dayLabel(item.date, index)}</span>
@@ -173,8 +184,11 @@ export function WeatherWidget({ widget, surface }: WidgetProps) {
             </div>
             <span className={styles.dailyLo}>{formatTemp(min)}</span>
             {showBars ? (
-              <div className={styles.dailyBarTrack}>
-                <div className={styles.dailyBarFill} style={barStyle} />
+              <div className={styles.dailyBarCell}>
+                <div className={styles.dailyBarTrack}>
+                  <div className={styles.dailyBarFill} style={barStyle} />
+                </div>
+                {showDot && <span className={styles.dailyBarDot} style={{ left: `${dotLeft}%` }} />}
               </div>
             ) : (
               <span className={styles.dailySpacer} />

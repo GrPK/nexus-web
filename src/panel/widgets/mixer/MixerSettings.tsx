@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { GripVertical } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { useAudioDevices } from '../../../hooks/useAudioDevices';
 import { useAudioMixer } from '../../../hooks/useAudioMixer';
 import { useSystemVolume } from '../../../hooks/useSystemVolume';
-import { MAX_PRESETS, MAX_PRESET_NAME, presetNameTaken } from '../../../api/mixer';
+import { MAX_PRESETS, MAX_PRESET_NAME, presetNameTaken, type AudioDevice } from '../../../api/mixer';
+import { SortableList } from '../../../components/common/SortableList/SortableList';
 import { MixerPresetRow } from './MixerPresetRow';
+import styles from './MixerSettings.module.scss';
 import { canEditFreeText } from '../../types';
 import type { WidgetSettingsProps } from '../types';
 import {
@@ -34,7 +37,10 @@ export function MixerSettings({ widget, surface, desktopEditor, onUpdate }: Widg
   const nameTaken = presetNameTaken(mixer.presets, name);
 
   const showMaster = (widget.config?.showMaster as boolean | undefined) ?? true;
-  const hideIdle = (widget.config?.hideIdle as boolean | undefined) ?? false;
+  // Stored as hideIdle so a widget saved before the toggle turned positive keeps its choice.
+  const showIdle = !((widget.config?.hideIdle as boolean | undefined) ?? false);
+  const showLabels = (widget.config?.showLabels as boolean | undefined) ?? true;
+  const showOutput = (widget.config?.showOutput as boolean | undefined) ?? true;
   const showPresets = (widget.config?.showPresets as boolean | undefined) ?? true;
   // A preset needs a typed name, so creation is offered only where a keyboard
   // exists. Applying and deleting stay available on every surface. The shared
@@ -74,10 +80,20 @@ export function MixerSettings({ widget, surface, desktopEditor, onUpdate }: Widg
           onChange={value => onUpdate({ showMaster: value })}
         />
         <SettingsToggle
-          label={t('panel.widget.mixer.settings.hideIdle')}
-          description={t('panel.widget.mixer.settings.hideIdleHint')}
-          checked={hideIdle}
-          onChange={value => onUpdate({ hideIdle: value })}
+          label={t('panel.widget.mixer.settings.showIdle')}
+          description={t('panel.widget.mixer.settings.showIdleHint')}
+          checked={showIdle}
+          onChange={value => onUpdate({ hideIdle: !value })}
+        />
+        <SettingsToggle
+          label={t('panel.widget.mixer.settings.showLabels')}
+          checked={showLabels}
+          onChange={value => onUpdate({ showLabels: value })}
+        />
+        <SettingsToggle
+          label={t('panel.widget.mixer.settings.showOutput')}
+          checked={showOutput}
+          onChange={value => onUpdate({ showOutput: value })}
         />
         <SettingsToggle
           label={t('panel.widget.mixer.settings.showPresets')}
@@ -85,6 +101,17 @@ export function MixerSettings({ widget, surface, desktopEditor, onUpdate }: Widg
           onChange={value => onUpdate({ showPresets: value })}
         />
       </SettingsSection>
+
+      <DeviceOrder
+        title={t('panel.widget.mixer.settings.outputOrder')}
+        devices={devices.outputs}
+        onReorder={ids => devices.reorderDevices('output', ids)}
+      />
+      <DeviceOrder
+        title={t('panel.widget.mixer.settings.inputOrder')}
+        devices={devices.inputs}
+        onReorder={ids => devices.reorderDevices('input', ids)}
+      />
 
       <SettingsSection title={t('panel.widget.mixer.settings.memory')}>
         <SettingsToggle
@@ -182,6 +209,53 @@ export function MixerSettings({ widget, surface, desktopEditor, onUpdate }: Widg
         )}
       </SettingsSection>
     </>
+  );
+}
+
+/** Drag order of the plugged-in devices; a lone device keeps the row layout with an inert handle slot. */
+function DeviceOrder({ title, devices, onReorder }: {
+  title: string;
+  devices: AudioDevice[];
+  onReorder: (ids: string[]) => void;
+}) {
+  const { t } = useTranslation();
+  // A device unplugged mid-drag keeps its name on the overlay and the aria label.
+  const names = useRef(new Map<string, string>());
+  for (const d of devices) names.current.set(d.id, d.name);
+  if (devices.length === 0) return null;
+  const nameOf = (id: string) => names.current.get(id) ?? '';
+  const draggable = devices.length > 1;
+  return (
+    <SettingsSection title={title}>
+      <SettingsHint>{t('panel.widget.mixer.settings.orderHint')}</SettingsHint>
+      <SortableList
+        opaqueOverlay
+        ariaLabel={title}
+        ids={devices.map(d => d.id)}
+        onReorder={onReorder}
+        renderRow={(id, a) => (
+          <div
+            ref={a.ref}
+            style={a.style}
+            className={`${styles.orderRow} ${a.isDragging ? a.placeholderClassName : ''}`}
+          >
+            {draggable ? (
+              <span
+                className={styles.orderHandle}
+                {...a.attributes}
+                {...a.listeners}
+                aria-label={t('panel.widget.mixer.aria.moveDevice', { name: nameOf(id) })}
+              >
+                <GripVertical size={18} strokeWidth={2} />
+              </span>
+            ) : (
+              <span className={styles.orderHandle} aria-hidden />
+            )}
+            <span className={styles.orderName}>{nameOf(id)}</span>
+          </div>
+        )}
+      />
+    </SettingsSection>
   );
 }
 
