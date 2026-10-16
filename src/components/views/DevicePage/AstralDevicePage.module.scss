@@ -87,14 +87,14 @@
 
 // The reading changes about once a second; the card glides to it.
 .turning {
-  transition: transform 0.8s ease-out;
+  transition: transform var(--ease-slow) ease-out;
 }
 
 .levelLine,
 .uprightLine {
   position: absolute;
   pointer-events: none;
-  border: 0 dashed rgba(156, 163, 175, 0.45);
+  border: 0 dashed rgb(156 163 175 / var(--alpha-medium));
 }
 
 .levelLine {
