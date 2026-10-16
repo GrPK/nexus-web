@@ -103,4 +103,19 @@ describe('RateCapSelect', () => {
     expect(onFail).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'lighting.ledMap.rateCap' }).textContent).toContain('"hz":20');
   });
+
+  it('keeps a newer pick when an older save refetch lands while it is pending', async () => {
+    const resolvers: Array<(v: unknown) => void> = [];
+    api.setLightingMaxRate.mockReset();
+    api.setLightingMaxRate.mockImplementation(() => new Promise(res => { resolvers.push(res); }));
+    const { rerender } = render(<RateCapSelect id="d1" value={null} onFail={vi.fn()} />);
+    pick(HZ(30));
+    pick(HZ(5));
+    rerender(<RateCapSelect id="d1" value={30} onFail={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'lighting.ledMap.rateCap' }).textContent).toContain('"hz":5');
+    resolvers.forEach(r => r({ error: false, msg: '' }));
+    await waitFor(() => expect(api.setLightingMaxRate).toHaveBeenCalledTimes(2));
+    rerender(<RateCapSelect id="d1" value={5} onFail={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'lighting.ledMap.rateCap' }).textContent).toContain('"hz":5');
+  });
 });
