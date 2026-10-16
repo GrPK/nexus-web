@@ -3040,6 +3040,7 @@
   "lighting.pin.disabledGameSync": "Game Sync нельзя закрепить",
   "lighting.pin.disabledOff": "Подсветка выключена, закреплять нечего",
   "lighting.pin.disabledUnavailable": "Сейчас не к чему закреплять",
+  "lighting.pin.hintBody": "Чтобы изменить подсветку, оставьте устройство выбранным. Открепите его, чтобы вернуться к подсветке всех устройств.",
   "lighting.pin.modeTarget": "{mode}: {name}",
   "lighting.pin.pinnedTo": "Закреплено: {name}",
   "lighting.renderGpu.auto": "Автоматически",

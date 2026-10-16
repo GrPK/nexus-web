@@ -3004,6 +3004,7 @@
   "lighting.pin.disabledGameSync": "Game Sync にはピン留めできません",
   "lighting.pin.disabledOff": "ライティングがオフのため、ピン留めできません",
   "lighting.pin.disabledUnavailable": "現在ピン留めできる対象がありません",
+  "lighting.pin.hintBody": "ライティングを変更するには、選択したままにしてください。ピン留めを解除すると、すべてのデバイス共通のライティングに戻ります。",
   "lighting.pin.modeTarget": "{mode}：{name}",
   "lighting.pin.pinnedTo": "{name} にピン留め中",
   "lighting.renderGpu.auto": "自動",

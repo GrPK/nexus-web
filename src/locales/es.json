@@ -3004,6 +3004,7 @@
   "lighting.pin.disabledGameSync": "Game Sync no se puede fijar",
   "lighting.pin.disabledOff": "La iluminación está apagada, no hay nada que fijar",
   "lighting.pin.disabledUnavailable": "Ahora mismo no hay nada a lo que fijar",
+  "lighting.pin.hintBody": "Para cambiar su iluminación, mantenlo seleccionado. Desfíjalo para volver a la iluminación de todos los dispositivos.",
   "lighting.pin.modeTarget": "{mode}: {name}",
   "lighting.pin.pinnedTo": "Fijado a {name}",
   "lighting.renderGpu.auto": "Automático",

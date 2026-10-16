@@ -3004,6 +3004,7 @@
   "lighting.pin.disabledGameSync": "Game Sync 无法固定",
   "lighting.pin.disabledOff": "灯光已关闭，没有可固定的内容",
   "lighting.pin.disabledUnavailable": "目前没有可固定的目标",
+  "lighting.pin.hintBody": "要更改其灯效，请保持选中状态。取消固定即可恢复所有设备的统一灯效。",
   "lighting.pin.modeTarget": "{mode}：{name}",
   "lighting.pin.pinnedTo": "已固定到 {name}",
   "lighting.renderGpu.auto": "自动",

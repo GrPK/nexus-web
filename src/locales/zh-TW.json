@@ -3004,6 +3004,7 @@
   "lighting.pin.disabledGameSync": "Game Sync 無法釘選",
   "lighting.pin.disabledOff": "燈光已關閉，沒有可釘選的內容",
   "lighting.pin.disabledUnavailable": "目前沒有可釘選的目標",
+  "lighting.pin.hintBody": "若要變更其燈效，請保持選取狀態。取消釘選即可恢復所有裝置的統一燈效。",
   "lighting.pin.modeTarget": "{mode}：{name}",
   "lighting.pin.pinnedTo": "已釘選到 {name}",
   "lighting.renderGpu.auto": "自動",

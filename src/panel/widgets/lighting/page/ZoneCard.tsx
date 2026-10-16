@@ -89,6 +89,9 @@ export interface BulkSelection {
  * press unpins it; the menu offers Pin on a following card and Unpin on a
  * pinned one.
  */
+/** Hint id of the one-time coachmark on the first pin; the id is also the `data-coachmark` value. */
+export const LIGHTING_PIN_HINT_ID = 'lighting-pin';
+
 export interface DevicePin {
   pinned: boolean;
   /** Display name of what the card is pinned to (tooltip). */
@@ -98,6 +101,8 @@ export interface DevicePin {
   /** Why this card cannot be pinned right now (Game Sync, Off). */
   disabledReason?: string;
   setPinned: (pinned: boolean) => void;
+  /** Marks this card's pin button as the target of the first-pin coachmark. */
+  hint?: boolean;
 }
 
 /** Where a card sits under a {@link ZoneCardStack} header: every member seams
@@ -737,6 +742,7 @@ export function ZoneCard({
               aria-label={t('lighting.pin.pinnedTo', { name: pin.targetName ?? '' })}
               aria-describedby={unpinHintId}
               data-no-dnd
+              data-coachmark={pin.hint ? LIGHTING_PIN_HINT_ID : undefined}
               onClick={e => {
                 e.stopPropagation();
                 pin.setPinned(false);

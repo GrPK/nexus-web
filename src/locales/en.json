@@ -3004,6 +3004,7 @@
   "lighting.pin.disabledGameSync": "Game Sync can't be pinned",
   "lighting.pin.disabledOff": "Lighting is off, so nothing can be pinned",
   "lighting.pin.disabledUnavailable": "Nothing to pin to right now",
+  "lighting.pin.hintBody": "To change its lighting, keep it selected. Unpin it to go back to the lighting for all devices.",
   "lighting.pin.modeTarget": "{mode}: {name}",
   "lighting.pin.pinnedTo": "Pinned to {name}",
   "lighting.renderGpu.auto": "Automatic",

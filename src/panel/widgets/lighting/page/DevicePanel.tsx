@@ -35,7 +35,7 @@ import styles from '../LightingPage.module.scss';
  * using the same component/styling as a motherboard group: a chevron, the brand
  * name, a group power switch, and its lights as indented child cards.
  */
-export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, colorTunedIds, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenDevicePage, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
+export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pinHintIds, onPinHintPress, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, colorTunedIds, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenDevicePage, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
   devices: LightingDevice[];
   /** Optional control rendered at the top of the scrolling list (master brightness). */
   /** Every device before the Nexus-Control-off filter, so a group header can
@@ -63,6 +63,10 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   pinDisabledReason?: string;
   /** Display name of what a pin targets, for the pinned tooltip. */
   pinTargetName?: (pin: Pin) => string;
+  /** Cards the first-pin coachmark may point at: its pin button on the top-most one carries the hint target. */
+  pinHintIds?: ReadonlySet<string>;
+  /** Called when the hinted card's pin button is pressed. */
+  onPinHintPress?: () => void;
   /** Pins these cards to the current global source, or unpins them. Absent
    *  leaves every card without a pin button. */
   onSetPin?: (ids: string[], pinned: boolean) => void;
@@ -397,15 +401,36 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
     };
   };
 
+  // The cards in the order the rail shows them; a collapsed group shows none.
+  const cardsInOrder = (ids: readonly string[], arr: Arrangement, blockOf: (id: string) => DeviceBlock | undefined): LightingDevice[] =>
+    ids.flatMap(id => {
+      if (id in arr.groupMembers) return isCollapsed(id) ? [] : cardsInOrder(arr.groupMembers[id], arr, blockOf);
+      const b = blockOf(id);
+      if (!b) return [];
+      if (b.kind !== 'group') return devicesOfBlock(b);
+      const innerArr = innerArrangements.get(b.groupKey);
+      if (isCollapsed(b.groupKey) || !innerArr) return [];
+      const rowOf = new Map(b.blocks.map(r => [blockKey(r), r]));
+      return cardsInOrder(innerArr.rowIds, innerArr, rid => rowOf.get(rid));
+    });
+  const pinHintId = pinHintIds && pinHintIds.size > 0 && onSetPin
+    ? cardsInOrder(arrangement.rowIds, arrangement, id => blockMap.get(id))
+      .find(d => pinHintIds.has(d.id) && !!pins?.[d.id] && !zoneCardUnavailable(d) && !fwOf(d))?.id
+    : undefined;
+
   const pinFor = (id: string): DevicePin | undefined => {
     if (!onSetPin) return undefined;
     const pin = pins?.[id];
     return {
+      hint: id === pinHintId,
       pinned: !!pin,
       targetName: pin ? pinTargetName?.(pin) : undefined,
       kind: pin?.kind,
       disabledReason: pinSource == null ? pinDisabledReason : undefined,
-      setPinned: value => onSetPin([id], value),
+      setPinned: value => {
+        onSetPin([id], value);
+        if (!value && id === pinHintId) onPinHintPress?.();
+      },
     };
   };
 

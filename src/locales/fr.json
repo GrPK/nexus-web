@@ -3004,6 +3004,7 @@
   "lighting.pin.disabledGameSync": "Game Sync ne peut pas être épinglé",
   "lighting.pin.disabledOff": "L'éclairage est éteint, il n'y a rien à épingler",
   "lighting.pin.disabledUnavailable": "Rien sur quoi épingler pour le moment",
+  "lighting.pin.hintBody": "Pour modifier son éclairage, gardez-le sélectionné. Désépinglez-le pour revenir à l'éclairage de tous les appareils.",
   "lighting.pin.modeTarget": "{mode} : {name}",
   "lighting.pin.pinnedTo": "Épinglé sur {name}",
   "lighting.renderGpu.auto": "Automatique",

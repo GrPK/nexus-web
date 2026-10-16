@@ -54,6 +54,8 @@ import { DeviceCountSummary } from '../../../components/common/DeviceCountSummar
 import { Notice } from '../../../components/common/Notice/Notice';
 import { SectionHeader } from '../../../components/common/SectionHeader/SectionHeader';
 import { useUiSettings } from '../../../hooks/useUiSettings';
+import { useOnboardingHint } from '../../../hooks/useOnboardingHint';
+import { Coachmark } from '../../../components/common/Coachmark/Coachmark';
 import { ServiceRequired } from '../../../components/views/ServiceRequired';
 import { DeviceCanvas } from '../../../components/common/DeviceCanvas/DeviceCanvas';
 import { canvasLabelName } from '../../../lib/canvasLabelName';
@@ -95,7 +97,7 @@ import { MediaCanvasNotice } from './page/MediaCanvasNotice';
 import { MediaBackdrop } from './page/MediaBackdrop';
 import { DevicePanel } from './page/DevicePanel';
 import { type DiscoveryState } from './page/DeviceDiscoveryCard';
-import { zoneCardSelectable, zoneCardSelectionHoldable, zoneCardUnavailable } from './page/ZoneCard';
+import { LIGHTING_PIN_HINT_ID, zoneCardSelectable, zoneCardSelectionHoldable, zoneCardUnavailable } from './page/ZoneCard';
 import { Button } from '../../../components/common/Button/Button';
 import { GAME_SYNC_GUIDE_URL } from '../../../lib/externalLinks';
 import { GameSyncLeftPane } from './page/GameSyncLeftPane';
@@ -144,6 +146,8 @@ interface LayoutHistorySnapshot {
    *  Scopes power reconciliation on undo/redo to exactly the touched devices. */
   powerIds: string[];
 }
+
+const PIN_HINT_SELECTOR = `[data-coachmark="${LIGHTING_PIN_HINT_ID}"]`;
 
 // The modes a tab press can pin selected cards to; Off and Game Sync always change the global mode.
 const PINNABLE_MODES: ReadonlySet<string> = new Set(['static', 'animate', 'screen', 'gif']);
@@ -388,7 +392,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
 
   // Pinned devices, keyed by device id. The service owns them; this is its
   // copy plus the optimistic edits made here, re-read on every lighting frame.
-  const { pins, refresh: refreshPins, applyPins, recordPins } = usePins();
+  const { pins, loaded: pinsLoaded, refresh: refreshPins, applyPins: writePins, recordPins } = usePins();
+  // First-pin coachmark: the devices a pin the user made this session went to.
+  // Pins restored from the service or set elsewhere never reach it.
+  const pinHint = useOnboardingHint(LIGHTING_PIN_HINT_ID);
+  const [pinHintIds, setPinHintIds] = useState<ReadonlySet<string> | null>(null);
+  const applyPins = useCallback(async (ids: readonly string[], pin: Pin | null, record?: boolean): Promise<boolean> => {
+    const ok = await writePins(ids, pin, record);
+    if (ok && pin && ids.length > 0) setPinHintIds(prev => prev ?? new Set(ids));
+    return ok;
+  }, [writePins]);
   // Collapsing the effect dock hands its space to the canvas and the browser.
   // The preset toolbar keeps its width either way - it lives in row 1, which
   // sizes itself.
@@ -2463,6 +2476,30 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           : 'lighting.pin.disabledUnavailable',
   );
   const pinTargetName = useCallback((pin: Pin): string => pinModeTargetLabel(pin, t), [t]);
+  const { dismissed: pinHintDismissed, dismiss: dismissPinHint } = pinHint;
+  // Pins already there when the page first loads them mean the user knows
+  // pins, or has seen the hint on another client.
+  const pinsCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!pinsLoaded || pinHintDismissed === null || pinsCheckedRef.current) return;
+    pinsCheckedRef.current = true;
+    if (pinHintDismissed === false && !pinHintIds && Object.keys(pins).length > 0) dismissPinHint();
+  }, [pinsLoaded, pinHintDismissed, pinHintIds, pins, dismissPinHint]);
+  // Unpinned by any path, the hint has nothing left to point at.
+  useEffect(() => {
+    if (pinHintDismissed === false && pinHintIds && ![...pinHintIds].some(id => pins[id])) dismissPinHint();
+  }, [pinHintDismissed, pinHintIds, pins, dismissPinHint]);
+  const hintPin = pinHintIds ? pins[[...pinHintIds].find(id => pins[id]) ?? ''] : undefined;
+  const pinHintName = hintPin ? pinTargetName(hintPin) : '';
+  const showPinHint = !simpleDashboard && pinHintDismissed === false && pinHintIds !== null;
+  // The bubble may not cover the tab row, so it stays inside the content below it.
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const topRowRef = useRef<HTMLDivElement | null>(null);
+  const contentBelowTabs = useCallback(() => {
+    const body = bodyRef.current?.getBoundingClientRect();
+    const tabs = topRowRef.current?.getBoundingClientRect();
+    return body && tabs ? new DOMRect(body.left, tabs.bottom, body.width, body.bottom - tabs.bottom) : null;
+  }, []);
   const handleSetPin = useCallback((ids: string[], pinned: boolean) => {
     if (!pinned) { void applyPins(ids, null); return; }
     if (globalPin) void applyPins(ids, globalPin.pin);
@@ -2594,8 +2631,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           always-mounted effect dock. Both side columns span the tab row so they
           rise to the very top of the page. Capped at --page-max (pageBody) so
           the page matches every other view's width. */}
-      <div className={`${styles.body} ${dockCollapsed ? styles.bodyDockCollapsed : ''} pageBody`}>
-        <div className={styles.topRow}>
+      <div ref={bodyRef} className={`${styles.body} ${dockCollapsed ? styles.bodyDockCollapsed : ''} pageBody`}>
+        <div ref={topRowRef} className={styles.topRow}>
           <div className={`${styles.tabsCell} ${styles.tabsAnchor}`} ref={modeMenuAnchorRef}>
             <ViewHeader
               title={t('lighting.title')}
@@ -2750,6 +2787,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             pinDisabledReason={pinDisabledReason}
             pinTargetName={pinTargetName}
             onSetPin={handleSetPin}
+            pinHintIds={showPinHint ? pinHintIds : undefined}
+            onPinHintPress={dismissPinHint}
             pickTargetIds={pickTargetIds}
             pulse={pulse}
             selectedIds={selectedDeviceIds}
@@ -3056,6 +3095,17 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           onCompositionChanged={hubId => { void handleCompositionChanged(hubId); }}
           onRateCapChanged={() => { void refreshDevices(); }}
           onNavigateToDevicePage={deviceKey => onSectionNavigate?.('device', { deviceKey })}
+        />
+      )}
+      {showPinHint && (
+        <Coachmark
+          hintId={LIGHTING_PIN_HINT_ID}
+          target={PIN_HINT_SELECTOR}
+          boundary={contentBelowTabs}
+          title={t('lighting.pin.pinnedTo', { name: pinHintName })}
+          body={t('lighting.pin.hintBody')}
+          dismissLabel={t('onboarding.hint.dismiss')}
+          onDismiss={dismissPinHint}
         />
       )}
       {colorTuningIds && (

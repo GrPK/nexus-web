@@ -3004,6 +3004,7 @@
   "lighting.pin.disabledGameSync": "Game Sync kann nicht angeheftet werden",
   "lighting.pin.disabledOff": "Beleuchtung ist aus, es lässt sich nichts anheften",
   "lighting.pin.disabledUnavailable": "Im Moment gibt es nichts zum Anheften",
+  "lighting.pin.hintBody": "Um die Beleuchtung zu ändern, lassen Sie das Gerät ausgewählt. Lösen Sie die Anheftung, um zur Beleuchtung für alle Geräte zurückzukehren.",
   "lighting.pin.modeTarget": "{mode}: {name}",
   "lighting.pin.pinnedTo": "Angeheftet an {name}",
   "lighting.renderGpu.auto": "Automatisch",

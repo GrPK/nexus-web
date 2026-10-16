@@ -3004,6 +3004,7 @@
   "lighting.pin.disabledGameSync": "Game Sync kan niet worden vastgezet",
   "lighting.pin.disabledOff": "Verlichting staat uit, er valt niets vast te zetten",
   "lighting.pin.disabledUnavailable": "Er is nu niets om aan vast te zetten",
+  "lighting.pin.hintBody": "Om de verlichting te wijzigen, houd je het geselecteerd. Maak het los om terug te gaan naar de verlichting voor alle apparaten.",
   "lighting.pin.modeTarget": "{mode}: {name}",
   "lighting.pin.pinnedTo": "Vastgezet op {name}",
   "lighting.renderGpu.auto": "Automatisch",

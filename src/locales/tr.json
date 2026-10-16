@@ -3004,6 +3004,7 @@
   "lighting.pin.disabledGameSync": "Game Sync sabitlenemez",
   "lighting.pin.disabledOff": "Aydınlatma kapalı, sabitlenecek bir şey yok",
   "lighting.pin.disabledUnavailable": "Şu anda sabitlenecek bir hedef yok",
+  "lighting.pin.hintBody": "Aydınlatmasını değiştirmek için cihazı seçili tutun. Tüm cihazların aydınlatmasına dönmek için sabitlemeyi kaldırın.",
   "lighting.pin.modeTarget": "{mode}: {name}",
   "lighting.pin.pinnedTo": "{name} öğesine sabitlendi",
   "lighting.renderGpu.auto": "Otomatik",
