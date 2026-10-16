@@ -42,6 +42,14 @@ describe('Select', () => {
     expect(within(open()).getByText('Ripe')).toBeInTheDocument();
   });
 
+  it('draws a menuIcon in the menu row only', () => {
+    const opts = [{ value: 'a', label: 'Apple' }, { value: 'b', label: 'Banana', menuIcon: <i data-testid="warn" /> }];
+    render(<Select value="b" onChange={vi.fn()} options={opts} ariaLabel="fruit" />);
+    expect(screen.queryByTestId('warn')).toBeNull();
+    open();
+    expect(screen.getByTestId('warn')).toBeInTheDocument();
+  });
+
   it('draws a fontFamily option in its face in the menu row only', () => {
     const fontOptions = [
       { value: 'lexend', label: 'Lexend', fontFamily: 'Lexend' },

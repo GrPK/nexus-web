@@ -1,13 +1,12 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { CircuitBoard, Clock, Cpu, Lock, Moon, RotateCcw, Speaker, Zap } from 'lucide-react';
+import { CircuitBoard, Clock, Cpu, Lock, Moon, RotateCcw, Speaker, TriangleAlert, Zap } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
 import { useToastSafe } from '../../common/Toast/Toast';
-import { Notice } from '../../common/Notice/Notice';
 import { Select } from '../../common/Select/Select';
 import { SettingRow, SettingSelect, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
-import { SOFTWARE_RENDER_VALUE, showRenderGpuPicker, showSoftwareOption } from './renderGpuUi';
+import { SOFTWARE_RENDER_VALUE, realCpuName, showRenderGpuPicker, showSoftwareOption } from './renderGpuUi';
 import { BrightnessScheduleModal } from './BrightnessScheduleModal';
 import { ThermalGuardSetting } from './ThermalGuardSetting';
 import {
@@ -156,6 +155,7 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   // Auto = the OS default offscreen-GL adapter (integrated on a hybrid rig);
   // show its name so the user sees where Auto lands, like the monitoring picker.
   const autoName = gpus.find(g => g.integrated)?.name ?? gpus[0]?.name ?? '';
+  const cpuName = realCpuName(sensors.cpuModel);
   const gpuSelectOptions = [
     {
       value: 'auto',
@@ -170,8 +170,11 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
       ...(gpus.length > 0 ? [{ value: '__sep_software__', label: '', divider: true }] : []),
       {
         value: SOFTWARE_RENDER_VALUE,
-        label: t('lighting.renderGpu.software'),
+        label: cpuName
+          ? t('lighting.renderGpu.softwareNamed', { name: cpuName })
+          : t('lighting.renderGpu.softwareFallback'),
         description: t('lighting.renderGpu.softwareWarning'),
+        menuIcon: <TriangleAlert size={14} />,
       },
     ] : []),
   ];
@@ -213,11 +216,6 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
             options={gpuSelectOptions}
             onChange={handleGpuChange}
           />
-        )}
-        {showGpuPicker && renderGpu === SOFTWARE_RENDER_VALUE && (
-          <div data-settings-aside="true">
-            <Notice tone="warning" role="status">{t('lighting.renderGpu.softwareWarning')}</Notice>
-          </div>
         )}
         {showAudioOutput && (
           <SettingSelect

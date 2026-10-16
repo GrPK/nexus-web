@@ -51,6 +51,9 @@ export interface SelectOption {
   // Dim second line under the label in the menu row only (e.g. a caveat about
   // the choice); the trigger shows the label alone.
   description?: string;
+  // Warning-tinted glyph before the label in the menu row only; the trigger
+  // shows the label alone (unlike `icon`, which appears in both).
+  menuIcon?: ReactNode;
   // Renders a thin rule instead of a selectable row, grouping the options above
   // and below it. Non-navigable and removed from the a11y tree; value/label are
   // ignored.
@@ -532,12 +535,14 @@ export function Select({
                     opt.value === value && styles.selected,
                     opt.disabled && styles.optionDisabled,
                     opt.fontFamily && styles.fontOption,
+                    opt.description && styles.optionRich,
                   )}
                   style={opt.fontFamily ? { fontFamily: opt.fontFamily } : undefined}
                   onPointerEnter={() => { if (!opt.disabled) setActiveIndex(i); }}
                   onClick={() => { if (!opt.disabled) commit(opt.value); }}
                 >
                   {opt.icon && <span className={styles.optionIcon} aria-hidden="true">{opt.icon}</span>}
+                  {!opt.icon && opt.menuIcon && <span className={classNames(styles.optionIcon, styles.menuIcon)} aria-hidden="true">{opt.menuIcon}</span>}
                   {opt.description ? (
                     <span className={styles.optionText}>
                       <span>{opt.label}</span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { showRenderGpuPicker, showSoftwareOption } from './renderGpuUi';
+import { realCpuName, showRenderGpuPicker, showSoftwareOption } from './renderGpuUi';
 
 describe('renderGpuUi', () => {
   it('shows the picker for a second card or the software option', () => {
@@ -13,5 +13,13 @@ describe('renderGpuUi', () => {
     expect(showSoftwareOption(true, 'auto')).toBe(true);
     expect(showSoftwareOption(false, 'auto')).toBe(false);
     expect(showSoftwareOption(false, 'software')).toBe(true);
+  });
+
+  it('returns a real CPU name and rejects empty or placeholder ones', () => {
+    expect(realCpuName(' AMD Ryzen 7 9800X3D ')).toBe('AMD Ryzen 7 9800X3D');
+    expect(realCpuName('')).toBeNull();
+    expect(realCpuName(undefined)).toBeNull();
+    expect(realCpuName('CPU')).toBeNull();
+    expect(realCpuName('Unknown')).toBeNull();
   });
 });

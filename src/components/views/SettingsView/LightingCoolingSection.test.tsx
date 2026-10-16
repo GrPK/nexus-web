@@ -5,7 +5,7 @@ import type { TempUnit } from '../../../lib/units';
 
 // Mutable so a test can flip the unit and re-render, mimicking the C/F chip on
 // the same settings page writing through useUiSettings.
-const prefs = vi.hoisted(() => ({ monitoringTempUnit: 'c' as TempUnit, lighting: true, cooling: true, gpus: [] as { id: string; name: string; integrated: boolean }[] }));
+const prefs = vi.hoisted(() => ({ monitoringTempUnit: 'c' as TempUnit, lighting: true, cooling: true, cpuModel: 'AMD Ryzen 7 9800X3D', gpus: [] as { id: string; name: string; integrated: boolean }[] }));
 
 vi.mock('../../../hooks/useUiSettings', () => ({
   useUiSettings: () => ({
@@ -35,6 +35,7 @@ vi.mock('../../../hooks/useSensors', () => ({
     cpu: [tempSensor('cpu/temp/pkg', 'CPU Package', 45), tempSensor('cpu/temp/core0', 'CPU Core 0', 50)],
     gpu: [tempSensor('gpu/0/temp', 'GPU Core', 60)],
     gpuComponents: prefs.gpus,
+    cpuModel: prefs.cpuModel,
   }),
 }));
 
@@ -96,7 +97,7 @@ vi.mock('../../../lib/i18n', () => ({
 }));
 
 describe('LightingCoolingSection section split', () => {
-  afterEach(() => { prefs.lighting = true; prefs.cooling = true; prefs.gpus = []; });
+  afterEach(() => { prefs.lighting = true; prefs.cooling = true; prefs.gpus = []; prefs.cpuModel = 'AMD Ryzen 7 9800X3D'; });
 
   it('groups sleep blackout under Lighting and the sensor pickers under Cooling', () => {
     render(<LightingCoolingSection serviceOnline platform="windows" />);
@@ -154,7 +155,7 @@ describe('LightingCoolingSection section split', () => {
     render(<LightingCoolingSection serviceOnline platform="windows" />);
     fireEvent.click(await screen.findByRole('button', { name: 'lighting.renderGpu.label' }));
     const list = screen.getByRole('listbox');
-    expect(within(list).getByText('lighting.renderGpu.software')).toBeInTheDocument();
+    expect(within(list).getByText('lighting.renderGpu.softwareNamed')).toBeInTheDocument();
     expect(within(list).getByText('lighting.renderGpu.softwareWarning')).toBeInTheDocument();
   });
 
@@ -169,20 +170,21 @@ describe('LightingCoolingSection section split', () => {
     expect(screen.getByRole('button', { name: 'lighting.renderGpu.label' })).not.toHaveTextContent('Discrete GPU');
   });
 
+  it('falls back to the generic label while the CPU name is a placeholder', async () => {
+    prefs.gpus = [{ id: 'a', name: 'Only GPU', integrated: false }];
+    prefs.cpuModel = 'Unknown';
+    lightingApi.fetchRenderGpu.mockResolvedValueOnce({ value: 'auto', softwareRenderingAvailable: true });
+    render(<LightingCoolingSection serviceOnline platform="windows" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'lighting.renderGpu.label' }));
+    expect(within(screen.getByRole('listbox')).getByText('lighting.renderGpu.softwareFallback')).toBeInTheDocument();
+  });
+
   it('hides the picker with one GPU and no software option', async () => {
     prefs.gpus = [{ id: 'a', name: 'Only GPU', integrated: false }];
     lightingApi.fetchRenderGpu.mockResolvedValueOnce({ value: 'auto' });
     render(<LightingCoolingSection serviceOnline platform="windows" />);
     await act(async () => { await Promise.resolve(); });
     expect(screen.queryByRole('button', { name: 'lighting.renderGpu.label' })).toBeNull();
-  });
-
-  it('shows the warning notice under the row once software is the saved choice', async () => {
-    prefs.gpus = [{ id: 'a', name: 'Only GPU', integrated: false }];
-    lightingApi.fetchRenderGpu.mockResolvedValueOnce({ value: 'software', softwareRenderingAvailable: true });
-    render(<LightingCoolingSection serviceOnline platform="windows" />);
-    const notice = await screen.findByRole('status');
-    expect(notice).toHaveTextContent('lighting.renderGpu.softwareWarning');
   });
 
   it('keeps the Lighting section for the schedule row before the platform resolves', () => {

@@ -216,6 +216,17 @@
   white-space: normal;
 }
 
+.menuIcon {
+  color: var(--warn);
+}
+
+// Icon beside a label-over-description block: top-aligned so the glyph sits on
+// the label line.
+.option.optionRich {
+  display: flex;
+  align-items: flex-start;
+}
+
 // Font-preview rows (SelectOption.fontFamily) draw larger so each face reads.
 .option.fontOption {
   font-size: var(--type-heading);
