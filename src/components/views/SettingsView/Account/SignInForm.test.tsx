@@ -75,4 +75,15 @@ describe('SignInForm unverified state', () => {
     await screen.findByText('account.verify.pendingMessage');
     expect(screen.queryByRole('button', { name: /account\.verify\.resend/ })).toBeNull();
   });
+
+  it('offers resend for a username sign-in when the api returns the email', async () => {
+    const login = vi.fn().mockResolvedValue({ status: 403, body: { error: true, msg: 'email_unverified', email: 'alice@example.com' } });
+    const resendVerification = vi.fn().mockResolvedValue('ok');
+    render(<SignInForm backend={{ login, resendVerification } as never} onSuccess={vi.fn()} />);
+
+    fillAndSubmit('alice', 'pw');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'account.verify.resend' }));
+    await waitFor(() => expect(resendVerification).toHaveBeenCalledWith('alice@example.com'));
+  });
 });

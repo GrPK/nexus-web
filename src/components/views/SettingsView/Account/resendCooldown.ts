@@ -23,7 +23,9 @@ export function useResendCooldown(initialSeconds: number) {
       if (left === 0) window.clearInterval(id);
     }, 1000);
     return () => window.clearInterval(id);
-  }, [run, initialSeconds]);
+    // initialSeconds is only read on mount (run 0); a later prop change must not restart the countdown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run]);
 
   const start = useCallback(() => {
     deadline.current = Date.now() + RESEND_COOLDOWN_SECONDS * 1000;

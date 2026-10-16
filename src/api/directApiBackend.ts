@@ -77,6 +77,7 @@ interface ApiErrorBody {
   code?: string;
   message?: string | string[];
   retryAt?: string;
+  email?: string;
 }
 
 let accessToken: string | null = null;
@@ -200,6 +201,7 @@ async function buildErrorBody<T extends AuthEnvelope>(res: Response): Promise<T>
   const message = Array.isArray(parsed?.message) ? parsed.message[0] : parsed?.message;
   const envelope = { error: true, msg: parsed?.code ?? message ?? 'request_failed' } as T;
   if (parsed?.retryAt) (envelope as AuthUsernameResponse).retryAt = parsed.retryAt;
+  if (parsed?.email) (envelope as AuthLoginResponse).email = parsed.email;
   return envelope;
 }
 

@@ -26,6 +26,7 @@ export function SignInForm({ backend, onSuccess, onForgotPassword, onCreateAccou
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unverified, setUnverified] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
 
   const attemptLogin = async () => {
     const trimmedIdentifier = identifier.trim();
@@ -41,6 +42,8 @@ export function SignInForm({ backend, onSuccess, onForgotPassword, onCreateAccou
     }
     const code = result.body?.msg;
     if (code === 'email_unverified') {
+      const typed = trimmedIdentifier.includes('@') ? trimmedIdentifier : null;
+      setUnverifiedEmail(result.body?.email ?? typed);
       setUnverified(true);
       return;
     }
@@ -65,7 +68,7 @@ export function SignInForm({ backend, onSuccess, onForgotPassword, onCreateAccou
         <div className={styles.pendingBlock}>
           <p className={styles.subtitle}>{t('account.verify.pendingMessage')}</p>
           {error && <p className={styles.error} role="alert">{error}</p>}
-          {identifier.includes('@') && <ResendVerification backend={backend} email={identifier.trim()} initialCooldown={0} />}
+          {unverifiedEmail && <ResendVerification backend={backend} email={unverifiedEmail} initialCooldown={0} />}
           <Button type="button" tone="accent" loading={submitting} onClick={() => void attemptLogin()}>
             {t('account.create.verifiedRetry')}
           </Button>

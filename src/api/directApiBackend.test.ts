@@ -120,6 +120,18 @@ describe('directApiBackend', () => {
     });
   });
 
+  describe('login email_unverified', () => {
+    it('surfaces the account email from the error body', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(403, { code: 'email_unverified', email: 'alpha@example.com' }));
+      const backend = await freshBackend();
+
+      const result = await backend.login('alpha', 'hunter22');
+
+      expect(result.status).toBe(403);
+      expect(result.body).toEqual({ error: true, msg: 'email_unverified', email: 'alpha@example.com' });
+    });
+  });
+
   describe('register', () => {
     it('reports 409 username_taken from the code field', async () => {
       fetchMock.mockResolvedValueOnce(jsonResponse(409, { code: 'username_taken', message: 'username already in use' }));
