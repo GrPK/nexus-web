@@ -11,6 +11,11 @@ export async function lightingOutputUrl(): Promise<string> {
   return resolveAuthWs('/lighting/output');
 }
 
+/** Live capture of the selected mirror monitor, in the lighting output frame layout. */
+export async function screenPreviewUrl(): Promise<string> {
+  return resolveAuthWs('/lighting/screen/preview');
+}
+
 // --- Effect thumbnails ---
 
 // Presets are universal, so a thumbnail is identified by (effect, slot). The
@@ -329,17 +334,22 @@ export const setMediaEffect = (v: PostProcessSettings, persist = true) =>
     persist,
   });
 
-// --- Render GPU (which card runs the lighting shaders) ---
+// --- Rendering device (which GPU, or the CPU, runs the lighting shaders) ---
 // Machine-specific (the GPU model name), so it lives in the service config, not
 // the cloud-synced UI prefs. Restart-to-apply: setRenderGpu persists + writes
 // the OS preference; restartService applies it.
-export interface RenderGpuState { value: string; }
+export interface RenderGpuState {
+  value: string;
+  /** CPU rendering can be chosen on this PC; absent on older services. */
+  softwareRenderingAvailable?: boolean;
+}
 
 export const fetchRenderGpu = () =>
   fetchService<RenderGpuState>('/lighting/render-gpu');
 
+/** Null when the service refused (e.g. software rendering unavailable). */
 export const setRenderGpu = (value: string) =>
-  postService('/lighting/render-gpu', { value });
+  postService<{ error?: boolean }>('/lighting/render-gpu', { value });
 
 export const restartService = () =>
   postService('/service/restart', {});
