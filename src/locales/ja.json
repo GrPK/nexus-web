@@ -3004,7 +3004,7 @@
   "lighting.pin.pinnedTo": "{name} にピン留め中",
   "lighting.renderGpu.auto": "自動",
   "lighting.renderGpu.confirmButton": "今すぐ再起動",
-  "lighting.renderGpu.confirmMessage": "レンダリングデバイスを変更するには再起動が必要です。今すぐ Nexus を再起動しますか?",
+  "lighting.renderGpu.confirmMessage": "レンダリングデバイスを変更するには再起動が必要です。今すぐ Nexus を再起動しますか？",
   "lighting.renderGpu.confirmTitle": "再起動して適用しますか？",
   "lighting.renderGpu.failed": "レンダリングデバイスを変更できませんでした。",
   "lighting.renderGpu.hint": "適用するには Nexus を再起動します",

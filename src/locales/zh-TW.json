@@ -3004,7 +3004,7 @@
   "lighting.pin.pinnedTo": "已釘選到 {name}",
   "lighting.renderGpu.auto": "自動",
   "lighting.renderGpu.confirmButton": "立即重新啟動",
-  "lighting.renderGpu.confirmMessage": "變更算繪裝置需要重新啟動才會生效。要現在重新啟動 Nexus 嗎?",
+  "lighting.renderGpu.confirmMessage": "變更算繪裝置需要重新啟動才會生效。要現在重新啟動 Nexus 嗎？",
   "lighting.renderGpu.confirmTitle": "重新啟動以套用？",
   "lighting.renderGpu.failed": "無法變更算繪裝置。",
   "lighting.renderGpu.hint": "重新啟動 Nexus 以套用",
