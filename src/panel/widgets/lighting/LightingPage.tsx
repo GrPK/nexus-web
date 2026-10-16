@@ -2667,8 +2667,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               activeTab={activeTabKey}
               onTabChange={handleTabChange}
               onTabHover={setHoveredTab}
-              actions={controlAllDevicesButton}
               tabActions={(
+                <>
+                {/* Left of the toolbar: the rail is right-aligned, so the
+                    toolbar keeps its position when the button comes and goes. */}
+                {controlAllDevicesButton}
                 <PresetToolbar
                   rail
                   presets={presetOptions}
@@ -2690,6 +2693,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   onUndo={handleUndoLayout}
                   onRedo={handleRedoLayout}
                 />
+                </>
               )}
             />
             {modeMenuNode}
