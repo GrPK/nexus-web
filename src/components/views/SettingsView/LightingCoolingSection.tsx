@@ -174,7 +174,7 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
           ? t('lighting.renderGpu.softwareNamed', { name: cpuName })
           : t('lighting.renderGpu.softwareFallback'),
         description: t('lighting.renderGpu.softwareWarning'),
-        menuIcon: <TriangleAlert size={14} />,
+        warnIcon: <TriangleAlert size={14} />,
       },
     ] : []),
   ];
