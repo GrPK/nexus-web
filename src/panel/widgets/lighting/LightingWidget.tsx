@@ -54,7 +54,7 @@ import { usePanelPreview } from '../common/PanelPreviewContext';
 import { previewRainbowUri } from '../common/previewAssets';
 import { LightingLivePreview } from './LightingLivePreview';
 import { LightingShaderPreview } from './LightingShaderPreview';
-import type { GpuState } from '../../../components/common/CanvasNoticeBar/gpuNotice';
+import { type GpuState } from '../../../components/common/CanvasNoticeBar/gpuNotice';
 import type { WidgetProps } from '../types';
 import styles from './LightingWidget.module.scss';
 

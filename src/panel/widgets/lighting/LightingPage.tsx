@@ -96,6 +96,7 @@ import { FullscreenShader } from './page/FullscreenShader';
 import { ModeControls } from './page/ModeControls';
 import { MediaCanvasNotice } from './page/MediaCanvasNotice';
 import { MediaBackdrop } from './page/MediaBackdrop';
+import { MirrorBackdrop } from './page/MirrorBackdrop';
 import { DevicePanel } from './page/DevicePanel';
 import { type DiscoveryState } from './page/DeviceDiscoveryCard';
 import { LIGHTING_PIN_HINT_ID, zoneCardSelectable, zoneCardSelectionHoldable, zoneCardUnavailable } from './page/ZoneCard';
@@ -222,8 +223,9 @@ const VIEW_3D = '3d';
 export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate, accountUsername = null }: LightingViewProps) {
   const { t, language } = useTranslation();
   const { mode, setMode, rawSync, setRawSync, synced, paused: syncedPaused, gameSyncRemovedNotice } = useLightingSync(serviceOnline, activeProfileId);
-  // gpuCanSwitch comes from the same enumeration the Settings picker gates on,
-  // so the shortcut never lands on a tab with no GPU control. Offered only for a
+  // gpuCanSwitch is true whenever the Settings picker has something to choose
+  // (a second card, or CPU rendering offered), so the shortcut never lands on
+  // a tab with no GPU control. Offered only for a
   // card that failed: while initializing, the picker restarts the service and
   // discards the context the notice is waiting for.
   const canPickRenderGpu = (serviceState.lighting?.gpuCanSwitch ?? false)
@@ -421,6 +423,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // drive the same template state through different start endpoints.
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  // Lets handlers declared before handleModeChange restart lighting from Off.
+  const resumeLightingRef = useRef<(m: LightingMode, effectKey?: string) => Promise<void>>(async () => {});
   // Static keeps its own last-selected key, so switching modes returns to what
   // each one was showing rather than carrying the other's effect across.
   const staticEffectRef = useRef<string>(DEFAULT_STATIC_EFFECT);
@@ -1069,6 +1073,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // wore; the running effect is untouched. Unselected pinned devices are
     // never reached.
     const ids = [...selectedDeviceIds];
+    // Off has stopped the engine, and a pin does not restart it: a pick starts the mode globally.
+    if (modeRef.current === 'none') {
+      const startMode = viewMode === 'static' ? 'static' : 'animate';
+      const valid = startMode === 'static' ? isStaticEffect(key) : ANIMATE_EFFECTS.some(e => e.key === key) || isCustomEffectKey(key);
+      setSelectionTab(null);
+      void resumeLightingRef.current(startMode, valid ? key : undefined);
+      return;
+    }
     if (detachedTab) { flashScope(); return; }
     if (ids.length > 0 && (viewMode === 'animate' || viewMode === 'static')) {
       if (viewMode === 'static') {
@@ -1102,6 +1114,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const queueColorWrite = useColorWriteQueue(useCallback((ids: string[], pin: Pin) => applyPins(ids, pin, false), [applyPins]));
 
   const handleCustomSelect = useCallback((hex: string) => {
+    // Off: a pin would not restart the stopped engine, so the color starts Static globally.
+    if (modeRef.current === 'none') {
+      setCustomStaticColor(hex);
+      setSelectionTab(null);
+      void resumeLightingRef.current('static').then(() => {
+        setGlobalColor(hex, startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, hex));
+      });
+      return;
+    }
     if (detachedTab) { flashScope(); return; }
     setCustomStaticColor(hex);
     const ids = [...selectedDeviceIds];
@@ -1120,6 +1141,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Records as well as writes: the marks and the device cards read the pin, so
   // a drag has to move them with the pointer, not on release.
   const handleCustomPreview = useCallback((hex: string) => {
+    // Off: the commit starts Static globally, so a drag must not pin the selection.
+    if (modeRef.current === 'none') return;
     const ids = [...selectedDeviceIds];
     if (ids.length === 0) return;
     const pin = colorPin(hex);
@@ -1994,7 +2017,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           break;
         }
         case 'static': {
-          const key = isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
+          const key = effectKey && isStaticEffect(effectKey) ? effectKey
+            : (isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current);
           setActiveEffect(key);
           const state = stateFor(key);
           // Entering Static keeps a global flat color: an effect start without one would clear it.
@@ -2021,6 +2045,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       }
     } catch { /* best-effort; backend state becomes source of truth */ }
   }, [activeEffect, globalColor, rawSync, setMode, setRawSync, screenPP, stateFor, setPausedState]);
+
+  resumeLightingRef.current = handleModeChange;
 
   // Once the profile's lighting has loaded, the requested effect becomes the Animation effect.
   useEffect(() => {
@@ -2147,7 +2173,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // A press or pick pulses the cards it changed; a new seq replays it.
   const [pulse, setPulse] = useState<{ ids: ReadonlySet<string>; seq: number }>({ ids: new Set(), seq: 0 });
   const pulseCards = useCallback((ids: ReadonlySet<string>) => setPulse(s => ({ ids, seq: s.seq + 1 })), []);
-  const pulsePick = () => pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds));
+  const pulsePick = () => pulseCards(pressReach(
+    visibleDevices,
+    pins,
+    mode === 'none' && (viewMode === 'animate' || viewMode === 'static') ? new Set() : selectedDeviceIds,
+  ));
   // Pause/freeze applies to the three modes that drive a continuous output
   // (animate shader, media playback, screen mirror) - Off has nothing to
   // freeze.
@@ -2271,6 +2301,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // and a pinnable mode, the cards it pins; otherwise the global reach.
   const tabPressReach = useCallback((key: string): Set<string> | undefined => {
     if (key === GAME_SYNC_REMOVED_TAB_KEY) return undefined;
+    // Off: the press starts the mode for every card, whatever is selected.
+    if (mode === 'none' && key !== 'none') return pressReach(visibleDevices, pins, new Set());
     if (selectedDeviceIds.size > 0 && PINNABLE_MODES.has(key)) {
       const ids = tabPressPins(pins, selectedDeviceIds, key);
       return ids.length ? pressReach(visibleDevices, pins, new Set(ids)) : undefined;
@@ -2278,7 +2310,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // With nothing selected a press changes the running mode, which a detached open tab is not.
     if (tabPressChangesNothing(key, detachedTab ? globalTabKey : activeTabKey, selectedDeviceIds.size, false)) return undefined;
     return pressReach(visibleDevices, pins, selectedDeviceIds);
-  }, [activeTabKey, globalTabKey, detachedTab, pins, selectedDeviceIds, visibleDevices]);
+  }, [mode, activeTabKey, globalTabKey, detachedTab, pins, selectedDeviceIds, visibleDevices]);
   // A tab press either opens the mode menu or applies a mode: to the selected
   // cards when there are any, else to every unpinned one. A mode switch also
   // drops the menu, which the tab row keeps "inside" its anchor.
@@ -2291,7 +2323,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     closeModeMenu();
     const reach = tabPressReach(key);
     if (reach) pulseCards(reach);
-    const pin = selectedDeviceIds.size > 0 ? tabPinFor(key as LightingMode) : null;
+    // Off: a pin would not restart the stopped engine, so the press starts the mode globally.
+    const pin = selectedDeviceIds.size > 0 && mode !== 'none' ? tabPinFor(key as LightingMode) : null;
     if (pin) {
       setSelectionTab(key as LightingMode);
       const ids = tabPressPins(pins, selectedDeviceIds, key);
@@ -2303,14 +2336,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   };
 
   const shaderMode = viewMode === 'animate' || viewMode === 'static';
-  // The cards a hovered press or pick reaches, outlined. Off has no picks.
+  // The cards a hovered press or pick reaches, outlined.
   const pickTargetIds = useMemo(() => {
     if (scopeHovered || pickHovered) {
+      // Off with an effect or color picker open: a pick starts the mode for every card. Media and Screen keep the engine stopped.
+      if (mode === 'none' && (viewMode === 'animate' || viewMode === 'static')) return pressReach(visibleDevices, pins, new Set());
       return viewMode === 'none' || detachedTab ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
     }
     if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
     return tabPressReach(hoveredTab);
-  }, [scopeHovered, pickHovered, viewMode, detachedTab, hoveredTab, tabPressReach, pins, selectedDeviceIds, visibleDevices]);
+  }, [scopeHovered, pickHovered, mode, viewMode, detachedTab, hoveredTab, tabPressReach, pins, selectedDeviceIds, visibleDevices]);
   const pinnedNames = useMemo(() => visibleDevices.filter(d => d.id in pins).map(canvasLabelName), [visibleDevices, pins]);
   // How many cards the next pick changes; with none, the way to reach any is a selection.
   const reachCount = detachedTab ? 0 : pressReach(visibleDevices, pins, selectedDeviceIds).size;
@@ -2839,7 +2874,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 />
               </Suspense>
             ) : (
-              <DeviceCanvas backdrop={viewMode === 'gif' && mode !== 'gif' ? <MediaBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} foreignFrames={foreignFrames} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
+              <DeviceCanvas backdrop={viewMode === 'gif' && mode !== 'gif' ? <MediaBackdrop /> : viewMode === 'screen' && mode !== 'screen' ? <MirrorBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} foreignFrames={foreignFrames} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
             )}
             {viewMode === 'gif' && <MediaCanvasNotice />}
             {shaderMode && dockEffect && dockState && !mixedSelection && (
