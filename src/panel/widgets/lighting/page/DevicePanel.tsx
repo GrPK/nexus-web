@@ -59,7 +59,7 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
    *  (the running shader, the global color or static look, Mirror, Media). Null
    *  when nothing can be pinned in this mode. */
   pinSource?: string | null;
-  /** Why nothing can be pinned right now (Game Sync, Off). */
+  /** Why nothing can be pinned right now (Off). */
   pinDisabledReason?: string;
   /** Display name of what a pin targets, for the pinned tooltip. */
   pinTargetName?: (pin: Pin) => string;

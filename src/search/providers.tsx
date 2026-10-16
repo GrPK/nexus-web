@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   Moon, Sun, Monitor, Smartphone, Palette, Power, MonitorUp, Film, Sparkles, Wifi, Cloud, RadioTower,
-  SlidersHorizontal, UserRound, FlaskConical, Gamepad2, FolderOpen, Info, MessageCircle, RefreshCw,
+  SlidersHorizontal, UserRound, FlaskConical, FolderOpen, Info, MessageCircle, RefreshCw,
   Music, Lightbulb, VolumeX, Play, SkipForward, SkipBack, Lock, LayoutGrid, AppWindow, Crosshair,
   ScrollText, Wrench, Download, Upload, Plus, Disc, Radio, Mic, Headphones, PackageOpen, FileText,
 } from 'lucide-react';
@@ -14,9 +14,9 @@ import { hostSupportsGlass } from '../app/windowActions';
 import { applyProfile } from '../api/cooling';
 import { setPanelRemoteControlEnabled, setPanelRelay, setPanelPairBroadcast } from '../api/panel';
 import {
-  startAnimate, stopLighting, startScreenMirror, startGameSync,
+  startAnimate, stopLighting, startScreenMirror,
   setMusicReactive, setGlobalBrightness, setLightingDevicePower, identifyLightingDevice,
-  rescanLightingDevices, reselectScreen, triggerGameSyncScan,
+  rescanLightingDevices, reselectScreen,
 } from '../api/lighting';
 import { setBrandEnabled, setSmartLightEnabled } from '../api/smartLights';
 import { setTrackingEnabled } from '../hooks/useScreenTimeBrowse';
@@ -252,7 +252,6 @@ const MODE_POLICY: Record<LightingMode, { icon: ReactNode; keywords: string[]; a
   gif:      { icon: <Film size={18} />,      keywords: ['media', 'gif', 'video', 'image'] },
   static:   { icon: <Palette size={18} />,   keywords: ['static', 'solid', 'color', 'colour', 'fill', 'still', 'frozen'] },
   animate:  { icon: <Sparkles size={18} />,  keywords: ['animation', 'animate', 'effects'] },
-  gamesync: { icon: <Gamepad2 size={18} />,  keywords: ['game', 'sync', 'chroma', 'razer', 'rgb'],   apply: () => { void startGameSync().catch(() => {}); } },
 };
 
 // Cooling presets that need the page rather than a blind apply (custom = your
@@ -734,17 +733,6 @@ const smartLightsSource: SearchSource = (ctx) => {
   return out;
 };
 
-// Game Sync's installed-games rescan; the mode itself is in lightingModes.
-const gameSyncScan: SearchSource = (ctx) => {
-  if (!ctx.online || ctx.platform !== 'windows') return [];
-  return [act('gamesync:scan', {
-    title: `${ctx.t('lighting.mode.gamesync')} · ${ctx.t('lighting.gameSync.games.rescan')}`,
-    icon: <Gamepad2 size={18} />,
-    keywords: ['game', 'sync', 'scan', 'rescan', 'games', 'detect', 'steam'],
-    run: () => { void triggerGameSyncScan().catch(() => {}); },
-  })];
-};
-
 // OBS + Discord live controls, present only while the integration reports a
 // state to flip (OBS connected; Discord in a voice channel).
 const integrations: SearchSource = (ctx) => {
@@ -906,7 +894,7 @@ export const SOURCES: SearchSource[] = [
   navigation, navDisplays, navSubtabs, settingsTabs, settingsItems, standalonePages,
   pageOnlyApps, installedApps, widgetApps, devices, profilesSource, profilesExtra,
   cooling, lightingModes, lightingEffects, lightingExtras, lightingDeviceActions,
-  smartLightsSource, gameSyncScan, appearance, updatePrefs,
+  smartLightsSource, appearance, updatePrefs,
   actions, quickOpens, remoteAccess, settingsToggles, privacyToggles,
   integrations, systemMedia, accountExtra, diagnostics,
 ];

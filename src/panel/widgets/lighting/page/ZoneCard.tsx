@@ -76,7 +76,7 @@ export interface BulkSelection {
   /** Takes the selection apart; present when it is exactly one stack. */
   unstack?: () => void;
   /** Members a Pin row can pin: following the global mode. Zero where
-   *  nothing can be pinned (Game Sync, Off). */
+   *  nothing can be pinned (Off). */
   pinCount?: number;
   /** Members currently pinned, which an Unpin row releases. */
   unpinCount?: number;
@@ -95,7 +95,7 @@ export interface DevicePin {
   targetName?: string;
   /** What the card is pinned to; the button wears that mode's tab icon. */
   kind?: PinKind;
-  /** Why this card cannot be pinned right now (Game Sync, Off). */
+  /** Why this card cannot be pinned right now (Off). */
   disabledReason?: string;
   setPinned: (pinned: boolean) => void;
 }

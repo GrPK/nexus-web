@@ -5,7 +5,7 @@ import { isStaticEffect } from '../types/lighting';
 import { subscribeControlSync } from '../lib/controlSync';
 import { useTopicCallback } from './useMultiplexSocket';
 
-export type LightingMode = 'animate' | 'static' | 'screen' | 'gif' | 'gamesync' | 'none';
+export type LightingMode = 'animate' | 'static' | 'screen' | 'gif' | 'none';
 
 /**
  * Fetches the current lighting sync state on mount and returns it.
@@ -89,6 +89,5 @@ export function normalizeSync(sync: string): LightingMode {
   if (sync === 'static' || isStaticEffect(sync)) return 'static';
   if (sync === 'screen' || sync.includes('mirror')) return 'screen';
   if (sync === 'gif' || sync.includes('gif') || sync.includes('media')) return 'gif';
-  if (sync === 'gamesync') return 'gamesync';
   return 'animate';
 }
