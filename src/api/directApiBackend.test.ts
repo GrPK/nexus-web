@@ -132,6 +132,29 @@ describe('directApiBackend', () => {
     });
   });
 
+  describe('resendVerification', () => {
+    it('posts the email to /auth/verify/resend and reports success', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(201, { ok: true }));
+      const backend = await freshBackend();
+
+      expect(await backend.resendVerification('a@b.com')).toBe(true);
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe(`${BASE}/auth/verify/resend`);
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body)).toEqual({ email: 'a@b.com' });
+    });
+
+    it('reports false on a throttled response and on a network failure', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(429, { message: 'ThrottlerException' }));
+      const backend = await freshBackend();
+      expect(await backend.resendVerification('a@b.com')).toBe(false);
+
+      fetchMock.mockRejectedValueOnce(new TypeError('offline'));
+      expect(await backend.resendVerification('a@b.com')).toBe(false);
+    });
+  });
+
   describe('authenticated calls: 401-retry-once', () => {
     it('retries exactly once after a 401 using a freshly refreshed token, then succeeds', async () => {
       localStorage.setItem(REFRESH_KEY, 'refresh-0');

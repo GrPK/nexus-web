@@ -3,6 +3,7 @@ import { Button } from '../../../common/Button/Button';
 import { TextInput } from '../../../common/TextInput/TextInput';
 import { useTranslation } from '../../../../lib/i18n';
 import type { AuthBackend } from '../../../../api/authBackend';
+import { ResendVerification } from './ResendVerification';
 import { authErrorMessage } from './accountErrors';
 import { storeLoginCredential } from './credentialStore';
 import styles from './Account.module.scss';
@@ -64,6 +65,7 @@ export function SignInForm({ backend, onSuccess, onForgotPassword, onCreateAccou
         <div className={styles.pendingBlock}>
           <p className={styles.subtitle}>{t('account.verify.pendingMessage')}</p>
           {error && <p className={styles.error} role="alert">{error}</p>}
+          {identifier.includes('@') && <ResendVerification backend={backend} email={identifier.trim()} />}
           <Button type="button" tone="accent" loading={submitting} onClick={() => void attemptLogin()}>
             {t('account.create.verifiedRetry')}
           </Button>

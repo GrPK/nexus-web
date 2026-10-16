@@ -54,3 +54,24 @@ describe('SignInForm errors', () => {
     expect(await screen.findByText('account.error.loginLocked')).toBeTruthy();
   });
 });
+
+describe('SignInForm unverified state', () => {
+  it('offers resend when signing in with an email address', async () => {
+    const login = vi.fn().mockResolvedValue({ status: 403, body: { error: true, msg: 'email_unverified' } });
+    render(<SignInForm backend={{ login, resendVerification: vi.fn() } as never} onSuccess={vi.fn()} />);
+
+    fillAndSubmit('alice@example.com', 'pw');
+
+    expect(await screen.findByRole('button', { name: /account\.verify\.resend/ })).toBeTruthy();
+  });
+
+  it('hides resend when the identifier is a username, which the api cannot resolve', async () => {
+    const login = vi.fn().mockResolvedValue({ status: 403, body: { error: true, msg: 'email_unverified' } });
+    render(<SignInForm backend={{ login, resendVerification: vi.fn() } as never} onSuccess={vi.fn()} />);
+
+    fillAndSubmit('alice', 'pw');
+
+    await screen.findByText('account.verify.pendingMessage');
+    expect(screen.queryByRole('button', { name: /account\.verify\.resend/ })).toBeNull();
+  });
+});

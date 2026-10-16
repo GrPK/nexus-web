@@ -3,6 +3,7 @@ import { Button } from '../../../common/Button/Button';
 import { useTranslation } from '../../../../lib/i18n';
 import type { AuthBackend } from '../../../../api/authBackend';
 import { CreateAccountForm } from './CreateAccountForm';
+import { ResendVerification } from './ResendVerification';
 import { authErrorMessage } from './accountErrors';
 import styles from './Account.module.scss';
 
@@ -46,6 +47,7 @@ export function RegisterFlow({ backend, onBackToSignIn, onSignedIn }: RegisterFl
         <div className={styles.pendingBlock}>
           <p className={styles.subtitle}>{t('account.verify.pendingMessage')}</p>
           {retryError && <p className={styles.error} role="alert">{retryError}</p>}
+          <ResendVerification backend={backend} email={pendingCreds.email} />
           <Button type="button" tone="accent" loading={retrying} onClick={() => void handleRetryVerify()}>
             {t('account.create.verifiedRetry')}
           </Button>

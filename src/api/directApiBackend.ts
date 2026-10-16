@@ -340,6 +340,19 @@ export const directApiBackend: AuthBackend = {
     return { status: res.status, body: await buildErrorBody<AuthRegisterResponse>(res) };
   },
 
+  resendVerification: async (email) => {
+    try {
+      const res = await fetch(`${BASE}/auth/verify/resend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
   logout: async () => {
     const cookieMode = isWebCookieMode();
     const stored = getStoredRefreshToken();
