@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCheck, Eye, EyeOff, Gamepad2, Lightbulb, Maximize2, Music, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { Ban, CheckCheck, ListChecks, Eye, EyeOff, Gamepad2, Lightbulb, Maximize2, Music, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
   startAnimate, startStatic, startScreenMirror, stopLighting,
   fetchStaticSettings,
@@ -2092,13 +2092,30 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     () => visibleDevices.some(d => d.controlled === false && zoneCardSelectionHoldable(d)),
     [visibleDevices],
   );
+  // The Advanced rail also holds the Presets toolbar, which a labeled button
+  // would push off-screen at narrow widths, so it goes icon-only there.
+  const [narrowViewport, setNarrowViewport] = useState(
+    () => typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia('(max-width: 900px)');
+    const onChange = (e: MediaQueryListEvent) => setNarrowViewport(e.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+  const controlAllLabel = t('lighting.controlAllDevices');
+  const controlAllIconOnly = !simpleDashboard && narrowViewport;
   const controlAllDevicesButton = anyUncontrolled ? (
     <Button
       size="sm"
       pill
+      icon={controlAllIconOnly ? <ListChecks /> : undefined}
+      aria-label={controlAllIconOnly ? controlAllLabel : undefined}
+      title={controlAllIconOnly ? controlAllLabel : undefined}
       onClick={() => { claimAllDevices(); if (simpleDashboard) unpinAll(); }}
     >
-      {t('lighting.controlAllDevices')}
+      {controlAllIconOnly ? undefined : controlAllLabel}
     </Button>
   ) : undefined;
 
