@@ -42,8 +42,10 @@ export function ResendVerification({ backend, email, initialCooldown }: ResendVe
       >
         {remaining > 0 ? t('account.verify.resendWait', { seconds: remaining }) : t('account.verify.resend')}
       </Button>
-      <p className={`${styles.error} ${styles.resendLine}`} role="alert">{error ?? ''}</p>
-      <p className={`${styles.resendStatus} ${styles.resendLine}`} role="status">{!error && sent ? t('account.verify.resendSent') : ''}</p>
+      <div className={styles.resendLine}>
+        <p className={styles.error} role="alert">{error ?? ''}</p>
+        <p className={styles.resendStatus} role="status">{!error && sent ? t('account.verify.resendSent') : ''}</p>
+      </div>
     </div>
   );
 }
