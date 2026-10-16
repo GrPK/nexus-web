@@ -108,12 +108,12 @@ vi.mock('./page/DevicePanel', () => ({
     const target = pinHintIds ? rail.order.find(id => pinHintIds.has(id) && pins?.[id]) ?? null : null;
     useEffect(() => { onPinHintTarget?.(target); }, [onPinHintTarget, target]);
     return (
-    <div data-testid="rail" data-pins={Object.keys(pins ?? {}).sort().join(',')} data-hint-ids={pinHintIds ? [...pinHintIds].join(',') : 'none'}>
-      <button type="button" onClick={() => onSetSelection(new Set(['a', 'b']), 'a')}>select-ab</button>
-      <button type="button" onClick={() => onSetPin?.(['a', 'b'], true)}>pin-ab</button>
-      <button type="button" onClick={() => onSetPin?.(['a'], false)}>unpin-a-menu</button>
-      <button type="button" onClick={() => { onSetPin?.(['a'], false); onPinHintPress?.(); }}>press-hinted</button>
-    </div>
+      <div data-testid="rail" data-pins={Object.keys(pins ?? {}).sort().join(',')} data-hint-ids={pinHintIds ? [...pinHintIds].join(',') : 'none'}>
+        <button type="button" onClick={() => onSetSelection(new Set(['a', 'b']), 'a')}>select-ab</button>
+        <button type="button" onClick={() => onSetPin?.(['a', 'b'], true)}>pin-ab</button>
+        <button type="button" onClick={() => onSetPin?.(['a'], false)}>unpin-a-menu</button>
+        <button type="button" onClick={() => { onSetPin?.(['a'], false); onPinHintPress?.(); }}>press-hinted</button>
+      </div>
     );
   },
 }));
@@ -213,11 +213,11 @@ vi.mock('../../../components/common/Coachmark/Coachmark', () => ({
   Coachmark: (p: { hintId: string; target: string; title: string; body?: string; onDismiss: () => void }) => {
     shown.titles.push(p.title);
     return (
-    <div data-testid="coachmark" data-hint-id={p.hintId} data-target={p.target}>
-      <span data-testid="coachmark-title">{p.title}</span>
-      <span data-testid="coachmark-body">{p.body}</span>
-      <button type="button" onClick={p.onDismiss}>coachmark-x</button>
-    </div>
+      <div data-testid="coachmark" data-hint-id={p.hintId} data-target={p.target}>
+        <span data-testid="coachmark-title">{p.title}</span>
+        <span data-testid="coachmark-body">{p.body}</span>
+        <button type="button" onClick={p.onDismiss}>coachmark-x</button>
+      </div>
     );
   },
 }));
@@ -298,6 +298,7 @@ describe('LightingPage first-pin coachmark', () => {
     await settle();
     fireEvent.click(screen.getByText('pin-ab'));
     await settle();
+    expect(setPins).toHaveBeenCalledTimes(1);
     expect(bubble()).toBeNull();
     expect(dismissOnboardingHint).not.toHaveBeenCalled();
   });
@@ -308,6 +309,7 @@ describe('LightingPage first-pin coachmark', () => {
     await settle();
     fireEvent.click(screen.getByText('pin-ab'));
     await settle();
+    expect(setPins).toHaveBeenCalledTimes(1);
     expect(bubble()).toBeNull();
     expect(dismissOnboardingHint).not.toHaveBeenCalled();
   });
@@ -329,9 +331,9 @@ describe('LightingPage first-pin coachmark', () => {
     fireEvent.click(screen.getByText('pin-ab'));
     await waitFor(() => expect(bubble()).not.toBeNull());
     fireEvent.click(screen.getByText('press-hinted'));
-    await waitFor(() => expect(bubble()).toBeNull());
+    await waitFor(() => expect(dismissOnboardingHint).toHaveBeenCalledTimes(1));
+    expect(bubble()).toBeNull();
     expect(railPins()).toBe('b');
-    expect(dismissOnboardingHint).toHaveBeenCalledTimes(1);
     expect(dismissOnboardingHint).toHaveBeenCalledWith('lighting-pin');
   });
 
@@ -348,8 +350,9 @@ describe('LightingPage first-pin coachmark', () => {
     // The service reports b unpinned (another client or the bulk menu).
     vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({}));
     topicHandlers.lighting.forEach(cb => cb());
-    await waitFor(() => expect(bubble()).toBeNull());
-    expect(dismissOnboardingHint).toHaveBeenCalledTimes(1);
+    // The bubble can unmount a flush before the dismiss effect runs, so wait on the call.
+    await waitFor(() => expect(dismissOnboardingHint).toHaveBeenCalledTimes(1));
+    expect(bubble()).toBeNull();
     expect(dismissOnboardingHint).toHaveBeenCalledWith('lighting-pin');
   });
 
