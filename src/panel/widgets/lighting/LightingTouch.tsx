@@ -51,10 +51,12 @@ import {
 import { mergeTemplates, slotThumbSignature } from '../../../types/lightingTemplates';
 import { normalizeSync as resolveImmersiveMode } from '../../../hooks/useLightingSync';
 import { usePersistentState } from '../../../hooks/usePersistentState';
+import { usePanelIdSet } from '../../../hooks/usePanelIdSet';
+import { zoneCardSelectionHoldable } from './page/ZoneCard';
 import { useTranslation } from '../../../lib/i18n';
 import { isPaletteKey } from '../../../types/lightingPalette';
 import {
-  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pickerMarks, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, clearLegacyLightingKeys,
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pickerMarks, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, clearLegacyLightingKeys, SELECTED_DEVICES_STORAGE_KEY,
 } from './pins';
 import type { WidgetProps } from '../types';
 import styles from './LightingPage.module.scss';
@@ -286,13 +288,13 @@ interface ImmersiveAnimateController {
  * pick made here targets exactly what that page shows selected.
  */
 function useImmersiveDevices(enabled: boolean) {
+  useState(clearLegacyLightingKeys);
   const [devices, setDevices] = useState<LightingDevice[]>([]);
-  // Not persisted: a restored selection would silently turn the next pick into a
-  // pin, so every visit starts at "All devices".
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
-    clearLegacyLightingKeys();
-    return new Set();
-  });
+  const holdableIds = useMemo(
+    () => new Set(visibleCards(devices).filter(zoneCardSelectionHoldable).map(d => d.id)),
+    [devices],
+  );
+  const [selectedIds, setSelectedIds] = usePanelIdSet(SELECTED_DEVICES_STORAGE_KEY, 'lightingSelection', holdableIds);
   const [, setPrimaryId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {

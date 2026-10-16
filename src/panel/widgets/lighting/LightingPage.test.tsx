@@ -296,21 +296,51 @@ describe('LightingPage selection in a drive-everything mode', () => {
     expect(await findByText('lighting.pane.appliesDevices.other')).toBeTruthy();
   });
 
-  it('does not restore a stored selection, and clears the keys of the old model', async () => {
-    // A restored selection would silently turn the next pick into a pin.
-    for (const key of ['nexus.lighting.selectedDevices', 'nexus.lighting.pinSelection']) {
-      localStorage.setItem(key, JSON.stringify(['dev-a']));
-    }
+  it('clears the keys of the old per-device-pick model', async () => {
+    localStorage.setItem('nexus.lighting.selectedDevices', JSON.stringify(['dev-a']));
     localStorage.setItem('nexus.lighting.devicePicks', JSON.stringify({ 'dev-a': { key: 'flat:red-3' } }));
     localStorage.setItem('nexus.lighting.selectionSeeded', 'true');
     const { findByLabelText } = renderPage();
 
     expect(await findByLabelText('lightingOnboarding.selectNone')).toBeDisabled();
-    await waitFor(() => expect(canvasDeviceIds.current).toEqual(['dev-a', 'dev-b']));
-    expect(canvasFocusIds.current).toEqual([]);
-    for (const key of ['nexus.lighting.selectedDevices', 'nexus.lighting.pinSelection', 'nexus.lighting.devicePicks', 'nexus.lighting.selectionSeeded']) {
+    for (const key of ['nexus.lighting.selectedDevices', 'nexus.lighting.devicePicks', 'nexus.lighting.selectionSeeded']) {
       expect(localStorage.getItem(key)).toBeNull();
     }
+  });
+
+  it('restores the selection after navigating away and back', async () => {
+    const first = renderPage();
+    fireEvent.click(await first.findByLabelText('lighting.pane.selectAllControlled'));
+    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+    first.unmount();
+
+    canvasFocusIds.current = [];
+    const second = renderPage();
+    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+    expect(await second.findByLabelText('lightingOnboarding.selectNone')).not.toBeDisabled();
+  });
+
+  it('stores the selection and restores one that only storage holds, as after a restart', async () => {
+    const first = renderPage();
+    fireEvent.click(await first.findByLabelText('lighting.pane.selectAllControlled'));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('nexus.lighting.pinSelection')!)).toEqual(['dev-a', 'dev-b']));
+    first.unmount();
+
+    canvasFocusIds.current = [];
+    localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-b']));
+    renderPage();
+    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-b']));
+  });
+
+  it('drops a remembered device that is no longer present and keeps the rest', async () => {
+    localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-a', 'gone']));
+    localStorage.setItem('nexus.lighting.primaryDevice', JSON.stringify('gone'));
+    const { findByLabelText } = renderPage();
+
+    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a']));
+    expect(await findByLabelText('lightingOnboarding.selectNone')).not.toBeDisabled();
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('nexus.lighting.pinSelection')!)).toEqual(['dev-a']));
+    expect(JSON.parse(localStorage.getItem('nexus.lighting.primaryDevice')!)).toBeNull();
   });
 
   it('offers select all/none, and clearing the selection draws every device again', async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { PanelDeviceIdProvider } from '../common/PanelDeviceIdContext';
 import { CoolingTouch } from './CoolingTouch';
 import type { PanelWidget } from '../../types';
 
@@ -84,10 +85,25 @@ vi.mock('../../../api/minihub', async (importOriginal) => {
 
 import { applyProfile, fetchFanChannels } from '../../../api/cooling';
 
+// The service's panel records, by panel id.
+const panelRecords = vi.hoisted(() => ({ current: {} as Record<string, Record<string, string[]>> }));
+vi.mock('../../../api/panel', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/panel')>()),
+  fetchPanelDevice: vi.fn(async (id: string) => (panelRecords.current[id] ? { id, ...panelRecords.current[id] } : null)),
+  patchPanelDevice: vi.fn(async (id: string, patch: Record<string, string[]>) => {
+    panelRecords.current[id] = { ...panelRecords.current[id], ...patch };
+    return { id, ...panelRecords.current[id] };
+  }),
+}));
+
 const widget = { id: 'w-cooling', type: 'cooling', size: '4x4', col: 0, row: 0 } as PanelWidget;
 
-function renderTouch() {
-  return render(<CoolingTouch widget={widget} immersiveGrid={{ columns: 4, rows: 8 }} />);
+function renderTouch(panelId: string | null = null) {
+  return render(
+    <PanelDeviceIdProvider value={panelId}>
+      <CoolingTouch widget={widget} immersiveGrid={{ columns: 4, rows: 8 }} />
+    </PanelDeviceIdProvider>,
+  );
 }
 
 describe('CoolingTouch', () => {
@@ -95,6 +111,7 @@ describe('CoolingTouch', () => {
     vi.clearAllMocks();
     // Isolate the shared cooling cache + fan-group collapse persistence.
     localStorage.clear();
+    panelRecords.current = {};
   });
 
   it('renders preset mode buttons with the active preset hydrated from /cooling/profiles', async () => {
@@ -206,6 +223,46 @@ describe('CoolingTouch', () => {
     await waitFor(() => expect(
       JSON.parse(localStorage.getItem('nexus.cooling.selectedFans') ?? '[]'),
     ).toEqual(['fan-cpu']));
+  });
+
+  it('desktop: reopening the view restores the selection', async () => {
+    const first = renderTouch();
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    fireEvent.click(await screen.findByRole('button', { name: /lighting.ledMap.selectAll/ }));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('nexus.cooling.selectedFans') ?? '[]').sort()).toEqual(['fan-case', 'fan-cpu']));
+    first.unmount();
+
+    renderTouch();
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    expect(await screen.findByRole('button', { name: /lighting.ledMap.selectNone/ })).toBeEnabled();
+  });
+
+  it('keeps each panel its own selection and restores it from the service on reopen', async () => {
+    const a = renderTouch('panel-a');
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    fireEvent.click(await screen.findByRole('button', { name: /lighting.ledMap.selectAll/ }));
+    await waitFor(() => expect([...(panelRecords.current['panel-a']?.coolingSelection ?? [])].sort()).toEqual(['fan-case', 'fan-cpu']));
+    a.unmount();
+
+    // Another panel and the desktop start with nothing selected.
+    const b = renderTouch('panel-b');
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    expect(await screen.findByRole('button', { name: /lighting.ledMap.selectNone/ })).toBeDisabled();
+    expect(panelRecords.current['panel-b']).toBeUndefined();
+    b.unmount();
+    expect(localStorage.getItem('nexus.cooling.selectedFans')).toBeNull();
+
+    localStorage.clear();
+    renderTouch('panel-a');
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /lighting.ledMap.selectNone/ })).toBeEnabled());
+  });
+
+  it('a panel drops a remembered fan that is gone', async () => {
+    panelRecords.current['panel-a'] = { coolingSelection: ['fan-cpu', 'ghost-fan'] };
+    renderTouch('panel-a');
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    await waitFor(() => expect(panelRecords.current['panel-a'].coolingSelection).toEqual(['fan-cpu']));
   });
 
   // A hub's cooling mode is one byte for the whole hub, and a curve cannot
