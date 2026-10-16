@@ -3006,6 +3006,7 @@
   "lighting.renderGpu.confirmButton": "Reiniciar ahora",
   "lighting.renderGpu.confirmMessage": "Cambiar qué GPU renderiza la iluminación requiere reiniciar para que surta efecto. ¿Reiniciar Nexus ahora?",
   "lighting.renderGpu.confirmTitle": "¿Reiniciar para aplicar?",
+  "lighting.renderGpu.failed": "No se pudo cambiar la GPU de renderizado.",
   "lighting.renderGpu.hint": "Reinicia Nexus para aplicar",
   "lighting.renderGpu.label": "GPU de renderizado",
   "lighting.renderGpu.software": "Renderizado por software (CPU)",

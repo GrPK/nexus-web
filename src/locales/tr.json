@@ -3006,6 +3006,7 @@
   "lighting.renderGpu.confirmButton": "Şimdi yeniden başlat",
   "lighting.renderGpu.confirmMessage": "Aydınlatmayı hangi GPU'nun işleyeceğini değiştirmenin etkili olması için yeniden başlatma gerekir. Nexus şimdi yeniden başlatılsın mı?",
   "lighting.renderGpu.confirmTitle": "Uygulamak için yeniden başlatılsın mı?",
+  "lighting.renderGpu.failed": "İşleme GPU'su değiştirilemedi.",
   "lighting.renderGpu.hint": "Uygulamak için Nexus'u yeniden başlatır",
   "lighting.renderGpu.label": "İşleme GPU'su",
   "lighting.renderGpu.software": "Yazılım ile işleme (CPU)",

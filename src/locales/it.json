@@ -3006,6 +3006,7 @@
   "lighting.renderGpu.confirmButton": "Riavvia ora",
   "lighting.renderGpu.confirmMessage": "Cambiare quale GPU esegue il rendering dell'illuminazione richiede un riavvio per avere effetto. Riavviare Nexus ora?",
   "lighting.renderGpu.confirmTitle": "Riavviare per applicare?",
+  "lighting.renderGpu.failed": "Impossibile cambiare la GPU di rendering.",
   "lighting.renderGpu.hint": "Riavvia Nexus per applicare",
   "lighting.renderGpu.label": "GPU di rendering",
   "lighting.renderGpu.software": "Rendering software (CPU)",

@@ -3006,6 +3006,7 @@
   "lighting.renderGpu.confirmButton": "立即重启",
   "lighting.renderGpu.confirmMessage": "更改用于渲染灯光的 GPU 需要重启才能生效。现在重启 Nexus 吗？",
   "lighting.renderGpu.confirmTitle": "重启以应用？",
+  "lighting.renderGpu.failed": "无法更改渲染 GPU。",
   "lighting.renderGpu.hint": "重启 Nexus 以应用",
   "lighting.renderGpu.label": "渲染 GPU",
   "lighting.renderGpu.software": "软件渲染 (CPU)",

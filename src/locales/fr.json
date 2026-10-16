@@ -3006,6 +3006,7 @@
   "lighting.renderGpu.confirmButton": "Redémarrer maintenant",
   "lighting.renderGpu.confirmMessage": "Changer le GPU qui rend l'éclairage nécessite un redémarrage pour prendre effet. Redémarrer Nexus maintenant ?",
   "lighting.renderGpu.confirmTitle": "Redémarrer pour appliquer ?",
+  "lighting.renderGpu.failed": "Impossible de modifier le GPU de rendu.",
   "lighting.renderGpu.hint": "Redémarre Nexus pour appliquer",
   "lighting.renderGpu.label": "GPU de rendu",
   "lighting.renderGpu.software": "Rendu logiciel (CPU)",

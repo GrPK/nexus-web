@@ -217,8 +217,9 @@ const VIEW_3D = '3d';
 export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate, accountUsername = null }: LightingViewProps) {
   const { t, language } = useTranslation();
   const { mode, setMode, rawSync, setRawSync, synced, paused: syncedPaused } = useLightingSync(serviceOnline, activeProfileId);
-  // gpuCanSwitch comes from the same enumeration the Settings picker gates on,
-  // so the shortcut never lands on a tab with no GPU control. Offered only for a
+  // gpuCanSwitch is true whenever the Settings picker has something to choose
+  // (a second card, or CPU rendering offered), so the shortcut never lands on
+  // a tab with no GPU control. Offered only for a
   // card that failed: while initializing, the picker restarts the service and
   // discards the context the notice is waiting for.
   const canPickRenderGpu = (serviceState.lighting?.gpuCanSwitch ?? false)

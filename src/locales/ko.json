@@ -3006,6 +3006,7 @@
   "lighting.renderGpu.confirmButton": "지금 다시 시작",
   "lighting.renderGpu.confirmMessage": "조명을 렌더링하는 GPU를 변경하려면 다시 시작해야 적용됩니다. 지금 Nexus를 다시 시작할까요?",
   "lighting.renderGpu.confirmTitle": "다시 시작하여 적용할까요?",
+  "lighting.renderGpu.failed": "렌더링 GPU를 변경하지 못했습니다.",
   "lighting.renderGpu.hint": "적용하려면 Nexus를 다시 시작합니다",
   "lighting.renderGpu.label": "렌더링 GPU",
   "lighting.renderGpu.software": "소프트웨어 렌더링 (CPU)",

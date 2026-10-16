@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { CircuitBoard, Clock, Cpu, Lock, Moon, RotateCcw, Speaker, Zap } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
+import { useToastSafe } from '../../common/Toast/Toast';
 import { Notice } from '../../common/Notice/Notice';
 import { Select } from '../../common/Select/Select';
 import { SettingRow, SettingSelect, SettingToggle } from '../../common/SettingRow/SettingRow';
@@ -45,6 +46,7 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   const { t } = useTranslation();
   const { settings, update } = useUiSettings();
   const features = useFeatureFlags();
+  const toast = useToastSafe();
   const sensors = useSensors(serviceOnline);
   const gpus = sensors.gpuComponents;
 
@@ -119,8 +121,15 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   const gpuDefault = useMemo(() => defaultGpuTempSensor(sensors.gpu), [sensors.gpu]);
 
   const handleGpuChange = async (value: string) => {
+    const previous = renderGpu;
     setRenderGpuValue(value);
-    try { await setRenderGpu(value); } catch { /* persist may retry; UI keeps the pick */ }
+    let res: Awaited<ReturnType<typeof setRenderGpu>> = null;
+    try { res = await setRenderGpu(value); } catch { /* treated as a refusal below */ }
+    if (!res || res.error) {
+      setRenderGpuValue(previous);
+      toast.push({ title: t('lighting.renderGpu.failed') });
+      return;
+    }
     setRestartOpen(true);
   };
   const handleSleepBlackoutChange = async (next: boolean) => {

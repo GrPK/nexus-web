@@ -242,11 +242,15 @@ export function Select({
     if (width == null) {
       const optionEls = Array.from(list.children) as HTMLElement[];
       for (const o of optionEls) o.style.overflow = 'visible';
+      // Descriptions wrap to the menu width the labels set; they never size it.
+      const descEls = Array.from(list.querySelectorAll<HTMLElement>('[data-option-description]'));
+      for (const d of descEls) d.style.display = 'none';
       menu.style.width = 'max-content';
       menu.style.minWidth = `${baseWidth}px`;
       menu.style.maxWidth = `${maxWidth}px`;
       const measured = menu.offsetWidth;
       for (const o of optionEls) o.style.overflow = '';
+      for (const d of descEls) d.style.display = '';
       width = Math.min(maxWidth, measured + MENU_WIDTH_PAD);
       menu.style.width = `${width}px`;
       menu.style.minWidth = '';
@@ -520,6 +524,7 @@ export function Select({
                   role="option"
                   aria-selected={opt.value === value}
                   aria-disabled={opt.disabled || undefined}
+                  aria-describedby={opt.description ? `${optionId(i)}-desc` : undefined}
                   className={classNames(
                     styles.option,
                     opt.className,
@@ -536,7 +541,7 @@ export function Select({
                   {opt.description ? (
                     <span className={styles.optionText}>
                       <span>{opt.label}</span>
-                      <span className={styles.optionDescription}>{opt.description}</span>
+                      <span id={`${optionId(i)}-desc`} data-option-description="true" className={styles.optionDescription}>{opt.description}</span>
                     </span>
                   ) : opt.label}
                 </li>

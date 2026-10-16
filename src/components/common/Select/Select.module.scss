@@ -205,18 +205,15 @@
 
 // Two-line rows (SelectOption.description): label over a dim caveat line.
 .optionText {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  max-width: 100%;
-  vertical-align: top;
 }
 
 .optionDescription {
+  margin-top: 0.15rem;
   color: var(--text-dim);
   font-size: var(--type-mini);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
 }
 
 // Font-preview rows (SelectOption.fontFamily) draw larger so each face reads.

@@ -3042,6 +3042,7 @@
   "lighting.renderGpu.confirmButton": "Перезапустить",
   "lighting.renderGpu.confirmMessage": "Чтобы изменить, какой GPU отрисовывает подсветку, требуется перезапуск. Перезапустить Nexus сейчас?",
   "lighting.renderGpu.confirmTitle": "Перезапустить для применения?",
+  "lighting.renderGpu.failed": "Не удалось изменить GPU для рендеринга.",
   "lighting.renderGpu.hint": "Перезапускает Nexus для применения",
   "lighting.renderGpu.label": "GPU для рендеринга",
   "lighting.renderGpu.software": "Программный рендеринг (CPU)",

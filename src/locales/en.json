@@ -3006,6 +3006,7 @@
   "lighting.renderGpu.confirmButton": "Restart now",
   "lighting.renderGpu.confirmMessage": "Changing which GPU renders lighting needs a restart to take effect. Restart Nexus now?",
   "lighting.renderGpu.confirmTitle": "Restart to apply?",
+  "lighting.renderGpu.failed": "Could not change the render GPU.",
   "lighting.renderGpu.hint": "Restarts Nexus to apply",
   "lighting.renderGpu.label": "Render GPU",
   "lighting.renderGpu.software": "Software rendering (CPU)",

@@ -3006,6 +3006,7 @@
   "lighting.renderGpu.confirmButton": "Jetzt neu starten",
   "lighting.renderGpu.confirmMessage": "Das Ändern der GPU, die die Beleuchtung rendert, wird erst nach einem Neustart wirksam. Nexus jetzt neu starten?",
   "lighting.renderGpu.confirmTitle": "Zum Übernehmen neu starten?",
+  "lighting.renderGpu.failed": "Die Render-GPU konnte nicht geändert werden.",
   "lighting.renderGpu.hint": "Startet Nexus zur Übernahme neu",
   "lighting.renderGpu.label": "Render-GPU",
   "lighting.renderGpu.software": "Software-Rendering (CPU)",

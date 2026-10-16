@@ -344,8 +344,9 @@ export interface RenderGpuState {
 export const fetchRenderGpu = () =>
   fetchService<RenderGpuState>('/lighting/render-gpu');
 
+/** Null when the service refused (e.g. software rendering unavailable). */
 export const setRenderGpu = (value: string) =>
-  postService('/lighting/render-gpu', { value });
+  postService<{ error?: boolean }>('/lighting/render-gpu', { value });
 
 export const restartService = () =>
   postService('/service/restart', {});

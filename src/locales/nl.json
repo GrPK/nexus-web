@@ -3006,6 +3006,7 @@
   "lighting.renderGpu.confirmButton": "Nu opnieuw starten",
   "lighting.renderGpu.confirmMessage": "Het wijzigen van welke GPU de verlichting rendert, vereist een herstart om van kracht te worden. Nexus nu opnieuw starten?",
   "lighting.renderGpu.confirmTitle": "Opnieuw starten om toe te passen?",
+  "lighting.renderGpu.failed": "De render-GPU kon niet worden gewijzigd.",
   "lighting.renderGpu.hint": "Start Nexus opnieuw om toe te passen",
   "lighting.renderGpu.label": "Render-GPU",
   "lighting.renderGpu.software": "Softwarematige rendering (CPU)",

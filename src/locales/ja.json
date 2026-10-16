@@ -3006,6 +3006,7 @@
   "lighting.renderGpu.confirmButton": "今すぐ再起動",
   "lighting.renderGpu.confirmMessage": "ライティングをレンダリングする GPU の変更を反映するには再起動が必要です。今すぐ Nexus を再起動しますか？",
   "lighting.renderGpu.confirmTitle": "再起動して適用しますか？",
+  "lighting.renderGpu.failed": "レンダリング GPU を変更できませんでした。",
   "lighting.renderGpu.hint": "適用するには Nexus を再起動します",
   "lighting.renderGpu.label": "レンダリング GPU",
   "lighting.renderGpu.software": "ソフトウェアレンダリング (CPU)",

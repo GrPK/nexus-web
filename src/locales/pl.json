@@ -3042,6 +3042,7 @@
   "lighting.renderGpu.confirmButton": "Uruchom ponownie",
   "lighting.renderGpu.confirmMessage": "Zmiana karty GPU renderującej podświetlenie wymaga ponownego uruchomienia, aby zaczęła obowiązywać. Uruchomić Nexus ponownie teraz?",
   "lighting.renderGpu.confirmTitle": "Uruchomić ponownie, aby zastosować?",
+  "lighting.renderGpu.failed": "Nie udało się zmienić GPU renderującego.",
   "lighting.renderGpu.hint": "Uruchamia ponownie Nexus, aby zastosować",
   "lighting.renderGpu.label": "GPU renderujące",
   "lighting.renderGpu.software": "Renderowanie programowe (CPU)",

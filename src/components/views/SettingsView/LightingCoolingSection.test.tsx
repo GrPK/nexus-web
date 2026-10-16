@@ -40,6 +40,7 @@ vi.mock('../../../hooks/useSensors', () => ({
 
 const lightingApi = vi.hoisted(() => ({
   fetchRenderGpu: vi.fn().mockResolvedValue(null),
+  setRenderGpu: vi.fn().mockResolvedValue({ error: false }),
   // Resolved by default: the sensor-picker tests below mount the same component
   // and would otherwise trip over an undefined return inside its effect.
   fetchSleepBlackout: vi.fn().mockResolvedValue({ enabled: true }),
@@ -60,7 +61,7 @@ const lightingApi = vi.hoisted(() => ({
 
 vi.mock('../../../api/lighting', () => ({
   fetchRenderGpu: lightingApi.fetchRenderGpu,
-  setRenderGpu: vi.fn().mockResolvedValue(null),
+  setRenderGpu: lightingApi.setRenderGpu,
   restartService: vi.fn().mockResolvedValue(null),
   fetchSleepBlackout: lightingApi.fetchSleepBlackout,
   setSleepBlackout: lightingApi.setSleepBlackout,
@@ -155,6 +156,17 @@ describe('LightingCoolingSection section split', () => {
     const list = screen.getByRole('listbox');
     expect(within(list).getByText('lighting.renderGpu.software')).toBeInTheDocument();
     expect(within(list).getByText('lighting.renderGpu.softwareWarning')).toBeInTheDocument();
+  });
+
+  it('reverts the pick and skips the restart confirm when the service refuses', async () => {
+    prefs.gpus = [{ id: 'a', name: 'Integrated GPU', integrated: true }, { id: 'b', name: 'Discrete GPU', integrated: false }];
+    lightingApi.setRenderGpu.mockResolvedValueOnce(null);
+    render(<LightingCoolingSection serviceOnline platform="windows" />);
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.renderGpu.label' }));
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('Discrete GPU'));
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByText('lighting.renderGpu.confirmTitle')).toBeNull();
+    expect(screen.getByRole('button', { name: 'lighting.renderGpu.label' })).not.toHaveTextContent('Discrete GPU');
   });
 
   it('hides the picker with one GPU and no software option', async () => {
