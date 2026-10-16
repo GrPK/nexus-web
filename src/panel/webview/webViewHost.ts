@@ -28,6 +28,8 @@ export interface WebViewHostSnapshot {
   interactive: boolean;
   maxViews: number;
   views: Readonly<Record<string, WebViewViewState>>;
+  /** Ids past the host's view limit: never synced, shown a placeholder. */
+  overLimit: readonly string[];
 }
 
 export interface WebViewClaimInput {
@@ -59,6 +61,13 @@ interface ClaimRecord extends WebViewClaimInput {
 // How long layout keeps being re-measured after a transition or animation
 // starts, so a sliding overlay carries the native view with it.
 const BURST_MS = 600;
+// The most views any host accepts.
+const MAX_VIEWS = 4;
+// A finger travels this far before it counts as a swipe or pull.
+const GESTURE_SLOP_PX = 6;
+// The panel's own click-through layers (hints, notices) mark themselves so
+// the topmost check, which skips them, can still hide the native view.
+const COVER_SELECTOR = '[data-webview-cover]';
 
 const EMPTY_KEY = JSON.stringify([null, []]);
 
@@ -78,7 +87,7 @@ export class WebViewHost {
   private interactive = false;
   private maxViews = 0;
   private viewStates: Record<string, WebViewViewState> = {};
-  private snapshot: WebViewHostSnapshot = { status: 'idle', interactive: false, maxViews: 0, views: {} };
+  private snapshot: WebViewHostSnapshot = { status: 'idle', interactive: false, maxViews: 0, views: {}, overLimit: [] };
   private listeners = new Set<() => void>();
   private suppressed = false;
   private pageHidden = false;
@@ -91,6 +100,12 @@ export class WebViewHost {
   private resizeObserver: ResizeObserver | null = null;
   private mutationObserver: MutationObserver | null = null;
   private teardown: Array<() => void> = [];
+  // Stable slots: an id keeps its place while it has any claim, so tile and
+  // immersive share one, and a re-register never reorders the others.
+  private slotOrder: string[] = [];
+  private overLimit = new Set<string>();
+  private pointers = new Map<number, { x: number; y: number; moved: boolean }>();
+  private gestureActive = false;
   private refreshTimers = new Map<string, { minutes: number; handle: ReturnType<typeof setInterval> }>();
 
   readonly subscribe = (listener: () => void): (() => void) => {
@@ -105,6 +120,7 @@ export class WebViewHost {
     const rec: ClaimRecord = { ...input, key: this.nextKey++ };
     this.claims.set(rec.key, rec);
     this.resizeObserver?.observe(rec.element);
+    if (this.reconcileSlots()) this.emit();
     this.ensureHeartbeat();
     this.schedule();
     this.updateRefreshTimers();
@@ -183,6 +199,7 @@ export class WebViewHost {
       this.capsTimer = null;
       if (this.status === 'pending') {
         this.status = 'unsupported';
+        this.stopHeartbeat();
         this.emit();
       }
     }, CAPS_TIMEOUT_MS);
@@ -219,6 +236,10 @@ export class WebViewHost {
     this.on(window, 'transitionend', burst, true);
     this.on(window, 'animationstart', burst, true);
     this.on(window, 'animationend', burst, true);
+    this.on(window, 'pointerdown', e => { this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: false }); }, true);
+    this.on(window, 'pointermove', e => this.onPointerMove(e), true);
+    this.on(window, 'pointerup', e => this.onPointerEnd(e), true);
+    this.on(window, 'pointercancel', e => this.onPointerEnd(e), true);
     this.on(window, 'pagehide', () => this.onPageHide());
     this.on(window, 'pageshow', () => this.onPageShow());
     const onVisibility = () => this.flush(false);
@@ -241,6 +262,7 @@ export class WebViewHost {
     if (msg.type === 'nexus.webview.caps') {
       if (this.capsTimer) { clearTimeout(this.capsTimer); this.capsTimer = null; }
       this.status = msg.supported ? 'supported' : 'unsupported';
+      if (this.status === 'unsupported') this.stopHeartbeat();
       this.interactive = msg.interactive;
       this.maxViews = msg.maxViews;
       this.emit();
@@ -253,6 +275,28 @@ export class WebViewHost {
     };
     this.emit();
     // An error or crash hides the native view, so the placeholder shows.
+    this.schedule();
+  }
+
+  // Swipes and pulls move content with inline transforms, which no observer
+  // sees: re-measure on every move, and hide the tiles once a drag begins so
+  // none sits over a sheet being pulled in.
+  private onPointerMove(e: PointerEvent): void {
+    const p = this.pointers.get(e.pointerId);
+    if (!p) return;
+    if (!p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) > GESTURE_SLOP_PX) {
+      p.moved = true;
+      this.gestureActive = true;
+      this.flush(false);
+      return;
+    }
+    this.schedule();
+  }
+
+  private onPointerEnd(e: PointerEvent): void {
+    if (!this.pointers.delete(e.pointerId)) return;
+    this.gestureActive = Array.from(this.pointers.values()).some(p => p.moved);
+    this.burstUntil = Date.now() + BURST_MS;
     this.schedule();
   }
 
@@ -272,7 +316,7 @@ export class WebViewHost {
   }
 
   private ensureHeartbeat(): void {
-    if (this.heartbeat || !this.transport) return;
+    if (this.heartbeat || !this.transport || this.status === 'unsupported') return;
     this.heartbeat = setInterval(() => this.flush(true), HEARTBEAT_MS);
   }
 
@@ -293,11 +337,13 @@ export class WebViewHost {
   }
 
   private emit(): void {
+    this.reconcileSlots();
     this.snapshot = {
       status: this.status,
       interactive: this.interactive,
       maxViews: this.maxViews,
       views: this.viewStates,
+      overLimit: Array.from(this.overLimit),
     };
     this.updateRefreshTimers();
     for (const l of [...this.listeners]) l();
@@ -315,7 +361,7 @@ export class WebViewHost {
       for (const c of this.claims.values()) {
         const minutes = c.refreshMinutes ?? 0;
         const st = this.viewStates[c.id]?.state;
-        if (c.immersive || immersiveIds.has(c.id) || minutes <= 0 || st === 'error' || st === 'crashed') continue;
+        if (c.immersive || immersiveIds.has(c.id) || this.overLimit.has(c.id) || minutes <= 0 || st === 'error' || st === 'crashed') continue;
         want.set(c.id, minutes);
       }
     }
@@ -332,17 +378,37 @@ export class WebViewHost {
     }
   }
 
+  private limit(): number {
+    return this.maxViews > 0 ? Math.min(this.maxViews, MAX_VIEWS) : MAX_VIEWS;
+  }
+
+  // Drops slots with no claim, appends new ids, and recomputes which ids fall
+  // past the limit. Returns whether the over-limit set changed.
+  private reconcileSlots(): boolean {
+    const live = new Set<string>();
+    for (const c of this.claims.values()) live.add(c.id);
+    this.slotOrder = this.slotOrder.filter(id => live.has(id));
+    for (const id of live) if (!this.slotOrder.includes(id)) this.slotOrder.push(id);
+    const next = new Set(this.slotOrder.slice(this.limit()));
+    const changed = next.size !== this.overLimit.size || [...next].some(id => !this.overLimit.has(id));
+    this.overLimit = next;
+    return changed;
+  }
+
   private buildViews(): WebViewSyncView[] {
     const supported = this.status === 'supported';
     const documentVisible = document.visibilityState !== 'hidden';
     const hit = (x: number, y: number) => document.elementFromPoint(x, y);
+    const covered = document.querySelector(COVER_SELECTOR) !== null;
     const winners = new Map<string, ClaimRecord>();
     for (const c of this.claims.values()) {
       const cur = winners.get(c.id);
       if (!cur || (c.immersive && !cur.immersive)) winners.set(c.id, c);
     }
     const views: WebViewSyncView[] = [];
-    for (const c of winners.values()) {
+    for (const id of this.slotOrder) {
+      const c = winners.get(id);
+      if (!c || this.overLimit.has(id)) continue;
       const { rect, target, radius } = measureTile(c.element);
       const st = this.viewStates[c.id]?.state;
       views.push({
@@ -355,7 +421,7 @@ export class WebViewHost {
         visible: computeVisible({
           supported,
           documentVisible,
-          suppressed: this.suppressed,
+          suppressed: this.suppressed || covered || (this.gestureActive && !c.immersive),
           connected: c.element.isConnected,
           loadFailed: st === 'error' || st === 'crashed',
           rect,
@@ -369,6 +435,7 @@ export class WebViewHost {
 
   private flush(force: boolean): void {
     if (!this.transport || this.status !== 'supported' || this.pageHidden) return;
+    if (this.reconcileSlots()) this.emit();
     const views = this.buildViews();
     if (views.length === 0 && this.lastKey === null) return;
     const viewport = { w: window.innerWidth, h: window.innerHeight };

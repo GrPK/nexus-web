@@ -39,6 +39,9 @@ export function WebViewSurface({ widget, surface, editorPreview, immersive }: We
   let previewOnly = false;
   if (url === null) {
     title = t('panel.widget.web-view.setUrl');
+  } else if (native && snapshot.overLimit.includes(widget.id)) {
+    title = t('panel.widget.web-view.tooMany');
+    hint = webViewHostName(url);
   } else if (!native) {
     // Name only, no message. The site favicon is not drawn: the panel CSP
     // img-src does not allow arbitrary hosts, so the globe stands in.

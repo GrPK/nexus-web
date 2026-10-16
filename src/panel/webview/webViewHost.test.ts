@@ -469,3 +469,133 @@ describe('auto-refresh timer', () => {
     expect(reloads()).toHaveLength(1);
   });
 });
+
+function pointer(type: string, x: number, y: number, id = 1) {
+  window.dispatchEvent(Object.assign(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true }), { pointerId: id }));
+}
+
+describe('finger-driven moves', () => {
+  it('re-measures on pointermove while a pointer is down', () => {
+    const host = makeHost();
+    const a = makeEl();
+    host.register({ id: 'a', url: 'https://a.test/', element: a.el, immersive: false });
+    bridge.push(caps());
+    pointer('pointerdown', 100, 100);
+    a.moveTo({ x: 40, y: 20, w: 300, h: 300 });
+    pointer('pointermove', 102, 100);
+    frame();
+    expect(syncs().at(-1)!.views[0].rect.x).toBe(40);
+  });
+
+  it('ignores pointermove with no pointer down', () => {
+    const host = makeHost();
+    const a = makeEl();
+    host.register({ id: 'a', url: 'https://a.test/', element: a.el, immersive: false });
+    bridge.push(caps());
+    frame();
+    const n = syncs().length;
+    a.moveTo({ x: 70, y: 20, w: 300, h: 300 });
+    pointer('pointermove', 300, 300);
+    frame();
+    expect(syncs()).toHaveLength(n);
+  });
+
+  it('hides tiles at once when a drag starts, keeps immersive, and shows again after release', () => {
+    const host = makeHost();
+    host.register({ id: 'a', url: 'https://a.test/', element: makeEl().el, immersive: false });
+    host.register({ id: 'b', url: 'https://b.test/', element: makeEl({ x: 0, y: 0, w: 400, h: 400 }).el, immersive: true });
+    bridge.push(caps());
+    document.elementFromPoint = () => document.body.querySelector('div');
+    pointer('pointerdown', 100, 100);
+    pointer('pointermove', 100, 140);
+    const during = syncs().at(-1)!;
+    expect(during.views.find(v => v.id === 'a')!.visible).toBe(false);
+    pointer('pointerup', 100, 140);
+    vi.advanceTimersByTime(40);
+    expect(syncs().at(-1)!.views.find(v => v.id === 'a')!.visible).toBe(true);
+  });
+
+  it('hides every view while a click-through cover layer is in the document', () => {
+    const host = makeHost();
+    host.register({ id: 'a', url: 'https://a.test/', element: makeEl().el, immersive: true });
+    bridge.push(caps());
+    expect(syncs().at(-1)!.views[0].visible).toBe(true);
+    const hint = document.createElement('span');
+    hint.setAttribute('data-webview-cover', '');
+    document.body.appendChild(hint);
+    vi.advanceTimersByTime(1000);
+    expect(syncs().at(-1)!.views[0].visible).toBe(false);
+    hint.remove();
+    vi.advanceTimersByTime(1000);
+    expect(syncs().at(-1)!.views[0].visible).toBe(true);
+  });
+});
+
+describe('view limit and stable slots', () => {
+  const reg = (host: WebViewHost, id: string, immersive = false) =>
+    host.register({ id, url: `https://${id}.test/`, element: makeEl().el, immersive });
+
+  it('never syncs widgets past maxViews and reports them over the limit', () => {
+    const host = makeHost();
+    reg(host, 'a'); reg(host, 'b'); reg(host, 'c');
+    bridge.push(caps({ maxViews: 2 }));
+    expect(syncs().at(-1)!.views.map(v => v.id)).toEqual(['a', 'b']);
+    expect(host.getSnapshot().overLimit).toEqual(['c']);
+  });
+
+  it('defaults the limit to 4', () => {
+    const host = makeHost();
+    ['a', 'b', 'c', 'd', 'e'].forEach(id => reg(host, id));
+    bridge.push(caps({ maxViews: 0 }));
+    expect(syncs().at(-1)!.views).toHaveLength(4);
+    expect(host.getSnapshot().overLimit).toEqual(['e']);
+  });
+
+  it('tile and immersive share one slot', () => {
+    const host = makeHost();
+    reg(host, 'a'); reg(host, 'b');
+    reg(host, 'a', true);
+    bridge.push(caps({ maxViews: 2 }));
+    expect(host.getSnapshot().overLimit).toEqual([]);
+    expect(syncs().at(-1)!.views.map(v => v.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('a release and re-register in one commit does not push another widget past the limit', () => {
+    const host = makeHost();
+    const a = reg(host, 'a'); reg(host, 'b'); reg(host, 'c');
+    bridge.push(caps({ maxViews: 2 }));
+    a.release();
+    reg(host, 'a');
+    frame();
+    expect(host.getSnapshot().overLimit).toEqual(['c']);
+    expect(syncs().at(-1)!.views.map(v => v.id)).toEqual(['a', 'b']);
+  });
+
+  it('gives a waiting widget the slot once one is really freed, without moving the others', () => {
+    const host = makeHost();
+    const a = reg(host, 'a'); reg(host, 'b'); reg(host, 'c');
+    bridge.push(caps({ maxViews: 2 }));
+    a.release();
+    frame();
+    expect(host.getSnapshot().overLimit).toEqual([]);
+    expect(syncs().at(-1)!.views.map(v => v.id)).toEqual(['b', 'c']);
+  });
+});
+
+describe('heartbeat on unsupported hosts', () => {
+  it('stops when caps time out', () => {
+    const host = makeHost();
+    host.register({ id: 'a', url: 'https://a.test/', element: makeEl().el, immersive: false });
+    vi.advanceTimersByTime(1600);
+    expect(host.getSnapshot().status).toBe('unsupported');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('stops when caps say unsupported', () => {
+    const host = makeHost();
+    host.register({ id: 'a', url: 'https://a.test/', element: makeEl().el, immersive: false });
+    bridge.push(caps({ supported: false }));
+    frame();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});

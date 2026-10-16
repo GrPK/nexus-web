@@ -4571,6 +4571,7 @@
   "panel.widget.web-view.settings.refreshOne": "1分ごと",
   "panel.widget.web-view.settings.zoom": "ズーム",
   "panel.widget.web-view.settings.zoomValue": "{n}x",
+  "panel.widget.web-view.tooMany": "このディスプレイにはWebビューのウィジェットが多すぎます",
   "panel.widget.web-view.toolbar": "Webビューのコントロール",
   "panel.widget.web-view.unsupported": "このディスプレイでは利用できません",
   "panel.widget.whiteboard": "ホワイトボード",

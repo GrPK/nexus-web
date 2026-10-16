@@ -4571,6 +4571,7 @@
   "panel.widget.web-view.settings.refreshOne": "1분마다",
   "panel.widget.web-view.settings.zoom": "확대/축소",
   "panel.widget.web-view.settings.zoomValue": "{n}x",
+  "panel.widget.web-view.tooMany": "이 디스플레이에 웹 보기 위젯이 너무 많습니다",
   "panel.widget.web-view.toolbar": "웹 보기 컨트롤",
   "panel.widget.web-view.unsupported": "이 디스플레이에서는 사용할 수 없습니다",
   "panel.widget.whiteboard": "화이트보드",

@@ -4571,6 +4571,7 @@
   "panel.widget.web-view.settings.refreshOne": "Jede Minute",
   "panel.widget.web-view.settings.zoom": "Zoom",
   "panel.widget.web-view.settings.zoomValue": "{n}x",
+  "panel.widget.web-view.tooMany": "Zu viele Webansichts-Widgets auf diesem Display",
   "panel.widget.web-view.toolbar": "Steuerung der Webansicht",
   "panel.widget.web-view.unsupported": "Auf diesem Display nicht verfügbar",
   "panel.widget.whiteboard": "Whiteboard",

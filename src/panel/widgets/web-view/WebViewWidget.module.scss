@@ -53,11 +53,11 @@
   }
 }
 
-// Matches the overlay's close notch height so its tap target and the close
-// swipe stay clear of the native area.
+// Keeps the overlay's close notch tap target and the close swipe clear of the
+// native area.
 .topStrip {
   flex: 0 0 auto;
-  height: 44px;
+  height: var(--immersive-notch-height);
 }
 
 .toolbar {

@@ -56,6 +56,13 @@ describe('parseInbound', () => {
     expect(parseInbound(JSON.stringify(caps))).toEqual(caps);
   });
 
+  it('reads interactive as true only when it is exactly true', () => {
+    const base = { type: 'nexus.webview.caps', version: 1, supported: true, maxViews: 4 };
+    expect((parseInbound({ ...base }) as { interactive: boolean }).interactive).toBe(false);
+    expect((parseInbound({ ...base, interactive: 'yes' }) as { interactive: boolean }).interactive).toBe(false);
+    expect((parseInbound({ ...base, interactive: true }) as { interactive: boolean }).interactive).toBe(true);
+  });
+
   it('parses a state frame and drops unknown states', () => {
     expect(parseInbound({ type: 'nexus.webview.state', id: 'a', state: 'error', code: 'x', canGoBack: true }))
       .toEqual({ type: 'nexus.webview.state', id: 'a', state: 'error', code: 'x', canGoBack: true });

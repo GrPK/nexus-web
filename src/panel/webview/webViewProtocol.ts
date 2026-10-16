@@ -4,7 +4,7 @@
 export const WEBVIEW_PROTOCOL_VERSION = 1;
 // No caps reply within this window after hello means the host has no native layer.
 export const CAPS_TIMEOUT_MS = 1500;
-// The native watchdog destroys every view after 3000 ms without a sync.
+// Heartbeat period: well inside the native watchdog window, which destroys every view when syncs stop.
 export const HEARTBEAT_MS = 1000;
 export const ZOOM_MIN = 0.25;
 export const ZOOM_MAX = 3;
@@ -118,7 +118,7 @@ export function parseInbound(raw: unknown): WebViewInbound | null {
       version: typeof m.version === 'number' ? m.version : 1,
       supported: m.supported === true,
       maxViews: typeof m.maxViews === 'number' ? m.maxViews : 0,
-      interactive: m.interactive !== false,
+      interactive: m.interactive === true,
     };
   }
   if (m.type === 'nexus.webview.state' && typeof m.id === 'string') {

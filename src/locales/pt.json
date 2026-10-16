@@ -4571,6 +4571,7 @@
   "panel.widget.web-view.settings.refreshOne": "A cada minuto",
   "panel.widget.web-view.settings.zoom": "Zoom",
   "panel.widget.web-view.settings.zoomValue": "{n}x",
+  "panel.widget.web-view.tooMany": "Demasiados widgets de vista web neste ecrã",
   "panel.widget.web-view.toolbar": "Controlos da vista web",
   "panel.widget.web-view.unsupported": "Indisponível neste ecrã",
   "panel.widget.whiteboard": "Quadro branco",

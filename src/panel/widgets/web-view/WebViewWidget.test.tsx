@@ -68,3 +68,23 @@ describe('web-view surface availability', () => {
     expect(webViewApp.meta.sizes).toEqual(['4x4']);
   });
 });
+
+describe('web-view over the view limit', () => {
+  it('shows the too-many placeholder for a widget past the limit', async () => {
+    window.history.pushState({}, '', '/panel/dev1');
+    const bridge = { postMessage: () => {}, addEventListener: () => {}, removeEventListener: () => {} };
+    (window as unknown as { chrome: unknown }).chrome = { webview: bridge };
+    try {
+      const { webViewHost: host } = await import('../../webview/webViewHost');
+      const { act } = await import('@testing-library/react');
+      render(<>{[1, 2, 3, 4, 5].map(n => (
+        <WebViewWidget key={n} widget={{ ...widget('https://example.com'), id: `w${n}` }} surface="y70" />
+      ))}</>);
+      act(() => { window.dispatchEvent(new CustomEvent('nexus-webview', { detail: { type: 'nexus.webview.caps', version: 1, supported: true, maxViews: 4, interactive: true } })); });
+      expect(host.getSnapshot().overLimit).toEqual(['w5']);
+      expect(screen.getAllByText('panel.widget.web-view.tooMany')).toHaveLength(1);
+    } finally {
+      delete (window as unknown as { chrome?: unknown }).chrome;
+    }
+  });
+});

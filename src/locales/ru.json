@@ -4617,6 +4617,7 @@
   "panel.widget.web-view.settings.refreshOne": "Каждую минуту",
   "panel.widget.web-view.settings.zoom": "Масштаб",
   "panel.widget.web-view.settings.zoomValue": "{n}x",
+  "panel.widget.web-view.tooMany": "Слишком много виджетов веб-просмотра на этом дисплее",
   "panel.widget.web-view.toolbar": "Управление веб-просмотром",
   "panel.widget.web-view.unsupported": "Недоступно на этом дисплее",
   "panel.widget.whiteboard": "Доска",
