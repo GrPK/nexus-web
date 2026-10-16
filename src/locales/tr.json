@@ -1184,7 +1184,6 @@
   "devices.logitechSpeaker.lower": "Kıs",
   "devices.logitechSpeaker.mode": "Surround modu",
   "devices.logitechSpeaker.movie": "Film",
-  "devices.logitechSpeaker.notDefault": "G560, Windows'ta varsayılan çıkış değil; bu yüzden başka yerde çalan ses bu ayarları almaz.",
   "devices.logitechSpeaker.notFound": "G560 bulunamadı",
   "devices.logitechSpeaker.notFoundHint": "Hoparlörü bağlayın. Nexus onu G HUB'ın kurduğu Logitech ses sürücüsü üzerinden bulur.",
   "devices.logitechSpeaker.preset": "Ön ayar",

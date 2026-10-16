@@ -1191,7 +1191,6 @@
   "devices.logitechSpeaker.lower": "Тише",
   "devices.logitechSpeaker.mode": "Режим объёмного звука",
   "devices.logitechSpeaker.movie": "Фильмы",
-  "devices.logitechSpeaker.notDefault": "G560 не выбрана выходом по умолчанию в Windows, поэтому звук, который играет в другом месте, не получает эти настройки.",
   "devices.logitechSpeaker.notFound": "G560 не найдена",
   "devices.logitechSpeaker.notFoundHint": "Подключите колонки. Nexus находит их через аудиодрайвер Logitech, который установил G HUB.",
   "devices.logitechSpeaker.preset": "Пресет",

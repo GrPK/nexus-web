@@ -427,7 +427,6 @@ export function LogitechSpeakerDevicePage() {
           <EmptyState icon={<Speaker size={40} />} title={t('devices.logitechSpeaker.notFound')} hint={t('devices.logitechSpeaker.notFoundHint')} />
         ) : (
           <div className={own.tab}>
-            {!state.isDefaultOutput && <Notice tone="info">{t('devices.logitechSpeaker.notDefault')}</Notice>}
             {failed && <Notice tone="critical" role="alert">{t('devices.logitechSpeaker.failed')}</Notice>}
             {tab === 'surround' ? <SurroundTab state={state} change={change} /> : <AcousticsTab state={state} change={change} />}
           </div>

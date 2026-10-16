@@ -1184,7 +1184,6 @@
   "devices.logitechSpeaker.lower": "小さく",
   "devices.logitechSpeaker.mode": "サラウンドモード",
   "devices.logitechSpeaker.movie": "映画",
-  "devices.logitechSpeaker.notDefault": "G560 は Windows の既定の出力ではないため、ほかで再生される音にはこの設定がかかりません。",
   "devices.logitechSpeaker.notFound": "G560 が見つかりません",
   "devices.logitechSpeaker.notFoundHint": "スピーカーを接続してください。Nexus は G HUB がインストールした Logitech オーディオドライバーを通して見つけます。",
   "devices.logitechSpeaker.preset": "プリセット",
