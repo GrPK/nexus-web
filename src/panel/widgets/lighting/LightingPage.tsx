@@ -2127,7 +2127,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       return;
     }
     const measure = () => {
-
       const full = controlAllFullWidth.current;
       const toolbarWidth = parseFloat(getComputedStyle(toolbar).getPropertyValue('--preset-rail-width'));
       if (!full || Number.isNaN(toolbarWidth)) return;
@@ -2147,16 +2146,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   }, [anyUncontrolled, simpleDashboard, controlAllLabel, controlAllCompact, fontEpoch]);
   const controlAllDevicesButton = anyUncontrolled ? (
     <span ref={controlAllRef} className={styles.controlAll}>
-    <Button
-      size="sm"
-      pill
-      icon={controlAllIconOnly ? <ListChecks /> : undefined}
-      aria-label={controlAllIconOnly ? controlAllLabel : undefined}
-      title={controlAllIconOnly ? controlAllLabel : undefined}
-      onClick={() => { claimAllDevices(); if (simpleDashboard) unpinAll(); }}
-    >
-      {controlAllIconOnly ? undefined : controlAllLabel}
-    </Button>
+      <Button
+        size="sm"
+        pill
+        icon={controlAllIconOnly ? <ListChecks /> : undefined}
+        aria-label={controlAllIconOnly ? controlAllLabel : undefined}
+        title={controlAllIconOnly ? controlAllLabel : undefined}
+        onClick={() => { claimAllDevices(); if (simpleDashboard) unpinAll(); }}
+      >
+        {controlAllIconOnly ? undefined : controlAllLabel}
+      </Button>
     </span>
   ) : undefined;
 
