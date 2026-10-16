@@ -57,3 +57,28 @@ describe('PanelThemeSettings background notice', () => {
     expect(screen.queryByRole('status')).toBeNull();
   });
 });
+
+describe('PanelThemeSettings immersive background toggle', () => {
+  function renderWith(showImmersiveBackdrop?: boolean) {
+    const theme = { ...buildPanelTheme(null, null), backgroundMode: 'solid' as const };
+    render(
+      <PanelThemeSettings
+        theme={theme}
+        resolvedThemeMode="dark"
+        sections="background"
+        showImmersiveBackdrop={showImmersiveBackdrop}
+        {...handlers()}
+      />,
+    );
+  }
+
+  it('shows the toggle for touch screens', () => {
+    renderWith(true);
+    expect(screen.getByText('Immersive background')).toBeTruthy();
+  });
+
+  it('hides the toggle for non-touch screens', () => {
+    renderWith(false);
+    expect(screen.queryByText('Immersive background')).toBeNull();
+  });
+});
