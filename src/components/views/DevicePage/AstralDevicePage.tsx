@@ -350,7 +350,7 @@ function PowerTab({ power, setPower }: PowerTabProps) {
         {countdown ? (
           <div className={own.countdown} role="alert">
             <div className={own.countdownTitle}>
-              <Power size={20} aria-hidden="true" />
+              <Power size={20} aria-hidden />
               <span>{power.shuttingDown ? t('devices.astral.shuttingDown') : t('devices.astral.countdownTitle', { left: clockLeft(countdown.endsAtMs - now) })}</span>
             </div>
             {countdown.text && <p className={own.countdownText}>{countdown.text}</p>}
@@ -500,7 +500,7 @@ export function AstralDevicePage() {
 
   const title = astralCardName(power?.gpus[0]?.name ?? levelName);
   const tabs = [
-    // eslint-disable-next-line i18next/no-literal-string -- GPU Tweak III's feature name
+    // GPU Tweak III's feature name, the same in every language.
     { key: 'levelsense', label: 'Level Sense', icon: <Activity size={14} /> },
     { key: 'power', label: t('devices.astral.powerTab'), icon: <Zap size={14} /> },
   ];
