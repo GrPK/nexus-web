@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { FolderPlus, Plus } from 'lucide-react';
 import { identifyLightingDevice, type LightingDevice } from '../../../../api/lighting';
 import { useTranslation } from '../../../../lib/i18n';
@@ -35,7 +35,7 @@ import styles from '../LightingPage.module.scss';
  * using the same component/styling as a motherboard group: a chevron, the brand
  * name, a group power switch, and its lights as indented child cards.
  */
-export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pinHintIds, onPinHintPress, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, colorTunedIds, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenDevicePage, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
+export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, filtering = false, header, pins, versionForSlot, ledFullscreen, pinSource, pinDisabledReason, pinTargetName, onSetPin, pinHintIds, onPinHintPress, onPinHintTarget, pickTargetIds, pulse, selectedIds, onSetSelection, onTogglePower, onSetPower, onToggleControlled, onSetControlled, lightingOff, onOpenSettings, onOpenColorTuning, colorTunedIds, keyReactiveIds, keyReactiveOnIds, onOpenKeyReactions, onRenameDevice, onDeviceReorder, communityCounts, onOpenCommunity, lianLiFirmwareHubs, onLianLiTakeControl, firmwareDeviceIds, onFirmwareTakeControl, onOpenDevicePage, onOpenSmartLights, discovery, rgbRunning = false, groups = [], onGroupsChange, stacks = [], onStacksChange }: {
   devices: LightingDevice[];
   /** Optional control rendered at the top of the scrolling list (master brightness). */
   /** Every device before the Nexus-Control-off filter, so a group header can
@@ -65,8 +65,10 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
   pinTargetName?: (pin: Pin) => string;
   /** Cards the first-pin coachmark may point at: its pin button on the top-most one carries the hint target. */
   pinHintIds?: ReadonlySet<string>;
-  /** Called when the hinted card's pin button is pressed. */
+  /** Called when the hinted card is unpinned from its pin button or its menu's Unpin. */
   onPinHintPress?: () => void;
+  /** Reports the card the hint points at (the top-most one carrying the target), or null when none renders it. */
+  onPinHintTarget?: (id: string | null) => void;
   /** Pins these cards to the current global source, or unpins them. Absent
    *  leaves every card without a pin button. */
   onSetPin?: (ids: string[], pinned: boolean) => void;
@@ -417,6 +419,8 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
     ? cardsInOrder(arrangement.rowIds, arrangement, id => blockMap.get(id))
       .find(d => pinHintIds.has(d.id) && !!pins?.[d.id] && !zoneCardUnavailable(d) && !fwOf(d))?.id
     : undefined;
+
+  useEffect(() => { onPinHintTarget?.(pinHintId ?? null); }, [onPinHintTarget, pinHintId]);
 
   const pinFor = (id: string): DevicePin | undefined => {
     if (!onSetPin) return undefined;

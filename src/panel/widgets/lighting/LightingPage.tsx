@@ -397,6 +397,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Pins restored from the service or set elsewhere never reach it.
   const pinHint = useOnboardingHint(LIGHTING_PIN_HINT_ID);
   const [pinHintIds, setPinHintIds] = useState<ReadonlySet<string> | null>(null);
+  // The card the bubble points at, reported by the rail; its pin names the title.
+  const [pinHintTargetId, setPinHintTargetId] = useState<string | null>(null);
   const applyPins = useCallback(async (ids: readonly string[], pin: Pin | null, record?: boolean): Promise<boolean> => {
     const ok = await writePins(ids, pin, record);
     if (ok && pin && ids.length > 0) setPinHintIds(prev => prev ?? new Set(ids));
@@ -2489,9 +2491,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   useEffect(() => {
     if (pinHintDismissed === false && pinHintIds && ![...pinHintIds].some(id => pins[id])) dismissPinHint();
   }, [pinHintDismissed, pinHintIds, pins, dismissPinHint]);
-  const hintPin = pinHintIds ? pins[[...pinHintIds].find(id => pins[id]) ?? ''] : undefined;
+  const hintPin = pinHintTargetId ? pins[pinHintTargetId] : undefined;
   const pinHintName = hintPin ? pinTargetName(hintPin) : '';
-  const showPinHint = !simpleDashboard && pinHintDismissed === false && pinHintIds !== null;
+  const showPinHint = !simpleDashboard && pinHintDismissed === false && pinHintIds !== null && !modeMenuOpen;
   // The bubble may not cover the tab row, so it stays inside the content below it.
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const topRowRef = useRef<HTMLDivElement | null>(null);
@@ -2789,6 +2791,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             onSetPin={handleSetPin}
             pinHintIds={showPinHint ? pinHintIds : undefined}
             onPinHintPress={dismissPinHint}
+            onPinHintTarget={setPinHintTargetId}
             pickTargetIds={pickTargetIds}
             pulse={pulse}
             selectedIds={selectedDeviceIds}

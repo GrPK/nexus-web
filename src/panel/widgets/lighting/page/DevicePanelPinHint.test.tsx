@@ -27,6 +27,7 @@ function renderPanel(opts: {
   hint: string[];
   onPinHintPress?: () => void;
   onSetPin?: (ids: string[], pinned: boolean) => void;
+  onPinHintTarget?: (id: string | null) => void;
 }) {
   const pins = Object.fromEntries(opts.pinned.map(id => [id, pinOf(id)]));
   return render(
@@ -48,6 +49,7 @@ function renderPanel(opts: {
       onSetPin={opts.onSetPin ?? (() => {})}
       pinHintIds={new Set(opts.hint)}
       onPinHintPress={opts.onPinHintPress}
+      onPinHintTarget={opts.onPinHintTarget}
     />,
   );
 }
@@ -103,5 +105,15 @@ describe('DevicePanel first-pin hint target', () => {
     fireEvent.click(screen.getByRole('button', { name: label('d1') }));
     expect(onSetPin).toHaveBeenCalledWith(['d1'], false);
     expect(onPinHintPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports the marked card, and null when none renders the hint', () => {
+    const onPinHintTarget = vi.fn();
+    const { rerender } = renderPanel({ pinned: ['d3', 'd2'], hint: ['d3', 'd2'], onPinHintTarget });
+    expect(onPinHintTarget).toHaveBeenLastCalledWith('d2');
+    rerender(<div />);
+    const none = vi.fn();
+    renderPanel({ pinned: ['d1'], hint: ['d2'], onPinHintTarget: none });
+    expect(none).toHaveBeenLastCalledWith(null);
   });
 });

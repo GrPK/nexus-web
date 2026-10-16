@@ -83,15 +83,15 @@ export interface BulkSelection {
   setPinned?: (pinned: boolean) => void;
 }
 
+/** Hint id of the one-time coachmark on the first pin; the id is also the `data-coachmark` value. */
+export const LIGHTING_PIN_HINT_ID = 'lighting-pin';
+
 /**
  * The card's pin. A card either follows the global mode or is pinned to a
  * target. Only a pinned card shows the pin button, beside its LED strip, and a
  * press unpins it; the menu offers Pin on a following card and Unpin on a
  * pinned one.
  */
-/** Hint id of the one-time coachmark on the first pin; the id is also the `data-coachmark` value. */
-export const LIGHTING_PIN_HINT_ID = 'lighting-pin';
-
 export interface DevicePin {
   pinned: boolean;
   /** Display name of what the card is pinned to (tooltip). */

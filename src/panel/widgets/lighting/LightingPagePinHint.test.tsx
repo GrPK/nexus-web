@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchLightingDevices, fetchPins, setPins, type Pin } from '../../../api/lighting';
@@ -88,21 +89,33 @@ vi.mock('./page/StaticPickerCanvas', () => ({
 }));
 // The rail stub exposes what the hint rides on: the ids the page marks as
 // hint candidates and the callbacks a pin press and the hinted button's press use.
+// The title's name is the thing under test, so the key keeps its params.
+vi.mock('../../../lib/i18n', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../lib/i18n')>()),
+  useTranslation: () => ({ t: (key: string, params?: Record<string, unknown>) => (params ? `${key}:${JSON.stringify(params)}` : key), language: 'en' }),
+}));
+const rail = vi.hoisted(() => ({ order: ['a', 'b'] }));
 vi.mock('./page/DevicePanel', () => ({
-  DevicePanel: ({ pins, pinHintIds, onPinHintPress, onSetPin, onSetSelection }: {
+  DevicePanel: ({ pins, pinHintIds, onPinHintPress, onPinHintTarget, onSetPin, onSetSelection }: {
     pins?: Record<string, Pin>;
     pinHintIds?: ReadonlySet<string>;
     onPinHintPress?: () => void;
+    onPinHintTarget?: (id: string | null) => void;
     onSetPin?: (ids: string[], pinned: boolean) => void;
     onSetSelection: (ids: Set<string>, primary: string | null) => void;
-  }) => (
+  }) => {
+    // The real rail points at the top-most hinted pinned card in rail order.
+    const target = pinHintIds ? rail.order.find(id => pinHintIds.has(id) && pins?.[id]) ?? null : null;
+    useEffect(() => { onPinHintTarget?.(target); }, [onPinHintTarget, target]);
+    return (
     <div data-testid="rail" data-pins={Object.keys(pins ?? {}).sort().join(',')} data-hint-ids={pinHintIds ? [...pinHintIds].join(',') : 'none'}>
       <button type="button" onClick={() => onSetSelection(new Set(['a', 'b']), 'a')}>select-ab</button>
       <button type="button" onClick={() => onSetPin?.(['a', 'b'], true)}>pin-ab</button>
       <button type="button" onClick={() => onSetPin?.(['a'], false)}>unpin-a-menu</button>
       <button type="button" onClick={() => { onSetPin?.(['a'], false); onPinHintPress?.(); }}>press-hinted</button>
     </div>
-  ),
+    );
+  },
 }));
 vi.mock('./page/LedMapEditor', () => ({ LedMapEditor: () => null }));
 vi.mock('./page/MediaBackdrop', () => ({ MediaBackdrop: () => <div data-testid="media-backdrop" /> }));
@@ -212,7 +225,9 @@ const dev = (id: string) => ({ id, name: `Fan ${id}`, ledsOn: true, ledCount: 10
 const settle = async () => {
   await waitFor(() => expect(fetchPins).toHaveBeenCalled());
   await waitFor(() => expect(fetchOnboardingStatus).toHaveBeenCalled());
-  await new Promise(r => setTimeout(r, 30));
+  await Promise.all([...vi.mocked(fetchPins).mock.results, ...vi.mocked(fetchOnboardingStatus).mock.results].map(r => r.value));
+  // One macrotask turn runs every continuation the answers queued; it waits for nothing.
+  await new Promise(r => setTimeout(r, 0));
 };
 const existing = { kind: 'animate', effect: 'plasma' } as Pin;
 
@@ -225,6 +240,7 @@ describe('LightingPage first-pin coachmark', () => {
     syncState.mode = 'animate';
     syncState.rawSync = 'fire';
     topicHandlers.lighting.length = 0;
+    rail.order = ['a', 'b'];
     vi.mocked(dismissOnboardingHint).mockClear();
     vi.mocked(setPins).mockImplementation(() => Promise.resolve(true));
     vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({}));
@@ -294,6 +310,7 @@ describe('LightingPage first-pin coachmark', () => {
     await waitFor(() => expect(bubble()).not.toBeNull());
     fireEvent.click(screen.getByText('coachmark-x'));
     expect(bubble()).toBeNull();
+    expect(dismissOnboardingHint).toHaveBeenCalledTimes(1);
     expect(dismissOnboardingHint).toHaveBeenCalledWith('lighting-pin');
   });
 
@@ -305,6 +322,7 @@ describe('LightingPage first-pin coachmark', () => {
     fireEvent.click(screen.getByText('press-hinted'));
     await waitFor(() => expect(bubble()).toBeNull());
     expect(railPins()).toBe('b');
+    expect(dismissOnboardingHint).toHaveBeenCalledTimes(1);
     expect(dismissOnboardingHint).toHaveBeenCalledWith('lighting-pin');
   });
 
@@ -322,6 +340,22 @@ describe('LightingPage first-pin coachmark', () => {
     vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({}));
     topicHandlers.lighting.forEach(cb => cb());
     await waitFor(() => expect(bubble()).toBeNull());
+    expect(dismissOnboardingHint).toHaveBeenCalledTimes(1);
     expect(dismissOnboardingHint).toHaveBeenCalledWith('lighting-pin');
+  });
+
+  it('names the title from the card the bubble points at, not the first pinned', async () => {
+    rail.order = ['b', 'a'];
+    renderPage();
+    await settle();
+    fireEvent.click(screen.getByText('pin-ab'));
+    await waitFor(() => expect(bubble()).not.toBeNull());
+    const both = screen.getByTestId('coachmark-title').textContent;
+    // Another client moves b to a different pin; b is still the top-most hinted card.
+    vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'animate', effect: 'fire' }, b: { kind: 'animate', effect: 'plasma' } }));
+    topicHandlers.lighting.forEach(cb => cb());
+    await waitFor(() => expect(screen.getByTestId('coachmark-title').textContent).not.toBe(both));
+    expect(screen.getByTestId('coachmark-title').textContent).toMatch(/plasma/i);
+    expect(screen.getByTestId('coachmark-title').textContent).not.toMatch(/fire/i);
   });
 });
