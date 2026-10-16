@@ -33,6 +33,7 @@ export function WebViewSettings({ widget, surface, desktopEditor, onUpdate }: Wi
   };
 
   return (
+    <>
     <SettingsSection title={t('panel.widget.web-view')} description={invalid ? t('panel.widget.web-view.settings.invalid') : t('panel.widget.web-view.settings.hint')}>
       {hasKeyboard ? (
         <SettingsRow label={t('panel.settings.url')}>
@@ -57,6 +58,8 @@ export function WebViewSettings({ widget, surface, desktopEditor, onUpdate }: Wi
           <DesktopOnlyBadge />
         </>
       )}
+    </SettingsSection>
+    <SettingsSection>
       <Slider
         label={t('panel.widget.web-view.settings.zoom')}
         value={dragZoom ?? savedZoom}
@@ -85,5 +88,6 @@ export function WebViewSettings({ widget, surface, desktopEditor, onUpdate }: Wi
         onChange={v => onUpdate({ refreshMinutes: resolveRefreshMinutes(Number(v)) })}
       />
     </SettingsSection>
+    </>
   );
 }
