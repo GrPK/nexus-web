@@ -4559,6 +4559,7 @@
   "panel.widget.web-view.crashed": "此頁面已停止運作",
   "panel.widget.web-view.error": "無法載入此頁面",
   "panel.widget.web-view.loading": "載入中",
+  "panel.widget.web-view.previewOnly": "僅在顯示器上顯示",
   "panel.widget.web-view.reload": "重新載入",
   "panel.widget.web-view.retry": "重試",
   "panel.widget.web-view.setUrl": "在設定中設定網址",

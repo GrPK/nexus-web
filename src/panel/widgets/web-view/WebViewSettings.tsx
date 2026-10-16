@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useTranslation } from '../../../lib/i18n';
 import type { WidgetSettingsProps } from '../types';
 import { Slider } from '../../../components/common/Slider/Slider';
-import { SettingsInput, SettingsRow, SettingsSection, SettingsSelect } from '../common/SettingsRow/SettingsRow';
-import { REFRESH_CHOICES, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, resolveRefreshMinutes, resolveZoom } from './webViewConfig';
+import { DesktopOnlyBadge } from '../../../components/common/DesktopOnlyBadge/DesktopOnlyBadge';
+import { canEditFreeText } from '../../types';
+import { SettingsHint, SettingsInput, SettingsRow, SettingsSection, SettingsSelect } from '../common/SettingsRow/SettingsRow';
+import { REFRESH_CHOICES, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, resolveRefreshMinutes, resolveZoom, snapZoom } from './webViewConfig';
 import { normalizeWebViewUrl } from './webViewUrl';
 
-export function WebViewSettings({ widget, onUpdate }: WidgetSettingsProps) {
+export function WebViewSettings({ widget, surface, desktopEditor, onUpdate }: WidgetSettingsProps) {
   const { t } = useTranslation();
   const saved = typeof widget.config?.url === 'string' ? widget.config.url : '';
   const [draft, setDraft] = useState(saved);
@@ -15,6 +17,7 @@ export function WebViewSettings({ widget, onUpdate }: WidgetSettingsProps) {
   // The Slider is controlled, so a drag needs somewhere to land before the commit.
   const [dragZoom, setDragZoom] = useState<number | null>(null);
   const refresh = resolveRefreshMinutes(widget.config?.refreshMinutes);
+  const hasKeyboard = canEditFreeText(surface, desktopEditor);
   const invalid = draft.trim() !== '' && normalized === null;
 
   // Saved on blur or Enter, never per keystroke: a half-typed address would
@@ -31,20 +34,29 @@ export function WebViewSettings({ widget, onUpdate }: WidgetSettingsProps) {
 
   return (
     <SettingsSection title={t('panel.widget.web-view')} description={invalid ? t('panel.widget.web-view.settings.invalid') : t('panel.widget.web-view.settings.hint')}>
-      <SettingsRow label={t('panel.settings.url')}>
-        <SettingsInput
-          type="text"
-          inputMode="url"
-          spellCheck={false}
-          value={draft}
-          // eslint-disable-next-line i18next/no-literal-string -- URL format hint
-          placeholder="https://example.com"
-          aria-invalid={invalid}
-          onChange={e => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={e => { if (e.key === 'Enter') commit(); }}
-        />
-      </SettingsRow>
+      {hasKeyboard ? (
+        <SettingsRow label={t('panel.settings.url')}>
+          <SettingsInput
+            type="text"
+            inputMode="url"
+            spellCheck={false}
+            value={draft}
+            // eslint-disable-next-line i18next/no-literal-string -- URL format hint
+            placeholder="https://example.com"
+            aria-invalid={invalid}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={e => { if (e.key === 'Enter') commit(); }}
+          />
+        </SettingsRow>
+      ) : (
+        <>
+          <SettingsRow label={t('panel.settings.url')}>
+            <SettingsHint>{saved}</SettingsHint>
+          </SettingsRow>
+          <DesktopOnlyBadge />
+        </>
+      )}
       <Slider
         label={t('panel.widget.web-view.settings.zoom')}
         value={dragZoom ?? savedZoom}
@@ -57,7 +69,7 @@ export function WebViewSettings({ widget, onUpdate }: WidgetSettingsProps) {
         trackFill
         formatValue={v => t('panel.widget.web-view.settings.zoomValue', { n: v.toFixed(2) })}
         onChange={v => setDragZoom(v)}
-        onCommit={v => { setDragZoom(null); onUpdate({ zoom: resolveZoom(Math.round(v / ZOOM_STEP) * ZOOM_STEP) }); }}
+        onCommit={v => { setDragZoom(null); onUpdate({ zoom: snapZoom(v) }); }}
       />
       <SettingsSelect
         label={t('panel.widget.web-view.settings.refresh')}

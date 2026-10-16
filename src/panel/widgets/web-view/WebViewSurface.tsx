@@ -1,4 +1,5 @@
 import { Globe, RotateCw } from 'lucide-react';
+import { Badge } from '../../../components/common/Badge/Badge';
 import { Button } from '../../../components/common/Button/Button';
 import { useTranslation } from '../../../lib/i18n';
 import { webViewHost } from '../../webview/webViewHost';
@@ -35,12 +36,14 @@ export function WebViewSurface({ widget, surface, editorPreview, immersive }: We
 
   let title: string;
   let hint: string | undefined;
+  let previewOnly = false;
   if (url === null) {
     title = t('panel.widget.web-view.setUrl');
   } else if (!native) {
     // Name only, no message. The site favicon is not drawn: the panel CSP
     // img-src does not allow arbitrary hosts, so the globe stands in.
     title = webViewSiteName(url);
+    previewOnly = true;
   } else if (unsupported) {
     title = t('panel.widget.web-view.unsupported');
     hint = webViewHostName(url);
@@ -58,6 +61,7 @@ export function WebViewSurface({ widget, surface, editorPreview, immersive }: We
         <Globe size={28} strokeWidth={1.5} aria-hidden />
         <span className={styles.title}>{title}</span>
         {hint && <span className={styles.hint}>{hint}</span>}
+        {previewOnly && <Badge label={t('panel.widget.web-view.previewOnly')} />}
         {failed && immersive && (
           <Button size="sm" icon={<RotateCw size={14} />} onClick={() => webViewHost.sendCommand(widget.id, 'reload')}>
             {t('panel.widget.web-view.retry')}

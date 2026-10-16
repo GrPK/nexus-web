@@ -4559,6 +4559,7 @@
   "panel.widget.web-view.crashed": "이 페이지가 작동을 멈췄습니다",
   "panel.widget.web-view.error": "이 페이지를 불러오지 못했습니다",
   "panel.widget.web-view.loading": "불러오는 중",
+  "panel.widget.web-view.previewOnly": "디스플레이에서만 표시됩니다",
   "panel.widget.web-view.reload": "새로고침",
   "panel.widget.web-view.retry": "다시 시도",
   "panel.widget.web-view.setUrl": "설정에서 URL 지정",

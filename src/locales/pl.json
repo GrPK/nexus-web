@@ -4605,6 +4605,7 @@
   "panel.widget.web-view.crashed": "Ta strona przestała działać",
   "panel.widget.web-view.error": "Nie udało się załadować tej strony",
   "panel.widget.web-view.loading": "Ładowanie",
+  "panel.widget.web-view.previewOnly": "Wyświetlane tylko na wyświetlaczu",
   "panel.widget.web-view.reload": "Odśwież",
   "panel.widget.web-view.retry": "Spróbuj ponownie",
   "panel.widget.web-view.setUrl": "Ustaw adres URL w ustawieniach",

@@ -4559,6 +4559,7 @@
   "panel.widget.web-view.crashed": "Cheste pagjine e à ismetût di funzionâ",
   "panel.widget.web-view.error": "Impussibil cjamâ cheste pagjine",
   "panel.widget.web-view.loading": "Daûr a cjamâ",
+  "panel.widget.web-view.previewOnly": "Si viôt dome sul visôr",
   "panel.widget.web-view.reload": "Torne cjame",
   "panel.widget.web-view.retry": "Torne prove",
   "panel.widget.web-view.setUrl": "Stabilìs un URL tes impostazions",

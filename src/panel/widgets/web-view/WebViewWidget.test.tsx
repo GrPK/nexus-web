@@ -18,7 +18,8 @@ describe('WebViewWidget placeholder', () => {
   it('shows only the site name, without www, on the editor canvas', () => {
     render(<WebViewWidget widget={widget('https://www.example.com/x')} surface="y70" editorPreview />);
     expect(screen.getByText('example.com')).toBeTruthy();
-    expect(screen.queryByText(/panel\.widget\.web-view/)).toBeNull();
+    expect(screen.getByText('panel.widget.web-view.previewOnly')).toBeTruthy();
+    expect(screen.queryByText('panel.widget.web-view.unsupported')).toBeNull();
   });
 
   it('shows only the site name in the catalog preview', () => {
@@ -28,14 +29,16 @@ describe('WebViewWidget placeholder', () => {
       </PanelPreviewProvider>,
     );
     expect(screen.getByText('example.com')).toBeTruthy();
-    expect(screen.queryByText(/panel\.widget\.web-view/)).toBeNull();
+    expect(screen.getByText('panel.widget.web-view.previewOnly')).toBeTruthy();
+    expect(screen.queryByText('panel.widget.web-view.unsupported')).toBeNull();
   });
 
   it('shows only the site name outside the live panel page (device page preview)', () => {
     window.history.pushState({}, '', '/devices');
     render(<WebViewWidget widget={widget('https://example.com')} surface="y70" />);
     expect(screen.getByText('example.com')).toBeTruthy();
-    expect(screen.queryByText(/panel\.widget\.web-view/)).toBeNull();
+    expect(screen.getByText('panel.widget.web-view.previewOnly')).toBeTruthy();
+    expect(screen.queryByText('panel.widget.web-view.unsupported')).toBeNull();
   });
 
   it('draws no favicon image', () => {
@@ -53,6 +56,7 @@ describe('WebViewWidget placeholder', () => {
     // jsdom has no native bridge, so the host settles on unsupported at once.
     render(<WebViewWidget widget={widget('https://example.com')} surface="y70" />);
     expect(screen.getByText('panel.widget.web-view.unsupported')).toBeTruthy();
+    expect(screen.queryByText('panel.widget.web-view.previewOnly')).toBeNull();
     expect(webViewHost.getSnapshot().status).toBe('unsupported');
   });
 });

@@ -4559,6 +4559,7 @@
   "panel.widget.web-view.crashed": "Bu sayfa çalışmayı durdurdu",
   "panel.widget.web-view.error": "Bu sayfa yüklenemedi",
   "panel.widget.web-view.loading": "Yükleniyor",
+  "panel.widget.web-view.previewOnly": "Yalnızca ekranda görüntülenir",
   "panel.widget.web-view.reload": "Yeniden yükle",
   "panel.widget.web-view.retry": "Yeniden dene",
   "panel.widget.web-view.setUrl": "URL’yi ayarlardan belirleyin",

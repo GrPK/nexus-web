@@ -34,3 +34,18 @@ describe('webViewHostName', () => {
     expect(webViewHostName('https://sub.example.com:81/x')).toBe('sub.example.com');
   });
 });
+
+describe('snapZoom', () => {
+  it('snaps to the nearest quarter within the range', async () => {
+    const { snapZoom } = await import('./webViewConfig');
+    expect(snapZoom(1.3)).toBe(1.25);
+    expect(snapZoom(1.4)).toBe(1.5);
+    expect(snapZoom(0.01)).toBe(0.25);
+    expect(snapZoom(9)).toBe(3);
+  });
+
+  it('leaves an imported zoom as stored', async () => {
+    const { resolveZoom } = await import('./webViewConfig');
+    expect(resolveZoom(1.3)).toBe(1.3);
+  });
+});

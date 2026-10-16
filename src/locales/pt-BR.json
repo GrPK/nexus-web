@@ -4559,6 +4559,7 @@
   "panel.widget.web-view.crashed": "Esta página parou de funcionar",
   "panel.widget.web-view.error": "Não foi possível carregar esta página",
   "panel.widget.web-view.loading": "Carregando",
+  "panel.widget.web-view.previewOnly": "Só aparece na tela",
   "panel.widget.web-view.reload": "Recarregar",
   "panel.widget.web-view.retry": "Tentar novamente",
   "panel.widget.web-view.setUrl": "Definir uma URL nas configurações",
