@@ -2493,7 +2493,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   }, [pinHintDismissed, pinHintIds, pins, dismissPinHint]);
   const hintPin = pinHintTargetId ? pins[pinHintTargetId] : undefined;
   const pinHintName = hintPin ? pinTargetName(hintPin) : '';
-  const showPinHint = !simpleDashboard && pinHintDismissed === false && pinHintIds !== null && !modeMenuOpen;
+  const pinHintActive = !simpleDashboard && pinHintDismissed === false && pinHintIds !== null && !modeMenuOpen;
+  // The bubble waits for the rail to name its target, so it never announces a blank title.
+  const showPinHint = pinHintActive && pinHintName !== '';
   // The bubble may not cover the tab row, so it stays inside the content below it.
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const topRowRef = useRef<HTMLDivElement | null>(null);
@@ -2789,7 +2791,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             pinDisabledReason={pinDisabledReason}
             pinTargetName={pinTargetName}
             onSetPin={handleSetPin}
-            pinHintIds={showPinHint ? pinHintIds : undefined}
+            pinHintIds={pinHintActive ? pinHintIds : undefined}
             onPinHintPress={dismissPinHint}
             onPinHintTarget={setPinHintTargetId}
             pickTargetIds={pickTargetIds}

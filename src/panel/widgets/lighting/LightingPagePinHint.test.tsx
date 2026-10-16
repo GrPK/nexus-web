@@ -207,15 +207,19 @@ vi.mock('../../../api/onboarding', async importOriginal => ({
   fetchOnboardingStatus: vi.fn(() => Promise.resolve({ completed: true, dismissedHints: onboarding.dismissed })),
   dismissOnboardingHint: vi.fn(() => Promise.resolve({ status: 200, body: { completed: true, dismissedHints: ['lighting-pin'] } })),
 }));
+const shown = vi.hoisted(() => ({ titles: [] as string[] }));
 // The real bubble needs layout; a stub exposes what the page passes it.
 vi.mock('../../../components/common/Coachmark/Coachmark', () => ({
-  Coachmark: (p: { hintId: string; target: string; title: string; body?: string; onDismiss: () => void }) => (
+  Coachmark: (p: { hintId: string; target: string; title: string; body?: string; onDismiss: () => void }) => {
+    shown.titles.push(p.title);
+    return (
     <div data-testid="coachmark" data-hint-id={p.hintId} data-target={p.target}>
       <span data-testid="coachmark-title">{p.title}</span>
       <span data-testid="coachmark-body">{p.body}</span>
       <button type="button" onClick={p.onDismiss}>coachmark-x</button>
     </div>
-  ),
+    );
+  },
 }));
 
 const bubble = () => screen.queryByTestId('coachmark');
@@ -225,7 +229,7 @@ const dev = (id: string) => ({ id, name: `Fan ${id}`, ledsOn: true, ledCount: 10
 const settle = async () => {
   await waitFor(() => expect(fetchPins).toHaveBeenCalled());
   await waitFor(() => expect(fetchOnboardingStatus).toHaveBeenCalled());
-  await Promise.all([...vi.mocked(fetchPins).mock.results, ...vi.mocked(fetchOnboardingStatus).mock.results].map(r => r.value));
+  await Promise.all([...vi.mocked(fetchPins).mock.results, ...vi.mocked(fetchOnboardingStatus).mock.results, ...vi.mocked(setPins).mock.results].map(r => r.value));
   // One macrotask turn runs every continuation the answers queued; it waits for nothing.
   await new Promise(r => setTimeout(r, 0));
 };
@@ -241,6 +245,8 @@ describe('LightingPage first-pin coachmark', () => {
     syncState.rawSync = 'fire';
     topicHandlers.lighting.length = 0;
     rail.order = ['a', 'b'];
+    shown.titles.length = 0;
+    vi.mocked(setPins).mockClear();
     vi.mocked(dismissOnboardingHint).mockClear();
     vi.mocked(setPins).mockImplementation(() => Promise.resolve(true));
     vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({}));
@@ -260,6 +266,9 @@ describe('LightingPage first-pin coachmark', () => {
     expect(screen.getByTestId('coachmark-title').textContent).toContain('lighting.pin.pinnedTo');
     expect(screen.getByTestId('coachmark-body').textContent).toBe('lighting.pin.hintBody');
     expect(screen.getByTestId('rail').dataset.hintIds).toBe('a,b');
+    // Never mounted before the rail named its target.
+    expect(shown.titles.length).toBeGreaterThan(0);
+    expect(shown.titles.every(title => !title.includes('"name":""'))).toBe(true);
   });
 
   it('does not show for pins restored from the service, nor for ones arriving on a lighting frame', async () => {

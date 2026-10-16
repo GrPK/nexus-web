@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useLayoutEffect, type ReactNode } from 'react';
 import { FolderPlus, Plus } from 'lucide-react';
 import { identifyLightingDevice, type LightingDevice } from '../../../../api/lighting';
 import { useTranslation } from '../../../../lib/i18n';
@@ -420,7 +420,11 @@ export function DevicePanel({ devices, allDevices, hidingUncontrolled = false, f
       .find(d => pinHintIds.has(d.id) && !!pins?.[d.id] && !zoneCardUnavailable(d) && !fwOf(d))?.id
     : undefined;
 
-  useEffect(() => { onPinHintTarget?.(pinHintId ?? null); }, [onPinHintTarget, pinHintId]);
+  // Layout phase, so the page has the target's name in the same commit that mounts the bubble.
+  useLayoutEffect(() => {
+    onPinHintTarget?.(pinHintId ?? null);
+    return () => onPinHintTarget?.(null);
+  }, [onPinHintTarget, pinHintId]);
 
   const pinFor = (id: string): DevicePin | undefined => {
     if (!onSetPin) return undefined;
