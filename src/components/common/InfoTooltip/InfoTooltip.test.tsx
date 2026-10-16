@@ -146,6 +146,23 @@ describe('InfoTooltip', () => {
       expect(bubble.childNodes[0].textContent).toBe('Gone ');
     });
 
+    const bubbleFor = (message: string) => {
+      render(<InfoTooltip message={message} ariaLabel="Info" />);
+      fireEvent.focus(screen.getByRole('button', { name: 'Info' }));
+      return screen.getByRole('tooltip');
+    };
+    const spanTexts = (bubble: HTMLElement) => Array.from(bubble.querySelectorAll('span')).map(n => n.textContent);
+
+    it.each(['😔', '👍🏽', '👩🏽‍💻', '🇺🇸', '1️⃣'])('wraps %s whole in one span', (emoji) => {
+      expect(spanTexts(bubbleFor(`a ${emoji} b`))).toEqual([emoji]);
+    });
+
+    it.each(['©', '™', '↔', '1 # *', '。，、'])('leaves %s unwrapped', (text) => {
+      const bubble = bubbleFor(`a ${text} b`);
+      expect(spanTexts(bubble)).toEqual([]);
+      expect(bubble.childNodes).toHaveLength(1);
+    });
+
     it('renders a message without an emoji as one plain text node', () => {
       render(<InfoTooltip message="Plain message" ariaLabel="Info" />);
       fireEvent.focus(screen.getByRole('button', { name: 'Info' }));

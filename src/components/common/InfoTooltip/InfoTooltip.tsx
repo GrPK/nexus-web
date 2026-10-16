@@ -25,7 +25,7 @@ interface InfoTooltipProps {
 
 const OFFSET = 8;
 
-const EMOJI_RUN = /\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*/gu;
+const EMOJI_RUN = /\p{Regional_Indicator}{2}|[#*0-9]️?⃣|(?:\p{Emoji_Presentation}|\p{Extended_Pictographic}️)\p{Emoji_Modifier}?(?:‍(?:\p{Emoji_Presentation}|\p{Extended_Pictographic}️?)\p{Emoji_Modifier}?)*/gu;
 
 // Chromium draws a color emoji with the text color's alpha, so the dimmed
 // message color would wash it out; each emoji run gets an opaque color.

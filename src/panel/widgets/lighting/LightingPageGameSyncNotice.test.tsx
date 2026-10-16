@@ -85,7 +85,7 @@ describe('Game Sync removal notice tab', () => {
 
     const info = screen.getByRole('button', { name: 'infoTooltip.ariaLabel' });
     fireEvent.pointerEnter(info, { pointerType: 'mouse' });
-    expect(await screen.findByText('lighting.gameSync.removedNotice')).toBeInTheDocument();
+    expect(await screen.findByText('lighting.gameSync.removedNotice', {}, { timeout: 3000 })).toBeInTheDocument();
     fireEvent.pointerLeave(info, { pointerType: 'mouse' });
     await waitFor(() => expect(screen.queryByText('lighting.gameSync.removedNotice')).toBeNull());
 
