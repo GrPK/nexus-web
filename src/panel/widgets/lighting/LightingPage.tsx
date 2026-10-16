@@ -2171,7 +2171,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // A press or pick pulses the cards it changed; a new seq replays it.
   const [pulse, setPulse] = useState<{ ids: ReadonlySet<string>; seq: number }>({ ids: new Set(), seq: 0 });
   const pulseCards = useCallback((ids: ReadonlySet<string>) => setPulse(s => ({ ids, seq: s.seq + 1 })), []);
-  const pulsePick = () => pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds));
+  const pulsePick = () => pulseCards(pressReach(
+    visibleDevices,
+    pins,
+    mode === 'none' && (viewMode === 'animate' || viewMode === 'static') ? new Set() : selectedDeviceIds,
+  ));
   // Pause/freeze applies to the three modes that drive a continuous output
   // (animate shader, media playback, screen mirror) - Off has nothing to
   // freeze.
@@ -2330,7 +2334,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   };
 
   const shaderMode = viewMode === 'animate' || viewMode === 'static';
-  // The cards a hovered press or pick reaches, outlined. Off has no picks.
+  // The cards a hovered press or pick reaches, outlined.
   const pickTargetIds = useMemo(() => {
     if (scopeHovered || pickHovered) {
       // Off with an effect or color picker open: a pick starts the mode for every card. Media and Screen keep the engine stopped.

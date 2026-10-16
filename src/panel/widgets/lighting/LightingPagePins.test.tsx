@@ -217,7 +217,6 @@ const lastPinsCall = () => vi.mocked(setPins).mock.calls.at(-1) as unknown as [s
 
 describe('LightingPage pins', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     localStorage.clear();
     localStorage.setItem('nexus_settings', JSON.stringify({ general: { lightingDashboardMode: 'advanced', coolingDashboardMode: 'advanced' } }));
     syncState.mode = 'animate';
@@ -231,13 +230,6 @@ describe('LightingPage pins', () => {
     vi.mocked(startStatic).mockClear();
     vi.mocked(saveAnimateTemplates).mockClear();
     topicHandlers.lighting.length = 0;
-  });
-
-  // The throttle's trailing timer outlives an unmounted page, so drain it before the next test.
-  afterEach(async () => {
-    cleanup();
-    await act(() => vi.runOnlyPendingTimersAsync());
-    vi.useRealTimers();
   });
 
   describe('the pin button', () => {
@@ -1047,6 +1039,14 @@ describe('LightingPage pins', () => {
   });
 
   describe('resuming lighting from Off', () => {
+    beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); });
+    // The throttle's trailing timer outlives an unmounted page, so drain it before the next test.
+    afterEach(async () => {
+      cleanup();
+      await act(() => vi.runOnlyPendingTimersAsync());
+      vi.useRealTimers();
+    });
+
     it('an Animation tab press with a selection starts the mode globally instead of pinning', async () => {
       syncState.mode = 'none';
       syncState.rawSync = 'none';
