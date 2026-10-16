@@ -1,4 +1,4 @@
-# Fork-only check for feat/tl-zone-select + fix/slider-thumb-path + feat/astral-device-page (not part of the PRs): installs, tests, lints and builds the
+# Fork-only check for fix/slider-thumb-path (slider-pr job) + feat/tl-zone-select + fix/slider-thumb-path + feat/astral-device-page (not part of the PRs): installs, tests, lints and builds the
 # dashboard on GitHub's runner, and uploads the service build for a local test. The baseline job runs
 # the same full checks on main, so failures that were already there can be told apart.
 name: fork-check
@@ -85,4 +85,28 @@ jobs:
       - name: Full lint
         if: always()
         continue-on-error: true
+        run: npm run lint
+
+  slider-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/slider-thumb-path
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Tests of the slider and the screens with a zero mark or marker
+        run: npx vitest run src/components/common/Slider src/components/views/SettingsView/ThermalGuardSetting.test.tsx src/panel/widgets/lighting/studio/StudioBlockCard.test.tsx
+      - name: Lint of the changed files
+        run: npx eslint src/components/common/Slider/Slider.tsx src/components/common/Slider/Slider.test.tsx
+      - name: Type check and service build
+        run: npm run build:service
+      - name: Full test suite
+        if: always()
+        run: npm test
+      - name: Full lint
+        if: always()
         run: npm run lint
