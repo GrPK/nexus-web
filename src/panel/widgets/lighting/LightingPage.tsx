@@ -1112,6 +1112,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const queueColorWrite = useColorWriteQueue(useCallback((ids: string[], pin: Pin) => applyPins(ids, pin, false), [applyPins]));
 
   const handleCustomSelect = useCallback((hex: string) => {
+    // Off: a pin would not restart the stopped engine, so the color starts Static globally.
+    if (modeRef.current === 'none') {
+      setCustomStaticColor(hex);
+      setSelectionTab(null);
+      void resumeLightingRef.current('static').then(() => {
+        setGlobalColor(hex, startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, hex));
+      });
+      return;
+    }
     if (detachedTab) { flashScope(); return; }
     setCustomStaticColor(hex);
     const ids = [...selectedDeviceIds];
