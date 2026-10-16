@@ -395,13 +395,13 @@ function PowerTab({ power, setPower }: PowerTabProps) {
           <SettingToggle label={t('devices.astral.overShutdown')}
             description={t('devices.astral.overShutdownHint', { limit: limitText(power.overcurrentAmps) })}
             checked={s.overcurrentShutdown} disabled={busy} onChange={toggle(on => ({ overcurrentShutdown: on }), 'shutdown')} />
+          <p className={own.note}>{t('devices.astral.overNote')}</p>
           <SettingSelect label={t('devices.astral.overFor')} value={String(s.overcurrentSeconds)}
             options={timeOptions(OVERCURRENT_TIMES, s.overcurrentSeconds)} disabled={busy}
             onChange={v => { void set({ overcurrentSeconds: Number(v) }); }} />
           <SettingSelect label={t('devices.astral.countdownFor')} value={String(s.countdownSeconds)}
             options={timeOptions(COUNTDOWN_TIMES, s.countdownSeconds)} disabled={busy}
             onChange={v => { void set({ countdownSeconds: Number(v) }); }} />
-          <p className={own.note}>{t('devices.astral.overNote')}</p>
           <SettingToggle label={t('devices.astral.critShutdown')}
             description={t('devices.astral.critShutdownHint', { limit: limitText(power.criticalAmps) })}
             checked={s.criticalShutdown} disabled={busy} onChange={toggle(on => ({ criticalShutdown: on }), 'shutdown')} />
