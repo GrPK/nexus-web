@@ -347,9 +347,10 @@ export const directApiBackend: AuthBackend = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      return res.ok;
+      if (res.ok) return 'ok';
+      return res.status === 429 ? 'rate_limited' : 'failed';
     } catch {
-      return false;
+      return 'failed';
     }
   },
 

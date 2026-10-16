@@ -65,7 +65,7 @@ export function SignInForm({ backend, onSuccess, onForgotPassword, onCreateAccou
         <div className={styles.pendingBlock}>
           <p className={styles.subtitle}>{t('account.verify.pendingMessage')}</p>
           {error && <p className={styles.error} role="alert">{error}</p>}
-          {identifier.includes('@') && <ResendVerification backend={backend} email={identifier.trim()} />}
+          {identifier.includes('@') && <ResendVerification backend={backend} email={identifier.trim()} initialCooldown={0} />}
           <Button type="button" tone="accent" loading={submitting} onClick={() => void attemptLogin()}>
             {t('account.create.verifiedRetry')}
           </Button>

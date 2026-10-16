@@ -62,7 +62,8 @@ describe('SignInForm unverified state', () => {
 
     fillAndSubmit('alice@example.com', 'pw');
 
-    expect(await screen.findByRole('button', { name: /account\.verify\.resend/ })).toBeTruthy();
+    const resend = await screen.findByRole('button', { name: 'account.verify.resend' });
+    expect((resend as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('hides resend when the identifier is a username, which the api cannot resolve', async () => {

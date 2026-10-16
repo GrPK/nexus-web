@@ -25,7 +25,8 @@ export const localServiceBackend: AuthBackend = {
 
   resendVerification: async (email) => {
     const res = await cloudResendVerification(email);
-    return res.status >= 200 && res.status < 300;
+    if (res.status >= 200 && res.status < 300) return 'ok';
+    return res.status === 429 ? 'rate_limited' : 'failed';
   },
 
   logout: async () => {

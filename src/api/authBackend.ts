@@ -46,6 +46,8 @@ export interface AuthRecoveryStatusResponse {
   recoveryFresh?: boolean;
 }
 
+export type AuthResendResult = 'ok' | 'rate_limited' | 'failed';
+
 export interface AuthFetchResult<T> {
   status: number;
   body: T | null;
@@ -67,8 +69,8 @@ export type AuthDeviceUpsertResponse = AuthEnvelope & Partial<AccountDeviceItem>
 export interface AuthBackend {
   login(identifier: string, password: string): Promise<AuthFetchResult<AuthLoginResponse>>;
   register(email: string, password: string, username: string): Promise<AuthFetchResult<AuthRegisterResponse>>;
-  /** False when no mail was requested (throttled, offline). The api answers ok for unknown or verified addresses. */
-  resendVerification(email: string): Promise<boolean>;
+  /** The api answers ok for unknown, verified or capped addresses, so 'ok' does not mean a mail went out. */
+  resendVerification(email: string): Promise<AuthResendResult>;
   logout(): Promise<void>;
   getAccount(): Promise<AuthAccount | null>;
   /** False when no link was sent (throttled, offline). */

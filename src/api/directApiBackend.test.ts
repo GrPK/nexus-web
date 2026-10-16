@@ -137,7 +137,7 @@ describe('directApiBackend', () => {
       fetchMock.mockResolvedValueOnce(jsonResponse(201, { ok: true }));
       const backend = await freshBackend();
 
-      expect(await backend.resendVerification('a@b.com')).toBe(true);
+      expect(await backend.resendVerification('a@b.com')).toBe('ok');
 
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe(`${BASE}/auth/verify/resend`);
@@ -145,13 +145,13 @@ describe('directApiBackend', () => {
       expect(JSON.parse(init.body)).toEqual({ email: 'a@b.com' });
     });
 
-    it('reports false on a throttled response and on a network failure', async () => {
+    it('distinguishes a throttled response from other failures', async () => {
       fetchMock.mockResolvedValueOnce(jsonResponse(429, { message: 'ThrottlerException' }));
       const backend = await freshBackend();
-      expect(await backend.resendVerification('a@b.com')).toBe(false);
+      expect(await backend.resendVerification('a@b.com')).toBe('rate_limited');
 
       fetchMock.mockRejectedValueOnce(new TypeError('offline'));
-      expect(await backend.resendVerification('a@b.com')).toBe(false);
+      expect(await backend.resendVerification('a@b.com')).toBe('failed');
     });
   });
 
