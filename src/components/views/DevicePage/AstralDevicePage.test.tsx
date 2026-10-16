@@ -196,6 +196,21 @@ describe('AstralDevicePage Power detector', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
+  it('does not bring back the alert a countdown answered once the countdown is over', async () => {
+    const now = Date.now();
+    const alert = { id: 1, level: 'overcurrent', title: 'High current in the GPU power cable', text: 'Pin 3 is carrying 13.2 A.', atMs: now - 10_000 };
+    mockPower.mockResolvedValue(power({
+      alert,
+      countdown: { reason: 'overcurrent', startedAtMs: now, endsAtMs: now + 30_000, text: 'Pin 3 is over its limit.' },
+    }));
+    render(<AstralDevicePage />);
+    await screen.findByRole('alertdialog', { name: `${P}countdownTitle:{"left":"0:30"}` });
+
+    // The countdown ran out (or was cancelled elsewhere): the alert stays answered.
+    mockPower.mockResolvedValue(power({ alert, heldOff: true }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(), { timeout: 3000 });
+  });
+
   it('shows no power detector for a card without one', async () => {
     mockPower.mockResolvedValue(power({ supported: false, gpus: [] }));
     render(<AstralDevicePage />);

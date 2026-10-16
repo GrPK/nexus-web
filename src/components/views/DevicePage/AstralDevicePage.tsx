@@ -437,6 +437,11 @@ function PowerPopups({ power, onCancel }: { power: AstralPowerState | null; onCa
   const countdown = power?.countdown ?? null;
   const alert = power?.alert ?? null;
   const now = useNow(!!countdown || !!alert, 500);
+  // An alert that came with a countdown is answered by the countdown, however it ends.
+  const coveredAt = countdown && alert && alert.atMs <= countdown.startedAtMs + 3000 ? alert.atMs : 0;
+  useEffect(() => {
+    if (coveredAt > 0) setSeenAlertAt(prev => Math.max(prev, coveredAt));
+  }, [coveredAt]);
 
   if (countdown && !power?.shuttingDown && hiddenCountdown !== countdown.startedAtMs) {
     // The countdown says what its alert said and more: answering it answers both.
