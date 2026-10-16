@@ -37,6 +37,9 @@ const TEST_GAP_MS = 1600;
 const HZ = 'Hz';
 const DB = 'dB';
 const VOL = 'VOL';
+const STACKED = 'stacked' as const;
+const GAMING = 'gaming';
+const MOVIE = 'movie';
 
 type SpeakerTab = 'acoustics' | 'surround';
 type Change = () => Promise<SpeakerState | null>;
@@ -153,7 +156,7 @@ function AcousticsTab({ state, change }: { state: SpeakerState; change: (c: Chan
     <>
       <SettingsSection title={t('devices.logitechSpeaker.speaker')} boxClassName={styles.sectionBox}>
         <Slider
-          orientation="stacked"
+          orientation={STACKED}
           label={t('devices.logitechSpeaker.volume')}
           trackFill
           min={0}
@@ -163,7 +166,7 @@ function AcousticsTab({ state, change }: { state: SpeakerState; change: (c: Chan
           onCommit={v => { void change(() => setSpeakerVolume(v / 100)).then(() => setVolume(null)); }}
         />
         <Slider
-          orientation="stacked"
+          orientation={STACKED}
           label={t('devices.logitechSpeaker.subwoofer')}
           trackFill
           min={0}
@@ -337,10 +340,10 @@ function SurroundTab({ state, change }: { state: SpeakerState; change: (c: Chang
           <ChipGroup
             ariaLabel={t('devices.logitechSpeaker.mode')}
             options={[
-              { key: 'gaming', label: t('devices.logitechSpeaker.gaming'), disabled: !state.surroundEnabled },
-              { key: 'movie', label: t('devices.logitechSpeaker.movie'), disabled: !state.surroundEnabled },
+              { key: GAMING, label: t('devices.logitechSpeaker.gaming'), disabled: !state.surroundEnabled },
+              { key: MOVIE, label: t('devices.logitechSpeaker.movie'), disabled: !state.surroundEnabled },
             ]}
-            activeKey={state.room === 'movie' ? 'movie' : 'gaming'}
+            activeKey={state.room === MOVIE ? MOVIE : GAMING}
             onChange={room => { void change(() => setSpeakerSurround({ room })); }}
           />
         </SettingRow>

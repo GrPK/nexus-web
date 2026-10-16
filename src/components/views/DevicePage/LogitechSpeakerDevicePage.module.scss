@@ -76,7 +76,6 @@
   font-size: var(--type-small);
   font-weight: var(--weight-strong);
   color: var(--text);
-  line-height: 1.2;
 }
 
 .eqUnit,
@@ -86,7 +85,9 @@
 
 // The unit under the scale sits level with the band fields.
 .eqUnitBottom {
-  line-height: 2rem;
+  display: flex;
+  align-items: center;
+  height: 2rem;
 }
 
 .eqScale {
@@ -144,7 +145,7 @@
   left: 50%;
   width: 6px;
   margin-left: -3px;
-  border-radius: 3px;
+  border-radius: var(--radius-pill);
 }
 
 .eqTrack {
