@@ -1052,10 +1052,10 @@
   // Picking a new size in the edit drawer updates the dock CSS vars; the
   // cell retargets the new span (matching the rearrange context menu).
   transition:
-    width 220ms cubic-bezier(0.32, 0.72, 0, 1),
-    height 220ms cubic-bezier(0.32, 0.72, 0, 1),
-    top 220ms cubic-bezier(0.32, 0.72, 0, 1),
-    left 220ms cubic-bezier(0.32, 0.72, 0, 1);
+    width var(--ease) cubic-bezier(0.32, 0.72, 0, 1),
+    height var(--ease) cubic-bezier(0.32, 0.72, 0, 1),
+    top var(--ease) cubic-bezier(0.32, 0.72, 0, 1),
+    left var(--ease) cubic-bezier(0.32, 0.72, 0, 1);
   backdrop-filter: none;
   will-change: transform;
 }
@@ -1570,6 +1570,15 @@
     max-height: none;
   }
 
+  // Follows the dock's own size transition (.cellEditorDocked) so the sheet
+  // never lags behind the dock's far edge while the size picker resizes it.
+  // top is the phone settings sheet's anchor, which this rule outranks.
+  &[data-docked='true'] .editorSheet:not([data-drag]) {
+    transition:
+      height var(--ease) cubic-bezier(0.32, 0.72, 0, 1),
+      top var(--ease) cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
   .editorSheetGrabber {
     display: block;
     position: absolute;
@@ -1637,12 +1646,11 @@
 // its contents are shaped at their shown size. The drawer hugs the right edge
 // and fills the height. align-items is vestigial at height:100%; left alone
 // rather than changing layout this change was not measured against.
-// Landscape Y70 / Q60 widget-edit takes the same drawer: the dock sits at the
-// left edge there, so a full-width bottom sheet would cover it.
+// Landscape Y70 widget-edit takes the same drawer: the dock sits at the left
+// edge there, so a full-width bottom sheet would cover it.
 @media (orientation: landscape) {
   .editorBackdrop[data-touch-chrome='true'][data-surface='monitor'],
-  .editorBackdrop[data-mode='settings'][data-surface='y70'],
-  .editorBackdrop[data-mode='settings'][data-surface='q60'] {
+  .editorBackdrop[data-mode='settings'][data-surface='y70'] {
     align-items: center;
     justify-content: flex-end;
 
@@ -1694,6 +1702,14 @@
   .editorBackdrop[data-mode='settings']:not([data-surface='desktop']) .editorSheet {
     max-width: calc((100vw - var(--panel-editor-dock-clear-right, 0px)) / var(--sheet-zoom, 1));
   }
+
+  // Same timing as the dock's size transition, so a shrinking dock never
+  // overlaps a drawer that has already moved.
+  .editorBackdrop[data-mode='settings'][data-docked='true']:not([data-surface='desktop']) .editorSheet:not([data-drag]) {
+    transition:
+      max-width var(--ease) cubic-bezier(0.32, 0.72, 0, 1),
+      width var(--ease) cubic-bezier(0.32, 0.72, 0, 1);
+  }
 }
 
 .editorBackdrop[data-surface='phone'][data-mode='settings'] .editorSheet {
@@ -1718,7 +1734,7 @@
   height: auto;
   max-height: none;
   padding-top: 14px;
-  transition: top 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: top var(--ease) cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .editorBackdrop[data-surface='phone'][data-mode='catalog'] .editorSheet,
