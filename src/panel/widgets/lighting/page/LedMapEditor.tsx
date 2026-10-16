@@ -131,12 +131,14 @@ interface Props {
   initialCommunityOpen?: boolean;
   /** Called after a hub composition change is confirmed. Receives the hubId so the parent can find matching devices. */
   onCompositionChanged?: (hubId: string) => void;
+  /** The frame cap changed; the cap spans sibling zone cards, so the parent refetches the device list. */
+  onRateCapChanged?: () => void;
   /** Navigate to a device page by its unified device key; backs the hub
    * composition panel's "configure ports" deep link. */
   onNavigateToDevicePage?: (deviceKey: string) => void;
 }
 
-export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizable, onClose, initialCommunityOpen, onCompositionChanged, onNavigateToDevicePage }: Props) {
+export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizable, onClose, initialCommunityOpen, onCompositionChanged, onRateCapChanged, onNavigateToDevicePage }: Props) {
   const { t, language } = useTranslation();
   const { push } = useToast();
 
@@ -2797,8 +2799,8 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
               );
             })()}
           </div>
-          {/* Under the canvas: what was removed on the left, Save on the
-              right. Fixed height so the restore button appearing does not
+          {/* Under the canvas: what was removed on the left, the frame cap
+              and Save on the right. Fixed height so the restore button appearing does not
               grow the modal under the pointer. */}
           <div className={styles.hintRow}>
             {removedCount > 0 ? (
@@ -2817,6 +2819,7 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
                   id={zoneCard.id}
                   value={zoneCard.maxRateHz ?? null}
                   onFail={() => push({ title: t('lighting.ledMap.rateCapFailed') })}
+                  onSaved={onRateCapChanged}
                 />
               )}
               <button

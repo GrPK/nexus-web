@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Select, type SelectOption } from '../../../../components/common/Select/Select';
 import { useTranslation } from '../../../../lib/i18n';
 import { setLightingMaxRate } from '../../../../api/lighting';
@@ -12,12 +12,18 @@ interface Props {
   /** The stored cap in Hz; null = Off. */
   value: number | null;
   onFail: () => void;
+  /** Called after the newest save succeeds, so the parent refetches the device list. */
+  onSaved?: () => void;
 }
 
 /** Per-device frame-rate cap. Applies on change; reverts when the save fails. */
-export function RateCapSelect({ id, value, onFail }: Props) {
+export function RateCapSelect({ id, value, onFail, onSaved }: Props) {
   const { t } = useTranslation();
   const [current, setCurrent] = useState<number | null>(value);
+  // Newest request wins: a response from an older request, or one that started
+  // on another card, must neither revert nor confirm anything.
+  const seq = useRef(0);
+  useEffect(() => { seq.current += 1; }, [id]);
   useEffect(() => { setCurrent(value); }, [value, id]);
 
   const options: SelectOption[] = [
@@ -30,10 +36,19 @@ export function RateCapSelect({ id, value, onFail }: Props) {
   const handleChange = (v: string) => {
     const next = v === OFF ? null : Number(v);
     const prev = current;
+    const mine = ++seq.current;
     setCurrent(next);
+    const fail = () => {
+      if (mine !== seq.current) return;
+      setCurrent(prev);
+      onFail();
+    };
     setLightingMaxRate(id, next)
-      .then(r => { if (!r || r.error) { setCurrent(prev); onFail(); } })
-      .catch(() => { setCurrent(prev); onFail(); });
+      .then(r => {
+        if (!r || r.error) fail();
+        else if (mine === seq.current) onSaved?.();
+      })
+      .catch(fail);
   };
 
   return (

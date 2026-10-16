@@ -408,8 +408,11 @@
 
 .saveGroup {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-xl);
+  justify-content: flex-end;
+  min-width: 0;
+  gap: var(--space-sm) var(--space-xl);
 }
 
 .rateCapField {

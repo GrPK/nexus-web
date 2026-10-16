@@ -3057,6 +3057,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           // LED colour picks apply as they are made; the cards read them back on close.
           onClose={() => { setEditorTarget(null); void refreshDevices(); }}
           onCompositionChanged={hubId => { void handleCompositionChanged(hubId); }}
+          onRateCapChanged={() => { void refreshDevices(); }}
           onNavigateToDevicePage={deviceKey => onSectionNavigate?.('device', { deviceKey })}
         />
       )}

@@ -43,4 +43,58 @@ describe('RateCapSelect', () => {
     await waitFor(() => expect(onFail).toHaveBeenCalled());
     expect(screen.getByRole('button').textContent).toContain('"hz":15');
   });
+
+  const pick = (name: string) => {
+    fireEvent.click(screen.getByRole('button'));
+    fireEvent.click(screen.getByRole('option', { name }));
+  };
+  const HZ = (hz: number) => `lighting.ledMap.rateCapHz:{"hz":${hz}}`;
+
+  it('tells the parent to refetch after a successful save', async () => {
+    api.setLightingMaxRate.mockResolvedValue({ error: false, msg: '' });
+    const onSaved = vi.fn();
+    render(<RateCapSelect id="d1" value={null} onFail={vi.fn()} onSaved={onSaved} />);
+    pick(HZ(10));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+  });
+
+  it('follows the stored value when the card or value changes (reopen, zone switch)', () => {
+    const { rerender } = render(<RateCapSelect id="a" value={null} onFail={vi.fn()} />);
+    rerender(<RateCapSelect id="b" value={5} onFail={vi.fn()} />);
+    expect(screen.getByRole('button').textContent).toContain('"hz":5');
+    rerender(<RateCapSelect id="a" value={10} onFail={vi.fn()} />);
+    expect(screen.getByRole('button').textContent).toContain('"hz":10');
+  });
+
+  it('ignores a stale failure when a newer request is in flight', async () => {
+    let failFirst: (v: unknown) => void = () => {};
+    api.setLightingMaxRate
+      .mockImplementationOnce(() => new Promise(res => { failFirst = res; }))
+      .mockResolvedValueOnce({ error: false, msg: '' });
+    const onFail = vi.fn();
+    const onSaved = vi.fn();
+    render(<RateCapSelect id="d1" value={null} onFail={onFail} onSaved={onSaved} />);
+    pick(HZ(30));
+    pick(HZ(5));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    failFirst({ error: true, msg: 'x' });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onFail).not.toHaveBeenCalled();
+    expect(screen.getByRole('button').textContent).toContain('"hz":5');
+  });
+
+  it('does not revert or report when the card changed during the request', async () => {
+    let failFirst: (v: unknown) => void = () => {};
+    api.setLightingMaxRate.mockImplementationOnce(() => new Promise(res => { failFirst = res; }));
+    const onFail = vi.fn();
+    const { rerender } = render(<RateCapSelect id="a" value={null} onFail={onFail} />);
+    pick(HZ(10));
+    rerender(<RateCapSelect id="b" value={20} onFail={onFail} />);
+    failFirst({ error: true, msg: 'x' });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onFail).not.toHaveBeenCalled();
+    expect(screen.getByRole('button').textContent).toContain('"hz":20');
+  });
 });
