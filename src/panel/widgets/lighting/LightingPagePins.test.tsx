@@ -1051,6 +1051,17 @@ describe('LightingPage pins', () => {
       expect(setPins).not.toHaveBeenCalled();
     });
 
+    it('previews every card on a tab hover, not just the selection', async () => {
+      withDevices('a', 'b');
+      syncState.mode = 'none';
+      syncState.rawSync = 'none';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.mouseEnter(screen.getByText('tab:animate'));
+      expect(screen.getByTestId('rail').dataset.targets).toBe('a,b');
+    });
+
     it('a Static tab press with a selection starts Static globally', async () => {
       syncState.mode = 'none';
       syncState.rawSync = 'none';
@@ -1069,6 +1080,8 @@ describe('LightingPage pins', () => {
       renderPage();
       await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
       fireEvent.click(screen.getByText('select-a'));
+      // Lets mount-time hydration finish so only the press can call startAnimate.
+      await new Promise(r => setTimeout(r, 50));
       vi.mocked(startAnimate).mockClear();
       fireEvent.click(screen.getByText('tab:animate'));
       await waitFor(() => expect(setPins).toHaveBeenCalled());

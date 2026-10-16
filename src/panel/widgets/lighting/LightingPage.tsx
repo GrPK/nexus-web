@@ -1073,10 +1073,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const ids = [...selectedDeviceIds];
     // Off has stopped the engine, and a pin does not restart it: a pick starts the mode globally.
     if (modeRef.current === 'none') {
-      const startMode = viewMode === 'static' && isStaticEffect(key) ? 'static' : 'animate';
-      if (startMode === 'static') staticEffectRef.current = key;
+      const startMode = viewMode === 'static' ? 'static' : 'animate';
+      const valid = startMode === 'static' ? isStaticEffect(key) : ANIMATE_EFFECTS.some(e => e.key === key) || isCustomEffectKey(key);
       setSelectionTab(null);
-      void resumeLightingRef.current(startMode, key);
+      void resumeLightingRef.current(startMode, valid ? key : undefined);
       return;
     }
     if (detachedTab) { flashScope(); return; }
@@ -2284,6 +2284,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // and a pinnable mode, the cards it pins; otherwise the global reach.
   const tabPressReach = useCallback((key: string): Set<string> | undefined => {
     if (key === GAME_SYNC_REMOVED_TAB_KEY) return undefined;
+    // Off: the press starts the mode for every card, whatever is selected.
+    if (mode === 'none') return pressReach(visibleDevices, pins, new Set());
     if (selectedDeviceIds.size > 0 && PINNABLE_MODES.has(key)) {
       const ids = tabPressPins(pins, selectedDeviceIds, key);
       return ids.length ? pressReach(visibleDevices, pins, new Set(ids)) : undefined;
@@ -2291,7 +2293,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // With nothing selected a press changes the running mode, which a detached open tab is not.
     if (tabPressChangesNothing(key, detachedTab ? globalTabKey : activeTabKey, selectedDeviceIds.size, false)) return undefined;
     return pressReach(visibleDevices, pins, selectedDeviceIds);
-  }, [activeTabKey, globalTabKey, detachedTab, pins, selectedDeviceIds, visibleDevices]);
+  }, [mode, activeTabKey, globalTabKey, detachedTab, pins, selectedDeviceIds, visibleDevices]);
   // A tab press either opens the mode menu or applies a mode: to the selected
   // cards when there are any, else to every unpinned one. A mode switch also
   // drops the menu, which the tab row keeps "inside" its anchor.
