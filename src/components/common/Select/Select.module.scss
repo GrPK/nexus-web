@@ -216,29 +216,6 @@
   white-space: normal;
 }
 
-.warnIcon {
-  color: var(--warn);
-}
-
-// Icon beside a label-over-description block: top-aligned so the glyph sits on
-// the label line.
-.option.optionRich {
-  display: flex;
-  align-items: flex-start;
-}
-
-// The icon box takes the label's line height (zero-width strut) and centers the
-// glyph in it, so it sits on the label's first line whatever the font metrics.
-.option.optionRich .optionIcon {
-  height: auto;
-  align-self: flex-start;
-  align-items: center;
-
-  &::before {
-    content: '\200b';
-  }
-}
-
 // Font-preview rows (SelectOption.fontFamily) draw larger so each face reads.
 .option.fontOption {
   font-size: var(--type-heading);

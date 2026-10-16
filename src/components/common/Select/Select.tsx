@@ -51,9 +51,6 @@ export interface SelectOption {
   // Dim second line under the label in the menu row only (e.g. a caveat about
   // the choice); the trigger shows the label alone.
   description?: string;
-  // Warning-tinted glyph before the label, in the menu row and on the trigger
-  // while this option is selected. Never shown with `icon`.
-  warnIcon?: ReactNode;
   // Renders a thin rule instead of a selectable row, grouping the options above
   // and below it. Non-navigable and removed from the a11y tree; value/label are
   // ignored.
@@ -174,7 +171,6 @@ export function Select({
   const selectedIndex = resolved.findIndex(o => o.value === value);
   const selectedLabel = selectedIndex >= 0 ? resolved[selectedIndex].label : '';
   const selectedIcon = selectedIndex >= 0 ? resolved[selectedIndex].icon : undefined;
-  const selectedWarnIcon = selectedIndex >= 0 ? resolved[selectedIndex].warnIcon : undefined;
   const showPlaceholder = selectedIndex < 0 && placeholder != null;
 
   // Offer the search field only on a keyboard/pointer device and once the list
@@ -443,7 +439,6 @@ export function Select({
       >
         <span className={classNames(styles.value, accentValue && styles.accentValue, showPlaceholder && styles.placeholder)}>
           {!showPlaceholder && selectedIcon && <span className={styles.optionIcon} aria-hidden="true">{selectedIcon}</span>}
-          {!showPlaceholder && !selectedIcon && selectedWarnIcon && <span className={classNames(styles.optionIcon, styles.warnIcon)} aria-hidden="true">{selectedWarnIcon}</span>}
           {showPlaceholder ? placeholder : (triggerIconOnly && selectedIcon ? null : selectedLabel)}
         </span>
       </button>
@@ -537,14 +532,12 @@ export function Select({
                     opt.value === value && styles.selected,
                     opt.disabled && styles.optionDisabled,
                     opt.fontFamily && styles.fontOption,
-                    opt.description && styles.optionRich,
                   )}
                   style={opt.fontFamily ? { fontFamily: opt.fontFamily } : undefined}
                   onPointerEnter={() => { if (!opt.disabled) setActiveIndex(i); }}
                   onClick={() => { if (!opt.disabled) commit(opt.value); }}
                 >
                   {opt.icon && <span className={styles.optionIcon} aria-hidden="true">{opt.icon}</span>}
-                  {!opt.icon && opt.warnIcon && <span className={classNames(styles.optionIcon, styles.warnIcon)} aria-hidden="true">{opt.warnIcon}</span>}
                   {opt.description ? (
                     <span className={styles.optionText}>
                       <span>{opt.label}</span>

@@ -156,7 +156,7 @@ describe('LightingCoolingSection section split', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'lighting.renderGpu.label' }));
     const list = screen.getByRole('listbox');
     expect(within(list).getByText('lighting.renderGpu.softwareNamed')).toBeInTheDocument();
-    expect(within(list).getByText('lighting.renderGpu.softwareWarning')).toBeInTheDocument();
+    expect(within(list).getByText('lighting.renderGpu.softwareDescription')).toBeInTheDocument();
   });
 
   it('reverts the pick and skips the restart confirm when the service refuses', async () => {

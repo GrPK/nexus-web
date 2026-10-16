@@ -16,7 +16,7 @@ import styles from './LightingWidget.module.scss';
  * are left at 0 (no live audio wired here), so audio-reactive effects animate
  * but do not pulse to sound in this preview.
  */
-export function LightingShaderPreview({ effect, state, gpuAvailable, gpuState, gpuSoftware, paused }: { effect: string; state: EffectState; gpuAvailable?: boolean; gpuState?: GpuState; gpuSoftware?: boolean; paused?: boolean }) {
+export function LightingShaderPreview({ effect, state, gpuAvailable, gpuState, paused }: { effect: string; state: EffectState; gpuAvailable?: boolean; gpuState?: GpuState; paused?: boolean }) {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(state);
@@ -24,7 +24,7 @@ export function LightingShaderPreview({ effect, state, gpuAvailable, gpuState, g
     stateRef.current = state;
   }, [state]);
   const { ready, error } = useShaderRenderer(canvasRef, effect, stateRef, undefined, undefined, paused);
-  const notice = gpuNotice(gpuState, gpuAvailable, gpuSoftware);
+  const notice = gpuNotice(gpuState, gpuAvailable);
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>

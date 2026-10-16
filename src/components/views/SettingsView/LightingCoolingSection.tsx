@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { CircuitBoard, Clock, Cpu, Lock, Moon, RotateCcw, Speaker, TriangleAlert, Zap } from 'lucide-react';
+import { CircuitBoard, Clock, Cpu, Lock, Moon, RotateCcw, Speaker, Zap } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
 import { useToastSafe } from '../../common/Toast/Toast';
@@ -173,8 +173,7 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
         label: cpuName
           ? t('lighting.renderGpu.softwareNamed', { name: cpuName })
           : t('lighting.renderGpu.softwareFallback'),
-        description: t('lighting.renderGpu.softwareWarning'),
-        warnIcon: <TriangleAlert size={14} />,
+        description: t('lighting.renderGpu.softwareDescription'),
       },
     ] : []),
   ];
