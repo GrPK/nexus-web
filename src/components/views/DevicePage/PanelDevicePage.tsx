@@ -1634,6 +1634,7 @@ export function PanelDevicePage({ device, onOpenFirmware, onSectionNavigate }: P
                             deviceH={nativeH}
                             hideWidgetLabelsToggle={singleWidget}
                             hideWidgetChromeControls={singleWidget}
+                            showImmersiveBackdrop={surfaceSupportsTouch(surface, deviceTouch)}
                             sections={activeTab}
                           />
                         </div>
