@@ -2870,6 +2870,7 @@
   "lighting.ledMap.parkedTooltip": "Drag into frame to restore",
   "lighting.ledMap.rateCap": "Frame cap",
   "lighting.ledMap.rateCapFailed": "Could not change the frame rate limit",
+  "lighting.ledMap.rateCapHint": "Limits how often this device's lighting updates. Choose a lower value if the device or your PC stutters or misbehaves during animated effects.",
   "lighting.ledMap.rateCapHz": "{hz} Hz",
   "lighting.ledMap.rateCapOff": "Off",
   "lighting.ledMap.redo": "Redo",

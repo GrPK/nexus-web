@@ -2902,6 +2902,7 @@
   "lighting.ledMap.parkedTooltip": "Перетащите в рамку для восстановления",
   "lighting.ledMap.rateCap": "Лимит кадров",
   "lighting.ledMap.rateCapFailed": "Не удалось изменить ограничение частоты кадров",
+  "lighting.ledMap.rateCapHint": "Ограничивает, как часто обновляется подсветка этого устройства. Выберите меньшее значение, если устройство или ПК подтормаживает или работает некорректно во время анимированных эффектов.",
   "lighting.ledMap.rateCapHz": "{hz} Hz",
   "lighting.ledMap.rateCapOff": "Выкл.",
   "lighting.ledMap.redo": "Повторить",

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { InfoTooltip } from '../../../../components/common/InfoTooltip/InfoTooltip';
 import { Select, type SelectOption } from '../../../../components/common/Select/Select';
 import { useTranslation } from '../../../../lib/i18n';
 import { setLightingMaxRate } from '../../../../api/lighting';
@@ -54,6 +55,7 @@ export function RateCapSelect({ id, value, onFail, onSaved }: Props) {
   return (
     <div className={styles.rateCapField}>
       <span>{t('lighting.ledMap.rateCap')}</span>
+      <InfoTooltip message={t('lighting.ledMap.rateCapHint')} side="top" />
       <Select
         value={current == null ? OFF : String(current)}
         onChange={handleChange}

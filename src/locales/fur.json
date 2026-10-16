@@ -2870,6 +2870,7 @@
   "lighting.ledMap.parkedTooltip": "Strissine dentri dal ricuadri par ripristinâ",
   "lighting.ledMap.rateCap": "Limit dai fotogrammis",
   "lighting.ledMap.rateCapFailed": "Impussibil cambiâ il limit dai fotogrammis",
+  "lighting.ledMap.rateCapHint": "Al limite ogni cuant che la iluminazion di chest dispositiv si inzorne. Sielç un valôr plui bas se il dispositiv o il to PC al scatte o al funzione mâl intant dai efiets animâts.",
   "lighting.ledMap.rateCapHz": "{hz} Hz",
   "lighting.ledMap.rateCapOff": "Disativât",
   "lighting.ledMap.redo": "Torne fâs",

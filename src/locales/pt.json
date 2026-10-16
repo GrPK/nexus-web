@@ -2870,6 +2870,7 @@
   "lighting.ledMap.parkedTooltip": "Arraste para o quadro para restaurar",
   "lighting.ledMap.rateCap": "Limite de fotogramas",
   "lighting.ledMap.rateCapFailed": "Não foi possível alterar o limite de taxa de fotogramas",
+  "lighting.ledMap.rateCapHint": "Limita a frequência com que a iluminação deste dispositivo é atualizada. Escolha um valor mais baixo se o dispositivo ou o seu PC encravar ou se comportar mal durante os efeitos animados.",
   "lighting.ledMap.rateCapHz": "{hz} Hz",
   "lighting.ledMap.rateCapOff": "Desativado",
   "lighting.ledMap.redo": "Refazer",

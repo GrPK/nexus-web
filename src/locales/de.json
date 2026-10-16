@@ -2870,6 +2870,7 @@
   "lighting.ledMap.parkedTooltip": "In den Rahmen ziehen zum Wiederherstellen",
   "lighting.ledMap.rateCap": "Bildratenlimit",
   "lighting.ledMap.rateCapFailed": "Bildratenlimit konnte nicht geändert werden",
+  "lighting.ledMap.rateCapHint": "Begrenzt, wie oft die Beleuchtung dieses Geräts aktualisiert wird. Wählen Sie einen niedrigeren Wert, wenn das Gerät oder Ihr PC bei animierten Effekten ruckelt oder sich fehlerhaft verhält.",
   "lighting.ledMap.rateCapHz": "{hz} Hz",
   "lighting.ledMap.rateCapOff": "Aus",
   "lighting.ledMap.redo": "Wiederholen",

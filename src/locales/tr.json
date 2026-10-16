@@ -2870,6 +2870,7 @@
   "lighting.ledMap.parkedTooltip": "Geri yuklemek icin cerceveye surukleyin",
   "lighting.ledMap.rateCap": "Kare sınırı",
   "lighting.ledMap.rateCapFailed": "Kare hızı sınırı değiştirilemedi",
+  "lighting.ledMap.rateCapHint": "Bu cihazın aydınlatmasının ne sıklıkla güncelleneceğini sınırlar. Animasyonlu efektler sırasında cihaz veya bilgisayarınız takılıyorsa ya da düzgün çalışmıyorsa daha düşük bir değer seçin.",
   "lighting.ledMap.rateCapHz": "{hz} Hz",
   "lighting.ledMap.rateCapOff": "Kapalı",
   "lighting.ledMap.redo": "Yinele",

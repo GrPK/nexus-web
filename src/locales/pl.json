@@ -2902,6 +2902,7 @@
   "lighting.ledMap.parkedTooltip": "Przeciagnij do ramki, aby przywrocic",
   "lighting.ledMap.rateCap": "Limit klatek",
   "lighting.ledMap.rateCapFailed": "Nie udało się zmienić limitu liczby klatek",
+  "lighting.ledMap.rateCapHint": "Ogranicza, jak często odświeża się podświetlenie tego urządzenia. Wybierz niższą wartość, jeśli urządzenie lub komputer zacina się albo działa nieprawidłowo podczas animowanych efektów.",
   "lighting.ledMap.rateCapHz": "{hz} Hz",
   "lighting.ledMap.rateCapOff": "Wyłączone",
   "lighting.ledMap.redo": "Ponow",

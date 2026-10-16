@@ -2870,6 +2870,7 @@
   "lighting.ledMap.parkedTooltip": "拖入画框以恢复",
   "lighting.ledMap.rateCap": "帧率上限",
   "lighting.ledMap.rateCapFailed": "无法更改帧率上限",
+  "lighting.ledMap.rateCapHint": "限制此设备灯光的更新频率。如果在动画效果期间设备或电脑出现卡顿或异常，请选择较低的值。",
   "lighting.ledMap.rateCapHz": "{hz} Hz",
   "lighting.ledMap.rateCapOff": "关闭",
   "lighting.ledMap.redo": "重做",
