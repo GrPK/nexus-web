@@ -9,16 +9,19 @@ import { canvasLabelName } from '../../../lib/canvasLabelName';
 export type Pins = Readonly<Record<string, Pin>>;
 
 /**
- * Keys of the per-device-pick era and of a persisted selection. The selection is
- * not stored any more: a restored one would silently turn the next pick into a
- * pin, so every visit starts at "All devices".
+ * The selection the lighting page keeps across navigation. An empty selection
+ * means "all devices": a pick then applies globally and pins nothing.
  */
+export const SELECTED_DEVICES_STORAGE_KEY = 'nexus.lighting.pinSelection';
+
+/** The selection's anchor device, highlighted on the canvas and 3D scene. */
+export const PRIMARY_DEVICE_STORAGE_KEY = 'nexus.lighting.primaryDevice';
+
+/** Keys of the per-device-pick era. */
 const LEGACY_LIGHTING_KEYS = [
   'nexus.lighting.selectedDevices',
   'nexus.lighting.devicePicks',
   'nexus.lighting.selectionSeeded',
-  'nexus.lighting.pinSelection',
-  'nexus.lighting.primaryDevice',
 ];
 
 export function clearLegacyLightingKeys(): void {

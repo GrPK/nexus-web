@@ -219,14 +219,14 @@ describe('pinTargetLabel', () => {
 });
 
 describe('clearLegacyLightingKeys', () => {
-  it('removes the keys of the per-device-pick model and of a stored selection', () => {
-    for (const k of ['nexus.lighting.selectedDevices', 'nexus.lighting.devicePicks', 'nexus.lighting.selectionSeeded', 'nexus.lighting.pinSelection', 'nexus.lighting.primaryDevice']) {
+  it('removes the keys of the per-device-pick model and keeps the stored selection', () => {
+    for (const k of ['nexus.lighting.selectedDevices', 'nexus.lighting.devicePicks', 'nexus.lighting.selectionSeeded', 'nexus.lighting.pinSelection']) {
       localStorage.setItem(k, '1');
     }
     localStorage.setItem('nexus.lighting.customColor', '"#fff"');
     clearLegacyLightingKeys();
     expect(localStorage.getItem('nexus.lighting.selectedDevices')).toBeNull();
-    expect(localStorage.getItem('nexus.lighting.pinSelection')).toBeNull();
+    expect(localStorage.getItem('nexus.lighting.pinSelection')).toBe('1');
     expect(localStorage.getItem('nexus.lighting.customColor')).toBe('"#fff"');
   });
 });
