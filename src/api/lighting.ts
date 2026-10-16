@@ -11,6 +11,11 @@ export async function lightingOutputUrl(): Promise<string> {
   return resolveAuthWs('/lighting/output');
 }
 
+/** Live capture of the selected mirror monitor, in the lighting output frame layout. */
+export async function screenPreviewUrl(): Promise<string> {
+  return resolveAuthWs('/lighting/screen/preview');
+}
+
 // --- Effect thumbnails ---
 
 // Presets are universal, so a thumbnail is identified by (effect, slot). The

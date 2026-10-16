@@ -119,6 +119,7 @@ vi.mock('./page/DevicePanel', () => ({
 }));
 vi.mock('./page/LedMapEditor', () => ({ LedMapEditor: () => null }));
 vi.mock('./page/MediaBackdrop', () => ({ MediaBackdrop: () => <div data-testid="media-backdrop" /> }));
+vi.mock('./page/MirrorBackdrop', () => ({ MirrorBackdrop: () => <div data-testid="mirror-backdrop" /> }));
 vi.mock('./page/RightPaneTabs', () => ({ RightPaneTabs: () => null }));
 // A typed slider edit is onChange(v, true) followed synchronously by onCommit.
 vi.mock('./page/EffectTab', () => ({
@@ -992,6 +993,30 @@ describe('LightingPage pins', () => {
       fireEvent.click(screen.getByText('select-a'));
       fireEvent.click(screen.getByText('tab:gif'));
       await waitFor(() => expect(screen.getByTestId('media-backdrop')).toBeTruthy());
+    });
+
+    it('draws no mirror preview while Mirror is the global mode', async () => {
+      syncState.mode = 'screen';
+      syncState.rawSync = 'screen';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('screen'));
+      // Mirror is global: the output stream already is the capture.
+      expect(screen.queryByTestId('mirror-backdrop')).toBeNull();
+    });
+
+    it('draws the live mirror preview on the Mirror tab opened for a selection while another mode runs, and keeps it once deselected', async () => {
+      syncState.mode = 'animate';
+      syncState.rawSync = 'fire';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('tabs').dataset.active).toBe('animate'));
+      expect(screen.queryByTestId('mirror-backdrop')).toBeNull();
+      fireEvent.click(screen.getByText('select-a'));
+      fireEvent.click(screen.getByText('tab:screen'));
+      await waitFor(() => expect(screen.getByTestId('mirror-backdrop')).toBeTruthy());
+      fireEvent.click(screen.getByText('clear-selection'));
+      expect(screen.getByTestId('mirror-backdrop')).toBeTruthy();
+      fireEvent.click(screen.getByText('tab:animate'));
+      await waitFor(() => expect(screen.queryByTestId('mirror-backdrop')).toBeNull());
     });
 
     it('keeps the Mirror dock editable for a mixed selection', async () => {
