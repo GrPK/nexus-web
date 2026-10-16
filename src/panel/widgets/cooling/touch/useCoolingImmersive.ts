@@ -35,7 +35,7 @@ import {
 } from '../../../../api/qseries';
 import { useCoolingRealtime } from '../../../../hooks/useCooling';
 import { useCoolingCurves } from '../../../../hooks/useCoolingCurves';
-import { usePersistentIdSet } from '../../../../hooks/usePersistentState';
+import { usePanelIdSet } from '../../../../hooks/usePanelIdSet';
 import { useMultiplex, useTopicCallback } from '../../../../hooks/useMultiplexSocket';
 import { useServiceState } from '../../../../hooks/useServiceState';
 import { useTempSensorPrefs } from '../../../../hooks/useUiSettings';
@@ -122,9 +122,10 @@ export function useCoolingImmersive(): CoolingImmersiveController {
   // Seeded from the cached curves so a revisit paints the hero card
   // immediately (same as CoolingPage).
   const [selectedCurveId, setSelectedCurveId] = useState<string | null>(() => cachedSeed.curves[0]?.id ?? null);
-  // Shared with the desktop page's fan rail, so a selection made on either
-  // surface is the one the other acts on.
-  const [selectedFanIds, setSelectedFanIds] = usePersistentIdSet('nexus.cooling.selectedFans');
+  // Keyed on the id list: the realtime merge reallocates every channel each tick.
+  const channelIdKey = useMemo(() => channels.map(c => c.id).join('|'), [channels]);
+  const presentFanIds = useMemo(() => new Set(channelIdKey === '' ? [] : channelIdKey.split('|')), [channelIdKey]);
+  const [selectedFanIds, setSelectedFanIds] = usePanelIdSet('nexus.cooling.selectedFans', 'coolingSelection', presentFanIds);
   const presetLockUntilRef = useRef(0);
   const activeProfileRef = useRef('');
   const tempPrefs = useTempSensorPrefs();
@@ -560,21 +561,6 @@ export function useCoolingImmersive(): CoolingImmersiveController {
       .map(c => c.id),
     [channels],
   );
-
-  // A restored selection can name fans that are gone (hub unplugged between
-  // visits); bulk actions would target ids no card can show.
-  // Keyed on the id list, not on `channels`: the realtime merge reallocates
-  // every channel each tick, and the persisted setter always rewrites
-  // localStorage, so reacting to the array itself would write on every tick.
-  const channelIdKey = useMemo(() => channels.map(c => c.id).join('|'), [channels]);
-  useEffect(() => {
-    if (channelIdKey === '') return;
-    const present = new Set(channelIdKey.split('|'));
-    setSelectedFanIds(prev => {
-      const kept = [...prev].filter(id => present.has(id));
-      return kept.length === prev.size ? prev : new Set(kept);
-    });
-  }, [channelIdKey, setSelectedFanIds]);
 
   // Touch has no multi-select modifier, so every tap toggles additively.
   const toggleFanSelection = useCallback((id: string) => {

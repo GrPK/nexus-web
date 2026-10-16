@@ -61,10 +61,11 @@ import { SCENE_3D } from '../../../lib/scene/sceneFeature';
 import { useLightingScene } from './scene/useLightingScene';
 import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
 import { SearchInput } from '../../../components/common/SearchInput/SearchInput';
-import { usePersistentState } from '../../../hooks/usePersistentState';
+import { usePersistentState, usePersistentIdSet } from '../../../hooks/usePersistentState';
 import {
   staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, pinGridKey, pinHex, pinSignature, type Pins,
   pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, pressReach, engineReaches, selectAllEligible, tabPressChangesNothing, clearLegacyLightingKeys,
+  SELECTED_DEVICES_STORAGE_KEY, PRIMARY_DEVICE_STORAGE_KEY,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
@@ -270,13 +271,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // pick lands on. `primaryDeviceId` is the one device a Static pick lands on
   // and the member a stacked frame's label names; every focused frame shows
   // its LED dots.
-  // Not persisted: a restored selection would silently turn the next pick into a
-  // pin, so every visit starts at "All devices".
-  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(() => {
-    clearLegacyLightingKeys();
-    return new Set();
-  });
-  const [primaryDeviceId, setPrimaryDeviceId] = useState<string | null>(null);
+  useState(clearLegacyLightingKeys);
+  const [selectedDeviceIds, setSelectedDeviceIds] = usePersistentIdSet(SELECTED_DEVICES_STORAGE_KEY);
+  const [primaryDeviceId, setPrimaryDeviceId] = usePersistentState<string | null>(PRIMARY_DEVICE_STORAGE_KEY, null);
   // Canvas focus: which of the drawn frames take the frame-level edits (drag,
   // resize, rotate, power, LED dots). Kept apart from the list selection so a
   // click on empty canvas recedes the frames instead of clearing the canvas.

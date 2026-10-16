@@ -106,6 +106,10 @@ export interface PanelDeviceRecord {
   font?: string;
   themeSyncWithDesktop?: boolean;
   accentSyncWithDesktop?: boolean;
+  // Device ids last selected on this panel's Lighting view; absent until set.
+  lightingSelection?: string[];
+  // Fan ids last selected on this panel's Cooling view; absent until set.
+  coolingSelection?: string[];
   firstSeenAt: number;
   lastSeenAt: number;
   capabilities?: PanelDeviceCapabilitiesDto;
@@ -198,6 +202,9 @@ export interface PanelDevicePatch {
   font?: string;
   themeSyncWithDesktop?: boolean;
   accentSyncWithDesktop?: boolean;
+  // Full list (the client sends the whole selection); empty means none.
+  lightingSelection?: string[];
+  coolingSelection?: string[];
   // Display-bound records only; ignored for other panels.
   reserveMonitor?: boolean;
   // Display-bound records only; ignored for other panels.
