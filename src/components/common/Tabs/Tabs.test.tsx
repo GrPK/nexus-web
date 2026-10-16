@@ -87,42 +87,4 @@ describe('Tabs', () => {
     const tabButton = screen.getByRole('tab', { name: 'One' });
     expect(tabButton.parentElement).toHaveAttribute('role', 'tablist');
   });
-
-  describe('tooltip', () => {
-    const renderInert = (onChange = vi.fn()) => render(
-      <Tabs
-        tabs={[{ key: 'one', label: 'One' }, { key: 'gone', label: 'Gone', disabled: true, tooltip: 'No longer available' }]}
-        activeKey="one"
-        onChange={onChange}
-      />,
-    );
-
-    it('keeps the tab focusable and marks it aria-disabled instead of disabled', () => {
-      renderInert();
-      const tab = screen.getByRole('tab', { name: 'Gone' });
-      expect(tab).toHaveAttribute('aria-disabled', 'true');
-      expect(tab).not.toBeDisabled();
-    });
-
-    it('drops clicks and keyboard activation', () => {
-      const onChange = vi.fn();
-      renderInert(onChange);
-      const tab = screen.getByRole('tab', { name: 'Gone' });
-      fireEvent.click(tab);
-      fireEvent.keyDown(tab, { key: 'Enter' });
-      expect(onChange).not.toHaveBeenCalled();
-    });
-
-    it('shows the tooltip on keyboard focus', () => {
-      renderInert();
-      fireEvent.focus(screen.getByRole('tab', { name: 'Gone' }));
-      expect(screen.getByRole('tooltip')).toHaveTextContent('No longer available');
-    });
-
-    it('shows the tooltip on mouse hover', async () => {
-      renderInert();
-      fireEvent.pointerEnter(screen.getByRole('tab', { name: 'Gone' }), { pointerType: 'mouse' });
-      expect(await screen.findByRole('tooltip')).toHaveTextContent('No longer available');
-    });
-  });
 });

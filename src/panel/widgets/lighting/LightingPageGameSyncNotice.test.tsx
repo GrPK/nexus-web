@@ -64,16 +64,22 @@ describe('Game Sync removal notice tab', () => {
     vi.mocked(stopLighting).mockClear();
   });
 
-  it('renders disabled with the notice tooltip when the flag is set on Windows', async () => {
+  it('renders a disabled tab whose (i) shows the notice on hover and on tap', async () => {
     vi.mocked(fetchCurrentSync).mockResolvedValue({ sync: 'none', paused: false, gameSyncRemovedNotice: true });
     renderPage('windows');
 
     await waitFor(() => expect(gameSyncTab()).toBeTruthy());
     const tab = gameSyncTab()!;
-    expect(tab).toHaveAttribute('aria-disabled', 'true');
+    expect(tab).toBeDisabled();
     expect(tab).toHaveAttribute('aria-selected', 'false');
 
-    fireEvent.focus(tab);
+    const info = screen.getByRole('button', { name: 'infoTooltip.ariaLabel' });
+    fireEvent.pointerEnter(info, { pointerType: 'mouse' });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('lighting.gameSync.removedNotice');
+    fireEvent.pointerLeave(info, { pointerType: 'mouse' });
+    await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
+
+    fireEvent.click(info);
     expect(screen.getByRole('tooltip')).toHaveTextContent('lighting.gameSync.removedNotice');
   });
 
@@ -83,7 +89,6 @@ describe('Game Sync removal notice tab', () => {
     await waitFor(() => expect(gameSyncTab()).toBeTruthy());
 
     fireEvent.click(gameSyncTab()!);
-    fireEvent.keyDown(gameSyncTab()!, { key: 'Enter' });
 
     expect(gameSyncTab()).toHaveAttribute('aria-selected', 'false');
     expect(startAnimate).not.toHaveBeenCalled();

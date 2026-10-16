@@ -45,6 +45,7 @@ import { pluralKey } from '../../../lib/pluralKey';
 import { Badge } from '../../../components/common/Badge/Badge';
 import { EmptyState } from '../../../components/common/EmptyState/EmptyState';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
+import { InfoTooltip } from '../../../components/common/InfoTooltip/InfoTooltip';
 import { ViewHeader } from '../../../components/common/ViewHeader/ViewHeader';
 import { AdvancedModeCta } from '../../../components/common/AdvancedModeCta/AdvancedModeCta';
 import { CollapsibleSection } from '../../../components/common/CollapsibleSection/CollapsibleSection';
@@ -227,7 +228,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     onSectionNavigate?.('settings', { settingsTab: 'lighting-cooling', settingsAnchor: 'set-render-gpu' });
   }, [onSectionNavigate]);
   const isWindows = platform === 'windows';
-  const effectiveMode: LightingMode = mode;
   const { settings: uiSettings, update: updateUiSettings } = useUiSettings();
   const simpleDashboard = uiSettings.lightingDashboardMode === 'simple';
   // Off / simple / advanced live behind the first tab (see modeTabs). The
@@ -1001,22 +1001,22 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The tab a press opened for a selection, null for the global mode's tab. Selecting and
   // deselecting cards never moves it.
   const [selectionTab, setSelectionTab] = useState<LightingMode | null>(null);
-  const [tabBaseMode, setTabBaseMode] = useState(effectiveMode);
-  if (tabBaseMode !== effectiveMode) {
+  const [tabBaseMode, setTabBaseMode] = useState(mode);
+  if (tabBaseMode !== mode) {
     // A global mode change from anywhere (a press, Off, simple mode, another client) reopens the global tab.
-    setTabBaseMode(effectiveMode);
+    setTabBaseMode(mode);
     setSelectionTab(null);
   }
-  const viewMode: LightingMode = selectionTab ?? effectiveMode;
+  const viewMode: LightingMode = selectionTab ?? mode;
   // Nothing selected on a tab other than the running mode: its picks reach no card until a
   // selection gives them one (or a press of the tab starts the mode), so they flash the scope chip.
-  const detachedTab = selectedDeviceIds.size === 0 && viewMode !== effectiveMode;
+  const detachedTab = selectedDeviceIds.size === 0 && viewMode !== mode;
   const [scopeFlash, setScopeFlash] = useState(0);
   const flashScope = useCallback(() => setScopeFlash(n => n + 1), []);
   const cardMode = useCallback((id: string): LightingMode => {
     const p = pins[id];
-    return p ? pinMode(p.kind) : effectiveMode;
-  }, [pins, effectiveMode]);
+    return p ? pinMode(p.kind) : mode;
+  }, [pins, mode]);
   const scoped: ScopedTarget = useMemo(() => {
     // A detached tab reaches outside the running mode just as a selection can.
     if (selectionIds.length === 0) return detachedTab ? { kind: 'mixed' } : { kind: 'none' };
@@ -1633,11 +1633,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const sawScanRef = useRef(false);
   useEffect(() => {
     if (!synced) return;
-    const off = effectiveMode === 'none';
+    const off = mode === 'none';
     if (wasOffRef.current === null) { wasOffRef.current = off; return; }
     if (off) { wasOffRef.current = true; sawScanRef.current = false; setLeftOff(false); return; }
     if (wasOffRef.current) { wasOffRef.current = false; sawScanRef.current = false; setLeftOff(true); }
-  }, [effectiveMode, synced]);
+  }, [mode, synced]);
   useEffect(() => {
     if (!leftOff) return undefined;
     if (rgb.scanning) { sawScanRef.current = true; return undefined; }
@@ -1649,7 +1649,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const timer = setTimeout(() => setLeftOff(false), DISCOVERY_GRACE_MS);
     return () => clearTimeout(timer);
   }, [leftOff, rgb.scanning]);
-  const discovery: DiscoveryState | undefined = effectiveMode === 'none'
+  const discovery: DiscoveryState | undefined = mode === 'none'
     ? 'off'
     : (leftOff ? 'detecting' : undefined);
 
@@ -2017,9 +2017,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Simple mode has no device rail, so a color is the exact global flat color.
   // Static has to own the output first.
   const handleSimplePaletteSelect = useCallback(async (color: PaletteColor) => {
-    if (effectiveMode !== 'static') await handleModeChange('static');
+    if (mode !== 'static') await handleModeChange('static');
     setGlobalColor(color.hex, startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, color.hex));
-  }, [effectiveMode, handleModeChange, setGlobalColor]);
+  }, [mode, handleModeChange, setGlobalColor]);
 
   // Simple mode has no per-device toggle, so a device left un-driven or dark on
   // the advanced page would sit black here with nothing on the page saying why.
@@ -2087,7 +2087,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   }, [claimAllDevices, paused, setMode, setPausedState, setRawSync, simpleReversed, unpinAll]);
 
   // The running sweep, which is also what marks a tile.
-  const simpleAnimation = synced && effectiveMode === 'animate' && isSimpleAnimation(rawSync)
+  const simpleAnimation = synced && mode === 'animate' && isSimpleAnimation(rawSync)
     ? rawSync
     : null;
 
@@ -2119,13 +2119,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The swatch simple mode marks active: the exact global color, when it is
   // one of the palette's.
   const simplePaletteId = useMemo(() => {
-    if (effectiveMode !== 'static' || !globalColor) return null;
+    if (mode !== 'static' || !globalColor) return null;
     return PALETTE.find(c => c.hex.toLowerCase() === globalColor.toLowerCase())?.id ?? null;
-  }, [effectiveMode, globalColor]);
+  }, [mode, globalColor]);
 
   // The simple page can only show Off or one palette swatch; anything else
   // leaves nothing marked active. `synced` gates it: an unsynced mode is a guess.
-  const simpleCustomActive = synced && effectiveMode !== 'none' && !simpleAnimation
+  const simpleCustomActive = synced && mode !== 'none' && !simpleAnimation
     && selectableIds.length > 0 && simplePaletteId === null;
 
   // A press or pick pulses the cards it changed; a new seq replays it.
@@ -2139,7 +2139,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // advanced swap, which the tab opens as a menu instead of switching mode.
   const modeMenu = usePageModeMenu({
     mode: simpleDashboard ? 'simple' : 'advanced',
-    off: synced && effectiveMode === 'none',
+    off: synced && mode === 'none',
     offIcon: LIGHTING_MODE_ICONS.none,
     offLabel: t('lighting.mode.off'),
     offDescription: t('lighting.modeMenu.offDesc'),
@@ -2149,7 +2149,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // first - the same claim the palette runs, so the page's counts agree.
     onOff: () => {
       // Already off: asking again would re-run the claim and re-issue the stop.
-      if (synced && effectiveMode === 'none') return;
+      if (synced && mode === 'none') return;
       pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds, true));
       if (simpleDashboard) claimAllDevices();
       void handleModeChange('none');
@@ -2168,7 +2168,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     .filter(m => m.key !== 'none')
     .map(m => {
       const Icon = LIGHTING_MODE_ICONS[m.key];
-      const showPauseToggle = synced && m.key === effectiveMode
+      const showPauseToggle = synced && m.key === mode
         && (m.key === 'animate' || m.key === 'gif' || m.key === 'screen');
       return {
         key: m.key,
@@ -2207,14 +2207,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       label: t('lighting.mode.gamesync'),
       icon: <Gamepad2 size={14} />,
       disabled: true,
-      tooltip: t('lighting.gameSync.removedNotice'),
+      trailing: <InfoTooltip message={t('lighting.gameSync.removedNotice')} />,
     }] : [])];
   // The strip marks the mode tab while lighting is off - it is the tab Off now
   // lives on. Every other mode still marks its own tab.
   const activeTabKey = !synced ? undefined
     : (viewMode === 'none' ? MODE_MENU_TAB_KEY : viewMode);
   const globalTabKey = !synced ? undefined
-    : (effectiveMode === 'none' ? MODE_MENU_TAB_KEY : effectiveMode);
+    : (mode === 'none' ? MODE_MENU_TAB_KEY : mode);
   // What a tab press gives the selected cards: that mode's global look, or the
   // one shared Mirror or Media. Off cannot be pinned, so it
   // always changes everything.
@@ -2222,11 +2222,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     switch (m) {
       case 'static': {
         if (globalColor) return colorPin(globalColor);
-        const key = effectiveMode === 'static' && isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
+        const key = mode === 'static' && isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
         return staticLookPin(key, slotOf(key), stateOf(key, slotOf(key)));
       }
       case 'animate':
-        return animatePin((effectiveMode === 'animate' ? (simpleAnimation ?? activeEffect) : '') || animateEffectRef.current);
+        return animatePin((mode === 'animate' ? (simpleAnimation ?? activeEffect) : '') || animateEffectRef.current);
       case 'screen': return MIRROR_PIN;
       case 'gif': return MEDIA_PIN;
       default: return null;
@@ -2263,7 +2263,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // drops the menu, which the tab row keeps "inside" its anchor.
   const handleTabChange = (key: string) => {
     setHoveredTab(null);
-    if (key === GAME_SYNC_REMOVED_TAB_KEY) return;
     if (key === MODE_MENU_TAB_KEY) {
       setModeMenuOpen(open => !open);
       return;
@@ -2405,7 +2404,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   }, [t]);
   const globalPin: { pin: Pin; name: string } | null = useMemo(() => {
     if (!synced) return null;
-    if (effectiveMode === 'static') {
+    if (mode === 'static') {
       // A pick with nothing selected sets the global color and leaves the
       // pattern alone, so the color is what following cards wear.
       if (globalColor) {
@@ -2414,16 +2413,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       }
       return activeEffect ? { pin: staticLookPin(activeEffect, slotOf(activeEffect), stateOf(activeEffect, slotOf(activeEffect))), name: effectLabel(activeEffect) } : null;
     }
-    if (effectiveMode === 'animate') {
+    if (mode === 'animate') {
       const key = simpleAnimation ?? activeEffect;
       return key ? { pin: animatePin(key), name: simpleAnimation ? t(simpleAnimationLabelKey(simpleAnimation)) : effectLabel(key) } : null;
     }
-    if (effectiveMode === 'screen') return { pin: MIRROR_PIN, name: t('lighting.mode.screen') };
-    if (effectiveMode === 'gif') return { pin: MEDIA_PIN, name: t('lighting.mode.gif') };
+    if (mode === 'screen') return { pin: MIRROR_PIN, name: t('lighting.mode.screen') };
+    if (mode === 'gif') return { pin: MEDIA_PIN, name: t('lighting.mode.gif') };
     return null;
-  }, [activeEffect, effectLabel, effectiveMode, globalColor, simpleAnimation, slotOf, stateOf, synced, t]);
+  }, [activeEffect, effectLabel, mode, globalColor, simpleAnimation, slotOf, stateOf, synced, t]);
   const pinDisabledReason = globalPin ? undefined : t(
-    effectiveMode === 'none' ? 'lighting.pin.disabledOff'
+    mode === 'none' ? 'lighting.pin.disabledOff'
       : 'lighting.pin.disabledUnavailable',
   );
   const pinTargetName = useCallback((pin: Pin): string => pinModeTargetLabel(pin, t), [t]);
@@ -2446,13 +2445,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     for (const d of visibleDevices) {
       if (!engineReaches(d)) continue;
       const pin = pins[d.id];
-      if (pin ? pin.kind === kind : effectiveMode === viewMode) reach.add(d.id);
+      if (pin ? pin.kind === kind : mode === viewMode) reach.add(d.id);
     }
     pulseCards(reach);
     handleSelectionPick?.();
-  }, [viewMode, visibleDevices, pins, selectedDeviceIds, effectiveMode, pulseCards, handleSelectionPick]);
+  }, [viewMode, visibleDevices, pins, selectedDeviceIds, mode, pulseCards, handleSelectionPick]);
 
-  const simpleOff = synced && effectiveMode === 'none';
+  const simpleOff = synced && mode === 'none';
   // The mode tab leads the strip in both dashboard modes; simple mode carries
   // nothing after it, so its header is the mode tab alone.
   const simpleTabs = [modeMenuTab];
@@ -2722,7 +2721,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             onSetPower={handleSetPower}
             onToggleControlled={handleToggleControlled}
             onSetControlled={handleSetControlled}
-            lightingOff={effectiveMode === 'none'}
+            lightingOff={mode === 'none'}
             onOpenSettings={handleOpenSettings}
             onOpenColorTuning={handleOpenColorTuning}
             colorTunedIds={colorTunedIds}
@@ -2790,7 +2789,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 />
               </Suspense>
             ) : (
-              <DeviceCanvas backdrop={viewMode === 'gif' && effectiveMode !== 'gif' ? <MediaBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} foreignFrames={foreignFrames} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
+              <DeviceCanvas backdrop={viewMode === 'gif' && mode !== 'gif' ? <MediaBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} foreignFrames={foreignFrames} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
             )}
             {viewMode === 'gif' && <MediaCanvasNotice />}
             {shaderMode && dockEffect && dockState && !mixedSelection && (
@@ -2905,7 +2904,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                 mode={viewMode}
                 screenPP={screenPP}
                 onScreenPPChange={setScreenPP}
-                keepMode={viewMode !== effectiveMode}
+                keepMode={viewMode !== mode}
                 onSelectionPick={handleSharedPick}
                 onBlockedPick={detachedTab ? flashScope : undefined}
               />
