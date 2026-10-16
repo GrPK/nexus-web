@@ -421,6 +421,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // drive the same template state through different start endpoints.
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  // Lets handlers declared before handleModeChange restart lighting from Off.
+  const resumeLightingRef = useRef<(m: LightingMode, effectKey?: string) => Promise<void>>(async () => {});
   // Static keeps its own last-selected key, so switching modes returns to what
   // each one was showing rather than carrying the other's effect across.
   const staticEffectRef = useRef<string>(DEFAULT_STATIC_EFFECT);
@@ -1069,6 +1071,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // wore; the running effect is untouched. Unselected pinned devices are
     // never reached.
     const ids = [...selectedDeviceIds];
+    // Off has stopped the engine, and a pin does not restart it: a pick starts the mode globally.
+    if (modeRef.current === 'none') {
+      const startMode = viewMode === 'static' && isStaticEffect(key) ? 'static' : 'animate';
+      if (startMode === 'static') staticEffectRef.current = key;
+      setSelectionTab(null);
+      void resumeLightingRef.current(startMode, key);
+      return;
+    }
     if (detachedTab) { flashScope(); return; }
     if (ids.length > 0 && (viewMode === 'animate' || viewMode === 'static')) {
       if (viewMode === 'static') {
@@ -1994,7 +2004,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           break;
         }
         case 'static': {
-          const key = isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
+          const key = effectKey && isStaticEffect(effectKey) ? effectKey
+            : (isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current);
           setActiveEffect(key);
           const state = stateFor(key);
           // Entering Static keeps a global flat color: an effect start without one would clear it.
@@ -2021,6 +2032,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       }
     } catch { /* best-effort; backend state becomes source of truth */ }
   }, [activeEffect, globalColor, rawSync, setMode, setRawSync, screenPP, stateFor, setPausedState]);
+
+  resumeLightingRef.current = handleModeChange;
 
   // Once the profile's lighting has loaded, the requested effect becomes the Animation effect.
   useEffect(() => {
@@ -2291,7 +2304,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     closeModeMenu();
     const reach = tabPressReach(key);
     if (reach) pulseCards(reach);
-    const pin = selectedDeviceIds.size > 0 ? tabPinFor(key as LightingMode) : null;
+    // Off: a pin would not restart the stopped engine, so the press starts the mode globally.
+    const pin = selectedDeviceIds.size > 0 && mode !== 'none' ? tabPinFor(key as LightingMode) : null;
     if (pin) {
       setSelectionTab(key as LightingMode);
       const ids = tabPressPins(pins, selectedDeviceIds, key);

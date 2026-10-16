@@ -1037,6 +1037,44 @@ describe('LightingPage pins', () => {
     const saved = vi.mocked(saveAnimateTemplates).mock.calls.at(-1)?.[0] as Record<string, { selected: number; slots: { intensity: number }[] }>;
     expect(saved.fire.slots[saved.fire.selected].intensity).toBe(0.3);
   });
+
+  describe('resuming lighting from Off', () => {
+    it('an Animation tab press with a selection starts the mode globally instead of pinning', async () => {
+      syncState.mode = 'none';
+      syncState.rawSync = 'none';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
+      fireEvent.click(screen.getByText('select-a'));
+      vi.mocked(setPins).mockClear();
+      fireEvent.click(screen.getByText('tab:animate'));
+      await waitFor(() => expect(startAnimate).toHaveBeenCalled());
+      expect(setPins).not.toHaveBeenCalled();
+    });
+
+    it('a Static tab press with a selection starts Static globally', async () => {
+      syncState.mode = 'none';
+      syncState.rawSync = 'none';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
+      fireEvent.click(screen.getByText('select-a'));
+      vi.mocked(setPins).mockClear();
+      fireEvent.click(screen.getByText('tab:static'));
+      await waitFor(() => expect(startStatic).toHaveBeenCalled());
+      expect(setPins).not.toHaveBeenCalled();
+    });
+
+    it('with lighting on, the same press with a selection still only pins', async () => {
+      syncState.mode = 'static';
+      syncState.rawSync = 'static';
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
+      fireEvent.click(screen.getByText('select-a'));
+      vi.mocked(startAnimate).mockClear();
+      fireEvent.click(screen.getByText('tab:animate'));
+      await waitFor(() => expect(setPins).toHaveBeenCalled());
+      expect(startAnimate).not.toHaveBeenCalled();
+    });
+  });
 });
 
 void within;
