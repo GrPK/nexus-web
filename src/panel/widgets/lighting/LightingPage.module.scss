@@ -1965,7 +1965,7 @@
   width: 100%;
 }
 
-// The Media tab's still of the current media, between the canvas stream and the frames.
+// The Mirror tab's live capture, between the canvas stream and the frames.
 .mirrorBackdrop {
   position: absolute;
   inset: 0;
@@ -1974,6 +1974,7 @@
   pointer-events: none;
 }
 
+// The Media tab's still of the current media, between the canvas stream and the frames.
 .mediaBackdrop {
   position: absolute;
   inset: 0;

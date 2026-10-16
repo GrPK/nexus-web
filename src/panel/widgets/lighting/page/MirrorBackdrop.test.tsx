@@ -15,7 +15,7 @@ class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
   binaryType = 'blob';
   onmessage: ((e: { data: unknown }) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((e: { code: number }) => void) | null = null;
   onerror: (() => void) | null = null;
   closed = false;
   constructor(public url: string) { FakeWebSocket.instances.push(this); }
@@ -74,14 +74,34 @@ describe('MirrorBackdrop', () => {
   it('opens no socket when it starts hidden', async () => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
     render(<MirrorBackdrop />);
-    await new Promise(r => setTimeout(r, 20));
+    await act(async () => { await Promise.resolve(); });
     expect(FakeWebSocket.instances).toHaveLength(0);
   });
 
   it('opens no socket over a sealed tunnel', async () => {
     tunnel.active = true;
     render(<MirrorBackdrop />);
-    await new Promise(r => setTimeout(r, 20));
+    await act(async () => { await Promise.resolve(); });
     expect(FakeWebSocket.instances).toHaveLength(0);
+  });
+
+  it('reconnects after an ordinary close', async () => {
+    render(<MirrorBackdrop />);
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    act(() => FakeWebSocket.instances[0].onclose?.({ code: 1006 }));
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(2), { timeout: 3500 });
+  });
+
+  it('renders nothing and stops retrying when the service reports no capture source', async () => {
+    const { container } = render(<MirrorBackdrop />);
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    expect(container.querySelector('canvas')).not.toBeNull();
+    act(() => FakeWebSocket.instances[0].onclose?.({ code: 4503 }));
+    expect(container.querySelector('canvas')).toBeNull();
+    // A page that hides and shows again must not retry either.
+    act(() => setVisibility('hidden'));
+    act(() => setVisibility('visible'));
+    await act(async () => { await Promise.resolve(); });
+    expect(FakeWebSocket.instances).toHaveLength(1);
   });
 });
