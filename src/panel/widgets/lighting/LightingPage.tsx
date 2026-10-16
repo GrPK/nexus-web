@@ -230,7 +230,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     onSectionNavigate?.('settings', { settingsTab: 'lighting-cooling', settingsAnchor: 'set-render-gpu' });
   }, [onSectionNavigate]);
   const isWindows = platform === 'windows';
-  const gameSyncNoticeHint = useOnboardingHint(GAME_SYNC_NOTICE_HINT_ID);
+  const gameSyncNoticeHint = useOnboardingHint(GAME_SYNC_NOTICE_HINT_ID, isWindows && gameSyncRemovedNotice);
   const { settings: uiSettings, update: updateUiSettings } = useUiSettings();
   const simpleDashboard = uiSettings.lightingDashboardMode === 'simple';
   // Off / simple / advanced live behind the first tab (see modeTabs). The

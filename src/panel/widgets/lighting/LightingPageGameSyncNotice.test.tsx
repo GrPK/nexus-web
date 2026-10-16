@@ -85,12 +85,12 @@ describe('Game Sync removal notice tab', () => {
 
     const info = screen.getByRole('button', { name: 'infoTooltip.ariaLabel' });
     fireEvent.pointerEnter(info, { pointerType: 'mouse' });
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('lighting.gameSync.removedNotice');
+    expect(await screen.findByText('lighting.gameSync.removedNotice')).toBeInTheDocument();
     fireEvent.pointerLeave(info, { pointerType: 'mouse' });
-    await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('lighting.gameSync.removedNotice')).toBeNull());
 
     fireEvent.click(info);
-    expect(screen.getByRole('tooltip')).toHaveTextContent('lighting.gameSync.removedNotice');
+    expect(screen.getByText('lighting.gameSync.removedNotice')).toBeInTheDocument();
   });
 
   it('does not switch tabs or start lighting when clicked', async () => {
@@ -114,6 +114,14 @@ describe('Game Sync removal notice tab', () => {
     await waitFor(() => expect(fetchOnboardingStatus).toHaveBeenCalled());
     await screen.findAllByRole('tab');
     expect(gameSyncTab()).toBeNull();
+  });
+
+  it('does not ask the service about the hint when the notice cannot show', async () => {
+    vi.mocked(fetchCurrentSync).mockResolvedValue({ sync: 'none', paused: false });
+    renderPage('windows');
+
+    await screen.findAllByRole('tab');
+    expect(fetchOnboardingStatus).not.toHaveBeenCalled();
   });
 
   it('Remove tab dismisses the hint on the service and hides the tab', async () => {

@@ -43,6 +43,7 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
   const triggerRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLSpanElement>(null);
   const actionRef = useRef<HTMLButtonElement>(null);
+  const refocusingRef = useRef(false);
   const closeTimerRef = useRef<number | null>(null);
   const openTimerRef = useRef<number | null>(null);
   // Whether this tooltip actually became visible - so the shared scan-mode
@@ -88,13 +89,24 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
     }, 120);
   };
 
-  // A modal opening takes over the screen; nothing under it keeps a tooltip.
-  useEffect(() => onModalOpen(() => {
+  // Closing with focus inside the bubble would drop it to the body, so the
+  // trigger takes it back; refocusingRef keeps that focus from reopening the bubble.
+  const closeNow = (restoreFocus: boolean) => {
     cancelPendingOpen();
     cancelPendingClose();
+    if (restoreFocus && tooltipRef.current?.contains(document.activeElement)) {
+      refocusingRef.current = true;
+      triggerRef.current?.focus();
+      refocusingRef.current = false;
+    }
     setOpen(false);
     if (openedRef.current) { openedRef.current = false; notifyTooltipClose(); }
-  }), []);
+  };
+
+  // A modal opening takes over the screen; nothing under it keeps a tooltip.
+  // closeNow reads refs / stable setters only.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => onModalOpen(() => closeNow(false)), []);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -147,8 +159,7 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
       // register their own Esc handlers on window).
       if (e.key === 'Escape') {
         e.stopPropagation();
-        setOpen(false);
-        if (openedRef.current) { openedRef.current = false; notifyTooltipClose(); }
+        closeNow(true);
       }
     };
     document.addEventListener('mousedown', onDocPointer);
@@ -157,6 +168,8 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
       document.removeEventListener('mousedown', onDocPointer);
       window.removeEventListener('keydown', onKey);
     };
+    // closeNow reads refs / stable setters only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Clear coords whenever it closes so the next open re-measures from scratch
@@ -173,12 +186,6 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
 
   const label = ariaLabel ?? t('infoTooltip.ariaLabel');
 
-  const closeNow = () => {
-    cancelPendingOpen();
-    cancelPendingClose();
-    setOpen(false);
-    if (openedRef.current) { openedRef.current = false; notifyTooltipClose(); }
-  };
 
   return (
     <span ref={rootRef} className={`${styles.root} ${open ? styles.open : ''} ${className ?? ''}`}>
@@ -210,7 +217,7 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
         onFocus={() => {
           // Focus a closing modal hands back is not the user arriving here.
           if (isRestoringModalFocus()) return;
-          if (pointerPressRef.current) return;
+          if (pointerPressRef.current || refocusingRef.current) return;
           cancelPendingClose(); cancelPendingOpen(); setOpen(true); openedRef.current = true; notifyTooltipOpen();
         }}
         onBlur={() => { pointerPressRef.current = false; scheduleClose(); }}>
@@ -219,7 +226,7 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
       {open && createPortal(
         // Rendered as soon as it opens (hidden until the layout effect measures
         // + clamps it) so getBoundingClientRect has a real box to size against.
-        <span role="tooltip" id={tooltipId}
+        <span role={action ? undefined : 'tooltip'} id={action ? undefined : tooltipId}
           ref={tooltipRef}
           className={styles.tooltip}
           style={{
@@ -231,13 +238,13 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
           onPointerLeave={scheduleClose}
           onFocus={action ? cancelPendingClose : undefined}
           onBlur={action ? scheduleClose : undefined}>
-          {message}
+          {action ? <span id={tooltipId}>{message}</span> : message}
           {action && (
             <Button
               ref={actionRef}
               size="sm"
               className={styles.action}
-              onClick={() => { closeNow(); action.onClick(); }}
+              onClick={() => { closeNow(true); action.onClick(); }}
               onKeyDown={(e) => {
                 if (e.key !== 'Tab') return;
                 // Back to the icon; a forward Tab then continues from there.
