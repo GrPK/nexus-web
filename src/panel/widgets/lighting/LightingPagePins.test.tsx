@@ -446,16 +446,6 @@ describe('LightingPage pins', () => {
       expect(lastPinsCall()).toEqual([['b'], { kind: 'mirror' }]);
     });
 
-    it('outlines every lit card on Game Sync, pinned or selected', async () => {
-      withDevices('a', 'b');
-      vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ a: { kind: 'mirror' } }));
-      renderPage('windows');
-      await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
-      fireEvent.click(screen.getByText('select-a'));
-      fireEvent.mouseEnter(tab('gamesync'));
-      expect(targets()).toBe('a,b');
-    });
-
     it('clears on a press, which may remount the tab before its pointerleave', async () => {
       withDevices('a', 'b');
       renderPage();

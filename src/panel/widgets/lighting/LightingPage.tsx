@@ -1,19 +1,19 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Maximize2, Music, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { Ban, CheckCheck, Eye, EyeOff, Gamepad2, Lightbulb, Maximize2, Music, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
-  startAnimate, startStatic, startScreenMirror, stopLighting, startGameSync,
+  startAnimate, startStatic, startScreenMirror, stopLighting,
   fetchStaticSettings,
   fetchLightingDevices, fetchAnimateSettings, saveAnimateTemplates,
   fetchAnimateDefaults, cachedAnimateDefaults,
   fetchMusicReactive, setMusicReactive, setLightingDevicePower, setLightingDeviceControlled,
   renameLightingDevice, saveLightingGroups, saveLightingStacks, saveDeviceLayout,
   fetchScreenEffect, setScreenEffect, fetchMediaEffect, setMediaEffect, fetchLedMap,
-  fetchCurrentSync, fetchAvailableMappings, fetchGameSyncState, fetchGameSyncGames,
-  steamArtworkUrl, resolveActiveGame, setLightingPaused,
+  fetchCurrentSync, fetchAvailableMappings,
+  setLightingPaused,
   resetDeviceLayouts, applyDeviceLayouts, setActiveLayoutPreset, updateLayoutPreset, identifyLightingDevice,
   fetchLightingColorAdjust,
-  type LightingDevice, type LightingColorAdjust, type LedMapEntry, type Pin, type PostProcessSettings, type GameSyncDevice,
-  type GameSyncGame, type DeviceLayoutDto, type PresetApp,
+  type LightingDevice, type LightingColorAdjust, type LedMapEntry, type Pin, type PostProcessSettings,
+  type DeviceLayoutDto, type PresetApp,
 } from '../../../api/lighting';
 import { groupNamesOf, type DeviceGroup } from '../../../lib/deviceGroups';
 import { matchesAllWords } from '../../../search/match';
@@ -45,6 +45,8 @@ import { pluralKey } from '../../../lib/pluralKey';
 import { Badge } from '../../../components/common/Badge/Badge';
 import { EmptyState } from '../../../components/common/EmptyState/EmptyState';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
+import { useOnboardingHint } from '../../../hooks/useOnboardingHint';
+import { InfoTooltip } from '../../../components/common/InfoTooltip/InfoTooltip';
 import { ViewHeader } from '../../../components/common/ViewHeader/ViewHeader';
 import { AdvancedModeCta } from '../../../components/common/AdvancedModeCta/AdvancedModeCta';
 import { CollapsibleSection } from '../../../components/common/CollapsibleSection/CollapsibleSection';
@@ -54,6 +56,7 @@ import { DeviceCountSummary } from '../../../components/common/DeviceCountSummar
 import { Notice } from '../../../components/common/Notice/Notice';
 import { SectionHeader } from '../../../components/common/SectionHeader/SectionHeader';
 import { useUiSettings } from '../../../hooks/useUiSettings';
+import { Coachmark } from '../../../components/common/Coachmark/Coachmark';
 import { ServiceRequired } from '../../../components/views/ServiceRequired';
 import { DeviceCanvas } from '../../../components/common/DeviceCanvas/DeviceCanvas';
 import { canvasLabelName } from '../../../lib/canvasLabelName';
@@ -96,10 +99,8 @@ import { MediaBackdrop } from './page/MediaBackdrop';
 import { MirrorBackdrop } from './page/MirrorBackdrop';
 import { DevicePanel } from './page/DevicePanel';
 import { type DiscoveryState } from './page/DeviceDiscoveryCard';
-import { zoneCardSelectable, zoneCardSelectionHoldable, zoneCardUnavailable } from './page/ZoneCard';
+import { LIGHTING_PIN_HINT_ID, zoneCardSelectable, zoneCardSelectionHoldable, zoneCardUnavailable } from './page/ZoneCard';
 import { Button } from '../../../components/common/Button/Button';
-import { GAME_SYNC_GUIDE_URL } from '../../../lib/externalLinks';
-import { GameSyncLeftPane } from './page/GameSyncLeftPane';
 import { LedMapEditor } from './page/LedMapEditor';
 import { ColorTuningModal } from './page/ColorTuningModal';
 import { useGlobalColor } from './page/useGlobalColor';
@@ -146,7 +147,11 @@ interface LayoutHistorySnapshot {
   powerIds: string[];
 }
 
-// The modes a tab press can pin selected cards to; Off and Game Sync always change the global mode.
+const PIN_HINT_SELECTOR = `[data-coachmark="${LIGHTING_PIN_HINT_ID}"]`;
+const GAME_SYNC_REMOVED_TAB_KEY = 'game-sync-removed';
+const GAME_SYNC_NOTICE_HINT_ID = 'game-sync-removed-notice';
+
+// The modes a tab press can pin selected cards to; Off always changes the global mode.
 const PINNABLE_MODES: ReadonlySet<string> = new Set(['static', 'animate', 'screen', 'gif']);
 
 /** The selected cards a press on `mode` pins: cards already pinned to that mode keep their own looks. */
@@ -217,7 +222,7 @@ const VIEW_2D = '2d';
 const VIEW_3D = '3d';
 export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate, accountUsername = null }: LightingViewProps) {
   const { t, language } = useTranslation();
-  const { mode, setMode, rawSync, setRawSync, synced, paused: syncedPaused } = useLightingSync(serviceOnline, activeProfileId);
+  const { mode, setMode, rawSync, setRawSync, synced, paused: syncedPaused, gameSyncRemovedNotice } = useLightingSync(serviceOnline, activeProfileId);
   // gpuCanSwitch is true whenever the Settings picker has something to choose
   // (a second card, or CPU rendering offered), so the shortcut never lands on
   // a tab with no GPU control. Offered only for a
@@ -228,10 +233,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const handlePickRenderGpu = useCallback(() => {
     onSectionNavigate?.('settings', { settingsTab: 'lighting-cooling', settingsAnchor: 'set-render-gpu' });
   }, [onSectionNavigate]);
-  // Game Sync requires the Windows Chroma capture shim; hide it on non-Windows
-  // (empty platform = ping not yet resolved, keep hidden to avoid a flash).
   const isWindows = platform === 'windows';
-  const effectiveMode: LightingMode = (mode === 'gamesync' && !isWindows) ? 'none' : mode;
+  const gameSyncNoticeHint = useOnboardingHint(GAME_SYNC_NOTICE_HINT_ID, isWindows && gameSyncRemovedNotice);
   const { settings: uiSettings, update: updateUiSettings } = useUiSettings();
   const simpleDashboard = uiSettings.lightingDashboardMode === 'simple';
   // Off / simple / advanced live behind the first tab (see modeTabs). The
@@ -390,7 +393,18 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
 
   // Pinned devices, keyed by device id. The service owns them; this is its
   // copy plus the optimistic edits made here, re-read on every lighting frame.
-  const { pins, refresh: refreshPins, applyPins, recordPins } = usePins();
+  const { pins, loaded: pinsLoaded, refresh: refreshPins, applyPins: writePins, recordPins } = usePins();
+  // First-pin coachmark: the devices a pin the user made this session went to.
+  // Pins restored from the service or set elsewhere never reach it.
+  const pinHint = useOnboardingHint(LIGHTING_PIN_HINT_ID);
+  const [pinHintIds, setPinHintIds] = useState<ReadonlySet<string> | null>(null);
+  // The card the bubble points at, reported by the rail; its pin names the title.
+  const [pinHintTargetId, setPinHintTargetId] = useState<string | null>(null);
+  const applyPins = useCallback(async (ids: readonly string[], pin: Pin | null, record?: boolean): Promise<boolean> => {
+    const ok = await writePins(ids, pin, record);
+    if (ok && pin && ids.length > 0) setPinHintIds(prev => prev ?? new Set(ids));
+    return ok;
+  }, [writePins]);
   // Collapsing the effect dock hands its space to the canvas and the browser.
   // The preset toolbar keeps its width either way - it lives in row 1, which
   // sizes itself.
@@ -887,45 +901,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
   }, [musicReactive]);
 
-  const [gameSyncState, setGameSyncState] = useState<{
-    devices: GameSyncDevice[];
-    lastFrameAt: number | null;
-    activeApp: string | null;
-    isReceiving: boolean;
-    vendorConflict: boolean;
-  }>({ devices: [], lastFrameAt: null, activeApp: null, isReceiving: false, vendorConflict: false });
-
-  useEffect(() => {
-    if (effectiveMode !== 'gamesync' || !serviceOnline) return;
-    let cancelled = false;
-    const poll = async () => {
-      const data = await fetchGameSyncState().catch(() => null);
-      if (cancelled || !data) return;
-      const lastFrameAt = data.lastFrameAt ?? null;
-      setGameSyncState({
-        devices: data.devices ?? [],
-        lastFrameAt,
-        activeApp: data.activeApp ?? null,
-        isReceiving: lastFrameAt != null && (Date.now() - lastFrameAt) < 2000,
-        vendorConflict: data.synapseConflict === true,
-      });
-    };
-    void poll();
-    const id = window.setInterval(() => { void poll(); }, 1500);
-    return () => { cancelled = true; window.clearInterval(id); };
-  }, [effectiveMode, serviceOnline]);
-
-  const [gameSyncGames, setGameSyncGames] = useState<GameSyncGame[]>([]);
-
-  useEffect(() => {
-    if (effectiveMode !== 'gamesync' || !serviceOnline) return;
-    let cancelled = false;
-    fetchGameSyncGames().then(data => {
-      if (!cancelled && data) setGameSyncGames(data.games ?? []);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [effectiveMode, serviceOnline]);
-
   // The Marketplace's "Open in Lighting" effect, taken on mount so it never fires on a later visit.
   // Kept when StrictMode's second mount finds nothing left to take.
   const openIntentRef = useRef<string | null>(null);
@@ -1044,22 +1019,22 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The tab a press opened for a selection, null for the global mode's tab. Selecting and
   // deselecting cards never moves it.
   const [selectionTab, setSelectionTab] = useState<LightingMode | null>(null);
-  const [tabBaseMode, setTabBaseMode] = useState(effectiveMode);
-  if (tabBaseMode !== effectiveMode) {
+  const [tabBaseMode, setTabBaseMode] = useState(mode);
+  if (tabBaseMode !== mode) {
     // A global mode change from anywhere (a press, Off, simple mode, another client) reopens the global tab.
-    setTabBaseMode(effectiveMode);
+    setTabBaseMode(mode);
     setSelectionTab(null);
   }
-  const viewMode: LightingMode = selectionTab ?? effectiveMode;
+  const viewMode: LightingMode = selectionTab ?? mode;
   // Nothing selected on a tab other than the running mode: its picks reach no card until a
   // selection gives them one (or a press of the tab starts the mode), so they flash the scope chip.
-  const detachedTab = selectedDeviceIds.size === 0 && viewMode !== effectiveMode;
+  const detachedTab = selectedDeviceIds.size === 0 && viewMode !== mode;
   const [scopeFlash, setScopeFlash] = useState(0);
   const flashScope = useCallback(() => setScopeFlash(n => n + 1), []);
   const cardMode = useCallback((id: string): LightingMode => {
     const p = pins[id];
-    return p ? pinMode(p.kind) : effectiveMode;
-  }, [pins, effectiveMode]);
+    return p ? pinMode(p.kind) : mode;
+  }, [pins, mode]);
   const scoped: ScopedTarget = useMemo(() => {
     // A detached tab reaches outside the running mode just as a selection can.
     if (selectionIds.length === 0) return detachedTab ? { kind: 'mixed' } : { kind: 'none' };
@@ -1676,11 +1651,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const sawScanRef = useRef(false);
   useEffect(() => {
     if (!synced) return;
-    const off = effectiveMode === 'none';
+    const off = mode === 'none';
     if (wasOffRef.current === null) { wasOffRef.current = off; return; }
     if (off) { wasOffRef.current = true; sawScanRef.current = false; setLeftOff(false); return; }
     if (wasOffRef.current) { wasOffRef.current = false; sawScanRef.current = false; setLeftOff(true); }
-  }, [effectiveMode, synced]);
+  }, [mode, synced]);
   useEffect(() => {
     if (!leftOff) return undefined;
     if (rgb.scanning) { sawScanRef.current = true; return undefined; }
@@ -1692,7 +1667,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const timer = setTimeout(() => setLeftOff(false), DISCOVERY_GRACE_MS);
     return () => clearTimeout(timer);
   }, [leftOff, rgb.scanning]);
-  const discovery: DiscoveryState | undefined = effectiveMode === 'none'
+  const discovery: DiscoveryState | undefined = mode === 'none'
     ? 'off'
     : (leftOff ? 'detecting' : undefined);
 
@@ -2041,9 +2016,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           }
           break;
         }
-        case 'gamesync':
-          await startGameSync();
-          break;
         case 'none': await stopLighting(); break;
       }
       if (m !== 'animate') {
@@ -2063,9 +2035,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Simple mode has no device rail, so a color is the exact global flat color.
   // Static has to own the output first.
   const handleSimplePaletteSelect = useCallback(async (color: PaletteColor) => {
-    if (effectiveMode !== 'static') await handleModeChange('static');
+    if (mode !== 'static') await handleModeChange('static');
     setGlobalColor(color.hex, startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, color.hex));
-  }, [effectiveMode, handleModeChange, setGlobalColor]);
+  }, [mode, handleModeChange, setGlobalColor]);
 
   // Simple mode has no per-device toggle, so a device left un-driven or dark on
   // the advanced page would sit black here with nothing on the page saying why.
@@ -2133,7 +2105,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   }, [claimAllDevices, paused, setMode, setPausedState, setRawSync, simpleReversed, unpinAll]);
 
   // The running sweep, which is also what marks a tile.
-  const simpleAnimation = synced && effectiveMode === 'animate' && isSimpleAnimation(rawSync)
+  const simpleAnimation = synced && mode === 'animate' && isSimpleAnimation(rawSync)
     ? rawSync
     : null;
 
@@ -2165,13 +2137,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The swatch simple mode marks active: the exact global color, when it is
   // one of the palette's.
   const simplePaletteId = useMemo(() => {
-    if (effectiveMode !== 'static' || !globalColor) return null;
+    if (mode !== 'static' || !globalColor) return null;
     return PALETTE.find(c => c.hex.toLowerCase() === globalColor.toLowerCase())?.id ?? null;
-  }, [effectiveMode, globalColor]);
+  }, [mode, globalColor]);
 
   // The simple page can only show Off or one palette swatch; anything else
   // leaves nothing marked active. `synced` gates it: an unsynced mode is a guess.
-  const simpleCustomActive = synced && effectiveMode !== 'none' && !simpleAnimation
+  const simpleCustomActive = synced && mode !== 'none' && !simpleAnimation
     && selectableIds.length > 0 && simplePaletteId === null;
 
   // A press or pick pulses the cards it changed; a new seq replays it.
@@ -2180,12 +2152,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const pulsePick = () => pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds));
   // Pause/freeze applies to the three modes that drive a continuous output
   // (animate shader, media playback, screen mirror) - Off has nothing to
-  // freeze and Game Sync is driven by the foreground game, not us.
+  // freeze.
   // Off is not a tab any more: it shares the first tab with the simple /
   // advanced swap, which the tab opens as a menu instead of switching mode.
   const modeMenu = usePageModeMenu({
     mode: simpleDashboard ? 'simple' : 'advanced',
-    off: synced && effectiveMode === 'none',
+    off: synced && mode === 'none',
     offIcon: LIGHTING_MODE_ICONS.none,
     offLabel: t('lighting.mode.off'),
     offDescription: t('lighting.modeMenu.offDesc'),
@@ -2195,7 +2167,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // first - the same claim the palette runs, so the page's counts agree.
     onOff: () => {
       // Already off: asking again would re-run the claim and re-issue the stop.
-      if (synced && effectiveMode === 'none') return;
+      if (synced && mode === 'none') return;
       pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds, true));
       if (simpleDashboard) claimAllDevices();
       void handleModeChange('none');
@@ -2212,10 +2184,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   };
   const modeTabs = [modeMenuTab, ...MODES
     .filter(m => m.key !== 'none')
-    .filter(m => m.key !== 'gamesync' || isWindows)
     .map(m => {
       const Icon = LIGHTING_MODE_ICONS[m.key];
-      const showPauseToggle = synced && m.key === effectiveMode
+      const showPauseToggle = synced && m.key === mode
         && (m.key === 'animate' || m.key === 'gif' || m.key === 'screen');
       return {
         key: m.key,
@@ -2247,25 +2218,38 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           </HoverTooltip>
         ) : undefined,
       };
-    })];
+    }),
+    // Removal notice for upgraders: delete with its hint id, locale keys and tests after the next production release.
+    ...(isWindows && gameSyncRemovedNotice && gameSyncNoticeHint.dismissed === false ? [{
+      key: GAME_SYNC_REMOVED_TAB_KEY,
+      label: t('lighting.mode.gamesync'),
+      icon: <Gamepad2 size={14} />,
+      disabled: true,
+      trailing: (
+        <InfoTooltip
+          message={t('lighting.gameSync.removedNotice')}
+          action={{ label: t('lighting.gameSync.removeTab'), onClick: gameSyncNoticeHint.dismiss }}
+        />
+      ),
+    }] : [])];
   // The strip marks the mode tab while lighting is off - it is the tab Off now
   // lives on. Every other mode still marks its own tab.
   const activeTabKey = !synced ? undefined
     : (viewMode === 'none' ? MODE_MENU_TAB_KEY : viewMode);
   const globalTabKey = !synced ? undefined
-    : (effectiveMode === 'none' ? MODE_MENU_TAB_KEY : effectiveMode);
+    : (mode === 'none' ? MODE_MENU_TAB_KEY : mode);
   // What a tab press gives the selected cards: that mode's global look, or the
-  // one shared Mirror or Media. Game Sync and Off cannot be pinned, so they
-  // always change everything.
+  // one shared Mirror or Media. Off cannot be pinned, so it
+  // always changes everything.
   const tabPinFor = (m: LightingMode): Pin | null => {
     switch (m) {
       case 'static': {
         if (globalColor) return colorPin(globalColor);
-        const key = effectiveMode === 'static' && isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
+        const key = mode === 'static' && isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
         return staticLookPin(key, slotOf(key), stateOf(key, slotOf(key)));
       }
       case 'animate':
-        return animatePin((effectiveMode === 'animate' ? (simpleAnimation ?? activeEffect) : '') || animateEffectRef.current);
+        return animatePin((mode === 'animate' ? (simpleAnimation ?? activeEffect) : '') || animateEffectRef.current);
       case 'screen': return MIRROR_PIN;
       case 'gif': return MEDIA_PIN;
       default: return null;
@@ -2288,13 +2272,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The cards a press on `key` changes, outlined on hover and pulsed on press: with a selection
   // and a pinnable mode, the cards it pins; otherwise the global reach.
   const tabPressReach = useCallback((key: string): Set<string> | undefined => {
+    if (key === GAME_SYNC_REMOVED_TAB_KEY) return undefined;
     if (selectedDeviceIds.size > 0 && PINNABLE_MODES.has(key)) {
       const ids = tabPressPins(pins, selectedDeviceIds, key);
       return ids.length ? pressReach(visibleDevices, pins, new Set(ids)) : undefined;
     }
     // With nothing selected a press changes the running mode, which a detached open tab is not.
     if (tabPressChangesNothing(key, detachedTab ? globalTabKey : activeTabKey, selectedDeviceIds.size, false)) return undefined;
-    return pressReach(visibleDevices, pins, selectedDeviceIds, key === 'gamesync');
+    return pressReach(visibleDevices, pins, selectedDeviceIds);
   }, [activeTabKey, globalTabKey, detachedTab, pins, selectedDeviceIds, visibleDevices]);
   // A tab press either opens the mode menu or applies a mode: to the selected
   // cards when there are any, else to every unpinned one. A mode switch also
@@ -2320,10 +2305,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   };
 
   const shaderMode = viewMode === 'animate' || viewMode === 'static';
-  // The cards a hovered press or pick reaches, outlined. Off and Game Sync have no picks.
+  // The cards a hovered press or pick reaches, outlined. Off has no picks.
   const pickTargetIds = useMemo(() => {
     if (scopeHovered || pickHovered) {
-      return viewMode === 'none' || viewMode === 'gamesync' || detachedTab ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
+      return viewMode === 'none' || detachedTab ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
     }
     if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
     return tabPressReach(hoveredTab);
@@ -2380,8 +2365,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const mixedSelection = scoped.kind === 'mixed' && viewMode !== 'screen' && viewMode !== 'gif';
   const allSelected = selectAllIds.length > 0 && selectAllIds.every(id => selectedDeviceIds.has(id));
   // The canvas previews the shared effect canvas, which Static does not sample
-  // and Off has nothing to show on. Game Sync substitutes its own activity block.
-  const showCanvas = viewMode !== 'static' && viewMode !== 'none' && viewMode !== 'gamesync';
+  // and Off has nothing to show on.
+  const showCanvas = viewMode !== 'static' && viewMode !== 'none';
   // The device list is the canvas filter: the canvas draws exactly what the
   // list has selected. Which of those frames is focused is the canvas's own
   // state (`canvasFocusIds`), so a canvas click never removes a frame.
@@ -2434,15 +2419,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
 
   // What a press on a following card's pin pins it to: the current global
   // source. Static pins the global color or static look, Animate the running
-  // shader, Mirror and Media the one shared source. Game Sync and Off cannot
-  // be pinned to.
+  // shader, Mirror and Media the one shared source. Off cannot be
+  // pinned to.
   const effectLabel = useCallback((key: string) => {
     const def = EFFECTS.find(e => e.key === key);
     return def ? t(def.labelKey) : key;
   }, [t]);
   const globalPin: { pin: Pin; name: string } | null = useMemo(() => {
     if (!synced) return null;
-    if (effectiveMode === 'static') {
+    if (mode === 'static') {
       // A pick with nothing selected sets the global color and leaves the
       // pattern alone, so the color is what following cards wear.
       if (globalColor) {
@@ -2451,20 +2436,45 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       }
       return activeEffect ? { pin: staticLookPin(activeEffect, slotOf(activeEffect), stateOf(activeEffect, slotOf(activeEffect))), name: effectLabel(activeEffect) } : null;
     }
-    if (effectiveMode === 'animate') {
+    if (mode === 'animate') {
       const key = simpleAnimation ?? activeEffect;
       return key ? { pin: animatePin(key), name: simpleAnimation ? t(simpleAnimationLabelKey(simpleAnimation)) : effectLabel(key) } : null;
     }
-    if (effectiveMode === 'screen') return { pin: MIRROR_PIN, name: t('lighting.mode.screen') };
-    if (effectiveMode === 'gif') return { pin: MEDIA_PIN, name: t('lighting.mode.gif') };
+    if (mode === 'screen') return { pin: MIRROR_PIN, name: t('lighting.mode.screen') };
+    if (mode === 'gif') return { pin: MEDIA_PIN, name: t('lighting.mode.gif') };
     return null;
-  }, [activeEffect, effectLabel, effectiveMode, globalColor, simpleAnimation, slotOf, stateOf, synced, t]);
+  }, [activeEffect, effectLabel, mode, globalColor, simpleAnimation, slotOf, stateOf, synced, t]);
   const pinDisabledReason = globalPin ? undefined : t(
-    effectiveMode === 'gamesync' ? 'lighting.pin.disabledGameSync'
-        : effectiveMode === 'none' ? 'lighting.pin.disabledOff'
-          : 'lighting.pin.disabledUnavailable',
+    mode === 'none' ? 'lighting.pin.disabledOff'
+      : 'lighting.pin.disabledUnavailable',
   );
   const pinTargetName = useCallback((pin: Pin): string => pinModeTargetLabel(pin, t), [t]);
+  const { dismissed: pinHintDismissed, dismiss: dismissPinHint } = pinHint;
+  // Pins already there when the page first loads them mean the user knows
+  // pins, or has seen the hint on another client.
+  const pinsCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!pinsLoaded || pinHintDismissed === null || pinsCheckedRef.current) return;
+    pinsCheckedRef.current = true;
+    if (pinHintDismissed === false && !pinHintIds && Object.keys(pins).length > 0) dismissPinHint();
+  }, [pinsLoaded, pinHintDismissed, pinHintIds, pins, dismissPinHint]);
+  // Unpinned by any path, the hint has nothing left to point at.
+  useEffect(() => {
+    if (pinHintDismissed === false && pinHintIds && ![...pinHintIds].some(id => pins[id])) dismissPinHint();
+  }, [pinHintDismissed, pinHintIds, pins, dismissPinHint]);
+  const hintPin = pinHintTargetId ? pins[pinHintTargetId] : undefined;
+  const pinHintName = hintPin ? pinTargetName(hintPin) : '';
+  const pinHintActive = !simpleDashboard && pinHintDismissed === false && pinHintIds !== null && !modeMenuOpen;
+  // The bubble waits for the rail to name its target, so it never announces a blank title.
+  const showPinHint = pinHintActive && pinHintName !== '';
+  // The bubble may not cover the tab row, so it stays inside the content below it.
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const topRowRef = useRef<HTMLDivElement | null>(null);
+  const contentBelowTabs = useCallback(() => {
+    const body = bodyRef.current?.getBoundingClientRect();
+    const tabs = topRowRef.current?.getBoundingClientRect();
+    return body && tabs ? new DOMRect(body.left, tabs.bottom, body.width, body.bottom - tabs.bottom) : null;
+  }, []);
   const handleSetPin = useCallback((ids: string[], pinned: boolean) => {
     if (!pinned) { void applyPins(ids, null); return; }
     if (globalPin) void applyPins(ids, globalPin.pin);
@@ -2484,13 +2494,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     for (const d of visibleDevices) {
       if (!engineReaches(d)) continue;
       const pin = pins[d.id];
-      if (pin ? pin.kind === kind : effectiveMode === viewMode) reach.add(d.id);
+      if (pin ? pin.kind === kind : mode === viewMode) reach.add(d.id);
     }
     pulseCards(reach);
     handleSelectionPick?.();
-  }, [viewMode, visibleDevices, pins, selectedDeviceIds, effectiveMode, pulseCards, handleSelectionPick]);
+  }, [viewMode, visibleDevices, pins, selectedDeviceIds, mode, pulseCards, handleSelectionPick]);
 
-  const simpleOff = synced && effectiveMode === 'none';
+  const simpleOff = synced && mode === 'none';
   // The mode tab leads the strip in both dashboard modes; simple mode carries
   // nothing after it, so its header is the mode tab alone.
   const simpleTabs = [modeMenuTab];
@@ -2596,8 +2606,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           always-mounted effect dock. Both side columns span the tab row so they
           rise to the very top of the page. Capped at --page-max (pageBody) so
           the page matches every other view's width. */}
-      <div className={`${styles.body} ${dockCollapsed ? styles.bodyDockCollapsed : ''} pageBody`}>
-        <div className={styles.topRow}>
+      <div ref={bodyRef} className={`${styles.body} ${dockCollapsed ? styles.bodyDockCollapsed : ''} pageBody`}>
+        <div ref={topRowRef} className={styles.topRow}>
           <div className={`${styles.tabsCell} ${styles.tabsAnchor}`} ref={modeMenuAnchorRef}>
             <ViewHeader
               title={t('lighting.title')}
@@ -2752,6 +2762,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             pinDisabledReason={pinDisabledReason}
             pinTargetName={pinTargetName}
             onSetPin={handleSetPin}
+            pinHintIds={pinHintActive ? pinHintIds : undefined}
+            onPinHintPress={dismissPinHint}
+            onPinHintTarget={setPinHintTargetId}
             pickTargetIds={pickTargetIds}
             pulse={pulse}
             selectedIds={selectedDeviceIds}
@@ -2760,7 +2773,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             onSetPower={handleSetPower}
             onToggleControlled={handleToggleControlled}
             onSetControlled={handleSetControlled}
-            lightingOff={effectiveMode === 'none'}
+            lightingOff={mode === 'none'}
             onOpenSettings={handleOpenSettings}
             onOpenColorTuning={handleOpenColorTuning}
             colorTunedIds={colorTunedIds}
@@ -2792,180 +2805,162 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           onPointerOver={e => { if (e.pointerType === 'mouse') setPickHovered(!!(e.target as Element).closest('[data-pick]')); }}
           onPointerLeave={e => { if (e.pointerType === 'mouse') setPickHovered(false); }}
         >
-          {viewMode === 'gamesync' ? (
-            <>
-              <div className={styles.canvasArea}>
-                <GameSyncActivityBlock
-                  isReceiving={gameSyncState.isReceiving}
-                  activeApp={gameSyncState.activeApp}
-                  vendorConflict={gameSyncState.vendorConflict}
-                  games={gameSyncGames}
+          {viewMode === 'static' && (
+          <div className={styles.canvasArea}>
+            <StaticPickerCanvas
+              devices={pickerDevices}
+              implied={selectedDeviceIds.size === 0}
+              hex={scopedHex}
+              segmented={pickerSegmented}
+              patternEffect={staticPattern?.key ?? null}
+              patternSlot={staticPattern?.slot ?? 0}
+              patternVersion={staticPattern ? versionForSlot(staticPattern.key, staticPattern.slot) : '0'}
+              gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
+              onPreview={handleCustomPreview}
+              onCommit={hex => { pulsePick(); handleCustomSelect(hex); }}
+            />
+          </div>
+          )}
+          {showCanvas && (
+          <div className={styles.canvasArea}>
+            {scene3d ? (
+              <Suspense fallback={<div className={styles.scenePlaceholder} />}>
+                <LightingScene3D
+                  api={sceneApi}
+                  devices={visibleDevices}
+                  selectedDeviceId={primaryDeviceId}
+                  onSelectDevice={handleFocusDevice}
+                  shaderEffect={shaderMode ? previewEffect : null}
+                  shaderState={shaderMode ? previewShaderState : null}
+                  shaderPaused={paused}
+                  audioRef={audioRef}
+                  editorOpen={sceneEditorOpen}
+                  onEditorOpenChange={setSceneEditorOpen}
+                  onIdentify={id => { identifyLightingDevice(id).catch(() => { /* silent */ }); }}
+                  onLayoutCommit={handleLayoutCommit}
                 />
-              </div>
-              <div className={styles.controls}>
-                <GameSyncLeftPane />
-              </div>
-            </>
-          ) : (
-            <>
-              {viewMode === 'static' && (
-              <div className={styles.canvasArea}>
-                <StaticPickerCanvas
-                  devices={pickerDevices}
-                  implied={selectedDeviceIds.size === 0}
-                  hex={scopedHex}
-                  segmented={pickerSegmented}
-                  patternEffect={staticPattern?.key ?? null}
-                  patternSlot={staticPattern?.slot ?? 0}
-                  patternVersion={staticPattern ? versionForSlot(staticPattern.key, staticPattern.slot) : '0'}
-                  gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
-                  onPreview={handleCustomPreview}
-                  onCommit={hex => { pulsePick(); handleCustomSelect(hex); }}
-                />
-              </div>
-              )}
-              {showCanvas && (
-              <div className={styles.canvasArea}>
-                {scene3d ? (
-                  <Suspense fallback={<div className={styles.scenePlaceholder} />}>
-                    <LightingScene3D
-                      api={sceneApi}
-                      devices={visibleDevices}
-                      selectedDeviceId={primaryDeviceId}
-                      onSelectDevice={handleFocusDevice}
-                      shaderEffect={shaderMode ? previewEffect : null}
-                      shaderState={shaderMode ? previewShaderState : null}
-                      shaderPaused={paused}
-                      audioRef={audioRef}
-                      editorOpen={sceneEditorOpen}
-                      onEditorOpenChange={setSceneEditorOpen}
-                      onIdentify={id => { identifyLightingDevice(id).catch(() => { /* silent */ }); }}
-                      onLayoutCommit={handleLayoutCommit}
-                    />
-                  </Suspense>
-                ) : (
-                  <DeviceCanvas backdrop={viewMode === 'gif' && effectiveMode !== 'gif' ? <MediaBackdrop /> : viewMode === 'screen' && effectiveMode !== 'screen' ? <MirrorBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} foreignFrames={foreignFrames} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
-                )}
-                {viewMode === 'gif' && <MediaCanvasNotice />}
-                {shaderMode && dockEffect && dockState && !mixedSelection && (
-                  <>
-                    {(EFFECTS.find(e => e.key === dockEffect)?.audio || dockCustom?.audio) && (
-                      <div className={styles.musicReactive}>
-                        <HoverTooltip body={t('lighting.musicReactive')} side="left">
-                          <button
-                            type="button"
-                            className={`${styles.musicReactiveBtn} ${musicReactive ? styles.musicReactiveBtnOn : ''}`}
-                            onClick={handleMusicReactiveToggle}
-                            aria-label={t('lighting.musicReactive')}
-                          >
-                            <Music size={14} strokeWidth={1.5} />
-                          </button>
-                        </HoverTooltip>
-                        {showAudioOutput && (
-                          <Select
-                            className={styles.musicReactiveOutput}
-                            value={audioOutput.value}
-                            options={audioOutput.options}
-                            onChange={audioOutput.select}
-                            ariaLabel={t('lighting.audioOutput.label')}
-                            height={26}
-                          />
-                        )}
-                      </div>
-                    )}
-                    <HoverTooltip body={t('lighting.fullscreen')} side="left">
-                      <button type="button" className={styles.fullscreenBtn} onClick={() => setFullscreenOpen(true)} aria-label={t('lighting.fullscreen')}>
-                        <Maximize2 size={14} strokeWidth={1.5} />
+              </Suspense>
+            ) : (
+              <DeviceCanvas backdrop={viewMode === 'gif' && mode !== 'gif' ? <MediaBackdrop /> : viewMode === 'screen' && mode !== 'screen' ? <MirrorBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} foreignFrames={foreignFrames} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
+            )}
+            {viewMode === 'gif' && <MediaCanvasNotice />}
+            {shaderMode && dockEffect && dockState && !mixedSelection && (
+              <>
+                {(EFFECTS.find(e => e.key === dockEffect)?.audio || dockCustom?.audio) && (
+                  <div className={styles.musicReactive}>
+                    <HoverTooltip body={t('lighting.musicReactive')} side="left">
+                      <button
+                        type="button"
+                        className={`${styles.musicReactiveBtn} ${musicReactive ? styles.musicReactiveBtnOn : ''}`}
+                        onClick={handleMusicReactiveToggle}
+                        aria-label={t('lighting.musicReactive')}
+                      >
+                        <Music size={14} strokeWidth={1.5} />
                       </button>
                     </HoverTooltip>
-                  </>
-                )}
-              </div>
-              )}
-              {/* Off renders no picker at all; Static and Animation each own an
-                  effect pool; Screen and Media get their source controls. */}
-              {(viewMode === 'animate' || viewMode === 'static') ? (
-                <>
-                <div className={styles.effectToolbar}>
-                  <SearchInput
-                    className={styles.effectSearch}
-                    value={effectQuery}
-                    onChange={setEffectQuery}
-                    placeholder={t('lighting.effects.search')}
-                    ariaLabel={t('lighting.effects.search')}
-                  />
-                  {viewMode === 'animate' && (
-                    <Button size="sm" icon={<SprayCan size={14} />} onClick={() => setStudioTarget({ id: activeCustom?.id ?? null })}>
-                      {t('lighting.studio.title')}
-                    </Button>
-                  )}
-                </div>
-                <div className={styles.browserWrap}>
-                <AnimateGrid
-                  effect={gridEffect}
-                  onSelect={handleEffectPick}
-                  effects={viewMode === 'static' ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
-                  query={effectQuery}
-                  frozen={viewMode === 'static'}
-                  slotFor={gridSlotFor}
-                  versionFor={gridVersionFor}
-                  panelEffects={panelUsage.effects}
-                  pinnedDevices={pinnedDevices}
-                  gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
-                  leadingMatches={savedMatch}
-                  leading={viewMode === 'animate' ? (
-                    <Suspense fallback={null}>
-                      <SavedEffectSections
-                        effect={gridEffect}
-                        query={effectQuery}
-                        username={accountUsername}
-                        gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
-                        onSelect={handleEffectPick}
+                    {showAudioOutput && (
+                      <Select
+                        className={styles.musicReactiveOutput}
+                        value={audioOutput.value}
+                        options={audioOutput.options}
+                        onChange={audioOutput.select}
+                        ariaLabel={t('lighting.audioOutput.label')}
+                        height={26}
                       />
-                    </Suspense>
-                  ) : viewMode === 'static' ? (
-                    <CollapsibleSection
-                      compact
-                      title={t('lighting.static.pickerGroup')}
-                      open={paletteOpen}
-                      onToggle={() => setPaletteOpen(o => !o)}
-                    >
-                      <div data-pick className={styles.animateGridSection}>
-                        <EffectCard
-                          overlay
-                          label={t('lighting.static.pickerSegmented')}
-                          thumbUrl={PICKER_SEGMENTED_SVG}
-                          active={colorScoped && pickerSegmented}
-                          onClick={() => { pulsePick(); handlePickerSelect(true); }}
-                        />
-                        <EffectCard
-                          overlay
-                          label={t('lighting.static.picker')}
-                          thumbUrl={PICKER_FIELD_SVG}
-                          active={colorScoped && !pickerSegmented}
-                          onClick={() => { pulsePick(); handlePickerSelect(false); }}
-                        />
-                      </div>
-                    </CollapsibleSection>
-                  ) : undefined}
-                />
-                </div>
-                </>
-              ) : viewMode === 'none' ? (
-                <EmptyState icon={<Lightbulb />} title={t('lighting.pane.offHint')} />
-              ) : (
-                <div className={`${styles.controls} ${viewMode === 'gif' ? styles.controlsFill : ''}`}>
-                  <ModeControls
-                    mode={viewMode}
-                    screenPP={screenPP}
-                    onScreenPPChange={setScreenPP}
-                    keepMode={viewMode !== effectiveMode}
-                    onSelectionPick={handleSharedPick}
-                    onBlockedPick={detachedTab ? flashScope : undefined}
-                  />
-                </div>
+                    )}
+                  </div>
+                )}
+                <HoverTooltip body={t('lighting.fullscreen')} side="left">
+                  <button type="button" className={styles.fullscreenBtn} onClick={() => setFullscreenOpen(true)} aria-label={t('lighting.fullscreen')}>
+                    <Maximize2 size={14} strokeWidth={1.5} />
+                  </button>
+                </HoverTooltip>
+              </>
+            )}
+          </div>
+          )}
+          {/* Off renders no picker at all; Static and Animation each own an
+              effect pool; Screen and Media get their source controls. */}
+          {(viewMode === 'animate' || viewMode === 'static') ? (
+            <>
+            <div className={styles.effectToolbar}>
+              <SearchInput
+                className={styles.effectSearch}
+                value={effectQuery}
+                onChange={setEffectQuery}
+                placeholder={t('lighting.effects.search')}
+                ariaLabel={t('lighting.effects.search')}
+              />
+              {viewMode === 'animate' && (
+                <Button size="sm" icon={<SprayCan size={14} />} onClick={() => setStudioTarget({ id: activeCustom?.id ?? null })}>
+                  {t('lighting.studio.title')}
+                </Button>
               )}
+            </div>
+            <div className={styles.browserWrap}>
+            <AnimateGrid
+              effect={gridEffect}
+              onSelect={handleEffectPick}
+              effects={viewMode === 'static' ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
+              query={effectQuery}
+              frozen={viewMode === 'static'}
+              slotFor={gridSlotFor}
+              versionFor={gridVersionFor}
+              panelEffects={panelUsage.effects}
+              pinnedDevices={pinnedDevices}
+              gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
+              leadingMatches={savedMatch}
+              leading={viewMode === 'animate' ? (
+                <Suspense fallback={null}>
+                  <SavedEffectSections
+                    effect={gridEffect}
+                    query={effectQuery}
+                    username={accountUsername}
+                    gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
+                    onSelect={handleEffectPick}
+                  />
+                </Suspense>
+              ) : viewMode === 'static' ? (
+                <CollapsibleSection
+                  compact
+                  title={t('lighting.static.pickerGroup')}
+                  open={paletteOpen}
+                  onToggle={() => setPaletteOpen(o => !o)}
+                >
+                  <div data-pick className={styles.animateGridSection}>
+                    <EffectCard
+                      overlay
+                      label={t('lighting.static.pickerSegmented')}
+                      thumbUrl={PICKER_SEGMENTED_SVG}
+                      active={colorScoped && pickerSegmented}
+                      onClick={() => { pulsePick(); handlePickerSelect(true); }}
+                    />
+                    <EffectCard
+                      overlay
+                      label={t('lighting.static.picker')}
+                      thumbUrl={PICKER_FIELD_SVG}
+                      active={colorScoped && !pickerSegmented}
+                      onClick={() => { pulsePick(); handlePickerSelect(false); }}
+                    />
+                  </div>
+                </CollapsibleSection>
+              ) : undefined}
+            />
+            </div>
             </>
+          ) : viewMode === 'none' ? (
+            <EmptyState icon={<Lightbulb />} title={t('lighting.pane.offHint')} />
+          ) : (
+            <div className={`${styles.controls} ${viewMode === 'gif' ? styles.controlsFill : ''}`}>
+              <ModeControls
+                mode={viewMode}
+                screenPP={screenPP}
+                onScreenPPChange={setScreenPP}
+                keepMode={viewMode !== mode}
+                onSelectionPick={handleSharedPick}
+                onBlockedPick={detachedTab ? flashScope : undefined}
+              />
+            </div>
           )}
         </div>
         {!dockCollapsed && (
@@ -3060,6 +3055,17 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           onNavigateToDevicePage={deviceKey => onSectionNavigate?.('device', { deviceKey })}
         />
       )}
+      {showPinHint && (
+        <Coachmark
+          hintId={LIGHTING_PIN_HINT_ID}
+          target={PIN_HINT_SELECTOR}
+          boundary={contentBelowTabs}
+          title={t('lighting.pin.pinnedTo', { name: pinHintName })}
+          body={t('lighting.pin.hintBody')}
+          dismissLabel={t('onboarding.hint.dismiss')}
+          onDismiss={dismissPinHint}
+        />
+      )}
       {colorTuningIds && (
         <ColorTuningModal
           devices={tunableDevices}
@@ -3106,79 +3112,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           onClose={() => setPresetAppsTarget(null)}
         />
       )}
-    </div>
-  );
-}
-
-interface GameSyncActivityBlockProps {
-  isReceiving: boolean;
-  activeApp: string | null;
-  vendorConflict: boolean;
-  games: GameSyncGame[];
-}
-
-function GameSyncActivityBlock({ isReceiving, activeApp, vendorConflict, games }: GameSyncActivityBlockProps) {
-  const { t } = useTranslation();
-  const [imgFailed, setImgFailed] = useState(false);
-
-  const matchedGame = isReceiving && activeApp
-    ? resolveActiveGame(activeApp, games)
-    : null;
-
-  const headerSrc = matchedGame ? steamArtworkUrl(matchedGame.appId, 'header') : null;
-
-  // Reset failure flag when the URL changes so a new game's art gets a fresh attempt.
-  const prevHeaderSrcRef = useRef(headerSrc);
-  if (prevHeaderSrcRef.current !== headerSrc) {
-    prevHeaderSrcRef.current = headerSrc;
-    if (imgFailed) setImgFailed(false);
-  }
-
-  const showImage = headerSrc !== null && !imgFailed;
-
-  return (
-    <div className={styles.gameSyncActivity}>
-      {showImage ? (
-        <img
-          src={headerSrc}
-          alt=""
-          aria-hidden
-          className={styles.gameSyncActivityArt}
-          onError={() => setImgFailed(true)}
-        />
-      ) : (
-        <Gamepad2
-          size={36}
-          className={`${styles.gameSyncActivityIcon} ${isReceiving ? styles.gameSyncActivityIconActive : ''}`}
-          aria-hidden
-        />
-      )}
-      <span className={`${styles.gameSyncActivityLabel} ${showImage ? styles.gameSyncActivityLabelOverArt : ''}`}>
-        {isReceiving
-          ? (activeApp
-              ? t('lighting.gameSync.signal.receiving', { activeApp })
-              : t('lighting.gameSync.signal.receivingUnknown'))
-          : t('lighting.gameSync.signal.idle')}
-      </span>
-      {/* The service leaves a real vendor SDK (Razer Synapse's, typically) in
-          place rather than replacing it, so games on that interface never reach
-          Nexus. Without this line that reads as an endless "Waiting for a game". */}
-      {!isReceiving && vendorConflict && (
-        <span className={styles.gameSyncActivityNote}>
-          {t('lighting.gameSync.signal.vendorConflict')}
-        </span>
-      )}
-      {/* Anchored to the frame rather than the page: the guide explains what
-          this frame is showing, so it belongs on it. */}
-      <a
-        className={styles.gameSyncGuideLink}
-        href={GAME_SYNC_GUIDE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <ExternalLink size={12} aria-hidden />
-        {t('lighting.gameSync.guideLink')}
-      </a>
     </div>
   );
 }
