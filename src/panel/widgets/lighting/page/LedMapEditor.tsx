@@ -2292,16 +2292,6 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
                   </button>
                 ))}
               </div>
-              {zoneCard?.rateCapSupported && (
-                <>
-                  <div className={styles.separator} />
-                  <RateCapSelect
-                    id={zoneCard.id}
-                    value={zoneCard.maxRateHz ?? null}
-                    onFail={() => push({ title: t('lighting.ledMap.rateCapFailed') })}
-                  />
-                </>
-              )}
               {isSmartLightId(selectedZoneId) && (
                 <>
                   <div className={styles.separator} />
@@ -2821,14 +2811,23 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
                 {t(pluralKey('lighting.ledMap.restoreRemovedCount', language, removedCount), { count: removedCount })}
               </button>
             ) : <span />}
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnPrimary}`}
-              onClick={handleSave}
-              disabled={!dirty || saving || chainBusy}
-            >
-              {t('lighting.ledMap.save')}
-            </button>
+            <div className={styles.saveGroup}>
+              {zoneCard?.rateCapSupported && (
+                <RateCapSelect
+                  id={zoneCard.id}
+                  value={zoneCard.maxRateHz ?? null}
+                  onFail={() => push({ title: t('lighting.ledMap.rateCapFailed') })}
+                />
+              )}
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={handleSave}
+                disabled={!dirty || saving || chainBusy}
+              >
+                {t('lighting.ledMap.save')}
+              </button>
+            </div>
           </div>
           </div>
           </div>

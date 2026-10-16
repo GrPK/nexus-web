@@ -4,12 +4,12 @@ import { useTranslation } from '../../../../lib/i18n';
 import { setLightingMaxRate } from '../../../../api/lighting';
 import styles from './LedMapEditor.module.scss';
 
-export const RATE_CAP_OPTIONS_FPS = [30, 20, 15, 10, 5, 1] as const;
+export const RATE_CAP_OPTIONS_HZ = [30, 20, 15, 10, 5, 1] as const;
 const OFF = '';
 
 interface Props {
   id: string;
-  /** The stored cap in FPS; null = Off. */
+  /** The stored cap in Hz; null = Off. */
   value: number | null;
   onFail: () => void;
 }
@@ -22,8 +22,8 @@ export function RateCapSelect({ id, value, onFail }: Props) {
 
   const options: SelectOption[] = [
     { value: OFF, label: t('lighting.ledMap.rateCapOff') },
-    ...RATE_CAP_OPTIONS_FPS.map(fps => ({
-      value: String(fps), label: t('lighting.ledMap.rateCapFps', { fps }),
+    ...RATE_CAP_OPTIONS_HZ.map(hz => ({
+      value: String(hz), label: t('lighting.ledMap.rateCapHz', { hz }),
     })),
   ];
 
@@ -38,7 +38,7 @@ export function RateCapSelect({ id, value, onFail }: Props) {
 
   return (
     <div className={styles.rateCapField}>
-      <span className={styles.modeBtnsLabel}>{t('lighting.ledMap.rateCap')}</span>
+      <span>{t('lighting.ledMap.rateCap')}</span>
       <Select
         value={current == null ? OFF : String(current)}
         onChange={handleChange}

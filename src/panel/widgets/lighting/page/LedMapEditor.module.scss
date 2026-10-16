@@ -406,10 +406,18 @@
   color: var(--text-dim);
 }
 
+.saveGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+}
+
 .rateCapField {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--space-sm);
+  color: var(--text-dim);
+  font-size: var(--type-small);
 }
 
 .brightnessIcon {
