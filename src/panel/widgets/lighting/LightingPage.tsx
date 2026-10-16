@@ -2285,7 +2285,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const tabPressReach = useCallback((key: string): Set<string> | undefined => {
     if (key === GAME_SYNC_REMOVED_TAB_KEY) return undefined;
     // Off: the press starts the mode for every card, whatever is selected.
-    if (mode === 'none') return pressReach(visibleDevices, pins, new Set());
+    if (mode === 'none' && key !== 'none') return pressReach(visibleDevices, pins, new Set());
     if (selectedDeviceIds.size > 0 && PINNABLE_MODES.has(key)) {
       const ids = tabPressPins(pins, selectedDeviceIds, key);
       return ids.length ? pressReach(visibleDevices, pins, new Set(ids)) : undefined;
@@ -2322,11 +2322,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The cards a hovered press or pick reaches, outlined. Off has no picks.
   const pickTargetIds = useMemo(() => {
     if (scopeHovered || pickHovered) {
+      // Off with a picker open: a pick starts the mode for every card.
+      if (mode === 'none' && viewMode !== 'none') return pressReach(visibleDevices, pins, new Set());
       return viewMode === 'none' || detachedTab ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
     }
     if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
     return tabPressReach(hoveredTab);
-  }, [scopeHovered, pickHovered, viewMode, detachedTab, hoveredTab, tabPressReach, pins, selectedDeviceIds, visibleDevices]);
+  }, [scopeHovered, pickHovered, mode, viewMode, detachedTab, hoveredTab, tabPressReach, pins, selectedDeviceIds, visibleDevices]);
   const pinnedNames = useMemo(() => visibleDevices.filter(d => d.id in pins).map(canvasLabelName), [visibleDevices, pins]);
   // How many cards the next pick changes; with none, the way to reach any is a selection.
   const reachCount = detachedTab ? 0 : pressReach(visibleDevices, pins, selectedDeviceIds).size;

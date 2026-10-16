@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchLightingDevices, fetchPins, fetchStaticSettings, saveAnimateTemplates, setPins, startAnimate, startStatic, type Pin } from '../../../api/lighting';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { ANIMATE_EFFECTS } from '../../../types/lighting';
@@ -217,6 +217,7 @@ const lastPinsCall = () => vi.mocked(setPins).mock.calls.at(-1) as unknown as [s
 
 describe('LightingPage pins', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     localStorage.clear();
     localStorage.setItem('nexus_settings', JSON.stringify({ general: { lightingDashboardMode: 'advanced', coolingDashboardMode: 'advanced' } }));
     syncState.mode = 'animate';
@@ -230,6 +231,13 @@ describe('LightingPage pins', () => {
     vi.mocked(startStatic).mockClear();
     vi.mocked(saveAnimateTemplates).mockClear();
     topicHandlers.lighting.length = 0;
+  });
+
+  // The throttle's trailing timer outlives an unmounted page, so drain it before the next test.
+  afterEach(async () => {
+    cleanup();
+    await act(() => vi.runOnlyPendingTimersAsync());
+    vi.useRealTimers();
   });
 
   describe('the pin button', () => {
@@ -1080,8 +1088,6 @@ describe('LightingPage pins', () => {
       renderPage();
       await waitFor(() => expect(screen.getByTestId('rail')).toBeTruthy());
       fireEvent.click(screen.getByText('select-a'));
-      // Lets mount-time hydration finish so only the press can call startAnimate.
-      await new Promise(r => setTimeout(r, 50));
       vi.mocked(startAnimate).mockClear();
       fireEvent.click(screen.getByText('tab:animate'));
       await waitFor(() => expect(setPins).toHaveBeenCalled());
