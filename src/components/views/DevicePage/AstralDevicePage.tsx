@@ -51,7 +51,7 @@ import {
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import { pluralKey } from '../../../lib/pluralKey';
-import { formatDateTime, hour12OptionFor } from '../../../lib/units';
+import { formatDateTime, hour12OptionFor, type DateFormat } from '../../../lib/units';
 import styles from './LianLiDevicePage.module.scss';
 import own from './AstralDevicePage.module.scss';
 
@@ -178,12 +178,15 @@ function LevelSenseTab() {
   const overLean = Math.abs(lean) > WARN_DEG;
   const over = overSag || overLean;
   const calibrating = busy || gpu.calibrating;
+  // A calibration date always carries its year: the pattern picked in Settings, DD/MM/YYYY
+  // while that is the system one, and the time on the 12h / 24h choice.
+  const datePattern: DateFormat = dateFormat === 'system' ? 'dd/mm/yyyy' : dateFormat;
   const calibratedText = gpu.calibratedAtMs
     ? t('devices.astral.calibrated', {
       when: formatDateTime(
         new Date(gpu.calibratedAtMs),
-        dateFormat,
-        { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: hour12OptionFor(timeFormat) },
+        datePattern,
+        { hour: 'numeric', minute: '2-digit', hour12: hour12OptionFor(timeFormat) },
         { locale: language, variant: 'year' },
       ),
     })

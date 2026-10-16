@@ -92,6 +92,12 @@ describe('AstralDevicePage Level Sense', () => {
     expect(screen.getByRole('img', { name: `${P}endView` })).toBeInTheDocument();
   });
 
+  it('dates the calibration DD/MM/YYYY while the date format is the system one', async () => {
+    render(<AstralDevicePage />);
+
+    expect(await screen.findByText(/^devices\.astral\.calibrated:\{"when":"\d{2}\/\d{2}\/\d{4} /)).toBeInTheDocument();
+  });
+
   it('says unchanged under the noise, with the real number, and that it is not calibrated yet', async () => {
     mockLevel.mockResolvedValue(level({ sag: 0.05, lean: -0.02, calibratedAtMs: null }));
     render(<AstralDevicePage />);
