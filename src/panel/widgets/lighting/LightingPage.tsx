@@ -2064,10 +2064,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Simple mode has no per-device toggle, so a device left un-driven or dark on
   // the advanced page would sit black here with nothing on the page saying why.
   // Claimed when the user asks for something, not on arrival: switching the
-  // view is not a decision about which devices Nexus drives.
-  const claimAllDevices = useCallback((): string[] => {
+  // view is not a decision about which devices Nexus drives. A pick passes
+  // takeControl false: a device the user turned Nexus control off for stays
+  // that way until Control all.
+  const claimAllDevices = useCallback((takeControl = true): string[] => {
     for (const d of devices.filter(d => d.devicePageReason === undefined)) {
-      if (d.controlled === false) handleSetControlled(d.id, true);
+      if (d.controlled === false) {
+        if (!takeControl) continue;
+        handleSetControlled(d.id, true);
+      }
       if (!d.ledsOn) handleSetPower(d.id, true);
     }
     return orderedDevices.filter(zoneCardSelectionHoldable).map(d => d.id);
@@ -2078,6 +2083,20 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const ids = Object.keys(pins);
     if (ids.length > 0) void applyPins(ids, null);
   }, [applyPins, pins]);
+
+  const anyUncontrolled = useMemo(
+    () => devices.some(d => d.devicePageReason === undefined && d.controlled === false),
+    [devices],
+  );
+  const controlAllDevicesButton = anyUncontrolled ? (
+    <Button
+      size="sm"
+      pill
+      onClick={() => { claimAllDevices(); if (simpleDashboard) unpinAll(); }}
+    >
+      {t('lighting.controlAllDevices')}
+    </Button>
+  ) : undefined;
 
   // Counted over the devices the claim can actually reach. A zone with no LEDs
   // cannot be lit, and a device-page card is set on its own page, so including
@@ -2106,7 +2125,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // catalogue key there marks that cell selected and draws its shader on the
   // canvas while the hardware runs this one.
   const handleSimpleAnimationSelect = useCallback(async (key: string) => {
-    claimAllDevices();
+    claimAllDevices(false);
     unpinAll();
     setActiveEffect('');
     // This IS the direction now, so the conform read below must not run for
@@ -2195,7 +2214,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       // Already off: asking again would re-run the claim and re-issue the stop.
       if (synced && mode === 'none') return;
       pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds, true));
-      if (simpleDashboard) claimAllDevices();
+      if (simpleDashboard) claimAllDevices(false);
       void handleModeChange('none');
     },
     onModeChange: setDashboardMode,
@@ -2576,6 +2595,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               tabs={simpleTabs}
               activeTab={activeTabKey}
               onTabChange={handleTabChange}
+              actions={controlAllDevicesButton}
               /* Off states what it did; every other mode carries both counts,
                  so a device the advanced page left un-driven is visible here
                  without a device list. Same line either way. The action runs
@@ -2590,7 +2610,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                       controlled: controlledCount,
                       total: claimableDevices.length,
                     })}
-                  action={!simpleOff && controlledCount < claimableDevices.length ? (
+                  action={!simpleOff && !anyUncontrolled && controlledCount < claimableDevices.length ? (
                     <Button size="sm" pill onClick={() => { claimAllDevices(); unpinAll(); }}>
                       {t('lighting.simple.controlAll')}
                     </Button>
@@ -2604,7 +2624,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             <SectionHeader className={styles.simpleSectionHeader}>{t('lighting.mode.static')}</SectionHeader>
             <StaticPalette
               selectedId={simplePaletteId}
-              onSelect={color => { claimAllDevices(); unpinAll(); void handleSimplePaletteSelect(color); }}
+              onSelect={color => { claimAllDevices(false); unpinAll(); void handleSimplePaletteSelect(color); }}
             />
           </div>
           <div className={styles.simpleSection}>
@@ -2646,6 +2666,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               activeTab={activeTabKey}
               onTabChange={handleTabChange}
               onTabHover={setHoveredTab}
+              actions={controlAllDevicesButton}
               tabActions={(
                 <PresetToolbar
                   rail
