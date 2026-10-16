@@ -244,6 +244,7 @@
 .speakerName {
   font-size: var(--type-mini);
   color: var(--text-dim);
+  white-space: nowrap;
 }
 
 // A speaker playing its test sound lights up in the accent colour.
