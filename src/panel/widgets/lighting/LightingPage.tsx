@@ -1139,6 +1139,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Records as well as writes: the marks and the device cards read the pin, so
   // a drag has to move them with the pointer, not on release.
   const handleCustomPreview = useCallback((hex: string) => {
+    // Off: the commit starts Static globally, so a drag must not pin the selection.
+    if (modeRef.current === 'none') return;
     const ids = [...selectedDeviceIds];
     if (ids.length === 0) return;
     const pin = colorPin(hex);
@@ -2331,8 +2333,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The cards a hovered press or pick reaches, outlined. Off has no picks.
   const pickTargetIds = useMemo(() => {
     if (scopeHovered || pickHovered) {
-      // Off with a picker open: a pick starts the mode for every card.
-      if (mode === 'none' && viewMode !== 'none') return pressReach(visibleDevices, pins, new Set());
+      // Off with an effect or color picker open: a pick starts the mode for every card. Media and Screen keep the engine stopped.
+      if (mode === 'none' && (viewMode === 'animate' || viewMode === 'static')) return pressReach(visibleDevices, pins, new Set());
       return viewMode === 'none' || detachedTab ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
     }
     if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
