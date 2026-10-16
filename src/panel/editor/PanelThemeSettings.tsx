@@ -155,6 +155,9 @@ export interface PanelThemeSettingsProps {
   /** Show the backdrop selector. Kiosk-hosted surfaces (y70 / monitor) only:
    * the wallpaper and see-through modes need a desktop behind the panel. */
   showBackdropSelector?: boolean;
+  /** Show the immersive background toggle. Immersive views exist only on touch
+   * screens, so non-touch displays hide it. */
+  showImmersiveBackdrop?: boolean;
   sections?: PanelThemeSettingsSection;
   /** Name of the focus mode holding this panel on a plain background right now, if any. */
   backgroundHeldBy?: string | null;
@@ -201,6 +204,7 @@ export function PanelThemeSettings({
   hideWidgetLabelsToggle = false,
   hideWidgetChromeControls = false,
   showBackdropSelector = false,
+  showImmersiveBackdrop = true,
   sections = 'all',
   backgroundHeldBy = null,
 }: PanelThemeSettingsProps) {
@@ -470,12 +474,14 @@ export function PanelThemeSettings({
                 />
               </SettingRow>
             )}
-            <SettingToggle
-              label={label('panel.settings.immersiveBackdrop', 'Immersive background')}
-              description={label('panel.settings.immersiveBackdrop.desc', 'Turn off to see your background through immersive views')}
-              checked={theme.immersiveBackdrop}
-              onChange={onImmersiveBackdropCommit}
-            />
+            {showImmersiveBackdrop && (
+              <SettingToggle
+                label={label('panel.settings.immersiveBackdrop', 'Immersive background')}
+                description={label('panel.settings.immersiveBackdrop.desc', 'Turn off to see your background through immersive views')}
+                checked={theme.immersiveBackdrop}
+                onChange={onImmersiveBackdropCommit}
+              />
+            )}
             {/* Frost and opacity stay visible under every backdrop, which
                 hides the theme-only mode controls below. */}
             <SettingSlider
