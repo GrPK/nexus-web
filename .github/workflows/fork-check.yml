@@ -5,7 +5,7 @@ name: fork-check
 
 on:
   push:
-    branches: [ci-build, ci-slider-thumb-path, ci-astral]
+    branches: [ci-build, ci-slider-thumb-path, ci-astral, ci-g560]
   workflow_dispatch:
 
 jobs:
@@ -19,9 +19,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Tests of the changed page
-        run: npx vitest run src/components/views/DevicePage/LianLiWirelessLightingTab.test.tsx src/components/common/Slider src/components/views/SettingsView/ThermalGuardSetting.test.tsx src/panel/widgets/lighting/studio/StudioBlockCard.test.tsx src/components/views/DevicePage/AstralDevicePage.test.tsx src/components/views/DevicePage/astralUtils.test.ts src/components/views/DevicePage/DevicePage.test.tsx
+        run: npx vitest run src/components/views/DevicePage/LianLiWirelessLightingTab.test.tsx src/components/common/Slider src/components/views/SettingsView/ThermalGuardSetting.test.tsx src/panel/widgets/lighting/studio/StudioBlockCard.test.tsx src/components/views/DevicePage/AstralDevicePage.test.tsx src/components/views/DevicePage/astralUtils.test.ts src/components/views/DevicePage/DevicePage.test.tsx src/components/views/DevicePage/LogitechSpeakerDevicePage.test.tsx src/components/views/DevicePage/speakerUtils.test.ts
       - name: Lint of the changed files
-        run: npx eslint src/api/lianli-wireless.ts src/components/views/DevicePage/LianLiWirelessLightingTab.tsx src/components/views/DevicePage/LianLiWirelessLightingTab.test.tsx src/components/common/Slider/Slider.tsx src/components/common/Slider/Slider.test.tsx src/api/astral.ts src/components/views/DevicePage/AstralArt.tsx src/components/views/DevicePage/AstralDevicePage.tsx src/components/views/DevicePage/AstralDevicePage.test.tsx src/components/views/DevicePage/astralUtils.ts src/components/views/DevicePage/astralUtils.test.ts src/components/views/DevicePage/DevicePage.tsx
+        run: npx eslint src/api/lianli-wireless.ts src/components/views/DevicePage/LianLiWirelessLightingTab.tsx src/components/views/DevicePage/LianLiWirelessLightingTab.test.tsx src/components/common/Slider/Slider.tsx src/components/common/Slider/Slider.test.tsx src/api/astral.ts src/components/views/DevicePage/AstralArt.tsx src/components/views/DevicePage/AstralDevicePage.tsx src/components/views/DevicePage/AstralDevicePage.test.tsx src/components/views/DevicePage/astralUtils.ts src/components/views/DevicePage/astralUtils.test.ts src/components/views/DevicePage/DevicePage.tsx src/api/logitechSpeaker.ts src/components/views/DevicePage/LogitechSpeakerDevicePage.tsx src/components/views/DevicePage/LogitechSpeakerDevicePage.test.tsx src/components/views/DevicePage/SpeakerEqSlider.tsx src/components/views/DevicePage/SpeakerArt.tsx src/components/views/DevicePage/speakerUtils.ts src/components/views/DevicePage/speakerUtils.test.ts src/hooks/useUnifiedDevices.ts
       - name: Locale parity
         run: node scripts/audit-locales.mjs
       - name: Type check and service build
@@ -59,21 +59,21 @@ jobs:
         continue-on-error: true
         run: npm run lint
 
-  astral-pr:
+  g560-pr:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: feat/astral-device-page
+          ref: feat/g560-device-page
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Tests of the Astral page and the device page
-        run: npx vitest run src/components/views/DevicePage/AstralDevicePage.test.tsx src/components/views/DevicePage/astralUtils.test.ts src/components/views/DevicePage/DevicePage.test.tsx
+      - name: Tests of the G560 page and the device page
+        run: npx vitest run src/components/views/DevicePage/DevicePage.test.tsx src/components/views/DevicePage/LogitechSpeakerDevicePage.test.tsx src/components/views/DevicePage/speakerUtils.test.ts
       - name: Lint of the changed files
-        run: npx eslint src/api/astral.ts src/components/views/DevicePage/AstralArt.tsx src/components/views/DevicePage/AstralDevicePage.tsx src/components/views/DevicePage/AstralDevicePage.test.tsx src/components/views/DevicePage/astralUtils.ts src/components/views/DevicePage/astralUtils.test.ts src/components/views/DevicePage/DevicePage.tsx
+        run: npx eslint src/components/views/DevicePage/DevicePage.tsx src/api/logitechSpeaker.ts src/components/views/DevicePage/LogitechSpeakerDevicePage.tsx src/components/views/DevicePage/LogitechSpeakerDevicePage.test.tsx src/components/views/DevicePage/SpeakerEqSlider.tsx src/components/views/DevicePage/SpeakerArt.tsx src/components/views/DevicePage/speakerUtils.ts src/components/views/DevicePage/speakerUtils.test.ts src/hooks/useUnifiedDevices.ts
       - name: Locale parity
         run: node scripts/audit-locales.mjs
       - name: Type check and service build
