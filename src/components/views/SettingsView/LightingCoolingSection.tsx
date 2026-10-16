@@ -2,9 +2,11 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { CircuitBoard, Clock, Cpu, Lock, Moon, RotateCcw, Speaker, Zap } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
+import { Notice } from '../../common/Notice/Notice';
 import { Select } from '../../common/Select/Select';
 import { SettingRow, SettingSelect, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
+import { SOFTWARE_RENDER_VALUE, showRenderGpuPicker, showSoftwareOption } from './renderGpuUi';
 import { BrightnessScheduleModal } from './BrightnessScheduleModal';
 import { ThermalGuardSetting } from './ThermalGuardSetting';
 import {
@@ -46,8 +48,10 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   const sensors = useSensors(serviceOnline);
   const gpus = sensors.gpuComponents;
 
-  const showGpuPicker = (platform === 'windows' || platform === 'linux') && gpus.length > 1;
+  const gpuPlatform = platform === 'windows' || platform === 'linux';
   const [renderGpu, setRenderGpuValue] = useState('auto');
+  const [softwareAvailable, setSoftwareAvailable] = useState(false);
+  const showGpuPicker = showRenderGpuPicker(platform, gpus.length, softwareAvailable);
   const [restartOpen, setRestartOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   // Only Windows notifies the service before the host suspends, which is the
@@ -79,13 +83,17 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   }, [features.lighting]);
 
   useEffect(() => {
-    if (!showGpuPicker || !serviceOnline) return;
+    if (!gpuPlatform || !serviceOnline) return;
     let cancelled = false;
     fetchRenderGpu()
-      .then(r => { if (!cancelled) setRenderGpuValue(r?.value || 'auto'); })
+      .then(r => {
+        if (cancelled) return;
+        setRenderGpuValue(r?.value || 'auto');
+        setSoftwareAvailable(r?.softwareRenderingAvailable ?? false);
+      })
       .catch(() => { /* keep default */ });
     return () => { cancelled = true; };
-  }, [showGpuPicker, serviceOnline]);
+  }, [gpuPlatform, serviceOnline]);
 
   useEffect(() => {
     if (!showSleepBlackout || !serviceOnline) return;
@@ -149,6 +157,14 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
       value: g.name,
       label: g.integrated ? `${g.name} (${t('monitoring.gpuSelect.integrated')})` : g.name,
     })),
+    ...(showSoftwareOption(softwareAvailable, renderGpu) ? [
+      ...(gpus.length > 0 ? [{ value: '__sep_software__', label: '', divider: true }] : []),
+      {
+        value: SOFTWARE_RENDER_VALUE,
+        label: t('lighting.renderGpu.software'),
+        description: t('lighting.renderGpu.softwareWarning'),
+      },
+    ] : []),
   ];
 
   const resetAction = canReset ? (
@@ -188,6 +204,11 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
             options={gpuSelectOptions}
             onChange={handleGpuChange}
           />
+        )}
+        {showGpuPicker && renderGpu === SOFTWARE_RENDER_VALUE && (
+          <div data-settings-aside="true">
+            <Notice tone="warning" role="status">{t('lighting.renderGpu.softwareWarning')}</Notice>
+          </div>
         )}
         {showAudioOutput && (
           <SettingSelect

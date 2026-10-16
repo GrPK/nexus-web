@@ -91,6 +91,8 @@ export interface LightingStatusResponse {
   gpuCanSwitch?: boolean;
   /** Shader lighting renders on the CPU; absent on older services. */
   gpuSoftware?: boolean;
+  /** The user chose CPU rendering; absent on older services. */
+  gpuSoftwareForced?: boolean;
   /** True while an RGB device detection pass or bridge reconnect is in flight. */
   scanning: boolean;
   /** True while the bundled OpenRGB subprocess is running. */
@@ -333,7 +335,11 @@ export const setMediaEffect = (v: PostProcessSettings, persist = true) =>
 // Machine-specific (the GPU model name), so it lives in the service config, not
 // the cloud-synced UI prefs. Restart-to-apply: setRenderGpu persists + writes
 // the OS preference; restartService applies it.
-export interface RenderGpuState { value: string; }
+export interface RenderGpuState {
+  value: string;
+  /** CPU rendering can be chosen on this PC; absent on older services. */
+  softwareRenderingAvailable?: boolean;
+}
 
 export const fetchRenderGpu = () =>
   fetchService<RenderGpuState>('/lighting/render-gpu');

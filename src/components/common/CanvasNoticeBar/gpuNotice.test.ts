@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gpuNotice } from './gpuNotice';
+import { canvasSoftwareFlag, gpuNotice } from './gpuNotice';
 
 describe('gpuNotice', () => {
   it('says nothing once a context exists', () => {
@@ -27,5 +27,13 @@ describe('gpuNotice', () => {
 
   it('keeps the unavailable notice ahead of the software one', () => {
     expect(gpuNotice('unavailable', false, true)?.key).toBe('lighting.gpuUnavailableNotice');
+  });
+
+  it('suppresses the canvas notice when the user chose software', () => {
+    expect(canvasSoftwareFlag(true, false)).toBe(true);
+    expect(canvasSoftwareFlag(true, undefined)).toBe(true);
+    expect(canvasSoftwareFlag(true, true)).toBe(false);
+    expect(canvasSoftwareFlag(false, false)).toBe(false);
+    expect(canvasSoftwareFlag(undefined, undefined)).toBe(false);
   });
 });

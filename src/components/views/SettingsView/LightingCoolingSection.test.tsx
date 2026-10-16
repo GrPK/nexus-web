@@ -39,6 +39,7 @@ vi.mock('../../../hooks/useSensors', () => ({
 }));
 
 const lightingApi = vi.hoisted(() => ({
+  fetchRenderGpu: vi.fn().mockResolvedValue(null),
   // Resolved by default: the sensor-picker tests below mount the same component
   // and would otherwise trip over an undefined return inside its effect.
   fetchSleepBlackout: vi.fn().mockResolvedValue({ enabled: true }),
@@ -58,7 +59,7 @@ const lightingApi = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../api/lighting', () => ({
-  fetchRenderGpu: vi.fn().mockResolvedValue(null),
+  fetchRenderGpu: lightingApi.fetchRenderGpu,
   setRenderGpu: vi.fn().mockResolvedValue(null),
   restartService: vi.fn().mockResolvedValue(null),
   fetchSleepBlackout: lightingApi.fetchSleepBlackout,
@@ -144,6 +145,32 @@ describe('LightingCoolingSection section split', () => {
     view.rerender(<LightingCoolingSection serviceOnline platform="windows" />);
 
     expect(screen.queryByText('lighting.renderGpu.confirmTitle')).toBeNull();
+  });
+
+  it('offers CPU rendering with a caveat line only when the service reports it available', async () => {
+    prefs.gpus = [{ id: 'a', name: 'Only GPU', integrated: false }];
+    lightingApi.fetchRenderGpu.mockResolvedValueOnce({ value: 'auto', softwareRenderingAvailable: true });
+    render(<LightingCoolingSection serviceOnline platform="windows" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'lighting.renderGpu.label' }));
+    const list = screen.getByRole('listbox');
+    expect(within(list).getByText('lighting.renderGpu.software')).toBeInTheDocument();
+    expect(within(list).getByText('lighting.renderGpu.softwareWarning')).toBeInTheDocument();
+  });
+
+  it('hides the picker with one GPU and no software option', async () => {
+    prefs.gpus = [{ id: 'a', name: 'Only GPU', integrated: false }];
+    lightingApi.fetchRenderGpu.mockResolvedValueOnce({ value: 'auto' });
+    render(<LightingCoolingSection serviceOnline platform="windows" />);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByRole('button', { name: 'lighting.renderGpu.label' })).toBeNull();
+  });
+
+  it('shows the warning notice under the row once software is the saved choice', async () => {
+    prefs.gpus = [{ id: 'a', name: 'Only GPU', integrated: false }];
+    lightingApi.fetchRenderGpu.mockResolvedValueOnce({ value: 'software', softwareRenderingAvailable: true });
+    render(<LightingCoolingSection serviceOnline platform="windows" />);
+    const notice = await screen.findByRole('status');
+    expect(notice).toHaveTextContent('lighting.renderGpu.softwareWarning');
   });
 
   it('keeps the Lighting section for the schedule row before the platform resolves', () => {

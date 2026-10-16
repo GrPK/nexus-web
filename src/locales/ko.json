@@ -3008,6 +3008,8 @@
   "lighting.renderGpu.confirmTitle": "다시 시작하여 적용할까요?",
   "lighting.renderGpu.hint": "적용하려면 Nexus를 다시 시작합니다",
   "lighting.renderGpu.label": "렌더링 GPU",
+  "lighting.renderGpu.software": "소프트웨어 렌더링 (CPU)",
+  "lighting.renderGpu.softwareWarning": "CPU에서 렌더링합니다. 효과가 느려지고 CPU를 더 많이 사용할 수 있습니다.",
   "lighting.resume": "재개",
   "lighting.rightPane.devices": "기기",
   "lighting.rightPane.effect": "이펙트 편집기",

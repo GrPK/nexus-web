@@ -30,6 +30,8 @@ interface LightingStatus {
   gpuCanSwitch?: boolean;
   /** Shader lighting renders on the CPU; absent on older services. */
   gpuSoftware?: boolean;
+  /** The user chose CPU rendering; absent on older services. */
+  gpuSoftwareForced?: boolean;
   scanning: boolean;
 }
 

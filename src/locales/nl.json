@@ -3008,6 +3008,8 @@
   "lighting.renderGpu.confirmTitle": "Opnieuw starten om toe te passen?",
   "lighting.renderGpu.hint": "Start Nexus opnieuw om toe te passen",
   "lighting.renderGpu.label": "Render-GPU",
+  "lighting.renderGpu.software": "Softwarematige rendering (CPU)",
+  "lighting.renderGpu.softwareWarning": "Rendert op de CPU. Effecten kunnen trager lopen en meer CPU gebruiken.",
   "lighting.resume": "Hervatten",
   "lighting.rightPane.devices": "Apparaten",
   "lighting.rightPane.effect": "Effect-editor",

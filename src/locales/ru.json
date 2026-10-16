@@ -3044,6 +3044,8 @@
   "lighting.renderGpu.confirmTitle": "Перезапустить для применения?",
   "lighting.renderGpu.hint": "Перезапускает Nexus для применения",
   "lighting.renderGpu.label": "GPU для рендеринга",
+  "lighting.renderGpu.software": "Программный рендеринг (CPU)",
+  "lighting.renderGpu.softwareWarning": "Рендеринг выполняется на CPU. Эффекты могут работать медленнее и сильнее нагружать CPU.",
   "lighting.resume": "Продолжить",
   "lighting.rightPane.devices": "Устройства",
   "lighting.rightPane.effect": "Редактор эффекта",

@@ -26,3 +26,11 @@ export function gpuNotice(
     ? { key: 'lighting.gpuInitializingNotice', tone: 'wait' }
     : { key: 'lighting.gpuUnavailableNotice', tone: 'fault' };
 }
+
+/**
+ * The canvas "no compatible GPU" notice describes a fallback the user did not
+ * choose, so it stays quiet when they picked CPU rendering themselves.
+ */
+export function canvasSoftwareFlag(software: boolean | undefined, forced: boolean | undefined): boolean {
+  return !!software && !forced;
+}

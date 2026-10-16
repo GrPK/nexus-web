@@ -3008,6 +3008,8 @@
   "lighting.renderGpu.confirmTitle": "Tornâ a inviâ par aplicâ?",
   "lighting.renderGpu.hint": "Al torne a inviâ Nexus par aplicâ",
   "lighting.renderGpu.label": "GPU di rendering",
+  "lighting.renderGpu.software": "Rendering software (CPU)",
+  "lighting.renderGpu.softwareWarning": "Il rendering al ven fat su la CPU. I efiets a puedin lâ plui planc e doprâ plui CPU.",
   "lighting.resume": "Continue",
   "lighting.rightPane.devices": "Dispositîfs",
   "lighting.rightPane.effect": "Editor dai efiets",

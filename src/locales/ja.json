@@ -3008,6 +3008,8 @@
   "lighting.renderGpu.confirmTitle": "再起動して適用しますか？",
   "lighting.renderGpu.hint": "適用するには Nexus を再起動します",
   "lighting.renderGpu.label": "レンダリング GPU",
+  "lighting.renderGpu.software": "ソフトウェアレンダリング (CPU)",
+  "lighting.renderGpu.softwareWarning": "CPU でレンダリングします。エフェクトが遅くなったり、CPU 使用率が高くなったりすることがあります。",
   "lighting.resume": "再開",
   "lighting.rightPane.devices": "デバイス",
   "lighting.rightPane.effect": "エフェクトエディター",

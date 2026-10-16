@@ -3044,6 +3044,8 @@
   "lighting.renderGpu.confirmTitle": "Uruchomić ponownie, aby zastosować?",
   "lighting.renderGpu.hint": "Uruchamia ponownie Nexus, aby zastosować",
   "lighting.renderGpu.label": "GPU renderujące",
+  "lighting.renderGpu.software": "Renderowanie programowe (CPU)",
+  "lighting.renderGpu.softwareWarning": "Renderowanie odbywa się na CPU. Efekty mogą działać wolniej i bardziej obciążać CPU.",
   "lighting.resume": "Wznów",
   "lighting.rightPane.devices": "Urządzenia",
   "lighting.rightPane.effect": "Edytor efektu",

@@ -48,6 +48,9 @@ export interface SelectOption {
   // CSS font-family the menu row draws its label in, enlarged, so a font
   // picker previews each face; the trigger keeps the control's own font.
   fontFamily?: string;
+  // Dim second line under the label in the menu row only (e.g. a caveat about
+  // the choice); the trigger shows the label alone.
+  description?: string;
   // Renders a thin rule instead of a selectable row, grouping the options above
   // and below it. Non-navigable and removed from the a11y tree; value/label are
   // ignored.
@@ -530,7 +533,12 @@ export function Select({
                   onClick={() => { if (!opt.disabled) commit(opt.value); }}
                 >
                   {opt.icon && <span className={styles.optionIcon} aria-hidden="true">{opt.icon}</span>}
-                  {opt.label}
+                  {opt.description ? (
+                    <span className={styles.optionText}>
+                      <span>{opt.label}</span>
+                      <span className={styles.optionDescription}>{opt.description}</span>
+                    </span>
+                  ) : opt.label}
                 </li>
               ))
             )}

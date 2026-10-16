@@ -3008,6 +3008,8 @@
   "lighting.renderGpu.confirmTitle": "Zum Übernehmen neu starten?",
   "lighting.renderGpu.hint": "Startet Nexus zur Übernahme neu",
   "lighting.renderGpu.label": "Render-GPU",
+  "lighting.renderGpu.software": "Software-Rendering (CPU)",
+  "lighting.renderGpu.softwareWarning": "Die Darstellung erfolgt auf der CPU. Effekte laufen möglicherweise langsamer und beanspruchen mehr CPU.",
   "lighting.resume": "Fortsetzen",
   "lighting.rightPane.devices": "Geräte",
   "lighting.rightPane.effect": "Effekt-Editor",

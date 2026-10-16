@@ -3008,6 +3008,8 @@
   "lighting.renderGpu.confirmTitle": "重启以应用？",
   "lighting.renderGpu.hint": "重启 Nexus 以应用",
   "lighting.renderGpu.label": "渲染 GPU",
+  "lighting.renderGpu.software": "软件渲染 (CPU)",
+  "lighting.renderGpu.softwareWarning": "在 CPU 上渲染。效果可能运行较慢，并占用更多 CPU。",
   "lighting.resume": "继续",
   "lighting.rightPane.devices": "设备",
   "lighting.rightPane.effect": "效果编辑器",

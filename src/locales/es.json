@@ -3008,6 +3008,8 @@
   "lighting.renderGpu.confirmTitle": "¿Reiniciar para aplicar?",
   "lighting.renderGpu.hint": "Reinicia Nexus para aplicar",
   "lighting.renderGpu.label": "GPU de renderizado",
+  "lighting.renderGpu.software": "Renderizado por software (CPU)",
+  "lighting.renderGpu.softwareWarning": "Se renderiza en la CPU. Los efectos pueden ir más lentos y usar más CPU.",
   "lighting.resume": "Reanudar",
   "lighting.rightPane.devices": "Dispositivos",
   "lighting.rightPane.effect": "Editor de efectos",
