@@ -1,0 +1,106 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fetchCurrentSync, startAnimate, startStatic, stopLighting } from '../../../api/lighting';
+import { UiSettingsProvider } from '../../../hooks/useUiSettings';
+import { LightingPage } from './LightingPage';
+
+vi.mock('../../../hooks/useMultiplexSocket', () => ({
+  useTopicCallback: vi.fn(),
+  useTopic: vi.fn(() => null),
+}));
+vi.mock('../../../hooks/useLightingFrames', () => ({
+  useLightingFrames: () => ({ connected: false, live: false }),
+}));
+vi.mock('../../../hooks/useUsbDevices', () => ({ useUsbDevices: () => ({ devices: [] }) }));
+vi.mock('../../../hooks/useAudioState', () => ({ useAudioState: () => ({ current: null }) }));
+vi.mock('../../../lib/controlSync', () => ({
+  publishControlSync: vi.fn(),
+  subscribeControlSync: vi.fn(() => () => {}),
+}));
+vi.mock('../../../components/views/ServiceRequired', () => ({ ServiceRequired: () => null }));
+vi.mock('../../../components/common/DeviceCanvas/DeviceCanvas', () => ({ DeviceCanvas: () => <div /> }));
+vi.mock('./page/LedMapEditor', () => ({ LedMapEditor: () => null }));
+
+vi.mock('../../../api/lighting', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../api/lighting')>();
+  return {
+    ...actual,
+    fetchCurrentSync: vi.fn(),
+    fetchAnimateSettings: vi.fn(() => Promise.resolve({ effect: 'fire', states: {}, templates: {} })),
+    fetchStaticSettings: vi.fn(() => Promise.resolve({ effect: 'checker', states: {} })),
+    fetchAnimateDefaults: vi.fn(() => Promise.resolve(null)),
+    cachedAnimateDefaults: vi.fn(() => null),
+    fetchMusicReactive: vi.fn(() => Promise.resolve({ enabled: false })),
+    fetchScreenEffect: vi.fn(() => Promise.resolve({ hue: 0, colorize: 0, saturation: 1, contrast: 1 })),
+    fetchMediaEffect: vi.fn(() => Promise.resolve({ hue: 0, colorize: 0, saturation: 1, contrast: 1 })),
+    fetchLightingDevices: vi.fn(() => Promise.resolve({ isInit: true, devices: [] })),
+    fetchLedMap: vi.fn(() => Promise.resolve(null)),
+    fetchAvailableMappings: vi.fn(() => Promise.resolve(null)),
+    fetchLayoutPresets: vi.fn(() => Promise.resolve(null)),
+    startAnimate: vi.fn(() => Promise.resolve(null)),
+    startStatic: vi.fn(() => Promise.resolve(null)),
+    startScreenMirror: vi.fn(() => Promise.resolve(null)),
+    stopLighting: vi.fn(() => Promise.resolve(null)),
+    fetchPins: vi.fn(() => Promise.resolve({})),
+  };
+});
+
+const serviceState = { cooling: null, lighting: null, panel: null } as never;
+
+const renderPage = (platform: string) => render(
+  <UiSettingsProvider>
+    <LightingPage serviceOnline serviceState={serviceState} activeProfileId="p1" platform={platform} />
+  </UiSettingsProvider>,
+);
+
+const gameSyncTab = () => screen.queryByRole('tab', { name: 'lighting.mode.gamesync' });
+
+describe('Game Sync removal notice tab', () => {
+  beforeEach(() => {
+    localStorage.setItem('nexus_settings', JSON.stringify({ general: { lightingDashboardMode: 'advanced', coolingDashboardMode: 'advanced' } }));
+    vi.mocked(fetchCurrentSync).mockReset();
+    vi.mocked(startAnimate).mockClear();
+    vi.mocked(startStatic).mockClear();
+    vi.mocked(stopLighting).mockClear();
+  });
+
+  it('renders disabled with the notice tooltip when the flag is set on Windows', async () => {
+    vi.mocked(fetchCurrentSync).mockResolvedValue({ sync: 'none', paused: false, gameSyncRemovedNotice: true });
+    renderPage('windows');
+
+    await waitFor(() => expect(gameSyncTab()).toBeTruthy());
+    const tab = gameSyncTab()!;
+    expect(tab).toHaveAttribute('aria-disabled', 'true');
+    expect(tab).toHaveAttribute('aria-selected', 'false');
+
+    fireEvent.focus(tab);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('lighting.gameSync.removedNotice');
+  });
+
+  it('does not switch tabs or start lighting when clicked', async () => {
+    vi.mocked(fetchCurrentSync).mockResolvedValue({ sync: 'none', paused: false, gameSyncRemovedNotice: true });
+    renderPage('windows');
+    await waitFor(() => expect(gameSyncTab()).toBeTruthy());
+
+    fireEvent.click(gameSyncTab()!);
+    fireEvent.keyDown(gameSyncTab()!, { key: 'Enter' });
+
+    expect(gameSyncTab()).toHaveAttribute('aria-selected', 'false');
+    expect(startAnimate).not.toHaveBeenCalled();
+    expect(startStatic).not.toHaveBeenCalled();
+    expect(stopLighting).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['the flag is false', 'windows', { gameSyncRemovedNotice: false }],
+    ['the flag is absent', 'windows', {}],
+    ['the platform is not Windows', 'macos', { gameSyncRemovedNotice: true }],
+  ])('is absent when %s', async (_name, platform, extra) => {
+    vi.mocked(fetchCurrentSync).mockResolvedValue({ sync: 'none', paused: false, ...extra });
+    renderPage(platform);
+
+    await waitFor(() => expect(fetchCurrentSync).toHaveBeenCalled());
+    await screen.findAllByRole('tab');
+    expect(gameSyncTab()).toBeNull();
+  });
+});

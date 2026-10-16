@@ -2741,6 +2741,7 @@
   "lighting.fullscreen.loadingShader": "正在加载着色器...",
   "lighting.fullscreen.nextEffect": "下一个特效",
   "lighting.fullscreen.prevEffect": "上一个特效",
+  "lighting.gameSync.removedNotice": "由于兼容性问题，Game Sync 已被移除。我们可能会在将来以改进后的形式重新推出。",
   "lighting.gpuInitializingNotice": "正在为灯效准备显卡，完成前设备将保持熄灭。",
   "lighting.gpuPickGpu": "选择 GPU",
   "lighting.gpuUnavailableNotice": "此PC没有可用的GPU，效果在此处预览，但不会点亮您的设备。",

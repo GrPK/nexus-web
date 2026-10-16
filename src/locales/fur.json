@@ -2741,6 +2741,7 @@
   "lighting.fullscreen.loadingShader": "Daûr a cjariâ il shader...",
   "lighting.fullscreen.nextEffect": "Efiet sucessîf",
   "lighting.fullscreen.prevEffect": "Efiet precedent",
+  "lighting.gameSync.removedNotice": "Game Sync al è stât gjavât par problemis di compatibilitât. Al è pussibil che lu tornìn a proponi in chê di vignì in forme miorade.",
   "lighting.gpuInitializingNotice": "Daûr a preparâ la schede grafiche pe iluminazion - i tiei dispositîfs a restin scûrs fin che al finis.",
   "lighting.gpuPickGpu": "Sielç GPU",
   "lighting.gpuUnavailableNotice": "Nissun GPU disponibil su chest PC - l'efiet al mostre chi la anteprime, ma nol luminarà i tiei dispositîfs.",

@@ -1,5 +1,7 @@
-import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react';
 import classNames from 'classnames';
+import { Info } from 'lucide-react';
+import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 import styles from './Tabs.module.scss';
 
 export interface TabDef {
@@ -30,6 +32,11 @@ export interface TabDef {
    *  see Card's `disableInteractiveRole` for the same constraint elsewhere.
    *  A click/keydown on it is stopped from bubbling into the tab's onChange. */
   readonly trailing?: ReactNode;
+  /** Explains a tab that cannot be used (with `disabled`): shows an info glyph
+   *  after the label and a tooltip on hover or keyboard focus. The tab stays
+   *  focusable and carries `aria-disabled` instead of the `disabled`
+   *  attribute, which would swallow the hover and focus the tooltip needs. */
+  readonly tooltip?: string;
 }
 
 export interface TabsProps {
@@ -60,6 +67,23 @@ export function Tabs({ tabs, activeKey, onChange, disabled, ariaLabel = 'Tabs', 
     onPointerEnter: (e: ReactPointerEvent) => { if (e.pointerType === 'mouse') onHover(key); },
     onPointerLeave: (e: ReactPointerEvent) => { if (e.pointerType === 'mouse') onHover(null); },
   } : {};
+  // A tab with a tooltip stays focusable (aria-disabled, not disabled) so the
+  // tooltip can open; its click is dropped here so it never changes the tab.
+  const tabState = (tab: TabDef) => {
+    const inert = !!tab.tooltip && !!tab.disabled;
+    return {
+      disabled: disabled || (tab.disabled && !inert),
+      'aria-disabled': inert ? true : undefined,
+      className: classNames(styles.tab, { [styles.tabInert]: inert }),
+      onClick: (e: ReactMouseEvent<HTMLButtonElement>) => { if (!inert) onChange(tab.key, e.currentTarget); },
+    };
+  };
+  const withTooltip = (tab: TabDef, button: ReactElement) => tab.tooltip
+    ? <HoverTooltip key={tab.key} body={tab.tooltip} side="bottom">{button}</HoverTooltip>
+    : button;
+  const infoGlyph = (tab: TabDef) => tab.tooltip
+    ? <span className={styles.tabInfo} aria-hidden="true"><Info size={14} /></span>
+    : null;
   return (
     <nav className={navClass} role="tablist" aria-label={ariaLabel}>
       {tabs.map(tab => {
@@ -67,7 +91,8 @@ export function Tabs({ tabs, activeKey, onChange, disabled, ariaLabel = 'Tabs', 
         // No trailing control: the button alone is the flex item, byte-for-byte
         // the same markup every existing caller already renders.
         if (!tab.trailing) {
-          return (
+          const state = tabState(tab);
+          return withTooltip(tab, (
             <button
               key={tab.key}
               type="button"
@@ -76,41 +101,48 @@ export function Tabs({ tabs, activeKey, onChange, disabled, ariaLabel = 'Tabs', 
               aria-label={tab.ariaLabel}
               aria-haspopup={tab.expanded === undefined ? undefined : 'menu'}
               aria-expanded={tab.expanded}
-              className={classNames(styles.tab, { [styles.active]: isActive })}
-              disabled={disabled || tab.disabled}
-              onClick={e => onChange(tab.key, e.currentTarget)}
+              aria-disabled={state['aria-disabled']}
+              className={classNames(state.className, { [styles.active]: isActive })}
+              disabled={state.disabled}
+              onClick={state.onClick}
               {...hoverProps(tab.key)}
             >
               <span className={classNames(styles.tabInner, { [styles.tabChip]: tab.chip })}>
                 {tab.icon && <span className={styles.tabIcon} aria-hidden="true">{tab.icon}</span>}
                 <span className={styles.tabLabel}>{tab.label}</span>
+                {infoGlyph(tab)}
               </span>
             </button>
-          );
+          ));
         }
         // With a trailing control, the tab becomes a flex-item group: the
         // button and the trailing control are siblings sharing one pill, not
         // parent/child, so the trailing control stays a separately reachable
         // focus target instead of a descendant of the tab's own button.
+        const state = tabState(tab);
         return (
           <span key={tab.key} role="presentation" className={classNames(styles.tabGroup, { [styles.active]: isActive })}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              aria-label={tab.ariaLabel}
-              aria-haspopup={tab.expanded === undefined ? undefined : 'menu'}
-              aria-expanded={tab.expanded}
-              className={styles.tab}
-              disabled={disabled || tab.disabled}
-              onClick={e => onChange(tab.key, e.currentTarget)}
-              {...hoverProps(tab.key)}
-            >
-              <span className={classNames(styles.tabInner, { [styles.tabChip]: tab.chip })}>
-                {tab.icon && <span className={styles.tabIcon} aria-hidden="true">{tab.icon}</span>}
-                <span className={styles.tabLabel}>{tab.label}</span>
-              </span>
-            </button>
+            {withTooltip(tab, (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-label={tab.ariaLabel}
+                aria-haspopup={tab.expanded === undefined ? undefined : 'menu'}
+                aria-expanded={tab.expanded}
+                aria-disabled={state['aria-disabled']}
+                className={state.className}
+                disabled={state.disabled}
+                onClick={state.onClick}
+                {...hoverProps(tab.key)}
+              >
+                <span className={classNames(styles.tabInner, { [styles.tabChip]: tab.chip })}>
+                  {tab.icon && <span className={styles.tabIcon} aria-hidden="true">{tab.icon}</span>}
+                  <span className={styles.tabLabel}>{tab.label}</span>
+                  {infoGlyph(tab)}
+                </span>
+              </button>
+            ))}
             <span className={styles.tabTrailing}>
               {tab.trailing}
             </span>

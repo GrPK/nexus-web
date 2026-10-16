@@ -2741,6 +2741,7 @@
   "lighting.fullscreen.loadingShader": "Caricamento dello shader...",
   "lighting.fullscreen.nextEffect": "Effetto successivo",
   "lighting.fullscreen.prevEffect": "Effetto precedente",
+  "lighting.gameSync.removedNotice": "Game Sync è stato rimosso a causa di problemi di compatibilità. In futuro potremmo riproporlo in una forma migliorata.",
   "lighting.gpuInitializingNotice": "Preparazione della scheda grafica per l'illuminazione: i tuoi dispositivi restano spenti fino al termine.",
   "lighting.gpuPickGpu": "Scegli GPU",
   "lighting.gpuUnavailableNotice": "Nessun GPU utilizzabile su questo PC - l'effetto è in anteprima qui, ma non illuminerà i tuoi dispositivi.",

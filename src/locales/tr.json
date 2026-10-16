@@ -2741,6 +2741,7 @@
   "lighting.fullscreen.loadingShader": "Shader yükleniyor...",
   "lighting.fullscreen.nextEffect": "Sonraki efekt",
   "lighting.fullscreen.prevEffect": "Önceki efekt",
+  "lighting.gameSync.removedNotice": "Game Sync, uyumluluk sorunları nedeniyle kaldırıldı. Gelecekte geliştirilmiş bir biçimde geri getirebiliriz.",
   "lighting.gpuInitializingNotice": "Aydınlatma için ekran kartı hazırlanıyor - işlem bitene kadar cihazlarınız kapalı kalır.",
   "lighting.gpuPickGpu": "GPU seç",
   "lighting.gpuUnavailableNotice": "Bu PC'de kullanılabilir GPU yok - efekt burada önizleniyor, ancak cihazlarınızı aydınlatmayacak.",

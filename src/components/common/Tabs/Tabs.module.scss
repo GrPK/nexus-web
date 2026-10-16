@@ -29,14 +29,21 @@
   cursor: pointer;
   transition: background var(--ease-fast) ease, border-color var(--ease-fast) ease, color var(--ease-fast) ease;
 
-  &:hover:not(:disabled):not(.active) {
+  &:hover:not(:disabled):not(.tabInert):not(.active) {
     color: var(--text);
   }
 
-  &:disabled {
+  &:disabled,
+  &.tabInert {
     opacity: 0.4;
     cursor: not-allowed;
   }
+}
+
+.tabInfo {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .active {

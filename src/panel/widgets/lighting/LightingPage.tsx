@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCheck, Eye, EyeOff, Lightbulb, Maximize2, Music, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { Ban, CheckCheck, Eye, EyeOff, Gamepad2, Lightbulb, Maximize2, Music, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
   startAnimate, startStatic, startScreenMirror, stopLighting,
   fetchStaticSettings,
@@ -143,6 +143,8 @@ interface LayoutHistorySnapshot {
   powerIds: string[];
 }
 
+const GAME_SYNC_REMOVED_TAB_KEY = 'game-sync-removed';
+
 // The modes a tab press can pin selected cards to; Off always changes the global mode.
 const PINNABLE_MODES: ReadonlySet<string> = new Set(['static', 'animate', 'screen', 'gif']);
 
@@ -214,7 +216,7 @@ const VIEW_2D = '2d';
 const VIEW_3D = '3d';
 export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate, accountUsername = null }: LightingViewProps) {
   const { t, language } = useTranslation();
-  const { mode, setMode, rawSync, setRawSync, synced, paused: syncedPaused } = useLightingSync(serviceOnline, activeProfileId);
+  const { mode, setMode, rawSync, setRawSync, synced, paused: syncedPaused, gameSyncRemovedNotice } = useLightingSync(serviceOnline, activeProfileId);
   // gpuCanSwitch comes from the same enumeration the Settings picker gates on,
   // so the shortcut never lands on a tab with no GPU control. Offered only for a
   // card that failed: while initializing, the picker restarts the service and
@@ -2198,7 +2200,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           </HoverTooltip>
         ) : undefined,
       };
-    })];
+    }),
+    // Removal notice for upgraders: delete with its locale keys and tests after the next production release.
+    ...(isWindows && gameSyncRemovedNotice ? [{
+      key: GAME_SYNC_REMOVED_TAB_KEY,
+      label: t('lighting.mode.gamesync'),
+      icon: <Gamepad2 size={14} />,
+      disabled: true,
+      tooltip: t('lighting.gameSync.removedNotice'),
+    }] : [])];
   // The strip marks the mode tab while lighting is off - it is the tab Off now
   // lives on. Every other mode still marks its own tab.
   const activeTabKey = !synced ? undefined
@@ -2239,6 +2249,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The cards a press on `key` changes, outlined on hover and pulsed on press: with a selection
   // and a pinnable mode, the cards it pins; otherwise the global reach.
   const tabPressReach = useCallback((key: string): Set<string> | undefined => {
+    if (key === GAME_SYNC_REMOVED_TAB_KEY) return undefined;
     if (selectedDeviceIds.size > 0 && PINNABLE_MODES.has(key)) {
       const ids = tabPressPins(pins, selectedDeviceIds, key);
       return ids.length ? pressReach(visibleDevices, pins, new Set(ids)) : undefined;
@@ -2252,6 +2263,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // drops the menu, which the tab row keeps "inside" its anchor.
   const handleTabChange = (key: string) => {
     setHoveredTab(null);
+    if (key === GAME_SYNC_REMOVED_TAB_KEY) return;
     if (key === MODE_MENU_TAB_KEY) {
       setModeMenuOpen(open => !open);
       return;

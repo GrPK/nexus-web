@@ -103,6 +103,8 @@ export const fetchLightingStatus = () =>
 export interface CurrentSyncResponse {
   sync: string;
   paused: boolean;
+  /** True on installs upgraded from a version that shipped Game Sync. */
+  gameSyncRemovedNotice?: boolean;
 }
 
 export const fetchCurrentSync = () =>
