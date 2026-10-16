@@ -4,9 +4,11 @@ import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { LightingPage } from './LightingPage';
 import * as lightingApi from '../../../api/lighting';
 
+const syncState = vi.hoisted(() => ({ mode: 'static' }));
+
 vi.mock('../../../hooks/useLightingSync', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../hooks/useLightingSync')>()),
-  useLightingSync: () => ({ mode: 'static', setMode: vi.fn(), rawSync: '', setRawSync: vi.fn(), synced: true, paused: false }),
+  useLightingSync: () => ({ mode: syncState.mode, setMode: vi.fn(), rawSync: '', setRawSync: vi.fn(), synced: true, paused: false }),
 }));
 vi.mock('../../../hooks/useLightingFrames', () => ({ useLightingFrames: () => ({ connected: false, live: false }) }));
 vi.mock('../../../hooks/useUsbDevices', () => ({ useUsbDevices: () => ({ devices: [] }) }));
@@ -48,8 +50,8 @@ vi.mock('../../../api/lighting', async importOriginal => {
   };
 });
 
-function renderSimple() {
-  localStorage.setItem('nexus_settings', JSON.stringify({ general: { lightingDashboardMode: 'simple' } }));
+function renderMode(dashboardMode: 'simple' | 'advanced') {
+  localStorage.setItem('nexus_settings', JSON.stringify({ general: { lightingDashboardMode: dashboardMode } }));
   return render(
     <UiSettingsProvider>
       <LightingPage serviceOnline serviceState={{ cooling: null, lighting: null, panel: null }} activeProfileId="p" />
@@ -57,8 +59,11 @@ function renderSimple() {
   );
 }
 
+const renderSimple = () => renderMode('simple');
+
 beforeEach(() => {
   vi.clearAllMocks();
+  syncState.mode = 'static';
   localStorage.clear();
   vi.mocked(lightingApi.fetchLightingDevices).mockImplementation(() => Promise.resolve({ isInit: true, devices: [DEVICE] } as never));
   vi.mocked(lightingApi.fetchPins).mockImplementation(() => Promise.resolve({}));
@@ -82,6 +87,33 @@ describe('LightingPage simple mode device claiming', () => {
 
     await waitFor(() => expect(lightingApi.stopLighting).toHaveBeenCalled());
     expect(lightingApi.setLightingDeviceControlled).not.toHaveBeenCalled();
+  });
+
+  it('does not issue a second stop when Off is picked while already off', async () => {
+    syncState.mode = 'none';
+    renderSimple();
+    fireEvent.click(await screen.findByRole('tab'));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /lighting\.mode\.off/ }));
+    expect(lightingApi.stopLighting).not.toHaveBeenCalled();
+    expect(lightingApi.setLightingDeviceControlled).not.toHaveBeenCalled();
+  });
+
+  it('does not power on a dark controlled device when Off is picked', async () => {
+    vi.mocked(lightingApi.fetchLightingDevices).mockImplementation(
+      () => Promise.resolve({ isInit: true, devices: [{ ...DEVICE, controlled: true }] } as never),
+    );
+    renderSimple();
+    await waitFor(() => expect(lightingApi.fetchLightingDevices).toHaveBeenCalled());
+    fireEvent.click(await screen.findByRole('tab'));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /lighting\.mode\.off/ }));
+    await waitFor(() => expect(lightingApi.stopLighting).toHaveBeenCalled());
+    expect(lightingApi.setLightingDevicePower).not.toHaveBeenCalled();
+  });
+
+  it('shows Control all devices in the advanced page too, while a device is uncontrolled', async () => {
+    renderMode('advanced');
+    fireEvent.click(await screen.findByRole('button', { name: /lighting\.controlAllDevices/ }));
+    await waitFor(() => expect(lightingApi.setLightingDeviceControlled).toHaveBeenCalledWith('openrgb-0', true));
   });
 
   it('sets the global color without retaking an uncontrolled device', async () => {

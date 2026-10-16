@@ -2086,9 +2086,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (ids.length > 0) void applyPins(ids, null);
   }, [applyPins, pins]);
 
+  // Over visibleDevices, which the show-uncontrolled filter does not touch, so
+  // hidden uncontrolled cards count; fully parked and zero-LED cards do not.
   const anyUncontrolled = useMemo(
-    () => devices.some(d => d.devicePageReason === undefined && d.controlled === false),
-    [devices],
+    () => visibleDevices.some(d => d.controlled === false && zoneCardSelectionHoldable(d)),
+    [visibleDevices],
   );
   const controlAllDevicesButton = anyUncontrolled ? (
     <Button
@@ -2210,13 +2212,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     offDescription: t('lighting.modeMenu.offDesc'),
     simpleDescription: t('lighting.modeMenu.simpleDesc'),
     advancedDescription: t('lighting.modeMenu.advancedDesc'),
-    // Simple mode never shows the device list, so Off claims what it can reach
-    // first - the same claim the palette runs, so the page's counts agree.
     onOff: () => {
-      // Already off: asking again would re-run the claim and re-issue the stop.
+      // Already off: asking again would re-issue the stop.
       if (synced && mode === 'none') return;
       pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds, true));
-      if (simpleDashboard) claimAllDevices(false);
       void handleModeChange('none');
     },
     onModeChange: setDashboardMode,
