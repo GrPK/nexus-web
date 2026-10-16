@@ -14,8 +14,6 @@ export interface SpeakerState {
   present: boolean;
   name?: string | null;
   model?: string | null;
-  /** Windows plays its sound on the speaker; settings only shape sound sent to it. */
-  isDefaultOutput: boolean;
   /** System volume of the speaker's output, 0-1. */
   volume?: number | null;
   /** 0-100; null when the speaker did not answer. */

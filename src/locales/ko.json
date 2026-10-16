@@ -1118,7 +1118,6 @@
   "devices.logitechSpeaker.lower": "낮추기",
   "devices.logitechSpeaker.mode": "서라운드 모드",
   "devices.logitechSpeaker.movie": "영화",
-  "devices.logitechSpeaker.notDefault": "G560이 Windows의 기본 출력이 아니어서 다른 곳에서 재생되는 소리에는 이 설정이 적용되지 않습니다.",
   "devices.logitechSpeaker.notFound": "G560을 찾을 수 없음",
   "devices.logitechSpeaker.notFoundHint": "스피커를 연결하세요. Nexus는 G HUB가 설치한 Logitech 오디오 드라이버로 스피커를 찾습니다.",
   "devices.logitechSpeaker.preset": "프리셋",

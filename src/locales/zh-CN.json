@@ -1118,7 +1118,6 @@
   "devices.logitechSpeaker.lower": "调低",
   "devices.logitechSpeaker.mode": "环绕模式",
   "devices.logitechSpeaker.movie": "电影",
-  "devices.logitechSpeaker.notDefault": "G560 不是 Windows 的默认输出，因此在其他地方播放的声音不会使用这些设置。",
   "devices.logitechSpeaker.notFound": "未找到 G560",
   "devices.logitechSpeaker.notFoundHint": "请连接音箱。Nexus 通过 G HUB 安装的罗技音频驱动找到它。",
   "devices.logitechSpeaker.preset": "预设",

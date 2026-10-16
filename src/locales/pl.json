@@ -1125,7 +1125,6 @@
   "devices.logitechSpeaker.lower": "Ciszej",
   "devices.logitechSpeaker.mode": "Tryb dźwięku przestrzennego",
   "devices.logitechSpeaker.movie": "Filmy",
-  "devices.logitechSpeaker.notDefault": "G560 nie jest domyślnym wyjściem w Windows, więc dźwięk odtwarzany gdzie indziej nie dostaje tych ustawień.",
   "devices.logitechSpeaker.notFound": "Nie znaleziono G560",
   "devices.logitechSpeaker.notFoundHint": "Podłącz głośniki. Nexus znajduje je przez sterownik audio Logitech zainstalowany przez G HUB.",
   "devices.logitechSpeaker.preset": "Ustawienie",

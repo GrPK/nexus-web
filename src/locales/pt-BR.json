@@ -1118,7 +1118,6 @@
   "devices.logitechSpeaker.lower": "Diminuir",
   "devices.logitechSpeaker.mode": "Modo surround",
   "devices.logitechSpeaker.movie": "Filmes",
-  "devices.logitechSpeaker.notDefault": "O G560 não é a saída padrão no Windows, então o som tocado em outro lugar não recebe estas configurações.",
   "devices.logitechSpeaker.notFound": "G560 não encontrado",
   "devices.logitechSpeaker.notFoundHint": "Conecte a caixa de som. O Nexus a encontra pelo driver de áudio da Logitech que o G HUB instalou.",
   "devices.logitechSpeaker.preset": "Predefinição",

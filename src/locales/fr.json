@@ -1118,7 +1118,6 @@
   "devices.logitechSpeaker.lower": "Plus bas",
   "devices.logitechSpeaker.mode": "Mode surround",
   "devices.logitechSpeaker.movie": "Films",
-  "devices.logitechSpeaker.notDefault": "Le G560 n'est pas la sortie par défaut de Windows : le son joué ailleurs ne reçoit pas ces réglages.",
   "devices.logitechSpeaker.notFound": "G560 introuvable",
   "devices.logitechSpeaker.notFoundHint": "Branchez l'enceinte. Nexus la trouve grâce au pilote audio Logitech installé par G HUB.",
   "devices.logitechSpeaker.preset": "Préréglage",

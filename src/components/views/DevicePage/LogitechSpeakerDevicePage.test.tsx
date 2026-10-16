@@ -43,7 +43,6 @@ function state(over: Partial<SpeakerState> = {}): SpeakerState {
     present: true,
     name: 'Logitech G560 Gaming Speaker',
     model: 'G560',
-    isDefaultOutput: true,
     volume: 0.2,
     subwooferLevel: 70,
     eqEnabled: true,
@@ -147,13 +146,6 @@ describe('LogitechSpeakerDevicePage Acoustics', () => {
     fireEvent.click(await screen.findByRole('button', { name: `${P}flat` }));
 
     expect(await screen.findByText(`${P}failed`)).toBeInTheDocument();
-  });
-
-  it('tells when the speaker is not the default output', async () => {
-    mockGet.mockResolvedValue(state({ isDefaultOutput: false }));
-    render(<LogitechSpeakerDevicePage />);
-
-    expect(await screen.findByText(`${P}notDefault`)).toBeInTheDocument();
   });
 
   it('shows the speaker is not found', async () => {
