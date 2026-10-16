@@ -441,6 +441,10 @@ export interface LightingDevice {
   hue?: number;
   /** Current saturation, 0..1. Set only for color-capable smart lights. */
   saturation?: number;
+  /** True when the device offers a frame-rate cap (slow-bus hardware). */
+  rateCapSupported?: boolean;
+  /** The user's frame-rate cap in FPS; null = Off. */
+  maxRateHz?: number | null;
   ledCount: number;
   /** The byte the lighting output frame tags this device's LEDs with. Absent on
    *  an older service, or when the device has no engine frame. */
@@ -703,6 +707,10 @@ export type LightingColorAdjustPatch = Partial<LightingColorAdjust> & { brightne
 // the others across devices that disagree on them.
 export const setLightingColorAdjust = (ids: string[], patch: LightingColorAdjustPatch) =>
   postService('/devices/lighting-devices/color-adjust', { ids, ...patch });
+
+// Per-device frame-rate cap for slow hardware. null turns the cap off.
+export const setLightingMaxRate = (id: string, maxRateHz: number | null) =>
+  postService<ApiEnvelope>('/devices/lighting-devices/max-rate', { id, maxRateHz });
 
 // Master brightness cap (0..1). Caps every per-device value so the effective
 // brightness for an LED is `min(global, device / 100)` - never brighter.

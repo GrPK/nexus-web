@@ -406,6 +406,23 @@
   color: var(--text-dim);
 }
 
+.saveGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  gap: var(--space-sm) var(--space-xl);
+}
+
+.rateCapField {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text-dim);
+  font-size: var(--type-small);
+}
+
 .brightnessIcon {
   flex-shrink: 0;
   color: var(--text-dim);
