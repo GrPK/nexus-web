@@ -2099,6 +2099,18 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const controlAllRef = useRef<HTMLSpanElement>(null);
   const controlAllFullWidth = useRef<{ label: string; width: number } | null>(null);
   const [controlAllCompact, setControlAllCompact] = useState(false);
+  // Bumped when web fonts finish loading, which invalidates every measured width.
+  const [fontEpoch, setFontEpoch] = useState(0);
+  useEffect(() => {
+    let live = true;
+    void document.fonts?.ready.then(() => {
+      if (!live) return;
+      controlAllFullWidth.current = null;
+      setControlAllCompact(false);
+      setFontEpoch(e => e + 1);
+    });
+    return () => { live = false; };
+  }, []);
   const controlAllLabel = t('lighting.controlAllDevices');
   const controlAllIconOnly = !simpleDashboard && controlAllCompact;
   useLayoutEffect(() => {
@@ -2106,14 +2118,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const rail = wrap?.parentElement;
     const row = rail?.parentElement;
     const toolbar = wrap?.nextElementSibling;
-    if (!wrap || !rail || !row || !toolbar || simpleDashboard) return;
+    const button = wrap?.firstElementChild as HTMLElement | null | undefined;
+    if (!wrap || !button || !rail || !row || !toolbar || simpleDashboard) return;
     if (!controlAllCompact) {
-      controlAllFullWidth.current = { label: controlAllLabel, width: wrap.offsetWidth };
+      controlAllFullWidth.current = { label: controlAllLabel, width: button.offsetWidth };
     } else if (controlAllFullWidth.current?.label !== controlAllLabel) {
       setControlAllCompact(false);
       return;
     }
     const measure = () => {
+
       const full = controlAllFullWidth.current;
       const toolbarWidth = parseFloat(getComputedStyle(toolbar).getPropertyValue('--preset-rail-width'));
       if (!full || Number.isNaN(toolbarWidth)) return;
@@ -2127,20 +2141,22 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
     observer.observe(row);
+    for (const c of row.children) if (c !== rail) observer.observe(c);
+    if (!controlAllCompact) observer.observe(button);
     return () => observer.disconnect();
-  }, [anyUncontrolled, simpleDashboard, controlAllLabel, controlAllCompact]);
+  }, [anyUncontrolled, simpleDashboard, controlAllLabel, controlAllCompact, fontEpoch]);
   const controlAllDevicesButton = anyUncontrolled ? (
     <span ref={controlAllRef} className={styles.controlAll}>
-      <Button
-        size="sm"
-        pill
-        icon={controlAllIconOnly ? <ListChecks /> : undefined}
-        aria-label={controlAllIconOnly ? controlAllLabel : undefined}
-        title={controlAllIconOnly ? controlAllLabel : undefined}
-        onClick={() => { claimAllDevices(); if (simpleDashboard) unpinAll(); }}
-      >
-        {controlAllIconOnly ? undefined : controlAllLabel}
-      </Button>
+    <Button
+      size="sm"
+      pill
+      icon={controlAllIconOnly ? <ListChecks /> : undefined}
+      aria-label={controlAllIconOnly ? controlAllLabel : undefined}
+      title={controlAllIconOnly ? controlAllLabel : undefined}
+      onClick={() => { claimAllDevices(); if (simpleDashboard) unpinAll(); }}
+    >
+      {controlAllIconOnly ? undefined : controlAllLabel}
+    </Button>
     </span>
   ) : undefined;
 

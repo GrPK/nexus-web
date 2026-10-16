@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { LightingPage } from './LightingPage';
@@ -147,25 +147,59 @@ describe('LightingPage simple mode device claiming', () => {
     expect(lightingApi.setLightingDevicePower).toHaveBeenCalledWith('openrgb-0', true);
   });
 
-  it('puts Control all devices in the Advanced rail, icon-only when the row cannot fit the label', async () => {
+  it('in the Advanced rail, keeps the label with room and goes icon-only and back as the row resizes', async () => {
     // jsdom has no layout, so the geometry the measure reads is faked: a row
-    // 200 wide, siblings 100 wide, a 300 wide toolbar and a 100 wide button.
-    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} unobserve() {} });
-    const widths = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(100);
-    const client = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
-    const style = vi.spyOn(window, 'getComputedStyle').mockReturnValue({
-      getPropertyValue: () => '300px', columnGap: '0px',
-    } as unknown as CSSStyleDeclaration);
+    // whose width the test controls, a fixed-width sibling, toolbar and button.
+    let rowWidth = 600;
+    // Only the header row's observer is driven; other components' observers
+    // would need real entries.
+    const observers: Array<(entries: unknown[]) => void> = [];
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(private cb: (entries: unknown[]) => void) {}
+      observe(el: Element) {
+        if (el.className.toString().includes('tabsRow')) observers.push(this.cb);
+      }
+      disconnect() {}
+      unobserve() {}
+    });
+    const offset = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(100);
+    const client = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.className.toString().includes('tabsRow') ? rowWidth : 0;
+    });
+    const realStyle = window.getComputedStyle.bind(window);
+    const style = vi.spyOn(window, 'getComputedStyle').mockImplementation((el, pseudo) => {
+      const real = realStyle(el, pseudo);
+      return new Proxy(real, {
+        get(target, key) {
+          if (key === 'getPropertyValue') {
+            return (name: string) => (name === '--preset-rail-width' ? '300px' : target.getPropertyValue(name));
+          }
+          if (key === 'columnGap') return '0px';
+          const value = Reflect.get(target, key) as unknown;
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+    const resize = (width: number) => {
+      rowWidth = width;
+      act(() => { observers.forEach(cb => cb([])); });
+    };
     try {
       renderMode('advanced');
-      const button = await screen.findByRole('button', { name: /lighting\.controlAllDevices/ });
+      const name = /lighting\.controlAllDevices/;
+      const button = await screen.findByRole('button', { name });
       expect(button.closest('header')).not.toBeNull();
-      await waitFor(() => {
-        const compact = screen.getByRole('button', { name: /lighting\.controlAllDevices/ });
-        expect(compact.getAttribute('aria-label')).toBe('lighting.controlAllDevices');
-      });
+      // Room for the label: no aria-label, the text is the name.
+      expect(button.getAttribute('aria-label')).toBeNull();
+      const ariaLabel = () => screen.getByRole('button', { name }).getAttribute('aria-label');
+
+      resize(200);
+      await waitFor(() => expect(ariaLabel()).toBe('lighting.controlAllDevices'));
+
+      resize(600);
+      await waitFor(() => expect(ariaLabel()).toBeNull());
     } finally {
-      widths.mockRestore(); client.mockRestore(); style.mockRestore();
+      offset.mockRestore(); client.mockRestore(); style.mockRestore();
       vi.unstubAllGlobals();
     }
   });
