@@ -134,4 +134,24 @@ describe('InfoTooltip', () => {
       expect(icon).toHaveFocus();
     });
   });
+
+  describe('emoji', () => {
+    it('wraps an emoji in its own span and leaves the plain text alone', () => {
+      render(<InfoTooltip message="Gone 😔 for now" ariaLabel="Info" />);
+      fireEvent.focus(screen.getByRole('button', { name: 'Info' }));
+      const bubble = screen.getByRole('tooltip');
+      const emoji = within(bubble).getByText('😔');
+      expect(emoji.tagName).toBe('SPAN');
+      expect(bubble).toHaveTextContent('Gone 😔 for now');
+      expect(bubble.childNodes[0].textContent).toBe('Gone ');
+    });
+
+    it('renders a message without an emoji as one plain text node', () => {
+      render(<InfoTooltip message="Plain message" ariaLabel="Info" />);
+      fireEvent.focus(screen.getByRole('button', { name: 'Info' }));
+      const bubble = screen.getByRole('tooltip');
+      expect(bubble.childNodes).toHaveLength(1);
+      expect(bubble.firstChild?.nodeType).toBe(Node.TEXT_NODE);
+    });
+  });
 });

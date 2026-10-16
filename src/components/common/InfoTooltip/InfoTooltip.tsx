@@ -24,6 +24,23 @@ interface InfoTooltipProps {
 }
 
 const OFFSET = 8;
+
+const EMOJI_RUN = /\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*/gu;
+
+// Chromium draws a color emoji with the text color's alpha, so the dimmed
+// message color would wash it out; each emoji run gets an opaque color.
+function withOpaqueEmoji(message: string): ReactNode {
+  const parts: ReactNode[] = [];
+  let last = 0;
+  for (const m of message.matchAll(EMOJI_RUN)) {
+    parts.push(message.slice(last, m.index));
+    parts.push(<span key={m.index} className={styles.emoji}>{m[0]}</span>);
+    last = m.index + m[0].length;
+  }
+  if (parts.length === 0) return message;
+  parts.push(message.slice(last));
+  return parts;
+}
 // Minimum gap kept between the tooltip box and the viewport edge when clamping.
 const VIEWPORT_MARGIN = 8;
 
@@ -238,7 +255,7 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
           onPointerLeave={scheduleClose}
           onFocus={action ? cancelPendingClose : undefined}
           onBlur={action ? scheduleClose : undefined}>
-          {action ? <span id={tooltipId}>{message}</span> : message}
+          {action ? <span id={tooltipId}>{withOpaqueEmoji(message)}</span> : withOpaqueEmoji(message)}
           {action && (
             <Button
               ref={actionRef}

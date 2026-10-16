@@ -63,6 +63,10 @@
   user-select: none;
 }
 
+.emoji {
+  color: var(--text);
+}
+
 .action {
   display: flex;
   width: fit-content;
