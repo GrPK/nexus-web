@@ -45,6 +45,7 @@ import { pluralKey } from '../../../lib/pluralKey';
 import { Badge } from '../../../components/common/Badge/Badge';
 import { EmptyState } from '../../../components/common/EmptyState/EmptyState';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
+import { useOnboardingHint } from '../../../hooks/useOnboardingHint';
 import { InfoTooltip } from '../../../components/common/InfoTooltip/InfoTooltip';
 import { ViewHeader } from '../../../components/common/ViewHeader/ViewHeader';
 import { AdvancedModeCta } from '../../../components/common/AdvancedModeCta/AdvancedModeCta';
@@ -145,6 +146,7 @@ interface LayoutHistorySnapshot {
 }
 
 const GAME_SYNC_REMOVED_TAB_KEY = 'game-sync-removed';
+const GAME_SYNC_NOTICE_HINT_ID = 'game-sync-removed-notice';
 
 // The modes a tab press can pin selected cards to; Off always changes the global mode.
 const PINNABLE_MODES: ReadonlySet<string> = new Set(['static', 'animate', 'screen', 'gif']);
@@ -228,6 +230,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     onSectionNavigate?.('settings', { settingsTab: 'lighting-cooling', settingsAnchor: 'set-render-gpu' });
   }, [onSectionNavigate]);
   const isWindows = platform === 'windows';
+  const gameSyncNoticeHint = useOnboardingHint(GAME_SYNC_NOTICE_HINT_ID);
   const { settings: uiSettings, update: updateUiSettings } = useUiSettings();
   const simpleDashboard = uiSettings.lightingDashboardMode === 'simple';
   // Off / simple / advanced live behind the first tab (see modeTabs). The
@@ -2201,13 +2204,18 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         ) : undefined,
       };
     }),
-    // Removal notice for upgraders: delete with its locale keys and tests after the next production release.
-    ...(isWindows && gameSyncRemovedNotice ? [{
+    // Removal notice for upgraders: delete with its hint id, locale keys and tests after the next production release.
+    ...(isWindows && gameSyncRemovedNotice && gameSyncNoticeHint.dismissed === false ? [{
       key: GAME_SYNC_REMOVED_TAB_KEY,
       label: t('lighting.mode.gamesync'),
       icon: <Gamepad2 size={14} />,
       disabled: true,
-      trailing: <InfoTooltip message={t('lighting.gameSync.removedNotice')} />,
+      trailing: (
+        <InfoTooltip
+          message={t('lighting.gameSync.removedNotice')}
+          action={{ label: t('lighting.gameSync.removeTab'), onClick: gameSyncNoticeHint.dismiss }}
+        />
+      ),
     }] : [])];
   // The strip marks the mode tab while lighting is off - it is the tab Off now
   // lives on. Every other mode still marks its own tab.

@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchCurrentSync, startAnimate, startStatic, stopLighting } from '../../../api/lighting';
+import { dismissOnboardingHint, fetchOnboardingStatus } from '../../../api/onboarding';
+import { resetOnboardingHintSession } from '../../../hooks/useOnboardingHint';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { LightingPage } from './LightingPage';
 
@@ -20,6 +22,11 @@ vi.mock('../../../lib/controlSync', () => ({
 vi.mock('../../../components/views/ServiceRequired', () => ({ ServiceRequired: () => null }));
 vi.mock('../../../components/common/DeviceCanvas/DeviceCanvas', () => ({ DeviceCanvas: () => <div /> }));
 vi.mock('./page/LedMapEditor', () => ({ LedMapEditor: () => null }));
+
+vi.mock('../../../api/onboarding', () => ({
+  fetchOnboardingStatus: vi.fn(),
+  dismissOnboardingHint: vi.fn(),
+}));
 
 vi.mock('../../../api/lighting', async importOriginal => {
   const actual = await importOriginal<typeof import('../../../api/lighting')>();
@@ -59,6 +66,9 @@ describe('Game Sync removal notice tab', () => {
   beforeEach(() => {
     localStorage.setItem('nexus_settings', JSON.stringify({ general: { lightingDashboardMode: 'advanced', coolingDashboardMode: 'advanced' } }));
     vi.mocked(fetchCurrentSync).mockReset();
+    resetOnboardingHintSession();
+    vi.mocked(fetchOnboardingStatus).mockReset().mockResolvedValue({ completed: true, dismissedHints: [] });
+    vi.mocked(dismissOnboardingHint).mockReset().mockResolvedValue({ status: 200, body: { completed: true, dismissedHints: ['game-sync-removed-notice'] } });
     vi.mocked(startAnimate).mockClear();
     vi.mocked(startStatic).mockClear();
     vi.mocked(stopLighting).mockClear();
@@ -94,6 +104,28 @@ describe('Game Sync removal notice tab', () => {
     expect(startAnimate).not.toHaveBeenCalled();
     expect(startStatic).not.toHaveBeenCalled();
     expect(stopLighting).not.toHaveBeenCalled();
+  });
+
+  it('is absent when the service already lists the hint as dismissed', async () => {
+    vi.mocked(fetchCurrentSync).mockResolvedValue({ sync: 'none', paused: false, gameSyncRemovedNotice: true });
+    vi.mocked(fetchOnboardingStatus).mockResolvedValue({ completed: true, dismissedHints: ['game-sync-removed-notice'] });
+    renderPage('windows');
+
+    await waitFor(() => expect(fetchOnboardingStatus).toHaveBeenCalled());
+    await screen.findAllByRole('tab');
+    expect(gameSyncTab()).toBeNull();
+  });
+
+  it('Remove tab dismisses the hint on the service and hides the tab', async () => {
+    vi.mocked(fetchCurrentSync).mockResolvedValue({ sync: 'none', paused: false, gameSyncRemovedNotice: true });
+    renderPage('windows');
+    await waitFor(() => expect(gameSyncTab()).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'infoTooltip.ariaLabel' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'lighting.gameSync.removeTab' }));
+
+    expect(dismissOnboardingHint).toHaveBeenCalledWith('game-sync-removed-notice');
+    await waitFor(() => expect(gameSyncTab()).toBeNull());
   });
 
   it.each([

@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Info } from 'lucide-react';
+import { Button } from '../Button/Button';
 import { useTranslation } from '../../../lib/i18n';
 import { tooltipOpenDelay, notifyTooltipOpen, notifyTooltipClose } from '../tooltipDelay';
 import { isRestoringModalFocus, onModalOpen } from '../Overlay/modalStack';
@@ -18,6 +19,8 @@ interface InfoTooltipProps {
   icon?: ReactNode;
   /** Colours the glyph for a warning or critical flag; absent keeps the neutral info look. */
   tone?: 'warning' | 'critical';
+  /** A button under the message. The bubble stays open while the pointer or focus is inside it, and Tab from the icon reaches the button. */
+  action?: { label: string; onClick: () => void };
 }
 
 const OFFSET = 8;
@@ -32,13 +35,14 @@ const VIEWPORT_MARGIN = 8;
  * Rendered into a portal on document.body so ancestor `overflow: auto`
  * containers (e.g. App's scrollable content column) can't clip it.
  */
-export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, icon, tone }: InfoTooltipProps) {
+export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, icon, tone, action }: InfoTooltipProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLSpanElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLSpanElement>(null);
+  const actionRef = useRef<HTMLButtonElement>(null);
   const closeTimerRef = useRef<number | null>(null);
   const openTimerRef = useRef<number | null>(null);
   // Whether this tooltip actually became visible - so the shared scan-mode
@@ -169,6 +173,13 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
 
   const label = ariaLabel ?? t('infoTooltip.ariaLabel');
 
+  const closeNow = () => {
+    cancelPendingOpen();
+    cancelPendingClose();
+    setOpen(false);
+    if (openedRef.current) { openedRef.current = false; notifyTooltipClose(); }
+  };
+
   return (
     <span ref={rootRef} className={`${styles.root} ${open ? styles.open : ''} ${className ?? ''}`}>
       <button type="button"
@@ -189,6 +200,13 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
         }}
         onPointerEnter={(e) => { if (e.pointerType !== 'touch') { cancelPendingClose(); scheduleOpen(); } }}
         onPointerLeave={(e) => { if (e.pointerType !== 'touch') scheduleClose(); }}
+        onKeyDown={action ? (e) => {
+          // The bubble is portaled to the end of the body, so Tab would skip it.
+          if (e.key === 'Tab' && !e.shiftKey && open && actionRef.current) {
+            e.preventDefault();
+            actionRef.current.focus();
+          }
+        } : undefined}
         onFocus={() => {
           // Focus a closing modal hands back is not the user arriving here.
           if (isRestoringModalFocus()) return;
@@ -210,8 +228,26 @@ export function InfoTooltip({ message, ariaLabel, side = 'bottom', className, ic
             visibility: coords ? 'visible' : 'hidden',
           }}
           onPointerEnter={cancelPendingClose}
-          onPointerLeave={scheduleClose}>
+          onPointerLeave={scheduleClose}
+          onFocus={action ? cancelPendingClose : undefined}
+          onBlur={action ? scheduleClose : undefined}>
           {message}
+          {action && (
+            <Button
+              ref={actionRef}
+              size="sm"
+              className={styles.action}
+              onClick={() => { closeNow(); action.onClick(); }}
+              onKeyDown={(e) => {
+                if (e.key !== 'Tab') return;
+                // Back to the icon; a forward Tab then continues from there.
+                if (e.shiftKey) e.preventDefault();
+                triggerRef.current?.focus();
+              }}
+            >
+              {action.label}
+            </Button>
+          )}
         </span>,
         document.body,
       )}

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { InfoTooltip } from './InfoTooltip';
 import { TOOLTIP_OPEN_DELAY_MS } from '../tooltipDelay';
 
@@ -57,5 +57,61 @@ describe('InfoTooltip', () => {
     fireEvent.focus(screen.getByRole('button', { name: 'Info' }));
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+
+  describe('action', () => {
+    it('renders no button unless an action is passed', () => {
+      render(<InfoTooltip message="Hello" ariaLabel="Info" />);
+      fireEvent.focus(screen.getByRole('button', { name: 'Info' }));
+      expect(within(screen.getByRole('tooltip')).queryByRole('button')).toBeNull();
+    });
+
+    it('renders the action and fires it on click, closing the bubble', () => {
+      const onClick = vi.fn();
+      render(<InfoTooltip message="Hello" ariaLabel="Info" action={{ label: 'Remove', onClick }} />);
+      fireEvent.focus(screen.getByRole('button', { name: 'Info' }));
+      fireEvent.click(within(screen.getByRole('tooltip')).getByRole('button', { name: 'Remove' }));
+      expect(onClick).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    });
+
+    it('stays open while the pointer travels from the icon into the bubble', () => {
+      vi.useFakeTimers();
+      try {
+        render(<InfoTooltip message="Hello" ariaLabel="Info" action={{ label: 'Remove', onClick: () => {} }} />);
+        const icon = screen.getByRole('button', { name: 'Info' });
+        fireEvent.pointerEnter(icon, { pointerType: 'mouse' });
+        act(() => { vi.advanceTimersByTime(TOOLTIP_OPEN_DELAY_MS); });
+        fireEvent.pointerLeave(icon, { pointerType: 'mouse' });
+        fireEvent.pointerEnter(screen.getByRole('tooltip'), { pointerType: 'mouse' });
+        act(() => { vi.advanceTimersByTime(500); });
+        expect(screen.getByRole('tooltip')).toBeInTheDocument();
+        fireEvent.pointerLeave(screen.getByRole('tooltip'), { pointerType: 'mouse' });
+        act(() => { vi.advanceTimersByTime(500); });
+        expect(screen.queryByRole('tooltip')).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('moves focus from the icon to the action on Tab, and back on Shift+Tab', () => {
+      render(<InfoTooltip message="Hello" ariaLabel="Info" action={{ label: 'Remove', onClick: () => {} }} />);
+      const icon = screen.getByRole('button', { name: 'Info' });
+      icon.focus();
+      fireEvent.focus(icon);
+      fireEvent.keyDown(icon, { key: 'Tab' });
+      const action = within(screen.getByRole('tooltip')).getByRole('button', { name: 'Remove' });
+      expect(action).toHaveFocus();
+      fireEvent.keyDown(action, { key: 'Tab', shiftKey: true });
+      expect(icon).toHaveFocus();
+    });
+
+    it('a tap opens the bubble and it stays open until an outside press', () => {
+      render(<InfoTooltip message="Hello" ariaLabel="Info" action={{ label: 'Remove', onClick: () => {} }} />);
+      tap(screen.getByRole('button', { name: 'Info' }));
+      expect(screen.getByRole('tooltip')).toBeInTheDocument();
+      fireEvent.mouseDown(document.body);
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    });
   });
 });
