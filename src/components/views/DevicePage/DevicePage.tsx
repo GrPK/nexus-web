@@ -23,6 +23,7 @@ import { StrimerDevicePage } from './StrimerDevicePage';
 import { NollieDevicePage } from './NollieDevicePage';
 import { TryxDevicePage } from './TryxDevicePage';
 import { AstralDevicePage } from './AstralDevicePage';
+import { LogitechSpeakerDevicePage } from './LogitechSpeakerDevicePage';
 import { StreamDeckDevicePage } from './StreamDeckDevicePage';
 import { NexusControlCard } from '../../common/NexusControlCard/NexusControlCard';
 import { Notice, NoticeSecondary } from '../../common/Notice/Notice';
@@ -289,6 +290,10 @@ function DeviceBody({ device, controlDevice, onOpenFirmware, onSectionNavigate }
 
   if (device.curatedId === 'asus-astral') {
     return <AstralDevicePage key={device.key} />;
+  }
+
+  if (device.curatedId === 'logitech-speaker') {
+    return <LogitechSpeakerDevicePage key={device.key} />;
   }
 
   if (device.curatedId === 'streamdeck') {
