@@ -2087,7 +2087,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   }, [applyPins, pins]);
 
   // Over visibleDevices, which the show-uncontrolled filter does not touch, so
-  // hidden uncontrolled cards count; fully parked and zero-LED cards do not.
+  // hidden uncontrolled cards count; zero-LED and device-page cards do not.
   const anyUncontrolled = useMemo(
     () => visibleDevices.some(d => d.controlled === false && zoneCardSelectionHoldable(d)),
     [visibleDevices],

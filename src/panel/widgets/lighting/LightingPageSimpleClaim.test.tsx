@@ -147,6 +147,19 @@ describe('LightingPage simple mode device claiming', () => {
     expect(lightingApi.setLightingDevicePower).toHaveBeenCalledWith('openrgb-0', true);
   });
 
+  it('offers Control all devices for an uncontrolled device hidden from the list', async () => {
+    localStorage.setItem('nexus_settings', JSON.stringify({
+      general: { lightingDashboardMode: 'advanced', showUncontrolledLightingDevices: false },
+    }));
+    render(
+      <UiSettingsProvider>
+        <LightingPage serviceOnline serviceState={{ cooling: null, lighting: null, panel: null }} activeProfileId="p" />
+      </UiSettingsProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /lighting\.controlAllDevices/ }));
+    await waitFor(() => expect(lightingApi.setLightingDeviceControlled).toHaveBeenCalledWith('openrgb-0', true));
+  });
+
   it('shows no Control all devices when every device is controlled', async () => {
     vi.mocked(lightingApi.fetchLightingDevices).mockImplementation(
       () => Promise.resolve({ isInit: true, devices: [{ ...DEVICE, controlled: true, ledsOn: true }] } as never),
