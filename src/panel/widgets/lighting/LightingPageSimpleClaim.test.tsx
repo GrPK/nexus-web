@@ -147,6 +147,29 @@ describe('LightingPage simple mode device claiming', () => {
     expect(lightingApi.setLightingDevicePower).toHaveBeenCalledWith('openrgb-0', true);
   });
 
+  it('puts Control all devices in the Advanced rail, icon-only when the row cannot fit the label', async () => {
+    // jsdom has no layout, so the geometry the measure reads is faked: a row
+    // 200 wide, siblings 100 wide, a 300 wide toolbar and a 100 wide button.
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} unobserve() {} });
+    const widths = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(100);
+    const client = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+    const style = vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+      getPropertyValue: () => '300px', columnGap: '0px',
+    } as unknown as CSSStyleDeclaration);
+    try {
+      renderMode('advanced');
+      const button = await screen.findByRole('button', { name: /lighting\.controlAllDevices/ });
+      expect(button.closest('header')).not.toBeNull();
+      await waitFor(() => {
+        const compact = screen.getByRole('button', { name: /lighting\.controlAllDevices/ });
+        expect(compact.getAttribute('aria-label')).toBe('lighting.controlAllDevices');
+      });
+    } finally {
+      widths.mockRestore(); client.mockRestore(); style.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('offers Control all devices for an uncontrolled device hidden from the list', async () => {
     localStorage.setItem('nexus_settings', JSON.stringify({
       general: { lightingDashboardMode: 'advanced', showUncontrolledLightingDevices: false },

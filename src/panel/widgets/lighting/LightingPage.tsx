@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Ban, CheckCheck, ListChecks, Eye, EyeOff, Gamepad2, Lightbulb, Maximize2, Music, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
   startAnimate, startStatic, startScreenMirror, stopLighting,
@@ -2093,30 +2093,55 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     [visibleDevices],
   );
   // The Advanced rail also holds the Presets toolbar, which a labeled button
-  // would push off-screen at narrow widths, so it goes icon-only there.
-  const [narrowViewport, setNarrowViewport] = useState(
-    () => typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches,
-  );
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return;
-    const mql = window.matchMedia('(max-width: 900px)');
-    const onChange = (e: MediaQueryListEvent) => setNarrowViewport(e.matches);
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
+  // would push off-screen, so the label drops when the row cannot fit both.
+  // Every input is independent of the toggle (sibling widths, the toolbar's
+  // natural width, the label's width measured while shown), so it cannot flap.
+  const controlAllRef = useRef<HTMLSpanElement>(null);
+  const controlAllFullWidth = useRef<{ label: string; width: number } | null>(null);
+  const [controlAllCompact, setControlAllCompact] = useState(false);
   const controlAllLabel = t('lighting.controlAllDevices');
-  const controlAllIconOnly = !simpleDashboard && narrowViewport;
+  const controlAllIconOnly = !simpleDashboard && controlAllCompact;
+  useLayoutEffect(() => {
+    const wrap = controlAllRef.current;
+    const rail = wrap?.parentElement;
+    const row = rail?.parentElement;
+    const toolbar = wrap?.nextElementSibling;
+    if (!wrap || !rail || !row || !toolbar || simpleDashboard) return;
+    if (!controlAllCompact) {
+      controlAllFullWidth.current = { label: controlAllLabel, width: wrap.offsetWidth };
+    } else if (controlAllFullWidth.current?.label !== controlAllLabel) {
+      setControlAllCompact(false);
+      return;
+    }
+    const measure = () => {
+      const full = controlAllFullWidth.current;
+      const toolbarWidth = parseFloat(getComputedStyle(toolbar).getPropertyValue('--preset-rail-width'));
+      if (!full || Number.isNaN(toolbarWidth)) return;
+      const siblings = [...row.children].filter(c => c !== rail) as HTMLElement[];
+      const rowGap = parseFloat(getComputedStyle(row).columnGap) || 0;
+      const railGap = parseFloat(getComputedStyle(rail).columnGap) || 0;
+      const used = siblings.reduce((sum, c) => sum + c.offsetWidth + rowGap, 0);
+      setControlAllCompact(row.clientWidth - used < toolbarWidth + railGap + full.width);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [anyUncontrolled, simpleDashboard, controlAllLabel, controlAllCompact]);
   const controlAllDevicesButton = anyUncontrolled ? (
-    <Button
-      size="sm"
-      pill
-      icon={controlAllIconOnly ? <ListChecks /> : undefined}
-      aria-label={controlAllIconOnly ? controlAllLabel : undefined}
-      title={controlAllIconOnly ? controlAllLabel : undefined}
-      onClick={() => { claimAllDevices(); if (simpleDashboard) unpinAll(); }}
-    >
-      {controlAllIconOnly ? undefined : controlAllLabel}
-    </Button>
+    <span ref={controlAllRef} className={styles.controlAll}>
+      <Button
+        size="sm"
+        pill
+        icon={controlAllIconOnly ? <ListChecks /> : undefined}
+        aria-label={controlAllIconOnly ? controlAllLabel : undefined}
+        title={controlAllIconOnly ? controlAllLabel : undefined}
+        onClick={() => { claimAllDevices(); if (simpleDashboard) unpinAll(); }}
+      >
+        {controlAllIconOnly ? undefined : controlAllLabel}
+      </Button>
+    </span>
   ) : undefined;
 
   // Counted over the devices the claim can actually reach. A zone with no LEDs
