@@ -135,7 +135,7 @@ describe('LightingCoolingSection section split', () => {
     expect(screen.queryByRole('switch', { name: 'lighting.schedule.enable.label' })).toBeNull();
   });
 
-  it('closes the render GPU restart confirm when Lighting turns off while it is open', async () => {
+  it('closes the rendering device restart confirm when Lighting turns off while it is open', async () => {
     prefs.gpus = [{ id: 'a', name: 'Integrated GPU', integrated: true }, { id: 'b', name: 'Discrete GPU', integrated: false }];
     const view = render(<LightingCoolingSection serviceOnline platform="windows" />);
     fireEvent.click(screen.getByRole('button', { name: 'lighting.renderGpu.label' }));

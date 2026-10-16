@@ -331,7 +331,7 @@ export const setMediaEffect = (v: PostProcessSettings, persist = true) =>
     persist,
   });
 
-// --- Render GPU (which card runs the lighting shaders) ---
+// --- Rendering device (which GPU, or the CPU, runs the lighting shaders) ---
 // Machine-specific (the GPU model name), so it lives in the service config, not
 // the cloud-synced UI prefs. Restart-to-apply: setRenderGpu persists + writes
 // the OS preference; restartService applies it.
