@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import type { DateFormat } from '../../../lib/units';
+import { resolveHour12, type DateFormat } from '../../../lib/units';
 import type { HardwareSensor } from '../../../hooks/useSensors';
 import { SENSOR_CATEGORIES } from '../../../panel/widgets/monitoring/sensorCategories';
 import {
@@ -354,14 +354,15 @@ describe('clock pseudo-device', () => {
   const at = (h: number, m: number) => new Date(2026, 10, 14, h, m, 0);
   const sensorsByGroup: TryxSensorsByGroup = {
     quick: [], cpu: [], gpu: [], memory: [], motherboard: [], storage: [], network: [], fps: [],
-    clock: tryxClockSensors(id => (id === 'time' ? 'Time' : 'Date')),
+    clock: tryxClockSensors(id => ({ time: 'Time', date: 'Date', datetime: 'Date & Time' })[id]),
   };
-  const ctx = (now: Date, timeFormat: 'system' | '12h' | '24h' = 'system', dateFormat: DateFormat = 'system') => ({ now, timeFormat, dateFormat });
+  const ctx = (now: Date, timeFormat: 'system' | '12h' | '24h' = '24h', dateFormat: DateFormat = 'system') => ({ now, timeFormat, dateFormat });
 
-  it('offers time then date by translated name but sends an empty label', () => {
+  it('offers time, date, then date and time by translated name but sends an empty label', () => {
     expect(tryxSensorOptionsForGroup('clock', sensorsByGroup)).toEqual([
       { value: 'time', optionLabel: 'Time', bareLabel: 'Time', prefixedLabel: '', type: 'Text' },
       { value: 'date', optionLabel: 'Date', bareLabel: 'Date', prefixedLabel: '', type: 'Text' },
+      { value: 'datetime', optionLabel: 'Date & Time', bareLabel: 'Date & Time', prefixedLabel: '', type: 'Text' },
     ]);
   });
 
@@ -369,10 +370,9 @@ describe('clock pseudo-device', () => {
     expect(TRYX_SENSOR_GROUP_DISPLAY_ORDER).toEqual(['clock', ...SENSOR_CATEGORIES]);
   });
 
-  it('renders time as invariant HH:mm for system and 24h, zero-padding a single-digit hour', () => {
+  it('renders 24h as HH:mm, zero-padding a single-digit hour', () => {
     expect(formatTryxClockPreview('time', ctx(at(9, 5)))).toBe('09:05');
-    expect(formatTryxClockPreview('time', ctx(at(9, 5), '24h'))).toBe('09:05');
-    expect(formatTryxClockPreview('time', ctx(at(15, 7), 'system'))).toBe('15:07');
+    expect(formatTryxClockPreview('time', ctx(at(15, 7), '24h'))).toBe('15:07');
   });
 
   it('renders 12h as h:mm with English AM/PM, including midnight and noon', () => {
@@ -387,6 +387,16 @@ describe('clock pseudo-device', () => {
     // The preview takes no locale, so a non-English app language cannot leak in.
     expect(formatTryxClockPreview('date', ctx(at(9, 5), '24h', 'dd.mm.yyyy'))).toBe('14.11.2026');
     expect(formatTryxClockPreview('date', ctx(at(9, 5), '24h', 'ddd d mmm'))).toBe('Sat 14 Nov');
+  });
+
+  it('renders datetime as date, two spaces, then time with each part following its own rules', () => {
+    expect(formatTryxClockPreview('datetime', ctx(at(9, 5)))).toBe('Sat, Nov 14  09:05');
+    expect(formatTryxClockPreview('datetime', ctx(at(15, 5), '12h', 'dd.mm.yyyy'))).toBe('14.11.2026  3:05 PM');
+  });
+
+  it('renders a system time format as 12h or 24h per the browser hour cycle, in the service text shape', () => {
+    const expected = resolveHour12('system') ? '3:07 PM' : '15:07';
+    expect(formatTryxClockPreview('time', ctx(at(15, 7), 'system'))).toBe(expected);
   });
 
   it('routes the clock device through tryxOverlayPreviewValue', () => {

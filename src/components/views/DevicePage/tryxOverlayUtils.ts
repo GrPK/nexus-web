@@ -8,7 +8,7 @@ import type { HardwareSensor } from '../../../hooks/useSensors';
 import { bareSensorLabel, prefixedSensorLabel } from '../../../panel/widgets/monitoring/sensorNames';
 import { decimalsForType, toFixedAway } from '../../../panel/widgets/monitoring/sensorValueFormat';
 import { SENSOR_CATEGORIES } from '../../../panel/widgets/monitoring/sensorCategories';
-import { DATE_FORMATS, formatDate, localizeNumbers, type DateFormat, type NumberFormat, type TimeFormat } from '../../../lib/units';
+import { DATE_FORMATS, formatDate, localizeNumbers, resolveHour12, type DateFormat, type NumberFormat, type TimeFormat } from '../../../lib/units';
 
 // Only the panel canvas's height matters here - every scaled metric below is
 // a fraction of it (width plays no part in the font/offset math).
@@ -297,7 +297,7 @@ function formatTryxThroughput(bytesPerSec: number): string {
   return `${Math.round(bytesPerSec)}B/s`;
 }
 
-export const TRYX_CLOCK_SENSOR_IDS = ['time', 'date'] as const;
+export const TRYX_CLOCK_SENSOR_IDS = ['time', 'date', 'datetime'] as const;
 export type TryxClockSensorId = (typeof TRYX_CLOCK_SENSOR_IDS)[number];
 
 /**
@@ -323,21 +323,29 @@ export interface TryxClockPreviewContext {
   dateFormat: DateFormat;
 }
 
-// Mirrors TryxPanoramaHub.FormatClockValue: the service runs with invariant
-// globalization, so the panel text is English and locale-independent. 'system'
-// time is 24h and 'system' (or an unknown) date is 'ddd, mmm d'.
+// Mirrors TryxPanoramaHub.FormatClockValue: the service text is English and
+// locale-independent. The 'system' date is 'ddd, mmm d'; 'system' time follows
+// the OS 12h/24h setting (the browser's resolved hour cycle stands in for the
+// service's Windows lookup), still rendered as HH:mm or h:mm AM/PM.
 const CLOCK_DEFAULT_DATE_FORMAT: DateFormat = 'ddd, mmm d';
 
-/** Local time or date text for the WYSIWYG preview, byte-identical to what the panel renders. */
+function clockTimeText(now: Date, timeFormat: TimeFormat): string {
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  if (resolveHour12(timeFormat)) return `${now.getHours() % 12 || 12}:${minutes} ${now.getHours() < 12 ? 'AM' : 'PM'}`;
+  return `${String(now.getHours()).padStart(2, '0')}:${minutes}`;
+}
+
+function clockDateText(now: Date, dateFormat: DateFormat): string {
+  const pattern = dateFormat !== 'system' && DATE_FORMATS.includes(dateFormat) ? dateFormat : CLOCK_DEFAULT_DATE_FORMAT;
+  return formatDate(now, pattern, { locale: 'en-US' });
+}
+
+/** Local time/date text for the WYSIWYG preview, byte-identical to what the panel renders. */
 export function formatTryxClockPreview(sensorId: string, ctx: TryxClockPreviewContext): string {
   const { now, timeFormat, dateFormat } = ctx;
-  if (sensorId === 'date') {
-    const pattern = dateFormat !== 'system' && DATE_FORMATS.includes(dateFormat) ? dateFormat : CLOCK_DEFAULT_DATE_FORMAT;
-    return formatDate(now, pattern, { locale: 'en-US' });
-  }
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  if (timeFormat === '12h') return `${now.getHours() % 12 || 12}:${minutes} ${now.getHours() < 12 ? 'AM' : 'PM'}`;
-  return `${String(now.getHours()).padStart(2, '0')}:${minutes}`;
+  if (sensorId === 'date') return clockDateText(now, dateFormat);
+  if (sensorId === 'datetime') return `${clockDateText(now, dateFormat)}  ${clockTimeText(now, timeFormat)}`;
+  return clockTimeText(now, timeFormat);
 }
 
 /**

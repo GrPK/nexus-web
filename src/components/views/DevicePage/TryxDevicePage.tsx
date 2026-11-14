@@ -71,6 +71,7 @@ import {
   TRYX_SENSOR_GROUP_DISPLAY_ORDER,
   TRYX_SENSOR_GROUP_LABEL_KEYS,
   TRYX_VALUE_FONT_PANEL_PX,
+  type TryxClockSensorId,
   type TryxOverlayAlign,
   type TryxSensorGroup,
   type TryxSensorsByGroup,
@@ -87,6 +88,11 @@ import { useReportDeviceWaiting } from './deviceDetecting';
 // docked/drag) to the service - long enough to coalesce a drag's pointermove
 // flood into one request, short enough to feel live.
 const OVERLAY_PUSH_DEBOUNCE_MS = 150;
+const CLOCK_SENSOR_NAME_KEYS: Record<TryxClockSensorId, string> = {
+  time: 'devices.tryx.clockTime',
+  date: 'devices.tryx.clockDate',
+  datetime: 'devices.tryx.deviceClock',
+};
 const OVERLAY_KEYBOARD_STEP = 0.01;
 const OVERLAY_ITEM_SLOTS = [0, 1, 2, 3] as const;
 const DEFAULT_OVERLAY_ALIGN: TryxOverlayAlign = 'left';
@@ -219,7 +225,7 @@ export function TryxDevicePage() {
     storage: sensorsForCategory('storage', sensors, networkSensors, fpsSensors),
     network: sensorsForCategory('network', sensors, networkSensors, fpsSensors),
     fps: sensorsForCategory('fps', sensors, networkSensors, fpsSensors),
-    clock: tryxClockSensors(id => t(id === 'time' ? 'devices.tryx.clockTime' : 'devices.tryx.clockDate')),
+    clock: tryxClockSensors(id => t(CLOCK_SENSOR_NAME_KEYS[id])),
   };
 
   const aliveRef = useRef(true);
