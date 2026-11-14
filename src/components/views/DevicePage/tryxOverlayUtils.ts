@@ -321,17 +321,20 @@ export interface TryxClockPreviewContext {
   now: Date;
   timeFormat: TimeFormat;
   dateFormat: DateFormat;
+  /** The service's resolved OS hour cycle; only read for a 'system' time format. Browser fallback when absent. */
+  systemClock12h?: boolean;
 }
 
 // Mirrors TryxPanoramaHub.FormatClockValue: the service text is English and
 // locale-independent. The 'system' date is 'ddd, mmm d'; 'system' time follows
-// the OS 12h/24h setting (the browser's resolved hour cycle stands in for the
-// service's Windows lookup), still rendered as HH:mm or h:mm AM/PM.
+// the service's resolved OS 12h/24h setting (the browser's hour cycle when an
+// older service does not report it), still rendered as HH:mm or h:mm AM/PM.
 const CLOCK_DEFAULT_DATE_FORMAT: DateFormat = 'ddd, mmm d';
 
-function clockTimeText(now: Date, timeFormat: TimeFormat): string {
+function clockTimeText(now: Date, timeFormat: TimeFormat, systemClock12h?: boolean): string {
   const minutes = String(now.getMinutes()).padStart(2, '0');
-  if (resolveHour12(timeFormat)) return `${now.getHours() % 12 || 12}:${minutes} ${now.getHours() < 12 ? 'AM' : 'PM'}`;
+  const twelve = timeFormat === 'system' && systemClock12h !== undefined ? systemClock12h : resolveHour12(timeFormat);
+  if (twelve) return `${now.getHours() % 12 || 12}:${minutes} ${now.getHours() < 12 ? 'AM' : 'PM'}`;
   return `${String(now.getHours()).padStart(2, '0')}:${minutes}`;
 }
 
@@ -342,10 +345,10 @@ function clockDateText(now: Date, dateFormat: DateFormat): string {
 
 /** Local time/date text for the WYSIWYG preview, byte-identical to what the panel renders. */
 export function formatTryxClockPreview(sensorId: string, ctx: TryxClockPreviewContext): string {
-  const { now, timeFormat, dateFormat } = ctx;
+  const { now, timeFormat, dateFormat, systemClock12h } = ctx;
   if (sensorId === 'date') return clockDateText(now, dateFormat);
-  if (sensorId === 'datetime') return `${clockDateText(now, dateFormat)}  ${clockTimeText(now, timeFormat)}`;
-  return clockTimeText(now, timeFormat);
+  if (sensorId === 'datetime') return `${clockDateText(now, dateFormat)}  ${clockTimeText(now, timeFormat, systemClock12h)}`;
+  return clockTimeText(now, timeFormat, systemClock12h);
 }
 
 /**

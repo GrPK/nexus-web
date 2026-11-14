@@ -394,9 +394,19 @@ describe('clock pseudo-device', () => {
     expect(formatTryxClockPreview('datetime', ctx(at(15, 5), '12h', 'dd.mm.yyyy'))).toBe('14.11.2026  3:05 PM');
   });
 
-  it('renders a system time format as 12h or 24h per the browser hour cycle, in the service text shape', () => {
+  it('renders a system time format per the service hour cycle, in the service text shape', () => {
+    expect(formatTryxClockPreview('time', { ...ctx(at(15, 7), 'system'), systemClock12h: true })).toBe('3:07 PM');
+    expect(formatTryxClockPreview('time', { ...ctx(at(15, 7), 'system'), systemClock12h: false })).toBe('15:07');
+  });
+
+  it('falls back to the browser hour cycle for a system format when the service omits it', () => {
     const expected = resolveHour12('system') ? '3:07 PM' : '15:07';
     expect(formatTryxClockPreview('time', ctx(at(15, 7), 'system'))).toBe(expected);
+  });
+
+  it('ignores the service hour cycle for an explicit 12h or 24h format', () => {
+    expect(formatTryxClockPreview('time', { ...ctx(at(15, 7), '24h'), systemClock12h: true })).toBe('15:07');
+    expect(formatTryxClockPreview('time', { ...ctx(at(15, 7), '12h'), systemClock12h: false })).toBe('3:07 PM');
   });
 
   it('routes the clock device through tryxOverlayPreviewValue', () => {

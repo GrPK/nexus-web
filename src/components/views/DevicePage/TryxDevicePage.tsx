@@ -1096,7 +1096,7 @@ export function TryxDevicePage() {
             )}
             {overlayItems.map((item, i) => {
               if (!item.enabled) return null;
-              const value = tryxOverlayPreviewValue(item.device, item.sensorId, item.sensorType, sensorsByGroup, monitoringWholeNumbers, { now: clockNow, timeFormat, dateFormat });
+              const value = tryxOverlayPreviewValue(item.device, item.sensorId, item.sensorType, sensorsByGroup, monitoringWholeNumbers, { now: clockNow, timeFormat, dateFormat, systemClock12h: status?.systemClock12h });
               const fontStyle = tryxFontCssStyle(overlayFont);
               const justify = tryxOverlayJustifyStyle(overlayAlign);
               const valueFontPx = scalePanelMetric(TRYX_VALUE_FONT_PANEL_PX, overlaySize, previewHeightPx);
