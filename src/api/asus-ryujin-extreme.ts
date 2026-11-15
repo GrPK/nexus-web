@@ -24,6 +24,8 @@ export interface RyujinDisplayState {
   uploadTotal: number;
   /** The service's reason when uploadState is failed. */
   uploadMessage: string;
+  /** Why an upload failed: failed, controlOff, bulkUnavailable or bulkInUse; empty otherwise. */
+  uploadReason: string;
 }
 
 export interface RyujinDisplayPatch {

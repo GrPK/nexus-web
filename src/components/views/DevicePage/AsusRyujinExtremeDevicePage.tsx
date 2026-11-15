@@ -29,6 +29,11 @@ import styles from './LianLiDevicePage.module.scss';
 const POLL_MS = 3000;
 const UPLOAD_POLL_MS = 1000;
 const AWAIT_UPLOAD_MS = 30000;
+const FAILED_REASON_KEYS: Record<string, string> = {
+  controlOff: 'devices.asus-ryujin-extreme.mediaReasonControlOff',
+  bulkUnavailable: 'devices.asus-ryujin-extreme.mediaReasonBulkUnavailable',
+  bulkInUse: 'devices.asus-ryujin-extreme.mediaReasonBulkInUse',
+};
 const SCREEN_MODES: readonly RyujinScreenMode[] = ['monitor', 'image'];
 const STACKED = 'stacked' as const;
 const ROTATIONS: readonly RyujinRotation[] = [0, 90];
@@ -50,6 +55,12 @@ export function AsusRyujinExtremeDevicePage() {
   useReportDeviceWaiting(state === null || !state.isConnected);
   // After a pick the service has not reported progress yet; the fast poll starts at once instead of waiting a slow cycle.
   const [awaitingUpload, setAwaitingUpload] = useState(false);
+  // Fetch order, so a state read before the pick cannot end the wait for the new upload's first report.
+  const seqRef = useRef(0);
+  const stateSeqRef = useRef(0);
+  const postSeqRef = useRef(0);
+  const awaitTimerRef = useRef<number | undefined>(undefined);
+  const [remoteNote, setRemoteNote] = useState(false);
   const sending = state?.uploadState === 'uploading' || awaitingUpload;
   const canUpload = canUploadRyujinMedia();
   const aliveRef = useRef(true);
@@ -62,8 +73,10 @@ export function AsusRyujinExtremeDevicePage() {
 
   const refresh = useCallback(async () => {
     if (busyRef.current > 0 || draggingRef.current) return;
+    const seq = ++seqRef.current;
     const next = await getRyujinDisplay();
     if (!aliveRef.current || next === null || busyRef.current > 0 || draggingRef.current) return;
+    stateSeqRef.current = seq;
     setState(next);
   }, []);
 
@@ -80,14 +93,13 @@ export function AsusRyujinExtremeDevicePage() {
   }, [refresh, sending]);
 
   useEffect(() => {
-    if (!awaitingUpload) return undefined;
-    if (state && state.uploadState !== 'idle') {
+    if (awaitingUpload && state && state.uploadState !== 'idle' && stateSeqRef.current > postSeqRef.current) {
+      window.clearTimeout(awaitTimerRef.current);
       setAwaitingUpload(false);
-      return undefined;
     }
-    const id = window.setTimeout(() => setAwaitingUpload(false), AWAIT_UPLOAD_MS);
-    return () => window.clearTimeout(id);
   }, [awaitingUpload, state]);
+
+  useEffect(() => () => window.clearTimeout(awaitTimerRef.current), []);
 
   const onPickFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -103,12 +115,21 @@ export function AsusRyujinExtremeDevicePage() {
       if (aliveRef.current) setConverting(false);
     }
     if (result?.ok) {
-      if (aliveRef.current) setAwaitingUpload(true);
+      postSeqRef.current = ++seqRef.current;
+      if (aliveRef.current) {
+        setAwaitingUpload(true);
+        window.clearTimeout(awaitTimerRef.current);
+        awaitTimerRef.current = window.setTimeout(() => setAwaitingUpload(false), AWAIT_UPLOAD_MS);
+      }
     } else {
       push({ title: t('devices.asus-ryujin-extreme.uploadFailedTitle'), body: result?.msg || t('devices.asus-ryujin-extreme.uploadFailedBody') });
     }
+    const seq = ++seqRef.current;
     const next = await getRyujinDisplay();
-    if (aliveRef.current && next !== null) setState(next);
+    if (aliveRef.current && next !== null) {
+      stateSeqRef.current = seq;
+      setState(next);
+    }
   }, [push, t]);
 
   const commit = useCallback(async (patch: RyujinDisplayPatch) => {
@@ -123,8 +144,12 @@ export function AsusRyujinExtremeDevicePage() {
       busyRef.current -= 1;
     }
     if (!ok) push({ title: t('devices.asus-ryujin-extreme.failedTitle'), body: t('devices.asus-ryujin-extreme.failedBody') });
+    const seq = ++seqRef.current;
     const next = await getRyujinDisplay();
-    if (aliveRef.current && next !== null && busyRef.current === 0) setState(next);
+    if (aliveRef.current && next !== null && busyRef.current === 0) {
+      stateSeqRef.current = seq;
+      setState(next);
+    }
   }, [push, t]);
 
   const ready = state !== null && state.isConnected;
@@ -187,7 +212,10 @@ export function AsusRyujinExtremeDevicePage() {
               onChange={key => {
                 const screenMode = key as RyujinScreenMode;
                 if (screenMode === 'image' && !state?.mediaName) {
-                  if (!canUpload) return;
+                  if (!canUpload) {
+                    setRemoteNote(true);
+                    return;
+                  }
                   fileRef.current?.click();
                   return;
                 }
@@ -217,16 +245,20 @@ export function AsusRyujinExtremeDevicePage() {
                 </p>
               )}
               {state.uploadState === 'failed' && (
-                <p className={styles.customNote}>
-                  {state.uploadMessage
-                    ? t('devices.asus-ryujin-extreme.mediaFailedDetail', { msg: state.uploadMessage })
-                    : t('devices.asus-ryujin-extreme.mediaFailed')}
-                </p>
+                <>
+                  <p className={styles.customNote}>{t(FAILED_REASON_KEYS[state.uploadReason] ?? 'devices.asus-ryujin-extreme.mediaFailed')}</p>
+                  {state.uploadMessage && (
+                    <p className={styles.customNote}>{t('devices.asus-ryujin-extreme.mediaDetail', { msg: state.uploadMessage })}</p>
+                  )}
+                </>
               )}
               {!canUpload && (
                 <p className={styles.customNote}>{t('devices.asus-ryujin-extreme.mediaRemote')}</p>
               )}
             </div>
+          )}
+          {!canUpload && remoteNote && state?.screenMode !== 'image' && (
+            <p className={styles.customNote}>{t('devices.asus-ryujin-extreme.mediaRemote')}</p>
           )}
           <input ref={fileRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={e => { void onPickFile(e); }} />
           {state?.screenMode !== 'image' && (

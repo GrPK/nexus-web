@@ -41,6 +41,7 @@ const base = {
   uploadSent: 0,
   uploadTotal: 0,
   uploadMessage: '',
+  uploadReason: '',
 };
 
 async function mount(state = base) {
@@ -241,8 +242,9 @@ describe('AsusRyujinExtremeDevicePage', () => {
   });
 
   it('a failed upload shows the reason and not the waiting line', async () => {
-    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif', uploadState: 'failed', uploadMessage: 'no ack' });
-    expect(screen.getByText(/mediaFailedDetail:\{"msg":"no ack"\}/)).toBeInTheDocument();
+    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif', uploadState: 'failed', uploadMessage: 'no ack', uploadReason: 'failed' });
+    expect(screen.getByText('devices.asus-ryujin-extreme.mediaFailed')).toBeInTheDocument();
+    expect(screen.getByText(/mediaDetail:\{"msg":"no ack"\}/)).toBeInTheDocument();
     expect(screen.queryByText(/mediaWaiting/)).not.toBeInTheDocument();
   });
 
@@ -251,5 +253,45 @@ describe('AsusRyujinExtremeDevicePage', () => {
     await mount({ ...base, screenMode: 'image', mediaName: 'a.gif', mediaHeld: true });
     expect(screen.getByRole('button', { name: 'devices.asus-ryujin-extreme.mediaReplace' })).toBeDisabled();
     expect(screen.getByText('devices.asus-ryujin-extreme.mediaRemote')).toBeInTheDocument();
+  });
+
+  it('a control-off abort says it resumes by itself and does not ask to choose the file again', async () => {
+    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif', uploadState: 'failed', uploadReason: 'controlOff' });
+    expect(screen.getByText('devices.asus-ryujin-extreme.mediaReasonControlOff')).toBeInTheDocument();
+    expect(screen.queryByText('devices.asus-ryujin-extreme.mediaFailed')).not.toBeInTheDocument();
+  });
+
+  it('choosing Image with nothing picked over the tunnel shows the remote note', async () => {
+    mockCanUpload.mockReturnValue(false);
+    await mount();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('radio', { name: 'devices.asus-ryujin-extreme.screenModeImage' }));
+    });
+    expect(screen.getByText('devices.asus-ryujin-extreme.mediaRemote')).toBeInTheDocument();
+    expect(mockSet).not.toHaveBeenCalled();
+  });
+
+  it('after a pick the controls stay locked until the service reports or the timeout passes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockGet.mockResolvedValue({ ...base, screenMode: 'image', mediaName: 'a.gif', mediaHeld: true, uploadState: 'done' });
+      await act(async () => {
+        render(<AsusRyujinExtremeDevicePage />);
+      });
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      // The service clears the earlier upload's state when it accepts a pick.
+      mockGet.mockResolvedValue({ ...base, screenMode: 'image', mediaName: 'a.gif', uploadState: 'idle' });
+      await act(async () => {
+        fireEvent.change(input, { target: { files: [new File(['x'], 'a.gif')] } });
+      });
+      // Nothing new has been reported yet, so the picker stays locked.
+      await waitFor(() => expect(screen.getByRole('button', { name: 'devices.asus-ryujin-extreme.mediaReplace' })).toBeDisabled());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31000);
+      });
+      expect(screen.getByRole('button', { name: 'devices.asus-ryujin-extreme.mediaReplace' })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
