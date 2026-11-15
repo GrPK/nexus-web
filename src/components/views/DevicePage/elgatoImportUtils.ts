@@ -36,6 +36,7 @@ const REASON_KEYS: Record<ElgatoUnmappedReason, string> = {
   audioPath: 'devices.streamdeck.import.reason.audioPath',
   openAppArgs: 'devices.streamdeck.import.reason.openAppArgs',
   dialPartial: 'devices.streamdeck.import.reason.dialPartial',
+  deviceReset: 'devices.streamdeck.import.reason.deviceReset',
 };
 
 /**

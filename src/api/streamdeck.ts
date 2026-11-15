@@ -220,7 +220,7 @@ export async function fetchElgatoProfiles(): Promise<ElgatoProfilesResponse | nu
 export type ElgatoUnmappedReason =
   | 'plugin' | 'unsupported' | 'hotkey' | 'open' | 'website' | 'text' | 'media'
   | 'multiStep' | 'encoder' | 'pageLimit' | 'hotkeyExtraSlots' | 'textEnterIgnored'
-  | 'monitoringSensor' | 'audioPath' | 'openAppArgs' | 'dialPartial';
+  | 'monitoringSensor' | 'audioPath' | 'openAppArgs' | 'dialPartial' | 'deviceReset';
 
 export interface ElgatoUnmappedKey {
   /** 1-based page index; 0 is the profile's Default dial page. */

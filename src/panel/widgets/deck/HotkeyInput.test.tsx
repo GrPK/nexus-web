@@ -42,6 +42,22 @@ describe('HotkeyInput capture', () => {
     expect(onChange).toHaveBeenLastCalledWith('enter');
   });
 
+  it('records a global hotkey keypad Enter and Equal as the main-row tokens and skips NumLock', () => {
+    const onChange = vi.fn();
+    render(<HotkeyInput value="" onChange={onChange} global />);
+    const field = screen.getByText('panel.settings.deck.hotkeySet');
+    fireEvent.click(field);
+    fireEvent.keyDown(field, { code: 'NumpadEnter', ctrlKey: true });
+    expect(onChange).toHaveBeenLastCalledWith('ctrl+enter');
+    fireEvent.click(field);
+    fireEvent.keyDown(field, { code: 'NumpadEqual', ctrlKey: true });
+    expect(onChange).toHaveBeenLastCalledWith('ctrl+=');
+    onChange.mockClear();
+    fireEvent.click(field);
+    fireEvent.keyDown(field, { code: 'NumLock' });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('captures the new printscreen and period tokens', () => {
     const onChange = vi.fn();
     render(<HotkeyInput value="" onChange={onChange} />);

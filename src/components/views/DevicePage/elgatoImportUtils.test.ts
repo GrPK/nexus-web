@@ -40,7 +40,7 @@ describe('unmappedReasonKey', () => {
     const reasons: ElgatoUnmappedReason[] = [
       'plugin', 'unsupported', 'hotkey', 'open', 'website', 'text', 'media',
       'multiStep', 'encoder', 'pageLimit', 'hotkeyExtraSlots', 'textEnterIgnored',
-      'monitoringSensor', 'audioPath', 'openAppArgs', 'dialPartial',
+      'monitoringSensor', 'audioPath', 'openAppArgs', 'dialPartial', 'deviceReset',
     ];
     for (const reason of reasons) {
       expect(unmappedReasonKey(reason)).toBe(`devices.streamdeck.import.reason.${reason}`);
@@ -56,6 +56,7 @@ describe('new reason codes and entry labels', () => {
   it('maps openAppArgs and dialPartial to their own keys', () => {
     expect(unmappedReasonKey('openAppArgs')).toBe('devices.streamdeck.import.reason.openAppArgs');
     expect(unmappedReasonKey('dialPartial')).toBe('devices.streamdeck.import.reason.dialPartial');
+    expect(unmappedReasonKey('deviceReset')).toBe('devices.streamdeck.import.reason.deviceReset');
   });
 
   it('labels page 0 dials as default dials, not page 0', () => {
