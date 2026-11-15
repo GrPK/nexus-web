@@ -767,6 +767,14 @@
   gap: 0.35rem;
 }
 
+// Label on the left, control right-aligned (toggle and colour params).
+.paramRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .paramEnumLabel {
   font-size: var(--type-small);
   color: var(--text-dim);

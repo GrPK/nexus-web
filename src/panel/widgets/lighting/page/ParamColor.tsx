@@ -1,7 +1,6 @@
 import { useId, useRef, useState } from 'react';
 import { HsvPicker } from '../../../../components/common/HsvPicker/HsvPicker';
 import { Popover } from '../../../../components/common/Popover/Popover';
-import styles from './ParamToggle.module.scss';
 import pageStyles from '../LightingPage.module.scss';
 
 /** A param row for a colour: the label on the left, one swatch right-aligned that opens the shared HSV picker. */
@@ -15,7 +14,7 @@ export function ParamColor({ label, value, onPreview, onCommit }: {
   const anchorRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   return (
-    <div className={styles.row} role="group" aria-labelledby={id}>
+    <div className={pageStyles.paramRow} role="group" aria-labelledby={id}>
       <span id={id} className={pageStyles.paramEnumLabel}>{label}</span>
       <div ref={anchorRef}>
         <button

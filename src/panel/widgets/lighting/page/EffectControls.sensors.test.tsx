@@ -192,4 +192,18 @@ describe('EffectControls background color', () => {
     fireEvent.change(screen.getByLabelText('common.hexColor'), { target: { value: '#0000ff' } });
     expect(onChange).toHaveBeenLastCalledWith({ params: { u_fill_bgHue: 240 / 360, u_fill_bgSat: 1, u_fill_bgVal: 1 } }, true);
   });
+
+  it('keeps the stored hue when the picked color is achromatic', () => {
+    const onChange = vi.fn();
+    const state = { ...baseState(), params: { u_fill_bgHue: 0.62, u_fill_bgSat: 0.8, u_fill_bgVal: 0.35 } };
+    render(
+      <EffectControls
+        effect="sensorbar" state={state} bundle={{ selected: 0, slots: [state] }} onTemplateSelect={() => {}}
+        canReset={false} onChange={onChange} onCommit={() => {}} onReset={() => {}} noPresets
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.fillBackground' }));
+    fireEvent.change(screen.getByLabelText('common.hexColor'), { target: { value: '#000000' } });
+    expect(onChange).toHaveBeenLastCalledWith({ params: { u_fill_bgHue: 0.62, u_fill_bgSat: 0, u_fill_bgVal: 0 } }, true);
+  });
 });

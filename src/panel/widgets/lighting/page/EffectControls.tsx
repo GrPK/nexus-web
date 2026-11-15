@@ -81,10 +81,11 @@ export const EffectControls = memo(function EffectControls({
     if (named) return named.labelKey ? t(named.labelKey) : named.label;
     return t('lighting.sensor.title');
   };
-  // The slot's three float params ride the same dictionary as the numeric ones.
   const setBackground = (id: string, hex: string, commit: boolean) => {
     const c = hexToHsv(hex);
-    onChange({ params: { ...state.params, [`u_${id}Hue`]: c.h / 360, [`u_${id}Sat`]: c.s / 100, [`u_${id}Val`]: c.v / 100 } }, commit);
+    // An achromatic pick has no hue of its own; keep the stored one so the picker does not snap to red.
+    const hue = c.s === 0 || c.v === 0 ? state.params[`u_${id}Hue`] ?? 0 : c.h / 360;
+    onChange({ params: { ...state.params, [`u_${id}Hue`]: hue, [`u_${id}Sat`]: c.s / 100, [`u_${id}Val`]: c.v / 100 } }, commit);
   };
   const selected = bundle.selected;
   // Simple fills are a fixed base colour: no colour wheel, no speed, no
