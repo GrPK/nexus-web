@@ -2,12 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '../../../lib/i18n';
 import { fetchLightingDevices, setLightingDeviceSaveToDevice, type LightingDevice } from '../../../api/lighting';
 import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
-import { SettingToggle } from '../../common/SettingRow/SettingRow';
+import { SettingRow, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { useToast } from '../../common/Toast/Toast';
 import { isGalleonDeck } from '../../../lib/galleonDeck';
 import { useStreamDecks } from '../../../hooks/useStreamDecks';
 import { GALLEON_SAVE_ANCHOR, keyboardCardForDeck } from './galleonKeyboardLighting';
+
+const SAVE_BLOCKED_KEYS = {
+  'foreign-host': 'devices.galleon.saveColors.reason.foreignHost',
+  'write-failed': 'devices.galleon.saveColors.reason.writeFailed',
+  'write-cap': 'devices.galleon.saveColors.reason.writeCap',
+} as const;
 
 /**
  * The Galleon page's keyboard lighting group. It lives outside the Stream Deck
@@ -44,6 +50,8 @@ export function GalleonKeyboardLightingSection({ serial, className }: { serial: 
   const deviceId = card.deviceId;
   const checked = pending ?? card.savedToDevice === true;
 
+  const reasonKey = checked && card.savedToDeviceReason ? SAVE_BLOCKED_KEYS[card.savedToDeviceReason] : undefined;
+
   const onChange = (next: boolean) => {
     const seq = ++seqRef.current;
     setPending(next);
@@ -70,6 +78,7 @@ export function GalleonKeyboardLightingSection({ serial, className }: { serial: 
         checked={checked}
         onChange={onChange}
       />
+      {reasonKey && <SettingRow description={t(reasonKey)} />}
     </SettingsSection>
   );
   return className ? <div className={className}>{section}</div> : section;

@@ -1361,6 +1361,15 @@ describe('ZoneCard save-colors strip', () => {
     expect(screen.queryByRole('button', { name: /saveStrip\.keep/ })).toBeNull();
   });
 
+  it('shows the blocked state in the gray tone instead of saved when a reason is set', () => {
+    renderKeyboard({ ...keyboard, savedToDevice: true, savedToDeviceReason: 'foreign-host' });
+    const strip = screen.getByRole('button', { name: /saveStrip\.blocked/ });
+    expect(strip.className).not.toContain(styles.deviceControlledByWarn);
+    expect(strip.textContent).toContain('lighting.devices.saveStrip.reason.foreignHost');
+    expect(strip.textContent).not.toContain('lighting.devices.saveStrip.limit');
+    expect(screen.queryByRole('button', { name: /saveStrip\.saved/ })).toBeNull();
+  });
+
   it('explains the color limit inside the strip only while the toggle is on', () => {
     const { unmount } = renderKeyboard({ ...keyboard, savedToDevice: true });
     const strip = screen.getByRole('button', { name: /saveStrip\.saved/ });

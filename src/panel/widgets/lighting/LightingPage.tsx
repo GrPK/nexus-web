@@ -2488,15 +2488,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       const showPauseToggle = synced && m.key === mode
         && (m.key === 'animate' || m.key === 'gif' || m.key === 'screen');
       const blocked = staticOnly && modeBlockedBySavedColors(m.key);
+      const blockedTip = t('lighting.mode.savedColorsOnly', { name: formatList(savedColorNames, language), static: t('lighting.mode.static') });
       return {
         key: m.key,
         label: t(m.labelKey),
-        tooltip: blocked ? t('lighting.mode.savedColorsOnly', { name: formatList(savedColorNames, language), static: t('lighting.mode.static') })
+        tooltip: blocked ? blockedTip
           : serviceOnline ? t(`${m.labelKey}.desc`) : undefined,
         icon: <Icon size={14} />,
         blocked: blocked || undefined,
         trailing: showPauseToggle ? (
-          <HoverTooltip body={t(paused ? 'lighting.resume' : 'lighting.pause')} side="top">
+          <HoverTooltip body={blocked ? blockedTip : t(paused ? 'lighting.resume' : 'lighting.pause')} side="top">
             <span
               role="button"
               tabIndex={0}
@@ -2530,9 +2531,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     : (viewMode === 'none' ? MODE_MENU_TAB_KEY : viewMode);
   const globalTabKey = !synced ? undefined
     : (mode === 'none' ? MODE_MENU_TAB_KEY : mode);
-  // What a tab press gives the selected cards: that mode's global look, or the
-  // one shared Mirror or Media. Off cannot be pinned, so it
-  // always changes everything.
   // Every path that makes a look global (no selection, simple mode, presets, sync, another client)
   // reaches an unpinned card, and a saved keyboard cannot keep an animated one. These cards show their
   // saved colors then, and the card says so.
@@ -2540,6 +2538,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     () => new Set(visibleDevices.filter(d => savesColorsToDevice(d) && modeBlockedBySavedColors(cardMode(d.id))).map(d => d.id)),
     [visibleDevices, cardMode],
   );
+  // What a tab press gives the selected cards: that mode's global look, or the
+  // one shared Mirror or Media. Off cannot be pinned, so it
+  // always changes everything.
   const tabPinFor = (m: LightingMode): Pin | null => {
     switch (m) {
       case 'static': {

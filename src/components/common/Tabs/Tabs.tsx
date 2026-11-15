@@ -119,7 +119,7 @@ export function Tabs({ tabs, activeKey, onChange, disabled, ariaLabel = 'Tabs', 
     if (typeof el.scrollTo === 'function') el.scrollTo({ left: el.scrollLeft + delta, behavior: 'smooth' });
     else el.scrollLeft += delta;
   };
-  const hoverProps = (key: string) => onHover ? {
+  const hoverProps = (key: string, blocked?: boolean) => onHover && !blocked ? {
     onPointerEnter: (e: ReactPointerEvent) => { if (e.pointerType === 'mouse') onHover(key); },
     onPointerLeave: (e: ReactPointerEvent) => { if (e.pointerType === 'mouse') onHover(null); },
   } : {};
@@ -145,7 +145,7 @@ export function Tabs({ tabs, activeKey, onChange, disabled, ariaLabel = 'Tabs', 
               aria-disabled={tab.blocked || undefined}
               disabled={disabled || tab.disabled}
               onClick={e => { if (!tab.blocked) onChange(tab.key, e.currentTarget); }}
-              {...hoverProps(tab.key)}
+              {...hoverProps(tab.key, tab.blocked)}
             >
               <span className={classNames(styles.tabInner, { [styles.tabChip]: tab.chip })}>
                 {tab.icon && <span className={styles.tabIcon} aria-hidden="true">{tab.icon}</span>}
@@ -171,7 +171,7 @@ export function Tabs({ tabs, activeKey, onChange, disabled, ariaLabel = 'Tabs', 
               aria-disabled={tab.blocked || undefined}
               disabled={disabled || tab.disabled}
               onClick={e => { if (!tab.blocked) onChange(tab.key, e.currentTarget); }}
-              {...hoverProps(tab.key)}
+              {...hoverProps(tab.key, tab.blocked)}
             >
               <span className={classNames(styles.tabInner, { [styles.tabChip]: tab.chip })}>
                 {tab.icon && <span className={styles.tabIcon} aria-hidden="true">{tab.icon}</span>}

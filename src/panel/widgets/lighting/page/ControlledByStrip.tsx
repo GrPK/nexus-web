@@ -16,8 +16,8 @@ const APP_TOKEN = '\uE000';
 type ControlledByStripProps = { onOpen: () => void; /** A quiet second line under the saved state; one line, so the card height does not depend on its copy. */ note?: string; /** The card around it is the one control, so the strip leaves the tab order and the accessibility tree. */ passive?: boolean } & (
   | { strip: CardAppStrip; label?: never; saveToDevice?: never }
   | { label: string; strip?: never; saveToDevice?: never }
-  /** The gray "save colors to the keyboard" entry: 'keep' offers it, 'saved' says it is on. Both lead to the device page. */
-  | { saveToDevice: 'keep' | 'saved'; strip?: never; label?: never }
+  /** The gray "save colors to the keyboard" entry: 'keep' offers it, 'saved' says it is on, 'blocked' says it is on but paused (the note names why). Both lead to the device page. */
+  | { saveToDevice: 'keep' | 'saved' | 'blocked'; strip?: never; label?: never }
 );
 
 // Stands in for the bold key names while translating, so each locale keeps its own word order around them.
@@ -28,10 +28,10 @@ export function ControlledByStrip({ strip, label, saveToDevice, note, onOpen, pa
   const warn = label !== undefined || !!strip?.controlled;
   const [before, after = ''] = t(warn ? 'devices.conflictRunning.badge' : 'lighting.devices.controlledBy', { app: APP_TOKEN }).split(APP_TOKEN);
   const [keysBefore, keysAfter = ''] = t('lighting.devices.saveStrip.keep', { keys: KEYS_TOKEN }).split(KEYS_TOKEN);
-  const Icon = saveToDevice ? (saveToDevice === 'saved' ? Save : Keyboard) : warn ? AlertTriangle : AppWindow;
+  const Icon = saveToDevice ? (saveToDevice === 'keep' ? Keyboard : Save) : warn ? AlertTriangle : AppWindow;
   let text;
-  if (saveToDevice === 'saved') {
-    text = <b>{t('lighting.devices.saveStrip.saved')}</b>;
+  if (saveToDevice === 'saved' || saveToDevice === 'blocked') {
+    text = <b>{t(saveToDevice === 'saved' ? 'lighting.devices.saveStrip.saved' : 'lighting.devices.saveStrip.blocked')}</b>;
   } else if (saveToDevice) {
     text = <>{keysBefore}<b>{t('lighting.devices.saveStrip.keys')}</b>{keysAfter}</>;
   } else if (label !== undefined) {
@@ -51,7 +51,7 @@ export function ControlledByStrip({ strip, label, saveToDevice, note, onOpen, pa
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
     >
       <Icon aria-hidden />
-      {note && saveToDevice === 'saved' ? (
+      {note && saveToDevice && saveToDevice !== 'keep' ? (
         <span className={styles.deviceControlledByStack}>
           <span>{text}</span>
           <span className={styles.deviceControlledByNote}>{note}</span>

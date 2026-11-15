@@ -255,4 +255,13 @@ describe('Tabs blocked tab', () => {
     fireEvent.focus(b);
     expect(screen.getByText('why')).toBeTruthy();
   });
+
+  it('does not preview a hover on a blocked tab but still does on a normal one', () => {
+    const onHover = vi.fn();
+    render(<Tabs tabs={[{ key: 'a', label: 'A' }, { key: 'b', label: 'B', blocked: true }]} activeKey="a" onChange={() => {}} onHover={onHover} />);
+    fireEvent.pointerEnter(screen.getByRole('tab', { name: 'B' }), { pointerType: 'mouse' });
+    expect(onHover).not.toHaveBeenCalled();
+    fireEvent.pointerEnter(screen.getByRole('tab', { name: 'A' }), { pointerType: 'mouse' });
+    expect(onHover).toHaveBeenCalledWith('a');
+  });
 });

@@ -539,7 +539,11 @@ export interface LightingDevice {
   saveToDeviceSupported?: boolean;
   /** True while the keyboard stays in its own mode with colors saved to it; omitted when off. */
   savedToDevice?: boolean;
+  /** Why saving is enabled but not applying right now; omitted when saving is not blocked. */
+  savedToDeviceReason?: SavedToDeviceReason;
 }
+
+export type SavedToDeviceReason = 'foreign-host' | 'write-failed' | 'write-cap';
 
 export interface LightingDevicesResponse {
   isInit: boolean;

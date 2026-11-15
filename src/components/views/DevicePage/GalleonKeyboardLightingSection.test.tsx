@@ -63,6 +63,19 @@ describe('GalleonKeyboardLightingSection', () => {
     await waitFor(() => expect(h.save).toHaveBeenCalledWith('corsair-galleon:S1', false));
   });
 
+  it('shows the reason line while saving is on but blocked', async () => {
+    h.fetch.mockResolvedValue({ devices: [kb({ savedToDevice: true, savedToDeviceReason: 'write-failed' })] });
+    render(<GalleonKeyboardLightingSection serial="S1" />);
+    expect(await screen.findByText('devices.galleon.saveColors.reason.writeFailed')).toBeTruthy();
+  });
+
+  it('shows no reason line when the service reports none', async () => {
+    h.fetch.mockResolvedValue({ devices: [kb({ savedToDevice: true })] });
+    render(<GalleonKeyboardLightingSection serial="S1" />);
+    await screen.findByRole('switch', { name: /saveColors\.label/ });
+    expect(screen.queryByText(/saveColors\.reason/)).toBeNull();
+  });
+
   it('rolls back and toasts when the service refuses', async () => {
     h.fetch.mockResolvedValue({ devices: [kb()] });
     h.save.mockResolvedValue({ error: true, msg: 'no' });
