@@ -247,7 +247,7 @@ export function AsusRyujinExtremeDevicePage() {
               {state.uploadState === 'failed' && (
                 <>
                   <p className={styles.customNote}>{t(FAILED_REASON_KEYS[state.uploadReason] ?? 'devices.asus-ryujin-extreme.mediaFailed')}</p>
-                  {state.uploadMessage && (
+                  {state.uploadMessage && (state.uploadReason === 'failed' || !FAILED_REASON_KEYS[state.uploadReason]) && (
                     <p className={styles.customNote}>{t('devices.asus-ryujin-extreme.mediaDetail', { msg: state.uploadMessage })}</p>
                   )}
                 </>
