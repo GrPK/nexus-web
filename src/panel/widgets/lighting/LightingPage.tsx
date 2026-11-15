@@ -2554,19 +2554,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       default: return null;
     }
   };
-  // A keyboard that starts keeping its colors holds the static look it wears now: pinned, it stays on it
-  // when the global look turns animated. Once per card per visit, so a later unpin is the user's choice.
-  const autoPinnedRef = useRef(new Set<string>());
-  const tabPinForRef = useRef(tabPinFor);
-  tabPinForRef.current = tabPinFor;
-  useEffect(() => {
-    if (!synced || !pinsLoaded || mode !== 'static') return;
-    const ids = visibleDevices.filter(d => savesColorsToDevice(d) && !pins[d.id] && !autoPinnedRef.current.has(d.id)).map(d => d.id);
-    if (ids.length === 0) return;
-    const pin = tabPinForRef.current('static');
-    ids.forEach(id => autoPinnedRef.current.add(id));
-    if (pin) void writePins(ids, pin);
-  }, [synced, pinsLoaded, mode, visibleDevices, pins, writePins]);
   // Hovering a mode tab, the scope chip or a pick control (color field, effect
   // or media tile) previews the reach of its press. A press or the advanced
   // page unmounting skips the pointerleave, so both clear it.

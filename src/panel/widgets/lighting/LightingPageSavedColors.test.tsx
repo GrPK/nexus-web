@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { LightingPage } from './LightingPage';
@@ -183,16 +183,13 @@ describe('LightingPage saved-colors keyboard', () => {
     expect(screen.queryByText('lighting.devices.saveStrip.limit')).toBeNull();
   });
 
-  it('pins a saved keyboard to the static look it wears when the global mode is static', async () => {
-    lightingSync.mode = 'static';
-    renderPage();
-    await waitFor(() => expect(mockSetPins).toHaveBeenCalledWith(['kb'], expect.objectContaining({ kind: expect.stringMatching(/static|color/) })));
-    expect(mockSetPins.mock.calls.every(c => (c as unknown[][])[0].join() === 'kb')).toBe(true);
-  });
-
-  it('does not pin a saved keyboard while the global look is animated', async () => {
-    renderPage();
-    await screen.findByText('Galleon 100 SD');
+  it('never writes a pin by visiting the page with a saved keyboard', async () => {
+    for (const mode of ['static', 'animate']) {
+      lightingSync.mode = mode;
+      renderPage();
+      await screen.findByText('Galleon 100 SD');
+      cleanup();
+    }
     expect(mockSetPins).not.toHaveBeenCalled();
   });
 });
