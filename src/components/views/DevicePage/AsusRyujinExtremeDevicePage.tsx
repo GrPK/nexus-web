@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
+import { Button } from '../../common/Button/Button';
+import { FlashProgress } from '../../common/FlashProgress/FlashProgress';
 import { SettingRow, SettingSelect } from '../../common/SettingRow/SettingRow';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
@@ -8,11 +10,13 @@ import { useToast } from '../../common/Toast/Toast';
 import {
   getRyujinDisplay,
   setRyujinDisplay,
+  uploadRyujinMedia,
   RYUJIN_MAX_BRIGHTNESS,
   RYUJIN_MIN_BRIGHTNESS,
   type RyujinDisplayPatch,
   type RyujinDisplayState,
   type RyujinRotation,
+  type RyujinScreenMode,
   type RyujinSensorCount,
 } from '../../../api/asus-ryujin-extreme';
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
@@ -22,6 +26,8 @@ import { useReportDeviceWaiting } from './deviceDetecting';
 import styles from './LianLiDevicePage.module.scss';
 
 const POLL_MS = 3000;
+const UPLOAD_POLL_MS = 1000;
+const SCREEN_MODES: readonly RyujinScreenMode[] = ['monitor', 'image'];
 const STACKED = 'stacked' as const;
 const ROTATIONS: readonly RyujinRotation[] = [0, 90];
 const SENSOR_COUNTS: readonly RyujinSensorCount[] = [2, 3];
@@ -40,11 +46,14 @@ export function AsusRyujinExtremeDevicePage() {
   const { numberFormat } = useUnitPrefs();
   const [state, setState] = useState<RyujinDisplayState | null>(null);
   useReportDeviceWaiting(state === null || !state.isConnected);
+  const sending = state?.uploadState === 'uploading';
   const aliveRef = useRef(true);
   // Writes in flight: a poll landing meanwhile would snap a control back.
   const busyRef = useRef(0);
   // A brightness drag in progress: a poll landing before its final write would snap the knob back.
   const draggingRef = useRef(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [converting, setConverting] = useState(false);
 
   const refresh = useCallback(async () => {
     if (busyRef.current > 0 || draggingRef.current) return;
@@ -56,14 +65,32 @@ export function AsusRyujinExtremeDevicePage() {
   useEffect(() => {
     aliveRef.current = true;
     void refresh();
-    const id = window.setInterval(() => { void refresh(); }, POLL_MS);
+    const id = window.setInterval(() => { void refresh(); }, sending ? UPLOAD_POLL_MS : POLL_MS);
     window.addEventListener('focus', refresh);
     return () => {
       aliveRef.current = false;
       window.clearInterval(id);
       window.removeEventListener('focus', refresh);
     };
-  }, [refresh]);
+  }, [refresh, sending]);
+
+  const onPickFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setConverting(true);
+    let ok = false;
+    try {
+      ok = (await uploadRyujinMedia(file)) === true;
+    } catch {
+      ok = false;
+    } finally {
+      if (aliveRef.current) setConverting(false);
+    }
+    if (!ok) push({ title: t('devices.asus-ryujin-extreme.uploadFailedTitle'), body: t('devices.asus-ryujin-extreme.uploadFailedBody') });
+    const next = await getRyujinDisplay();
+    if (aliveRef.current && next !== null) setState(next);
+  }, [push, t]);
 
   const commit = useCallback(async (patch: RyujinDisplayPatch) => {
     busyRef.current += 1;
@@ -129,23 +156,71 @@ export function AsusRyujinExtremeDevicePage() {
               }}
             />
           </SettingRow>
-          <SettingRow label={t('devices.asus-ryujin-extreme.readings')}>
+          <SettingRow label={t('devices.asus-ryujin-extreme.screenMode')}>
             <ChipGroup
-              ariaLabel={t('devices.asus-ryujin-extreme.readings')}
-              activeKey={state ? String(sensorCount) : ''}
-              options={SENSOR_COUNTS.map(n => ({
-                key: String(n),
-                label: localizeNumbers(String(n), numberFormat),
-                disabled: !ready,
+              ariaLabel={t('devices.asus-ryujin-extreme.screenMode')}
+              activeKey={state?.screenMode ?? ''}
+              options={SCREEN_MODES.map(mode => ({
+                key: mode,
+                label: t(mode === 'image' ? 'devices.asus-ryujin-extreme.screenModeImage' : 'devices.asus-ryujin-extreme.screenModeMonitor'),
+                disabled: !ready || sending || converting,
               }))}
               onChange={key => {
-                const next = Number(key) as RyujinSensorCount;
-                setState(prev => prev && { ...prev, sensorCount: next });
-                void commit({ sensorCount: next });
+                const screenMode = key as RyujinScreenMode;
+                if (screenMode === 'image' && !state?.mediaName) {
+                  fileRef.current?.click();
+                  return;
+                }
+                setState(prev => prev && { ...prev, screenMode });
+                void commit({ screenMode });
               }}
             />
           </SettingRow>
-          {Array.from({ length: sensorCount }, (_, i) => (
+          {state?.screenMode === 'image' && (
+            <div data-settings-aside="true">
+              <Button size="sm" tone="neutral" disabled={!ready || sending || converting} onClick={() => fileRef.current?.click()}>
+                {converting
+                  ? t('devices.asus-ryujin-extreme.mediaConverting')
+                  : t(state.mediaName ? 'devices.asus-ryujin-extreme.mediaReplace' : 'devices.asus-ryujin-extreme.mediaChoose')}
+              </Button>
+              {sending && (
+                <FlashProgress
+                  status={{
+                    percent: state.uploadTotal > 0 ? Math.round((state.uploadSent / state.uploadTotal) * 100) : 0,
+                    message: t('devices.asus-ryujin-extreme.mediaSending'),
+                  }}
+                />
+              )}
+              {!sending && state.mediaName && (
+                <p className={styles.customNote}>
+                  {t(state.mediaHeld ? 'devices.asus-ryujin-extreme.mediaStored' : 'devices.asus-ryujin-extreme.mediaWaiting', { name: state.mediaName })}
+                </p>
+              )}
+              {state.uploadState === 'failed' && (
+                <p className={styles.customNote}>{t('devices.asus-ryujin-extreme.mediaFailed')}</p>
+              )}
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={e => { void onPickFile(e); }} />
+          {state?.screenMode !== 'image' && (
+            <SettingRow label={t('devices.asus-ryujin-extreme.readings')}>
+              <ChipGroup
+                ariaLabel={t('devices.asus-ryujin-extreme.readings')}
+                activeKey={state ? String(sensorCount) : ''}
+                options={SENSOR_COUNTS.map(n => ({
+                  key: String(n),
+                  label: localizeNumbers(String(n), numberFormat),
+                  disabled: !ready,
+                }))}
+                onChange={key => {
+                  const next = Number(key) as RyujinSensorCount;
+                  setState(prev => prev && { ...prev, sensorCount: next });
+                  void commit({ sensorCount: next });
+                }}
+              />
+            </SettingRow>
+          )}
+          {state?.screenMode !== 'image' && Array.from({ length: sensorCount }, (_, i) => (
             <SettingSelect
               key={i}
               label={t('devices.asus-ryujin-extreme.reading', { n: localizeNumbers(String(i + 1), numberFormat) })}

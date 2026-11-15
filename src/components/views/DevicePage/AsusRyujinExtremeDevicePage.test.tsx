@@ -10,6 +10,7 @@ vi.mock('../../../lib/i18n', () => ({
 
 const mockGet = vi.fn();
 const mockSet = vi.fn();
+const mockUpload = vi.fn();
 const mockPush = vi.fn();
 
 vi.mock('../../common/Toast/Toast', () => ({
@@ -19,6 +20,7 @@ vi.mock('../../common/Toast/Toast', () => ({
 vi.mock('../../../api/asus-ryujin-extreme', () => ({
   getRyujinDisplay: () => mockGet(),
   setRyujinDisplay: (patch: unknown) => mockSet(patch),
+  uploadRyujinMedia: (file: File) => mockUpload(file),
   RYUJIN_MIN_BRIGHTNESS: 10,
   RYUJIN_MAX_BRIGHTNESS: 100,
 }));
@@ -30,6 +32,12 @@ const base = {
   sensorCount: 3,
   slots: ['cpu-temp', 'gpu-temp', 'pump-rpm'],
   availableSensors: ['cpu-temp', 'gpu-temp', 'liquid-temp', 'pump-rpm', 'fan-rpm'],
+  screenMode: 'monitor',
+  mediaName: '',
+  mediaHeld: false,
+  uploadState: 'idle',
+  uploadSent: 0,
+  uploadTotal: 0,
 };
 
 async function mount(state = base) {
@@ -42,6 +50,7 @@ async function mount(state = base) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockSet.mockResolvedValue(true);
+  mockUpload.mockResolvedValue(true);
 });
 
 describe('AsusRyujinExtremeDevicePage', () => {
@@ -174,5 +183,46 @@ describe('AsusRyujinExtremeDevicePage', () => {
     await act(async () => { window.dispatchEvent(new Event('focus')); });
     expect(mockGet).not.toHaveBeenCalled();
     await act(async () => { release(true); });
+  });
+  it('switching to the hardware monitor sends only the screen mode', async () => {
+    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif', mediaHeld: true });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('radio', { name: 'devices.asus-ryujin-extreme.screenModeMonitor' }));
+    });
+    await waitFor(() => expect(mockSet).toHaveBeenCalledWith({ screenMode: 'monitor' }));
+  });
+
+  it('image mode shows the picked file and hides the reading choices', async () => {
+    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif', mediaHeld: true });
+    expect(screen.getByText(/mediaStored:\{"name":"a.gif"\}/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'devices.asus-ryujin-extreme.mediaReplace' })).toBeInTheDocument();
+    expect(screen.queryByText('devices.asus-ryujin-extreme.readings')).not.toBeInTheDocument();
+  });
+
+  it('shows the upload progress while the cooler is being sent the file', async () => {
+    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif', uploadState: 'uploading', uploadSent: 5, uploadTotal: 20 });
+    expect(screen.getByText(/mediaSending.*\(25%\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'devices.asus-ryujin-extreme.mediaReplace' })).toBeDisabled();
+  });
+
+  it('picking a file uploads it and refetches the state', async () => {
+    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif', mediaHeld: true });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['x'], 'b.gif', { type: 'image/gif' });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+    await waitFor(() => expect(mockUpload).toHaveBeenCalledWith(file));
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('a refused upload raises the failure toast', async () => {
+    mockUpload.mockResolvedValue(false);
+    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif' });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File(['x'], 'b.gif')] } });
+    });
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
   });
 });

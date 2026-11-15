@@ -1,7 +1,9 @@
-import { fetchService, putService } from './service';
+import { fetchService, postServiceFormResult, putService } from './service';
 
 export type RyujinRotation = 0 | 90;
 export type RyujinSensorCount = 2 | 3;
+export type RyujinScreenMode = 'monitor' | 'image';
+export type RyujinUploadPhase = 'idle' | 'uploading' | 'done' | 'failed';
 
 export interface RyujinDisplayState {
   isConnected: boolean;
@@ -12,6 +14,14 @@ export interface RyujinDisplayState {
   /** Sensor ids per reading position; the unused third slot is still sent. */
   slots: string[];
   availableSensors: string[];
+  screenMode: RyujinScreenMode;
+  /** File name of the picked picture or GIF; empty when none. */
+  mediaName: string;
+  /** True once the cooler holds the picked file. */
+  mediaHeld: boolean;
+  uploadState: RyujinUploadPhase;
+  uploadSent: number;
+  uploadTotal: number;
 }
 
 export interface RyujinDisplayPatch {
@@ -19,6 +29,7 @@ export interface RyujinDisplayPatch {
   rotation?: RyujinRotation;
   sensorCount?: RyujinSensorCount;
   slots?: string[];
+  screenMode?: RyujinScreenMode;
 }
 
 export const RYUJIN_MIN_BRIGHTNESS = 10;
@@ -35,4 +46,12 @@ export async function getRyujinDisplay(): Promise<RyujinDisplayState | null> {
 export async function setRyujinDisplay(patch: RyujinDisplayPatch): Promise<boolean> {
   const res = await putService<{ error: boolean; msg: string }>(DISPLAY, patch);
   return res !== null && !res.error;
+}
+
+/** Converts the file and queues it for upload to the cooler; the service sends it on its next cycle. Null on a transport failure. */
+export async function uploadRyujinMedia(file: File): Promise<boolean | null> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  const res = await postServiceFormResult<{ error: boolean; msg: string }>(`${DISPLAY}/media`, form);
+  return res === null ? null : !res.error;
 }
