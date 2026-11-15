@@ -900,6 +900,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "選擇圖片或 GIF",
   "devices.asus-ryujin-extreme.mediaConverting": "轉換中...",
   "devices.asus-ryujin-extreme.mediaFailed": "上傳失敗。請重新選擇檔案以重試。",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "上傳失敗：{msg}。請重新選擇檔案以重試。",
+  "devices.asus-ryujin-extreme.mediaRemote": "只能在執行 Nexus 的電腦上選擇圖片和 GIF。",
   "devices.asus-ryujin-extreme.mediaReplace": "選擇其他檔案",
   "devices.asus-ryujin-extreme.mediaSending": "正在傳送到水冷",
   "devices.asus-ryujin-extreme.mediaStored": "已儲存在水冷中：{name}",

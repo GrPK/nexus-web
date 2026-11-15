@@ -1,4 +1,4 @@
-import { fetchService, postServiceFormResult, putService } from './service';
+import { fetchService, isTunnelActive, postServiceFormResult, putService } from './service';
 
 export type RyujinRotation = 0 | 90;
 export type RyujinSensorCount = 2 | 3;
@@ -22,6 +22,8 @@ export interface RyujinDisplayState {
   uploadState: RyujinUploadPhase;
   uploadSent: number;
   uploadTotal: number;
+  /** The service's reason when uploadState is failed. */
+  uploadMessage: string;
 }
 
 export interface RyujinDisplayPatch {
@@ -48,10 +50,15 @@ export async function setRyujinDisplay(patch: RyujinDisplayPatch): Promise<boole
   return res !== null && !res.error;
 }
 
+/** The picker posts a file, which the remote tunnel cannot carry. */
+export function canUploadRyujinMedia(): boolean {
+  return !isTunnelActive();
+}
+
 /** Converts the file and queues it for upload to the cooler; the service sends it on its next cycle. Null on a transport failure. */
-export async function uploadRyujinMedia(file: File): Promise<boolean | null> {
+export async function uploadRyujinMedia(file: File): Promise<{ ok: boolean; msg: string } | null> {
   const form = new FormData();
   form.append('file', file, file.name);
   const res = await postServiceFormResult<{ error: boolean; msg: string }>(`${DISPLAY}/media`, form);
-  return res === null ? null : !res.error;
+  return res === null ? null : { ok: !res.error, msg: res.msg };
 }

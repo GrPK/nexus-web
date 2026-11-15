@@ -11,6 +11,7 @@ vi.mock('../../../lib/i18n', () => ({
 const mockGet = vi.fn();
 const mockSet = vi.fn();
 const mockUpload = vi.fn();
+const mockCanUpload = vi.fn();
 const mockPush = vi.fn();
 
 vi.mock('../../common/Toast/Toast', () => ({
@@ -21,6 +22,7 @@ vi.mock('../../../api/asus-ryujin-extreme', () => ({
   getRyujinDisplay: () => mockGet(),
   setRyujinDisplay: (patch: unknown) => mockSet(patch),
   uploadRyujinMedia: (file: File) => mockUpload(file),
+  canUploadRyujinMedia: () => mockCanUpload(),
   RYUJIN_MIN_BRIGHTNESS: 10,
   RYUJIN_MAX_BRIGHTNESS: 100,
 }));
@@ -38,6 +40,7 @@ const base = {
   uploadState: 'idle',
   uploadSent: 0,
   uploadTotal: 0,
+  uploadMessage: '',
 };
 
 async function mount(state = base) {
@@ -50,7 +53,8 @@ async function mount(state = base) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockSet.mockResolvedValue(true);
-  mockUpload.mockResolvedValue(true);
+  mockUpload.mockResolvedValue({ ok: true, msg: '' });
+  mockCanUpload.mockReturnValue(true);
 });
 
 describe('AsusRyujinExtremeDevicePage', () => {
@@ -217,12 +221,35 @@ describe('AsusRyujinExtremeDevicePage', () => {
   });
 
   it('a refused upload raises the failure toast', async () => {
-    mockUpload.mockResolvedValue(false);
+    mockUpload.mockResolvedValue({ ok: false, msg: 'File too large' });
     await mount({ ...base, screenMode: 'image', mediaName: 'a.gif' });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     await act(async () => {
       fireEvent.change(input, { target: { files: [new File(['x'], 'b.gif')] } });
     });
     await waitFor(() => expect(mockPush).toHaveBeenCalled());
+  });
+
+  it('a refused upload shows the service message in the toast', async () => {
+    mockUpload.mockResolvedValue({ ok: false, msg: 'File too large' });
+    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif' });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File(['x'], 'b.gif')] } });
+    });
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ body: 'File too large' })));
+  });
+
+  it('a failed upload shows the reason and not the waiting line', async () => {
+    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif', uploadState: 'failed', uploadMessage: 'no ack' });
+    expect(screen.getByText(/mediaFailedDetail:\{"msg":"no ack"\}/)).toBeInTheDocument();
+    expect(screen.queryByText(/mediaWaiting/)).not.toBeInTheDocument();
+  });
+
+  it('the picker is disabled with an explanation on a remote tunnel', async () => {
+    mockCanUpload.mockReturnValue(false);
+    await mount({ ...base, screenMode: 'image', mediaName: 'a.gif', mediaHeld: true });
+    expect(screen.getByRole('button', { name: 'devices.asus-ryujin-extreme.mediaReplace' })).toBeDisabled();
+    expect(screen.getByText('devices.asus-ryujin-extreme.mediaRemote')).toBeInTheDocument();
   });
 });

@@ -900,6 +900,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "Elegir imagen o GIF",
   "devices.asus-ryujin-extreme.mediaConverting": "Convirtiendo...",
   "devices.asus-ryujin-extreme.mediaFailed": "Falló la subida. Elige el archivo de nuevo para reintentarlo.",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "Falló la subida: {msg}. Elige el archivo de nuevo para reintentarlo.",
+  "devices.asus-ryujin-extreme.mediaRemote": "Las imágenes y los GIF solo se pueden elegir en el PC donde se ejecuta Nexus.",
   "devices.asus-ryujin-extreme.mediaReplace": "Elegir otro archivo",
   "devices.asus-ryujin-extreme.mediaSending": "Enviando al refrigerador",
   "devices.asus-ryujin-extreme.mediaStored": "Guardado en el refrigerador: {name}",

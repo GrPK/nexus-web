@@ -900,6 +900,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "Resim veya GIF seç",
   "devices.asus-ryujin-extreme.mediaConverting": "Dönüştürülüyor...",
   "devices.asus-ryujin-extreme.mediaFailed": "Yükleme başarısız oldu. Yeniden denemek için dosyayı tekrar seçin.",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "Yükleme başarısız oldu: {msg}. Yeniden denemek için dosyayı tekrar seçin.",
+  "devices.asus-ryujin-extreme.mediaRemote": "Resimler ve GIF'ler yalnızca Nexus'un çalıştığı bilgisayarda seçilebilir.",
   "devices.asus-ryujin-extreme.mediaReplace": "Başka bir dosya seç",
   "devices.asus-ryujin-extreme.mediaSending": "Soğutucuya gönderiliyor",
   "devices.asus-ryujin-extreme.mediaStored": "Soğutucuda saklanıyor: {name}",

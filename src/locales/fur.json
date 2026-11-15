@@ -900,6 +900,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "Sielç imagjin o GIF",
   "devices.asus-ryujin-extreme.mediaConverting": "Daûr a convertî...",
   "devices.asus-ryujin-extreme.mediaFailed": "Il cjariament al è falît. Sielç di gnûf il file par tornâ a provâ.",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "Il cjariament al è falît: {msg}. Sielç di gnûf il file par tornâ a provâ.",
+  "devices.asus-ryujin-extreme.mediaRemote": "Lis imagjins e lis GIF si puedin sielgi dome sul PC là che al va Nexus.",
   "devices.asus-ryujin-extreme.mediaReplace": "Sielç un altri file",
   "devices.asus-ryujin-extreme.mediaSending": "Daûr a mandâ al refredadôr",
   "devices.asus-ryujin-extreme.mediaStored": "Salvât tal refredadôr: {name}",

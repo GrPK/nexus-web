@@ -900,6 +900,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "Bild oder GIF auswählen",
   "devices.asus-ryujin-extreme.mediaConverting": "Wird konvertiert...",
   "devices.asus-ryujin-extreme.mediaFailed": "Der Upload ist fehlgeschlagen. Wähle die Datei erneut aus, um es noch einmal zu versuchen.",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "Der Upload ist fehlgeschlagen: {msg}. Wähle die Datei erneut aus, um es noch einmal zu versuchen.",
+  "devices.asus-ryujin-extreme.mediaRemote": "Bilder und GIFs lassen sich nur auf dem PC auswählen, auf dem Nexus läuft.",
   "devices.asus-ryujin-extreme.mediaReplace": "Andere Datei auswählen",
   "devices.asus-ryujin-extreme.mediaSending": "Wird an den Kühler gesendet",
   "devices.asus-ryujin-extreme.mediaStored": "Auf dem Kühler gespeichert: {name}",

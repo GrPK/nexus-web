@@ -900,6 +900,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "画像またはGIFを選択",
   "devices.asus-ryujin-extreme.mediaConverting": "変換中...",
   "devices.asus-ryujin-extreme.mediaFailed": "アップロードに失敗しました。もう一度ファイルを選択して再試行してください。",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "アップロードに失敗しました: {msg}。もう一度ファイルを選択して再試行してください。",
+  "devices.asus-ryujin-extreme.mediaRemote": "画像とGIFは、Nexusが動作しているPCでのみ選択できます。",
   "devices.asus-ryujin-extreme.mediaReplace": "別のファイルを選択",
   "devices.asus-ryujin-extreme.mediaSending": "クーラーに送信中",
   "devices.asus-ryujin-extreme.mediaStored": "クーラーに保存済み: {name}",

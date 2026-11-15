@@ -900,6 +900,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "이미지 또는 GIF 선택",
   "devices.asus-ryujin-extreme.mediaConverting": "변환 중...",
   "devices.asus-ryujin-extreme.mediaFailed": "업로드에 실패했습니다. 파일을 다시 선택하여 재시도하세요.",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "업로드에 실패했습니다: {msg}. 파일을 다시 선택하여 재시도하세요.",
+  "devices.asus-ryujin-extreme.mediaRemote": "이미지와 GIF는 Nexus가 실행 중인 PC에서만 선택할 수 있습니다.",
   "devices.asus-ryujin-extreme.mediaReplace": "다른 파일 선택",
   "devices.asus-ryujin-extreme.mediaSending": "쿨러로 전송 중",
   "devices.asus-ryujin-extreme.mediaStored": "쿨러에 저장됨: {name}",

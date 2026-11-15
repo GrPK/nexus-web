@@ -900,6 +900,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "Scegli immagine o GIF",
   "devices.asus-ryujin-extreme.mediaConverting": "Conversione...",
   "devices.asus-ryujin-extreme.mediaFailed": "Caricamento non riuscito. Scegli di nuovo il file per riprovare.",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "Caricamento non riuscito: {msg}. Scegli di nuovo il file per riprovare.",
+  "devices.asus-ryujin-extreme.mediaRemote": "Immagini e GIF si possono scegliere solo sul PC su cui è in esecuzione Nexus.",
   "devices.asus-ryujin-extreme.mediaReplace": "Scegli un altro file",
   "devices.asus-ryujin-extreme.mediaSending": "Invio al dissipatore",
   "devices.asus-ryujin-extreme.mediaStored": "Salvato sul dissipatore: {name}",

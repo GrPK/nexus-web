@@ -909,6 +909,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "Vybrat obrázek nebo GIF",
   "devices.asus-ryujin-extreme.mediaConverting": "Převádění...",
   "devices.asus-ryujin-extreme.mediaFailed": "Nahrání se nezdařilo. Vyberte soubor znovu a zkuste to znovu.",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "Nahrání se nezdařilo: {msg}. Vyberte soubor znovu a zkuste to znovu.",
+  "devices.asus-ryujin-extreme.mediaRemote": "Obrázky a GIFy lze vybírat jen na počítači, na kterém běží Nexus.",
   "devices.asus-ryujin-extreme.mediaReplace": "Vybrat jiný soubor",
   "devices.asus-ryujin-extreme.mediaSending": "Odesílání do chladiče",
   "devices.asus-ryujin-extreme.mediaStored": "Uloženo v chladiči: {name}",

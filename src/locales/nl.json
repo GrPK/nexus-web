@@ -900,6 +900,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "Afbeelding of GIF kiezen",
   "devices.asus-ryujin-extreme.mediaConverting": "Converteren...",
   "devices.asus-ryujin-extreme.mediaFailed": "Het uploaden is mislukt. Kies het bestand opnieuw om het nogmaals te proberen.",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "Het uploaden is mislukt: {msg}. Kies het bestand opnieuw om het nogmaals te proberen.",
+  "devices.asus-ryujin-extreme.mediaRemote": "Afbeeldingen en GIF's kunnen alleen worden gekozen op de pc waarop Nexus draait.",
   "devices.asus-ryujin-extreme.mediaReplace": "Ander bestand kiezen",
   "devices.asus-ryujin-extreme.mediaSending": "Verzenden naar de koeler",
   "devices.asus-ryujin-extreme.mediaStored": "Opgeslagen op de koeler: {name}",

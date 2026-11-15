@@ -900,6 +900,8 @@
   "devices.asus-ryujin-extreme.mediaChoose": "Escolher imagem ou GIF",
   "devices.asus-ryujin-extreme.mediaConverting": "Convertendo...",
   "devices.asus-ryujin-extreme.mediaFailed": "O envio falhou. Escolha o arquivo novamente para tentar de novo.",
+  "devices.asus-ryujin-extreme.mediaFailedDetail": "O envio falhou: {msg}. Escolha o arquivo novamente para tentar de novo.",
+  "devices.asus-ryujin-extreme.mediaRemote": "Imagens e GIFs só podem ser escolhidos no PC em que o Nexus está sendo executado.",
   "devices.asus-ryujin-extreme.mediaReplace": "Escolher outro arquivo",
   "devices.asus-ryujin-extreme.mediaSending": "Enviando para o cooler",
   "devices.asus-ryujin-extreme.mediaStored": "Armazenado no cooler: {name}",
