@@ -171,7 +171,7 @@ describe('EffectControls on/off params', () => {
 });
 
 describe('EffectControls background color', () => {
-  it('keeps the wheel, adds a Background picker that starts black and writes the fill background params', () => {
+  it('keeps the wheel, adds a Background swatch that starts black and writes the fill background params', () => {
     const onChange = vi.fn();
     const state = baseState();
     render(
@@ -181,11 +181,15 @@ describe('EffectControls background color', () => {
       />,
     );
     const picker = screen.getByRole('group', { name: 'lighting.controls.fillBackground' });
-    expect(screen.getAllByRole('group', { name: 'Palette' })).toHaveLength(2);
-    expect(within(picker).getAllByRole('group', { name: 'Palette' })).toHaveLength(1);
-    const brightness = within(picker).getByLabelText('lighting.controls.param.brightness', { selector: 'input[type="range"]' }) as HTMLInputElement;
-    expect(brightness.value).toBe('0');
-    fireEvent.change(brightness, { target: { value: '40' } });
-    expect(onChange).toHaveBeenLastCalledWith({ params: { u_fill_bgHue: 0, u_fill_bgSat: 0, u_fill_bgVal: 0.4 } }, expect.anything());
+    // One wheel only (the effect's own); the background is a labelled swatch row.
+    expect(screen.getAllByRole('group', { name: 'Palette' })).toHaveLength(1);
+    expect(within(picker).queryByRole('group', { name: 'Palette' })).toBeNull();
+    const swatch = within(picker).getByRole('button', { name: 'lighting.controls.fillBackground' });
+    expect(swatch.style.backgroundColor).toBe('rgb(0, 0, 0)');
+    expect(swatch.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(swatch);
+    expect(swatch.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.change(screen.getByLabelText('common.hexColor'), { target: { value: '#0000ff' } });
+    expect(onChange).toHaveBeenLastCalledWith({ params: { u_fill_bgHue: 240 / 360, u_fill_bgSat: 1, u_fill_bgVal: 1 } }, true);
   });
 });
