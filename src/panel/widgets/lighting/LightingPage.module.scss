@@ -638,7 +638,7 @@
 .effectLabel {
   font-size: var(--type-mini);
   font-weight: var(--weight-body);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   color: var(--text);
   text-align: center;
   text-transform: capitalize;
@@ -726,7 +726,7 @@
   --effect-template-border-width: var(--picker-border-width);
   --effect-template-border: transparent;
   --effect-template-preview-inset: var(--picker-fill-gap);
-  --effect-template-hover-border: var(--border-strong);
+  --effect-template-hover-border: var(--border-hover);
   // Transparent so the inset preview floats with no plate around it, matching
   // the colour swatches' transparent gap.
   --effect-template-bg: transparent;
@@ -767,10 +767,18 @@
   gap: 0.35rem;
 }
 
+// Label on the left, control right-aligned (toggle and colour params).
+.paramRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .paramEnumLabel {
   font-size: var(--type-small);
   color: var(--text-dim);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
 }
 
 // Pinned-to-bottom footer holding the scoped Reset button; stays
@@ -792,7 +800,7 @@
   color: var(--text-dim);
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em + var(--small-tracking, 0em));
   cursor: pointer;
   transition: border-color var(--ease-fast), color var(--ease-fast), background var(--ease-fast), opacity var(--ease-fast);
 
@@ -934,7 +942,7 @@
   font-size: var(--type-small);
   font-family: inherit;
   cursor: pointer;
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   white-space: nowrap;
   transition: border-color var(--ease-fast) ease, background var(--ease-fast) ease, color var(--ease-fast) ease;
 
@@ -983,7 +991,7 @@
 .monitorButtonTitle {
   font-size: var(--type-mini);
   font-weight: var(--weight-display);
-  letter-spacing: 0.01em;
+  letter-spacing: calc(0.01em + var(--small-tracking, 0em));
 }
 
 .monitorButtonRes {
@@ -1106,6 +1114,14 @@
     color: var(--text);
     background: var(--surface);
   }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border-strong);
+    color: var(--text-dim);
+    background: transparent;
+  }
 }
 
 .deviceCard {
@@ -1120,9 +1136,7 @@
   cursor: pointer;
   transition: border-color var(--ease-fast), background var(--ease-fast);
 
-  &:hover {
-    border-color: var(--border-strong);
-  }
+  @include interactive-hover;
 
   // The selection's border without its fill: a pick lands here. After :hover,
   // like the selected state, so hovering does not drop the accent.
@@ -1149,8 +1163,7 @@
   }
 
   &.deviceCardSelected {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+    @include interactive-selected;
   }
 
   // Detection-failed / 0-LED non-resizable zones: dimmed + dashed as a state
@@ -1158,8 +1171,6 @@
   &.deviceCardUnavailable {
     opacity: 0.55;
     border-style: dashed;
-
-    &:hover { border-color: var(--border-strong); }
   }
 
   &.deviceCardNeedsBinding {
@@ -1204,7 +1215,7 @@
   color: var(--text-dim);
   text-align: left;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em + var(--small-tracking, 0em));
   cursor: pointer;
   transition: background var(--ease-fast);
 
@@ -1262,11 +1273,17 @@
 
 .deviceCardStackHeaderSelectable {
   cursor: pointer;
+  transition: background var(--ease-fast);
+
+  // Fill only: the header's outline is open at the bottom and a selected zone
+  // owns its own border, so a hover border here would draw a second outline.
+  &:hover { background: var(--surface-hover); }
 }
 
 // Any zone under the header selected: the fill only, so the selected zone's
 // own accent border stays the one outline in the card.
-.deviceCardStackHeaderSelected {
+.deviceCardStackHeaderSelected,
+.deviceCardStackHeaderSelected:hover {
   background: var(--accent-soft);
 }
 
@@ -1668,7 +1685,7 @@
 .staticSwatchTitle {
   font-size: var(--type-small);
   color: var(--text-dim);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   text-align: center;
 }
 

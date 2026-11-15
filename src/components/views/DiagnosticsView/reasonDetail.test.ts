@@ -19,6 +19,12 @@ const AT = String(Date.UTC(2026, 10, 10, 22, 31));
 const guard = { cause: 'x', active: 'false', reason: 'limit', peakC: '99.4', escalated: 'false', at: AT };
 
 describe('reasonDetailText', () => {
+  it('names the failed units for system.failedUnits, and never shows the raw detail without params', () => {
+    const text = reasonDetailText(reason('system.failedUnits', { count: '1', units: 'logrotate.service' }), ctx());
+    expect(text).toBe('diagnostics.reasonDetail.failedUnits(units=logrotate.service)');
+    expect(reasonDetailText(reason('system.failedUnits'), ctx())).toBeNull();
+  });
+
   it('words a thermal guard trip from its params, never from detail', () => {
     const text = reasonDetailText(reason('cooling.thermalGuardTrip', guard), ctx())!;
     expect(text).toContain('cause=diagnostics.reasonDetail.cause.limit');
@@ -47,12 +53,11 @@ describe('reasonDetailText', () => {
     expect(h12).toMatch(/AM|PM/);
   });
 
-  it('words a sustained high temperature episode from ISO times', () => {
-    const text = reasonDetailText(reason('cooling.sustainedHighTemp', {
-      componentId: 'cpu', peakC: '88.5', start: String(Date.UTC(2026, 10, 10, 20)), end: String(Date.UTC(2026, 10, 10, 20, 30)),
-    }), ctx())!;
-    expect(text).toContain('peak=88.5°C');
-    expect(text).toContain('diagnostics.reasonDetail.sustainedHighTemp');
+  it('words a finished sensor alert for a built-in with its device name', () => {
+    const ended = { ruleId: 'builtin-cpu', category: 'builtin', type: 'Temperature', sensorName: 'CPU', direction: 'above', threshold: '90', peak: '95', ended: String(Date.UTC(2026, 10, 10, 20)), builtIn: 'cpuTemp' };
+    const text = reasonDetailText(reason('alerts.sensorThresholdEnded', ended), ctx())!;
+    expect(text).toContain('diagnostics.reasonDetail.sensorThresholdEnded(name=CPU,limit=90°C,peak=95°C');
+    expect(reasonDetailText(reason('alerts.sensorThresholdEnded', { ...ended, peak: '' }), ctx())).toBeNull();
   });
 
   it('words a fan stall and tolerates a percent sign on the duty', () => {

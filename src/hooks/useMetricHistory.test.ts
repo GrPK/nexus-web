@@ -1224,6 +1224,49 @@ describe('useMetricHistory', () => {
       expect(points[points.length - 1].t).toBe(NOW + 2000);
     });
 
+    it('keeps the live edge at the wall clock for a polled source, and draws a series that first appears after a minute', async () => {
+      // The service records one point per second from the moment the sensor is added.
+      const startT = NOW + 60_000;
+      const tails: MetricHistoryQuery[] = [];
+      const fetcher = vi.fn<(q: MetricHistoryQuery) => Promise<Result>>(async q => {
+        if (q.maxPoints === 50) tails.push(q);
+        const lo = Math.max(q.from, startT);
+        const hi = Math.min(q.to, Date.now());
+        const points: { t: number; avg: number; max: number }[] = [];
+        for (let t = Math.ceil(lo / 1000) * 1000; t <= hi; t += 1000) points.push({ t, avg: 50, max: 50 });
+        return { data: alertResp(points), mocked: false, unsupported: false };
+      });
+      const { result } = renderHook(() => useMetricHistory(true, 'sensorAlert', fetcher, { fillBox: true }));
+      await advance(0);
+      await advance(60_000);
+      await advance(120_000);
+
+      expect(Math.abs(tails[tails.length - 1].to - Date.now())).toBeLessThan(15_000);
+      const points = result.current.series.find(s => s.id === 'r1')?.points ?? [];
+      expect(points.length).toBeGreaterThan(0);
+      expect(Date.now() - points[points.length - 1].t).toBeLessThan(8_000);
+      expect(Date.now() - result.current.domain[1]).toBeLessThan(8_000);
+    });
+
+    it('catches up to a source whose PC clock is behind the client clock without asking for a future window', async () => {
+      // The PC records points up to its own clock, which trails the client clock.
+      const skewMs = 40_000;
+      const fetcher = vi.fn<(q: MetricHistoryQuery) => Promise<Result>>(async q => {
+        const serverNow = Date.now() - skewMs;
+        const points: { t: number; avg: number; max: number }[] = [];
+        for (let t = Math.ceil(q.from / 1000) * 1000; t <= Math.min(q.to, serverNow); t += 1000) points.push({ t, avg: 50, max: 50 });
+        return { data: alertResp(points), mocked: false, unsupported: false };
+      });
+      const { result } = renderHook(() => useMetricHistory(true, 'sensorAlert', fetcher, { fillBox: true }));
+      await advance(0);
+      await advance(60_000);
+      await advance(60_000);
+
+      const points = result.current.series.find(s => s.id === 'r1')?.points ?? [];
+      expect(points.length).toBeGreaterThan(0);
+      expect(Date.now() - skewMs - points[points.length - 1].t).toBeLessThan(15_000);
+    });
+
     it('does not subscribe to the push topic, which would be filtered out', async () => {
       const fetcher = vi.fn<(q: MetricHistoryQuery) => Promise<Result>>(async () => ({ data: alertResp([]), mocked: false, unsupported: false }));
       renderHook(() => useMetricHistory(true, 'sensorAlert', fetcher));
@@ -1296,6 +1339,20 @@ describe('useMetricHistory', () => {
       act(() => { result.current.setRange('3h'); });
       expect(result.current.domain[1] - result.current.domain[0]).toBe(3 * HOUR);
       expect(result.current.domain).toEqual(result.current.stripDomain);
+    });
+
+    it('keeps polling past an empty first response and picks up points recorded later', async () => {
+      const later = { t: NOW + 20_000, avg: 61, max: 62 };
+      const fetcher = vi.fn<(q: MetricHistoryQuery) => Promise<Result>>(async q => ({
+        data: alertResp(q.from <= later.t && later.t <= q.to ? [later] : []),
+        mocked: false, unsupported: false,
+      }));
+      const { result } = renderHook(() => useMetricHistory(true, 'sensorAlert', fetcher, { fillBox: true }));
+      await advance(0);
+      expect(result.current.series.find(s => s.id === 'r1')?.points ?? []).toEqual([]);
+
+      await advance(25_000);
+      expect(result.current.series.find(s => s.id === 'r1')!.points).toEqual([later]);
     });
 
     it('keeps the default sixth-of-strip window without fillBox', async () => {

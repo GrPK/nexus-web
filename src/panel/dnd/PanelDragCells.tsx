@@ -23,6 +23,7 @@ import { findWidgetById, readCellMetrics, type DashboardSectionNavigate } from '
 import type { EditorDockMotion } from '../editor/panelEditorDock';
 import type { ResolvedPanelThemeMode } from '../editor/PanelThemeSettings';
 import styles from '../PanelApp.module.scss';
+import { usePanelSkinAttrs } from '../../components/common/ThemeScope/PanelSkinScope';
 
 // A container React renders into but never places itself, so moving it moves
 // its subtree without remounting it.
@@ -378,6 +379,8 @@ export function PanelTouchCell({
     gridRow,
     '--panel-span-cols': span.cols,
     '--panel-span-rows': span.rows,
+    '--panel-cell-col': widget.col,
+    '--panel-cell-row': widget.row,
     '--panel-editor-dock-cols': span.cols,
     '--panel-editor-dock-rows': span.rows,
     ...editorDockMotion?.style,
@@ -618,8 +621,14 @@ export function PanelCatalogCell({
   onEditAdded,
   onPointerLeave,
   drag,
+  previewStyle,
+  previewScope,
 }: {
   widget: PanelWidget;
+  /** Applied to the preview alone, for a host whose chrome is not drawn in the panel's font. */
+  previewStyle?: CSSProperties;
+  /** Skin attributes and theme vars for the card alone, for a host outside a panel skin scope whose name strip keeps the app look. */
+  previewScope?: { attrs: Readonly<Record<string, string>>; style: CSSProperties };
   surface?: PanelSurface;
   deviceTouch?: boolean;
   label: string;
@@ -668,6 +677,34 @@ export function PanelCatalogCell({
       activate();
     }
   };
+  const cardEl = (
+    <div className={`panel-card ${styles.cell}`} data-size={widget.size} data-widget-type={widget.type}>
+      <div className={styles.cellScaler} style={{ ...previewStyle, pointerEvents: 'none' }}>
+        <ErrorBoundary label={widget.type}>
+          <PanelPreviewProvider value={true}>
+            <Comp widget={widget} surface={surface} deviceTouch={deviceTouch} />
+          </PanelPreviewProvider>
+        </ErrorBoundary>
+      </div>
+      {addedStage && (
+        <div className={styles.cellAdded} data-stage={addedStage} aria-hidden="true">
+          <div className={styles.cellAddedContent}>
+            {addedStage === 'added' ? (
+              <>
+                <Check className={styles.cellAddedIcon} />
+                <span className={styles.cellAddedLabel}>{t('panel.add.added')}</span>
+              </>
+            ) : (
+              <>
+                <Pencil className={styles.cellAddedIcon} />
+                <span className={styles.cellAddedLabel}>{t('panel.widget.editWidget')}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
   const card = (
     <div
       ref={drag?.ref}
@@ -677,6 +714,7 @@ export function PanelCatalogCell({
       className={[
         styles.cellWrap,
         styles.catalogCell,
+        previewScope ? styles.catalogCellScoped : '',
         selected ? styles.catalogCellSelected : '',
         disabled ? styles.catalogCellDisabled : '',
         drag?.dragging ? styles.catalogCellDragging : '',
@@ -706,32 +744,16 @@ export function PanelCatalogCell({
       onPointerLeave={onPointerLeave}
       onBlur={onPointerLeave}
     >
-      <div className={`panel-card ${styles.cell}`} data-size={widget.size} data-widget-type={widget.type}>
-        <div className={styles.cellScaler} style={{ pointerEvents: 'none' }}>
-          <ErrorBoundary label={widget.type}>
-            <PanelPreviewProvider value={true}>
-              <Comp widget={widget} surface={surface} deviceTouch={deviceTouch} />
-            </PanelPreviewProvider>
-          </ErrorBoundary>
+      {previewScope ? (
+        <div
+          className="panel-root"
+          {...previewScope.attrs}
+          data-preview-skin=""
+          style={{ ...previewScope.style, display: 'contents' }}
+        >
+          {cardEl}
         </div>
-        {addedStage && (
-          <div className={styles.cellAdded} data-stage={addedStage} aria-hidden="true">
-            <div className={styles.cellAddedContent}>
-              {addedStage === 'added' ? (
-                <>
-                  <Check className={styles.cellAddedIcon} />
-                  <span className={styles.cellAddedLabel}>{t('panel.add.added')}</span>
-                </>
-              ) : (
-                <>
-                  <Pencil className={styles.cellAddedIcon} />
-                  <span className={styles.cellAddedLabel}>{t('panel.widget.editWidget')}</span>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      ) : cardEl}
       {showLabel && (
         <div className={styles.cellLabelStrip}>
           <WidgetCellLabel label={label} />
@@ -768,6 +790,7 @@ export function PanelDragOverlayCell({
   flush?: boolean;
   onSlot: (slot: HTMLElement, attached: boolean) => void;
 }) {
+  const skinAttrs = usePanelSkinAttrs();
   const slotRef = useCallback((slot: HTMLDivElement) => {
     onSlot(slot, true);
     return () => onSlot(slot, false);
@@ -777,6 +800,7 @@ export function PanelDragOverlayCell({
   return (
     <div
       className={`panel-root ${styles.dragOverlayHost}`}
+      {...skinAttrs}
       data-theme={themeMode}
       data-surface={surface}
       // Portaled to body, so it can't inherit the panel root's labels-off state
