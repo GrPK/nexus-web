@@ -75,6 +75,8 @@ export interface TryxStatus {
   slideshow?: TryxSlideshow;
   /** Absent/null = on. */
   sleepWhenLocked?: boolean | null;
+  /** The service's resolved OS hour cycle, used for a 'system' time format. Absent from an older service. */
+  systemClock12h?: boolean;
 }
 
 export interface TryxPreset {
