@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as lightingApi from '../../../api/lighting';
 import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
@@ -67,6 +67,7 @@ vi.mock('../../../api/lighting', async importOriginal => {
     fetchLightingDevices: vi.fn(() => Promise.resolve({ isInit: true, devices: devicesRef.current })),
     fetchLedMap: vi.fn(() => Promise.resolve(null)),
     fetchAvailableMappings: vi.fn(() => Promise.resolve(null)),
+    setPins: vi.fn(() => Promise.resolve(true)),
     saveAnimateTemplates: vi.fn(() => Promise.resolve(null)),
     startAnimate: vi.fn(() => Promise.resolve(null)),
     startStatic: vi.fn(() => Promise.resolve(null)),
@@ -124,8 +125,10 @@ vi.mock('../../../components/common/DeviceCanvas/DeviceCanvas', () => ({
   },
 }));
 
-vi.mock('./lighting/AnimateGrid', () => ({
-  AnimateGrid: () => <div data-testid="animate-grid" />,
+vi.mock('./page/AnimateGrid', () => ({
+  AnimateGrid: ({ onSelect }: { onSelect: (key: string) => void }) => (
+    <div data-testid="animate-grid"><button type="button" data-testid="pick-plasma" onClick={() => onSelect('plasma')} /></div>
+  ),
 }));
 
 vi.mock('./lighting/FullscreenShader', () => ({
@@ -368,34 +371,81 @@ describe('LightingPage selection in a drive-everything mode', () => {
     await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-b']));
   });
 
-  it('drops a remembered device that is no longer present and keeps the rest', async () => {
-    localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-a', 'gone']));
-    localStorage.setItem('nexus.lighting.primaryDevice', JSON.stringify('gone'));
-    const { findByLabelText } = renderPage();
+  const GRACE_MS = 60_000;
+  const fireDevicesTopic = () => {
+    const call = vi.mocked(useTopicCallback).mock.calls.filter(c => c[0] === 'devices').at(-1)!;
+    act(() => { (call[2] as () => void)(); });
+  };
+  const storedSelection = () => JSON.parse(localStorage.getItem('nexus.lighting.pinSelection')!);
 
-    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a']));
-    expect(await findByLabelText('lightingOnboarding.selectNone')).not.toBeDisabled();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem('nexus.lighting.pinSelection')!)).toEqual(['dev-a']));
-    expect(JSON.parse(localStorage.getItem('nexus.lighting.primaryDevice')!)).toBeNull();
-  });
+  describe('absent selected devices', () => {
+    beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); });
+    afterEach(() => { vi.useRealTimers(); });
 
-  it('keeps a selected device that vanishes from the list and reappears', async () => {
-    localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-a', 'dev-b']));
-    renderPage();
-    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+    it('keeps a device that vanishes for a few seconds and returns', async () => {
+      localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-a', 'dev-b']));
+      renderPage();
+      await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
 
-    const fireDevicesTopic = () => {
-      const call = vi.mocked(useTopicCallback).mock.calls.filter(c => c[0] === 'devices').at(-1)!;
-      act(() => { (call[2] as () => void)(); });
-    };
-    devicesRef.current = [makeDevice('dev-a', 'Device A')];
-    fireDevicesTopic();
-    await waitFor(() => expect(canvasDeviceIds.current).toEqual(['dev-a']));
-    expect(JSON.parse(localStorage.getItem('nexus.lighting.pinSelection')!)).toEqual(['dev-a', 'dev-b']);
+      devicesRef.current = [makeDevice('dev-a', 'Device A')];
+      fireDevicesTopic();
+      await waitFor(() => expect(canvasDeviceIds.current).toEqual(['dev-a']));
+      vi.setSystemTime(Date.now() + 3000);
+      fireDevicesTopic();
+      expect(storedSelection()).toEqual(['dev-a', 'dev-b']);
 
-    devicesRef.current = [makeDevice('dev-a', 'Device A'), makeDevice('dev-b', 'Device B')];
-    fireDevicesTopic();
-    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+      devicesRef.current = [makeDevice('dev-a', 'Device A'), makeDevice('dev-b', 'Device B')];
+      fireDevicesTopic();
+      await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+    });
+
+    it('drops a device that stays absent past the grace window, and its primary', async () => {
+      localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-a', 'gone']));
+      localStorage.setItem('nexus.lighting.primaryDevice', JSON.stringify('gone'));
+      const { findByLabelText } = renderPage();
+
+      await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a']));
+      expect(await findByLabelText('lightingOnboarding.selectNone')).not.toBeDisabled();
+      expect(storedSelection()).toEqual(['dev-a', 'gone']);
+
+      vi.setSystemTime(Date.now() + GRACE_MS + 1);
+      fireDevicesTopic();
+      await waitFor(() => expect(storedSelection()).toEqual(['dev-a']));
+      expect(JSON.parse(localStorage.getItem('nexus.lighting.primaryDevice')!)).toBeNull();
+    });
+
+    it('keeps a device absent at mount that appears within the grace window', async () => {
+      devicesRef.current = [makeDevice('dev-a', 'Device A')];
+      localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-a', 'dev-b']));
+      renderPage();
+      await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a']));
+
+      vi.setSystemTime(Date.now() + 20_000);
+      devicesRef.current = [makeDevice('dev-a', 'Device A'), makeDevice('dev-b', 'Device B')];
+      fireDevicesTopic();
+      await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+
+      // The clock restarts once it is missing again.
+      devicesRef.current = [makeDevice('dev-a', 'Device A')];
+      fireDevicesTopic();
+      vi.setSystemTime(Date.now() + GRACE_MS - 1000);
+      fireDevicesTopic();
+      expect(storedSelection()).toEqual(['dev-a', 'dev-b']);
+    });
+
+    it('treats a selection of only absent devices as nothing selected', async () => {
+      localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['gone']));
+      const { findByTestId } = renderPage();
+
+      await waitFor(() => expect(canvasDeviceIds.current).toEqual(['dev-a', 'dev-b']));
+      expect(canvasHidesFrames.current).toBe(true);
+      expect(canvasFocusIds.current).toEqual([]);
+
+      vi.mocked(lightingApi.startAnimate).mockClear();
+      fireEvent.click(await findByTestId('pick-plasma'));
+      await waitFor(() => expect(lightingApi.startAnimate).toHaveBeenCalled());
+      expect(lightingApi.setPins).not.toHaveBeenCalled();
+    });
   });
 
   it('offers select all/none, and clearing the selection draws every device again', async () => {
