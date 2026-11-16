@@ -1785,12 +1785,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     : (leftOff ? 'detecting' : undefined);
 
   // A restored selection can name devices that are gone (unplugged between
-  // visits). Drop those once the list has loaded. Judged against what a click
-  // can select, NOT the pick targets: this effect re-runs on every device
-  // poll, so pruning to the narrower set would quietly undo the selection of a
-  // card the user picked precisely because its lights were off.
+  // visits). Drop those once, when the list first loads. Later polls must not
+  // prune: a device that drops for a moment (a wireless chain re-pairing) would
+  // lose its selection for good. Judged against what a click can select, NOT
+  // the pick targets, so a card picked while its lights were off stays selected.
+  const selectionPrunedRef = useRef(false);
   useEffect(() => {
-    if (orderedDevices.length === 0) return;
+    if (selectionPrunedRef.current || orderedDevices.length === 0) return;
+    selectionPrunedRef.current = true;
     // Hidden OpenRGB cards come back with the daemon, so their ids stay selected.
     const keep = new Set([...selectionKeepIds, ...hiddenDeviceIdsRef.current]);
     setSelectedDeviceIds(prev => {

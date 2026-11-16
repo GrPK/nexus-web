@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as lightingApi from '../../../api/lighting';
+import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
 import { UiSettingsProvider } from '../../../hooks/useUiSettings';
 import { LightingPage } from './LightingPage';
 
@@ -376,6 +377,25 @@ describe('LightingPage selection in a drive-everything mode', () => {
     expect(await findByLabelText('lightingOnboarding.selectNone')).not.toBeDisabled();
     await waitFor(() => expect(JSON.parse(localStorage.getItem('nexus.lighting.pinSelection')!)).toEqual(['dev-a']));
     expect(JSON.parse(localStorage.getItem('nexus.lighting.primaryDevice')!)).toBeNull();
+  });
+
+  it('keeps a selected device that vanishes from the list and reappears', async () => {
+    localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-a', 'dev-b']));
+    renderPage();
+    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+
+    const fireDevicesTopic = () => {
+      const call = vi.mocked(useTopicCallback).mock.calls.filter(c => c[0] === 'devices').at(-1)!;
+      act(() => { (call[2] as () => void)(); });
+    };
+    devicesRef.current = [makeDevice('dev-a', 'Device A')];
+    fireDevicesTopic();
+    await waitFor(() => expect(canvasDeviceIds.current).toEqual(['dev-a']));
+    expect(JSON.parse(localStorage.getItem('nexus.lighting.pinSelection')!)).toEqual(['dev-a', 'dev-b']);
+
+    devicesRef.current = [makeDevice('dev-a', 'Device A'), makeDevice('dev-b', 'Device B')];
+    fireDevicesTopic();
+    await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
   });
 
   it('offers select all/none, and clearing the selection draws every device again', async () => {
