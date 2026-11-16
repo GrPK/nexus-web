@@ -434,12 +434,13 @@ describe('LightingPage selection in a drive-everything mode', () => {
       renderPage();
       await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a']));
 
-      advanceClock(10_000);
+      // 45 s absent, short of the window.
+      for (let i = 0; i < 3; i++) { advanceClock(15_000); await fireDevicesTopic(); }
       devicesRef.current = [makeDevice('dev-a', 'Device A'), makeDevice('dev-b', 'Device B')];
       await fireDevicesTopic();
       expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']);
 
-      // The clock restarts once it is missing again: three steps of 15 s are short of the window.
+      // Reappearing reset the clock: another 45 s absent would pass 60 s only if it had carried over.
       devicesRef.current = [makeDevice('dev-a', 'Device A')];
       await fireDevicesTopic();
       for (let i = 0; i < 3; i++) { advanceClock(15_000); await fireDevicesTopic(); }

@@ -325,7 +325,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const primaryDeviceId = storedPrimaryId && selectionHoldableIds.has(storedPrimaryId) ? storedPrimaryId : null;
   // Every edit writes through here: a stored id that is absent right now (still
   // inside its grace window) rides along, so toggling a card during a dropout
-  // does not forget the device that dropped. Select none (an empty result) clears all.
+  // does not forget the device that dropped. Any edit that leaves nothing selected
+  // (select none, or toggling off the last visible card) clears them all.
   const holdableRef = useRef(selectionHoldableIds);
   holdableRef.current = selectionHoldableIds;
   const setSelectedDeviceIds = useCallback((update: SetStateAction<Set<string>>) => {
