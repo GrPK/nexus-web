@@ -284,6 +284,29 @@ describe('FanCard overflow menu', () => {
     expect(onToggleControlled).toHaveBeenCalledWith('fan1', false);
   });
 
+  it('offers Hide unresponsive fans only on an unresponsive fan, above the Nexus Control row', () => {
+    const onHideUnresponsive = vi.fn();
+    renderMenuCard(makeChannel({ classification: 'Unresponsive', rpm: 0 }), { onHideUnresponsive, onToggleControlled: vi.fn() });
+    openMenu();
+    const hide = screen.getByText('cooling.fan.menuHideUnresponsive');
+    const off = screen.getByText('cooling.fan.menuControlOff');
+    expect(hide.compareDocumentPosition(off) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(hide);
+    expect(onHideUnresponsive).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits Hide unresponsive fans on a healthy fan or when the page does not offer it', () => {
+    renderMenuCard(makeChannel(), { onHideUnresponsive: vi.fn(), onToggleControlled: vi.fn() });
+    openMenu();
+    expect(screen.queryByText('cooling.fan.menuHideUnresponsive')).toBeNull();
+  });
+
+  it('omits Hide unresponsive fans while the filter is on (no handler passed)', () => {
+    renderMenuCard(makeChannel({ classification: 'Unresponsive', rpm: 0 }), { onToggleControlled: vi.fn() });
+    openMenu();
+    expect(screen.queryByText('cooling.fan.menuHideUnresponsive')).toBeNull();
+  });
+
   it('omits the Nexus Control row on a surface that cannot set it', () => {
     renderMenuCard(makeChannel());
     openMenu();

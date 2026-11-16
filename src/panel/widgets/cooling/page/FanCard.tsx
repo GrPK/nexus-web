@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { isMultiSelectModifier } from '../../../../lib/platform';
-import { CircleSlash, Cpu, Fan, GaugeCircle, Gpu, Link2, Link2Off, MousePointerClick, Pencil, Pin, PinOff, Plus, RotateCcw, Unplug } from 'lucide-react';
+import { CircleSlash, Cpu, EyeOff, Fan, GaugeCircle, Gpu, Link2, Link2Off, MousePointerClick, Pencil, Pin, PinOff, Plus, RotateCcw, Unplug } from 'lucide-react';
 import { type FanChannel, type FanRole, isFanUnresponsive } from '../../../../api/cooling';
 import { useUnitPrefs } from '../../../../hooks/useUiSettings';
 import { useTranslation } from '../../../../lib/i18n';
@@ -63,7 +63,7 @@ export const FanCard = memo(function FanCard({
   hubMode, hubSupportsFirmware,
   hubSupportsBios = true,
   nubRef, cardRef: cardRefProp, onWirePointerDown, onWireHover,
-  onSetMode, onCreateCurve, onRename, onSpeedChange, onTogglePin, onToggleControlled, onSetRole, onClearOffset, drag,
+  onSetMode, onCreateCurve, onRename, onSpeedChange, onTogglePin, onToggleControlled, onHideUnresponsive, onSetRole, onClearOffset, drag,
   onSelectOnly, bulk, groupMove, hazard,
 }: {
   channel: FanChannel;
@@ -115,6 +115,9 @@ export const FanCard = memo(function FanCard({
   /** Nexus Control on/off for this channel. Off releases it to the motherboard
    *  and keeps every preset apply off it. Absent on surfaces that cannot set it. */
   onToggleControlled?: (id: string, controlled: boolean) => void;
+  /** Turns the page's hide filter on. Passed only while the filter is off, so the
+   *  menu offers it on an unresponsive fan and nowhere else. */
+  onHideUnresponsive?: () => void;
   onSetRole: (id: string, role: FanRole) => void;
   /** Clears a per-fan duty offset (the FanControl import is what creates them). Absent on surfaces that do not offer it. */
   onClearOffset?: (id: string) => void;
@@ -385,6 +388,10 @@ export const FanCard = memo(function FanCard({
       if (!bulk && offset !== 0 && onClearOffset) {
         items.push({ key: 'clearOffset', icon: <RotateCcw size={14} />, label: t('cooling.card.clearOffset'), onSelect: () => onClearOffset(channel.id) });
       }
+    }
+    if (!bulk && unresponsive && onHideUnresponsive) {
+      if (items.length > 0) items[items.length - 1] = { ...items[items.length - 1], separatorAfter: true };
+      items.push({ key: 'hideUnresponsive', icon: <EyeOff size={14} />, label: t('cooling.fan.menuHideUnresponsive'), onSelect: onHideUnresponsive, separatorAfter: onToggleControlled !== undefined });
     }
     if (onToggleControlled) {
       const setControlled = (next: boolean) => bulk ? bulk.setControlled(next) : onToggleControlled(channel.id, next);
