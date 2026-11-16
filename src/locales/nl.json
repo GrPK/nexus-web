@@ -6268,6 +6268,7 @@
   "store.removeUnused": "Deze app wordt nergens gebruikt.",
   "store.removeUsed": "Deze app wordt op deze plekken gebruikt. Verwijderen wist hem daar ook.",
   "store.requiresHardware": "Vereist {name}",
+  "store.requiresNexus": "Vereist Nexus {version} of nieuwer",
   "store.retry": "Opnieuw",
   "store.screenshotAlt": "Schermafbeelding {index} van {name}",
   "store.section.apps": "Apps en widgets",

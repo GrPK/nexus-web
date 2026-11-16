@@ -6268,6 +6268,7 @@
   "store.removeUnused": "このアプリはどこでも使われていません。",
   "store.removeUsed": "このアプリは次の場所で使われています。削除するとそこからも消えます。",
   "store.requiresHardware": "{name} が必要です",
+  "store.requiresNexus": "Nexus {version} 以降が必要です",
   "store.retry": "再試行",
   "store.screenshotAlt": "{name} のスクリーンショット {index}",
   "store.section.apps": "アプリとウィジェット",

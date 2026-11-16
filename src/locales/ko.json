@@ -6268,6 +6268,7 @@
   "store.removeUnused": "이 앱은 어디에서도 사용되지 않습니다.",
   "store.removeUsed": "이 앱은 다음 위치에서 사용 중입니다. 제거하면 거기서도 삭제됩니다.",
   "store.requiresHardware": "{name} 필요",
+  "store.requiresNexus": "Nexus {version} 이상 필요",
   "store.retry": "다시 시도",
   "store.screenshotAlt": "{name} 스크린샷 {index}",
   "store.section.apps": "앱 및 위젯",

@@ -6324,6 +6324,7 @@
   "store.removeUnused": "Tato aplikace se nikde nepoužívá.",
   "store.removeUsed": "Tato aplikace se používá na těchto místech. Odebráním se smaže i z nich.",
   "store.requiresHardware": "Vyžaduje {name}",
+  "store.requiresNexus": "Vyžaduje Nexus {version} nebo novější",
   "store.retry": "Zkusit znovu",
   "store.screenshotAlt": "{name}, snímek obrazovky {index}",
   "store.section.apps": "Aplikace a widgety",

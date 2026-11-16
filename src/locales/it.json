@@ -6268,6 +6268,7 @@
   "store.removeUnused": "Questa app non è usata da nessuna parte.",
   "store.removeUsed": "Questa app è usata in questi punti. Rimuovendola viene eliminata anche da lì.",
   "store.requiresHardware": "Richiede {name}",
+  "store.requiresNexus": "Richiede Nexus {version} o successivo",
   "store.retry": "Riprova",
   "store.screenshotAlt": "Schermata {index} di {name}",
   "store.section.apps": "App e widget",

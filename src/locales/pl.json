@@ -6324,6 +6324,7 @@
   "store.removeUnused": "Ta aplikacja nie jest nigdzie używana.",
   "store.removeUsed": "Ta aplikacja jest używana w tych miejscach. Usunięcie skasuje ją także tam.",
   "store.requiresHardware": "Wymaga {name}",
+  "store.requiresNexus": "Wymaga Nexus {version} lub nowszego",
   "store.retry": "Ponów",
   "store.screenshotAlt": "Zrzut ekranu {index} aplikacji {name}",
   "store.section.apps": "Aplikacje i widgety",

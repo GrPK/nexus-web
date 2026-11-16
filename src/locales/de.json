@@ -6268,6 +6268,7 @@
   "store.removeUnused": "Diese App wird nirgends verwendet.",
   "store.removeUsed": "Diese App wird an diesen Orten verwendet. Beim Entfernen wird sie auch dort gelöscht.",
   "store.requiresHardware": "Benötigt {name}",
+  "store.requiresNexus": "Benötigt Nexus {version} oder neuer",
   "store.retry": "Wiederholen",
   "store.screenshotAlt": "Screenshot {index} von {name}",
   "store.section.apps": "Apps & Widgets",

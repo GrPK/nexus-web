@@ -6268,6 +6268,7 @@
   "store.removeUnused": "此應用程式未在任何位置使用。",
   "store.removeUsed": "此應用程式正在這些位置使用。移除會一併從那裡刪除。",
   "store.requiresHardware": "需要 {name}",
+  "store.requiresNexus": "需要 Nexus {version} 或更新版本",
   "store.retry": "重試",
   "store.screenshotAlt": "{name} 螢幕截圖 {index}",
   "store.section.apps": "應用程式與小工具",

@@ -6324,6 +6324,7 @@
   "store.removeUnused": "Это приложение нигде не используется.",
   "store.removeUsed": "Это приложение используется здесь. Удаление уберёт его и оттуда.",
   "store.requiresHardware": "Требуется {name}",
+  "store.requiresNexus": "Требуется Nexus {version} или новее",
   "store.retry": "Повторить",
   "store.screenshotAlt": "Скриншот {index} приложения {name}",
   "store.section.apps": "Приложения и виджеты",
