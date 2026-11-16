@@ -425,8 +425,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
 
   // Device ids of OWN_EFFECT_DEVICES not following the Lighting page; only present devices are read.
   const [ownEffectIds, setOwnEffectIds] = useState<ReadonlySet<string>>(() => new Set());
+  // The matched ids themselves, so a further controller appearing re-reads the mode.
   const ownEffectPresent = useMemo(
-    () => OWN_EFFECT_DEVICES.map(e => devices.some(d => !!d.deviceId && e.matches(d.deviceId)) ? '1' : '0').join(''),
+    () => OWN_EFFECT_DEVICES.map(e => devices.flatMap(d => d.deviceId && e.matches(d.deviceId) ? [d.deviceId] : []).sort().join(',')).join('|'),
     [devices],
   );
   // Only the newest read applies, so one started before a Take control cannot restore the old state.
@@ -434,13 +435,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // A device whose read fails keeps its last known state.
   const refreshOwnEffects = useCallback(async () => {
     const seq = ++ownEffectSeq.current;
+    const present = ownEffectPresent.split('|');
     const modes = await Promise.all(OWN_EFFECT_DEVICES.map((e, i) =>
-      ownEffectPresent[i] === '1' ? e.getMode().catch(() => null) : Promise.resolve(null)));
+      present[i] !== '' ? e.getMode().catch(() => null) : Promise.resolve(null)));
     if (seq !== ownEffectSeq.current) return;
     setOwnEffectIds(prev => {
       const next = new Set<string>();
       OWN_EFFECT_DEVICES.forEach((e, i) => {
-        if (ownEffectPresent[i] !== '1') return;
+        if (present[i] === '') return;
         const mode = modes[i];
         const ids = devicesRef.current.flatMap(d => d.deviceId && e.matches(d.deviceId) ? [d.deviceId] : []);
         if (mode === null ? ids.some(id => prev.has(id)) : mode !== e.lightingPageMode) {
