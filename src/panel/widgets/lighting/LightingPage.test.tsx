@@ -372,10 +372,12 @@ describe('LightingPage selection in a drive-everything mode', () => {
   });
 
   const GRACE_MS = 60_000;
-  const fireDevicesTopic = () => {
+  // Resolves once the refetch the topic frame starts has landed in the page.
+  const fireDevicesTopic = async () => {
     const call = vi.mocked(useTopicCallback).mock.calls.filter(c => c[0] === 'devices').at(-1)!;
-    act(() => { (call[2] as () => void)(); });
+    await act(async () => { (call[2] as () => void)(); });
   };
+  const advanceClock = (ms: number) => vi.setSystemTime(Date.now() + ms);
   const storedSelection = () => JSON.parse(localStorage.getItem('nexus.lighting.pinSelection')!);
 
   describe('absent selected devices', () => {
@@ -388,15 +390,15 @@ describe('LightingPage selection in a drive-everything mode', () => {
       await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
 
       devicesRef.current = [makeDevice('dev-a', 'Device A')];
-      fireDevicesTopic();
-      await waitFor(() => expect(canvasDeviceIds.current).toEqual(['dev-a']));
-      vi.setSystemTime(Date.now() + 3000);
-      fireDevicesTopic();
+      await fireDevicesTopic();
+      expect(canvasDeviceIds.current).toEqual(['dev-a']);
+      advanceClock(3000);
+      await fireDevicesTopic();
       expect(storedSelection()).toEqual(['dev-a', 'dev-b']);
 
       devicesRef.current = [makeDevice('dev-a', 'Device A'), makeDevice('dev-b', 'Device B')];
-      fireDevicesTopic();
-      await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+      await fireDevicesTopic();
+      expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']);
     });
 
     it('drops a device that stays absent past the grace window, and its primary', async () => {
@@ -408,10 +410,22 @@ describe('LightingPage selection in a drive-everything mode', () => {
       expect(await findByLabelText('lightingOnboarding.selectNone')).not.toBeDisabled();
       expect(storedSelection()).toEqual(['dev-a', 'gone']);
 
-      vi.setSystemTime(Date.now() + GRACE_MS + 1);
-      fireDevicesTopic();
-      await waitFor(() => expect(storedSelection()).toEqual(['dev-a']));
+      // Steady refreshes, each inside the per-refresh step cap, add up to the window.
+      for (let i = 0; i < 4; i++) { advanceClock(GRACE_MS / 4); await fireDevicesTopic(); }
+      expect(storedSelection()).toEqual(['dev-a']);
       expect(JSON.parse(localStorage.getItem('nexus.lighting.primaryDevice')!)).toBeNull();
+    });
+
+    it('does not count a sleep between two refreshes as time absent', async () => {
+      localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-a', 'dev-b']));
+      renderPage();
+      await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+
+      devicesRef.current = [makeDevice('dev-a', 'Device A')];
+      await fireDevicesTopic();
+      advanceClock(8 * 60 * 60 * 1000);
+      await fireDevicesTopic();
+      expect(storedSelection()).toEqual(['dev-a', 'dev-b']);
     });
 
     it('keeps a device absent at mount that appears within the grace window', async () => {
@@ -420,17 +434,36 @@ describe('LightingPage selection in a drive-everything mode', () => {
       renderPage();
       await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a']));
 
-      vi.setSystemTime(Date.now() + 20_000);
+      advanceClock(10_000);
       devicesRef.current = [makeDevice('dev-a', 'Device A'), makeDevice('dev-b', 'Device B')];
-      fireDevicesTopic();
-      await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']));
+      await fireDevicesTopic();
+      expect(canvasFocusIds.current).toEqual(['dev-a', 'dev-b']);
 
-      // The clock restarts once it is missing again.
+      // The clock restarts once it is missing again: three steps of 15 s are short of the window.
       devicesRef.current = [makeDevice('dev-a', 'Device A')];
-      fireDevicesTopic();
-      vi.setSystemTime(Date.now() + GRACE_MS - 1000);
-      fireDevicesTopic();
+      await fireDevicesTopic();
+      for (let i = 0; i < 3; i++) { advanceClock(15_000); await fireDevicesTopic(); }
       expect(storedSelection()).toEqual(['dev-a', 'dev-b']);
+    });
+
+    it('keeps an absent selected device through a selection edit, and select none clears it', async () => {
+      devicesRef.current = [makeDevice('dev-a', 'Device A'), makeDevice('dev-c', 'Device C')];
+      localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-a', 'dev-b']));
+      const { findByLabelText } = renderPage();
+      await waitFor(() => expect(canvasFocusIds.current).toEqual(['dev-a']));
+
+      fireEvent.click(await findByLabelText('lighting.pane.selectAllControlled'));
+      await waitFor(() => expect(canvasFocusIds.current.sort()).toEqual(['dev-a', 'dev-c']));
+      expect(storedSelection().sort()).toEqual(['dev-a', 'dev-b', 'dev-c']);
+
+      devicesRef.current = [makeDevice('dev-a', 'Device A'), makeDevice('dev-b', 'Device B'), makeDevice('dev-c', 'Device C')];
+      await fireDevicesTopic();
+      expect(canvasFocusIds.current.sort()).toEqual(['dev-a', 'dev-b', 'dev-c']);
+
+      devicesRef.current = [makeDevice('dev-a', 'Device A'), makeDevice('dev-c', 'Device C')];
+      await fireDevicesTopic();
+      fireEvent.click(await findByLabelText('lightingOnboarding.selectNone'));
+      await waitFor(() => expect(storedSelection()).toEqual([]));
     });
 
     it('treats a selection of only absent devices as nothing selected', async () => {
