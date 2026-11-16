@@ -142,6 +142,18 @@ describe('LightingPage cards of devices playing their own effect', () => {
     });
   });
 
+  it('treats a second Strimer controller like the first', async () => {
+    devicesRef.current = [
+      device('strimer:atx:z0', 'strimer:atx'),
+      device('strimer:2:atx:z0', 'strimer:2:atx'),
+      device('strimer:2:gpu:z0', 'strimer:2:gpu'),
+    ];
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('rail').dataset.firmware).toBe('strimer:2:atx,strimer:2:gpu,strimer:atx');
+    });
+  });
+
   it('reads no device settings when none of those devices is present', async () => {
     devicesRef.current = [device('other', 'other')];
     renderPage();

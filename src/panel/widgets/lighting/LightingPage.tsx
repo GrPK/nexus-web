@@ -197,27 +197,28 @@ const layoutHistoryStore = {
 const DISCOVERY_GRACE_MS = 4000;
 const DEVICE_ORDER_KEY = 'lighting.deviceOrder';
 
-/** Devices that play their own effect unless set to `lightingPageMode`, keyed by their cards' deviceIds. */
+/** Devices that play their own effect unless set to `lightingPageMode`, matched by their cards' deviceIds. */
 const OWN_EFFECT_DEVICES: readonly {
-  deviceIds: readonly string[];
+  matches: (deviceId: string) => boolean;
   lightingPageMode: string;
   getMode: () => Promise<string | null>;
   setMode: (mode: string) => Promise<unknown>;
 }[] = [
   {
-    deviceIds: ['lianli-hydroshift2'],
+    matches: id => id === 'lianli-hydroshift2',
     lightingPageMode: 'canvas',
     getMode: () => getHydroShift2Lighting().then(l => l?.mode ?? null),
     setMode: mode => setHydroShift2Lighting({ mode }),
   },
   {
-    deviceIds: ['lianli-aio'],
+    matches: id => id === 'lianli-aio',
     lightingPageMode: 'canvas',
     getMode: () => getGalahad2Lighting().then(l => l?.mode ?? null),
     setMode: mode => setGalahad2Lighting({ mode }),
   },
   {
-    deviceIds: ['strimer:atx', 'strimer:gpu'],
+    // Further controllers carry strimer:<n>:atx and strimer:<n>:gpu.
+    matches: id => /^strimer:(\d+:)?(atx|gpu)$/.test(id),
     lightingPageMode: 'custom',
     getMode: () => getStrimerLighting().then(l => l?.mode ?? null),
     setMode: mode => setStrimerLighting({ mode }),
@@ -425,7 +426,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Device ids of OWN_EFFECT_DEVICES not following the Lighting page; only present devices are read.
   const [ownEffectIds, setOwnEffectIds] = useState<ReadonlySet<string>>(() => new Set());
   const ownEffectPresent = useMemo(
-    () => OWN_EFFECT_DEVICES.map(e => e.deviceIds.some(id => devices.some(d => d.deviceId === id)) ? '1' : '0').join(''),
+    () => OWN_EFFECT_DEVICES.map(e => devices.some(d => !!d.deviceId && e.matches(d.deviceId)) ? '1' : '0').join(''),
     [devices],
   );
   // Only the newest read applies, so one started before a Take control cannot restore the old state.
@@ -441,18 +442,19 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       OWN_EFFECT_DEVICES.forEach((e, i) => {
         if (ownEffectPresent[i] !== '1') return;
         const mode = modes[i];
-        if (mode === null ? e.deviceIds.some(id => prev.has(id)) : mode !== e.lightingPageMode) {
-          e.deviceIds.forEach(id => next.add(id));
+        const ids = devicesRef.current.flatMap(d => d.deviceId && e.matches(d.deviceId) ? [d.deviceId] : []);
+        if (mode === null ? ids.some(id => prev.has(id)) : mode !== e.lightingPageMode) {
+          ids.forEach(id => next.add(id));
         }
       });
       return next;
     });
   }, [ownEffectPresent]);
   const handleOwnEffectTakeControl = useCallback(async (deviceId: string) => {
-    const entry = OWN_EFFECT_DEVICES.find(e => e.deviceIds.includes(deviceId));
+    const entry = OWN_EFFECT_DEVICES.find(e => e.matches(deviceId));
     if (!entry) return;
     ownEffectSeq.current++;
-    setOwnEffectIds(prev => new Set([...prev].filter(id => !entry.deviceIds.includes(id))));
+    setOwnEffectIds(prev => new Set([...prev].filter(id => !entry.matches(id))));
     if (!await entry.setMode(entry.lightingPageMode)) void refreshOwnEffects();
   }, [refreshOwnEffects]);
   const firmwareDeviceIds = useMemo(
