@@ -333,6 +333,14 @@ describe('FanCard menu in a multi-selection', () => {
   }
   const openMenu = () => fireEvent.click(screen.getByRole('button', { name: 'cooling.fan.moreActions' }));
 
+  it('offers Hide unresponsive fans in a multi-selection when this fan is unresponsive', () => {
+    const onHideUnresponsive = vi.fn();
+    renderBulkCard(bulk(), { channel: makeChannel({ classification: 'Unresponsive', rpm: 0 }), onHideUnresponsive });
+    openMenu();
+    fireEvent.click(screen.getByText('cooling.fan.menuHideUnresponsive'));
+    expect(onHideUnresponsive).toHaveBeenCalledTimes(1);
+  });
+
   it('pins the whole selection, counting it in the row', () => {
     const b = bulk();
     renderBulkCard(b);

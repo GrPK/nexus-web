@@ -1373,7 +1373,8 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     if (hiddenFansHint.dismissed === false) setHiddenFansHintOpen(true);
   }, [updateUiSettings, hiddenFansHint.dismissed]);
   const showHiddenFansHint = hiddenFansHintOpen && hiddenFansHint.dismissed === false && hideUncontrolled
-    && !simpleDashboard;
+    && !simpleDashboard && !showCalibrateHint && !calibrating
+    && !calConfirmOpen && !importDialogOpen && !modeMenuOpen;
   // What the rail search matches a fan on: its names, its hub or board block,
   // and every user group above it.
   const railSearchFields = useCallback((c: FanChannel) => {

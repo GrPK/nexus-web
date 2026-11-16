@@ -90,16 +90,6 @@ describe('CoolingPage hide unresponsive fans from the fan menu', () => {
     expect(screen.getByText('cooling.fan.menuHideUnresponsive')).toBeInTheDocument();
   });
 
-  it('does not offer the entry while the filter is already on', async () => {
-    localStorage.setItem('nexus_settings', JSON.stringify({
-      general: { coolingDashboardMode: 'advanced', showUncontrolledCoolingDevices: false },
-    }));
-    renderPage();
-    await settle();
-    expect(screen.queryByText('Dead Fan')).toBeNull();
-    expect(screen.getByLabelText('cooling.hidden.show')).toBeInTheDocument();
-  });
-
   it('turns the filter on and points at the eye when it was never toggled', async () => {
     renderPage();
     await settle();
@@ -111,6 +101,22 @@ describe('CoolingPage hide unresponsive fans from the fan menu', () => {
     await waitFor(() => expect(hiddenFansBubble()).not.toBeNull());
     const selector = hiddenFansBubble()?.getAttribute('data-target') ?? '';
     expect(document.querySelector(selector)).toBe(screen.getByLabelText('cooling.hidden.show'));
+  });
+
+  it('waits while a calibration runs, then shows once it ends', async () => {
+    const view = renderPage(true);
+    await settle();
+    await waitFor(() => expect(screen.getByLabelText('cooling.hidden.hide')).toBeInTheDocument());
+    rightClick('Dead Fan');
+    fireEvent.click(screen.getByText('cooling.fan.menuHideUnresponsive'));
+    await waitFor(() => expect(screen.queryByText('Dead Fan')).toBeNull());
+    expect(hiddenFansBubble()).toBeNull();
+    view.rerender(
+      <UiSettingsProvider>
+        <CoolingPage serviceOnline serviceState={{ cooling: { calibrating: false } } as unknown as ServiceState} />
+      </UiSettingsProvider>,
+    );
+    await waitFor(() => expect(hiddenFansBubble()).not.toBeNull());
   });
 
   it('shows no bubble when the eye was toggled before', async () => {

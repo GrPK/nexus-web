@@ -389,9 +389,9 @@ export const FanCard = memo(function FanCard({
         items.push({ key: 'clearOffset', icon: <RotateCcw size={14} />, label: t('cooling.card.clearOffset'), onSelect: () => onClearOffset(channel.id) });
       }
     }
-    if (!bulk && unresponsive && onHideUnresponsive) {
+    if (unresponsive && onHideUnresponsive) {
       if (items.length > 0) items[items.length - 1] = { ...items[items.length - 1], separatorAfter: true };
-      items.push({ key: 'hideUnresponsive', icon: <EyeOff size={14} />, label: t('cooling.fan.menuHideUnresponsive'), onSelect: onHideUnresponsive, separatorAfter: onToggleControlled !== undefined });
+      items.push({ key: 'hideUnresponsive', icon: <EyeOff size={14} />, label: t('cooling.fan.menuHideUnresponsive'), onSelect: onHideUnresponsive });
     }
     if (onToggleControlled) {
       const setControlled = (next: boolean) => bulk ? bulk.setControlled(next) : onToggleControlled(channel.id, next);
