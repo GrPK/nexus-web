@@ -44,6 +44,7 @@ import { FeatureDisabled } from '../components/common/FeatureDisabled/FeatureDis
 import { PageHero } from '../components/common/PageHero/PageHero';
 import { Popover } from '../components/common/Popover/Popover';
 import { DatePicker } from '../components/common/DatePicker/DatePicker';
+import { MiniMonth } from '../components/common/MiniMonth/MiniMonth';
 import { EffectCard } from '../components/common/EffectCard/EffectCard';
 import { PairedPcsContent } from '../components/common/PairedPcs/PairedPcsContent';
 import { EffectControls } from '../panel/widgets/lighting/page/EffectControls';
@@ -275,6 +276,25 @@ function PreviewDatePicker() {
   const iso = new Date().toISOString().slice(0, 10);
   const [v, setV] = useState(iso);
   return <DatePicker value={v} max={iso} onChange={setV} />;
+}
+
+function PreviewMiniMonth() {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [month, setMonth] = useState(today.getTime());
+  const [selected, setSelected] = useState(today.getTime());
+  return (
+    <div style={{ width: 260 }}>
+      <MiniMonth
+        month={month}
+        selected={selected}
+        today={today.getTime()}
+        weekStart={0}
+        highlightWeek
+        onSelect={setSelected}
+        onMonthChange={delta => { const d = new Date(month); setMonth(new Date(d.getFullYear(), d.getMonth() + delta, 1).getTime()); }}
+      />
+    </div>
+  );
 }
 
 function PreviewHeartBurst() {
@@ -3014,6 +3034,12 @@ export const REGISTRY: StorybookEntry[] = [
     filePath: 'src/components/common/DatePicker/DatePicker.tsx',
     description: 'Themed date input - trigger + month-grid popup. Replaces native `<input type="date">` whose popup ignored app chrome. Used in Screen Time browse (day nav, custom-range clear). Respects min / max bounds.', Preview: PreviewDatePicker,
     notes: 'Click outside or Escape closes. "Today" button jumps to today if within bounds. Disabled cells are past / future out of range.',
+  },
+  {
+    name: 'MiniMonth', category: 'inputs',
+    filePath: 'src/components/common/MiniMonth/MiniMonth.tsx',
+    description: 'An always-open month grid with arrow navigation, for a side rail that picks a day (the Calendar page). DatePicker without the trigger and popup.', Preview: PreviewMiniMonth,
+    notes: 'Controlled: the caller owns the shown month and the selected day. `highlightWeek` tints the selected day\'s whole row for week-based views.',
   },
   {
     name: 'InfoTooltip', category: 'status',

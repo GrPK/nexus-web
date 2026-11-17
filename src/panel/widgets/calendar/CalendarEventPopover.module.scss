@@ -1,0 +1,61 @@
+@use '../../styles/flexGap' as *;
+
+.popover {
+  min-width: 260px;
+  max-width: 340px;
+}
+
+.head { display: flex; align-items: stretch; @include hgap(0.6rem); }
+.bar { width: 4px; border-radius: 2px; flex: none; background: var(--cal-color); }
+.title { font-size: 1.1rem; font-weight: var(--weight-heading); line-height: 1.3; overflow-wrap: anywhere; }
+.when { font-size: var(--type-small); color: var(--text); line-height: 1.45; }
+.calendar { display: flex; align-items: center; @include hgap(0.5rem); font-size: var(--type-small); color: var(--text-dim); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cal-color); }
+.line { display: flex; @include hgap(0.5rem); align-items: flex-start; font-size: var(--type-small); color: var(--text-dim); line-height: 1.45; }
+.line svg { flex: none; margin-top: 2px; }
+.notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.more { min-width: 240px; }
+.moreHead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-bottom: 0.25rem;
+
+  b {
+    display: flex;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    color: var(--text);
+    letter-spacing: 0;
+    font-weight: var(--weight-strong);
+  }
+}
+.moreToday { color: var(--accent); b { background: var(--accent); color: var(--accent-text); } }
+.moreRow {
+  display: flex;
+  align-items: center;
+  @include hgap(0.5rem);
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-small);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover { background: var(--bg-card-hover); }
+}
+.rowBar { width: 3px; height: 16px; border-radius: 2px; flex: none; background: var(--cal-color); }
+.rowTime { color: var(--text-dim); flex: none; min-width: 58px; }
+.rowTitle { font-weight: var(--weight-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
