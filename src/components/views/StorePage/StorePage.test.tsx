@@ -299,6 +299,32 @@ describe('StorePage hardware-gated app', () => {
     expect(screen.getByRole('heading', { name: 'store.section.apps' })).toBeInTheDocument();
   });
 
+  it('lists an app this build is too old for, naming the Nexus version it needs in place of Install', async () => {
+    const tooNew = { ...app, latest: null, requiresNexus: '3.1.12' };
+    fetchStoreApps.mockResolvedValue([tooNew]);
+    fetchStoreApp.mockResolvedValue({ ...detail, ...tooNew });
+    const { unmount } = render(<StorePage />);
+
+    expect(await screen.findByText('store.requiresNexus version=3.1.12')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'store.install' })).not.toBeInTheDocument();
+    unmount();
+
+    render(<StorePage tab={app.id} onTabChange={vi.fn()} />);
+    expect(await screen.findByText('store.requiresNexus version=3.1.12')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'store.install' })).not.toBeInTheDocument();
+  });
+
+  it('keeps an installed app Installed when this build is too old for its current release', async () => {
+    installed.push({ id: app.id, version: '1.0.0', iconUrl: null });
+    const tooNew = { ...app, latest: null, requiresNexus: '3.1.12' };
+    fetchStoreApps.mockResolvedValue([tooNew]);
+    fetchStoreApp.mockResolvedValue({ ...detail, ...tooNew });
+    render(<StorePage tab={app.id} onTabChange={vi.fn()} />);
+
+    expect(await screen.findByRole('button', { name: 'store.installed' })).toBeDisabled();
+    expect(screen.queryByText('store.requiresNexus version=3.1.12')).not.toBeInTheDocument();
+  });
+
   it('swaps Install for a product button and a requirement line on the app page when the hardware is absent', async () => {
     fetchStoreApps.mockResolvedValue([gated(false)]);
     fetchStoreApp.mockResolvedValue({ ...detail, ...gated(false) });
