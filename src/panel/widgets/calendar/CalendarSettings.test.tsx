@@ -41,13 +41,13 @@ const source = (id: string): CalendarSourceDto => ({
   id, kind: 'ics', name: `Cal ${id}`, color: '#8b7cff', host: null, lastSyncedAt: null, status: 'ok', error: null,
 });
 
-const widget = (config?: Record<string, unknown>): PanelWidget => ({ id: 'w', type: 'calendar', size: '4x2', col: 0, row: 0, config } as PanelWidget);
+const widget = (config?: Record<string, unknown>, size: PanelWidget['size'] = '4x2'): PanelWidget => ({ id: 'w', type: 'calendar', size, col: 0, row: 0, config } as PanelWidget);
 
-function renderSettings(opts: { surface?: PanelSurface; desktopEditor?: boolean; config?: Record<string, unknown> }) {
+function renderSettings(opts: { surface?: PanelSurface; desktopEditor?: boolean; config?: Record<string, unknown>; size?: PanelWidget['size'] }) {
   const onUpdate = vi.fn();
   render(
     <CalendarSettings
-      widget={widget(opts.config)}
+      widget={widget(opts.config, opts.size)}
       surface={opts.surface}
       desktopEditor={opts.desktopEditor}
       onUpdate={onUpdate}
@@ -94,18 +94,47 @@ describe('CalendarSettings', () => {
     expect(onUpdate).toHaveBeenCalledWith({ hiddenCalendars: ['b'] });
   });
 
-  it('writes both display toggles together and shows the dots toggle only with the grid on', () => {
-    const onUpdate = renderSettings({ surface: 'desktop', config: { showGrid: false, showEvents: true } });
-    expect(screen.queryByRole('switch', { name: 'panel.widget.calendar.settings.showDots' })).toBeNull();
+  const SMALL = ['2x2', '2x4', '4x2', '2x2round'] as const;
+  const sw = (name: string) => screen.getByRole('switch', { name: `panel.widget.calendar.settings.${name}` }) as HTMLButtonElement;
+
+  it.each(SMALL)('greys out the grid toggle at %s while events are on', size => {
+    renderSettings({ surface: 'desktop', size, config: { showGrid: false, showEvents: true } });
+    expect(sw('showGrid').disabled).toBe(true);
+    expect(sw('showEvents').disabled).toBe(false);
+  });
+
+  it.each(SMALL)('greys out the events toggle at %s while the grid is on', size => {
+    renderSettings({ surface: 'desktop', size, config: { showGrid: true, showEvents: false } });
+    expect(sw('showEvents').disabled).toBe(true);
+    expect(sw('showGrid').disabled).toBe(false);
+  });
+
+  it.each(SMALL)('enables both at %s when both are off', size => {
+    renderSettings({ surface: 'desktop', size, config: { showGrid: false, showEvents: false } });
+    expect(sw('showGrid').disabled).toBe(false);
+    expect(sw('showEvents').disabled).toBe(false);
+  });
+
+  it('lets both be on at 4x4', () => {
+    const onUpdate = renderSettings({ surface: 'desktop', size: '4x4', config: { showGrid: false, showEvents: true } });
     fireEvent.click(screen.getByRole('switch', { name: 'panel.widget.calendar.settings.showGrid' }));
     expect(onUpdate).toHaveBeenCalledWith({ showGrid: true, showEvents: true });
   });
 
-  it('turns events off while keeping the grid, starting from a legacy showGrid', () => {
-    const onUpdate = renderSettings({ surface: 'desktop', config: { showGrid: true } });
-    expect(screen.getByRole('switch', { name: 'panel.widget.calendar.settings.showDots' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('switch', { name: 'panel.widget.calendar.settings.showEvents' }));
-    expect(onUpdate).toHaveBeenCalledWith({ showGrid: true, showEvents: false });
+  it('shows both-on stored config as grid on and events off and disabled after a resize, without writing', () => {
+    const onUpdate = renderSettings({ surface: 'desktop', size: '4x2', config: { showGrid: true, showEvents: true } });
+    expect(sw('showGrid').getAttribute('aria-checked')).toBe('true');
+    expect(sw('showGrid').disabled).toBe(false);
+    expect(sw('showEvents').getAttribute('aria-checked')).toBe('false');
+    expect(sw('showEvents').disabled).toBe(true);
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('keeps both on at 4x4 for stored both-on config', () => {
+    renderSettings({ surface: 'desktop', size: '4x4', config: { showGrid: true, showEvents: true } });
+    expect(sw('showEvents').getAttribute('aria-checked')).toBe('true');
+    expect(sw('showEvents').disabled).toBe(false);
+    expect(sw('showGrid').disabled).toBe(false);
   });
 
   it('offers an edit button per calendar on a pointer surface only', () => {

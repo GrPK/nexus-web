@@ -10,7 +10,7 @@ import { useCalendarMutations, useCalendarSettings, useCalendarSources } from '.
 import { Button } from '../../../components/common/Button/Button';
 import { SettingRow } from '../../../components/common/SettingRow/SettingRow';
 import { SettingsSection, SettingsToggle, SettingsSelect } from '../common/SettingsRow/SettingsRow';
-import { hiddenCalendarIds, resolveCalendarDisplay, syncedText } from './calendarEvents';
+import { hiddenCalendarIds, resolveCalendarDisplay, supportsGridAndEvents, syncedText } from './calendarEvents';
 import { CalendarSourceRow } from './CalendarSourceRow';
 import { CalendarSourceEditor } from './CalendarSourceEditor';
 import { CalendarSourceModal } from './page/CalendarSourceModal';
@@ -32,11 +32,13 @@ const KIND_LABEL_KEYS: Record<CalendarSourceDto['kind'], string> = {
 export function CalendarSettings({ widget, surface, deviceTouch, desktopEditor, onUpdate }: WidgetSettingsProps) {
   const { t } = useTranslation();
   const config = widget.config;
-  const { grid, events: showEvents } = resolveCalendarDisplay(config);
+  const { grid, events: showEvents } = resolveCalendarDisplay(config, widget.size);
   const weekStart = (config?.weekStart as string | undefined) ?? 'auto';
   const showDots = config?.showDots !== false;
   // Both keys are written together so a toggle never re-derives the other from an older config shape.
   const setDisplay = (next: Partial<{ showGrid: boolean; showEvents: boolean }>) => onUpdate({ showGrid: grid, showEvents, ...next });
+  // Sizes with no room for both: while one is on the other is greyed out.
+  const exclusive = !supportsGridAndEvents(widget.size);
   const immersiveView = (config?.immersiveView as string | undefined) ?? 'auto';
   const hidden = hiddenCalendarIds(config);
 
@@ -66,11 +68,13 @@ export function CalendarSettings({ widget, surface, deviceTouch, desktopEditor, 
         <SettingsToggle
           label={t('panel.widget.calendar.settings.showGrid')}
           checked={grid}
+          disabled={exclusive && showEvents}
           onChange={value => setDisplay({ showGrid: value })}
         />
         <SettingsToggle
           label={t('panel.widget.calendar.settings.showEvents')}
           checked={showEvents}
+          disabled={exclusive && grid}
           onChange={value => setDisplay({ showEvents: value })}
         />
         <SettingsSelect

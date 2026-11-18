@@ -316,6 +316,12 @@ describe('config resolution', () => {
     expect(resolveCalendarDisplay({ view: 'next' })).toEqual({ grid: false, events: true });
     expect(resolveCalendarDisplay({ view: 'month' })).toEqual({ grid: true, events: true });
   });
+  it('shows the grid only when both are stored at a size without room for the list', () => {
+    const both = { showGrid: true, showEvents: true };
+    expect(resolveCalendarDisplay(both, '4x4')).toEqual({ grid: true, events: true });
+    for (const size of ['2x2', '2x4', '4x2', '2x2round']) expect(resolveCalendarDisplay(both, size)).toEqual({ grid: true, events: false });
+    expect(resolveCalendarDisplay({ showGrid: false, showEvents: true }, '4x2')).toEqual({ grid: false, events: true });
+  });
   it('prefers the stored toggles over older keys', () => {
     expect(resolveCalendarDisplay({ view: 'month', showGrid: true, showEvents: false })).toEqual({ grid: true, events: false });
     expect(resolveCalendarDisplay({ view: 'next', showGrid: false, showEvents: true })).toEqual({ grid: false, events: true });
