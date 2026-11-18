@@ -19,6 +19,15 @@ const REFRESH_LABEL_KEYS: Record<CalendarRefreshMinutes, string> = {
   60: 'panel.widget.calendar.refresh.hour1',
 };
 
+// Known service sync codes; anything else reads as a generic failure.
+const SOURCE_ERROR_KEYS: Readonly<Record<string, string>> = {
+  unreachable: 'panel.widget.calendar.add.error.unreachable',
+  unauthorized: 'panel.widget.calendar.add.error.unauthorized',
+  notFound: 'panel.widget.calendar.add.error.notFound',
+  notIcs: 'panel.widget.calendar.add.error.notIcs',
+  tooLarge: 'panel.widget.calendar.add.error.tooLarge',
+};
+
 const KIND_LABEL_KEYS: Record<CalendarSourceDto['kind'], string> = {
   ics: 'panel.widget.calendar.kind.ics',
   google: 'panel.widget.calendar.kind.google',
@@ -63,7 +72,7 @@ export function CalendarSourcesSections({ hidden, onToggle, canEdit }: Props) {
             color={source.color}
             isError={source.error !== null}
             description={source.error
-              ? t(`panel.widget.calendar.add.error.${source.error}`)
+              ? t(SOURCE_ERROR_KEYS[source.error] ?? 'panel.widget.calendar.source.error.generic')
               : syncedText(t, source.lastSyncedAt, now, t(KIND_LABEL_KEYS[source.kind]))}
             checked={!hidden.includes(source.id)}
             onChange={on => onToggle(source.id, on)}

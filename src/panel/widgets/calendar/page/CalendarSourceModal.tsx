@@ -27,6 +27,7 @@ const ERROR_KEYS: Record<CalendarAddError, string> = {
   notIcs: 'panel.widget.calendar.add.error.notIcs',
   tooLarge: 'panel.widget.calendar.add.error.tooLarge',
   invalidUrl: 'panel.widget.calendar.add.error.invalidUrl',
+  limitReached: 'panel.widget.calendar.add.error.limitReached',
 };
 
 /** The first palette colour no existing calendar uses, else the first. */
@@ -59,10 +60,12 @@ interface CalendarSourceModalProps {
   source?: CalendarSourceDto | null;
   onSave?: (patch: { name: string; color: string }) => Promise<unknown>;
   onRemove?: () => void;
+  // A message from the caller (a failed remove), shown like the dialog's own errors.
+  notice?: string | null;
 }
 
 /** The Add calendar dialog, and the same dialog in edit mode for a calendar that exists. */
-export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, onRemove, onClose }: CalendarSourceModalProps) {
+export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, onRemove, notice, onClose }: CalendarSourceModalProps) {
   const { t } = useTranslation();
   const editing = source != null;
   const [url, setUrl] = useState('');
@@ -174,7 +177,7 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
             <span className={styles.label}>{t('panel.widget.calendar.edit.feed')}</span>
             <span className={styles.readonly}>{source.host ?? ''}</span>
             <span className={styles.note}>{t('panel.widget.calendar.add.readOnly')}</span>
-            {error && <p id={errorId} className={styles.error} role="alert">{error}</p>}
+            {(error ?? notice) && <p id={errorId} className={styles.error} role="alert">{error ?? notice}</p>}
           </div>
         ) : (
         <div className={styles.field}>

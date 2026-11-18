@@ -178,6 +178,7 @@ export function CalendarPage({ tab, onTabChange }: Props) {
             onToggle={toggleCalendar}
           />
           <div className={styles.main}>
+            {data.truncated && <Notice tone="info" role="status">{t('panel.widget.calendar.events.truncated')}</Notice>}
             {noCalendars && (
               <Notice tone="info" role="status">
                 {t('panel.widget.calendar.page.empty')}

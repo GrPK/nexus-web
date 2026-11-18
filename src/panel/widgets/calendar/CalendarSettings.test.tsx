@@ -68,7 +68,7 @@ describe('CalendarSettings', () => {
     expect(screen.getByText('panel.widget.calendar.add.button')).toBeTruthy();
   });
 
-  it.each(['y70', 'phone'] as const)('hides Add calendar on the %s touch surface, keeping toggles and refresh', surface => {
+  it.each(['y70', 'phone', 'q60', 'monitor'] as const)('hides Add calendar on the %s panel surface, keeping toggles and refresh', surface => {
     renderSettings({ surface });
     expect(screen.queryByText('panel.widget.calendar.add.button')).toBeNull();
     expect(screen.getAllByRole('switch').length).toBeGreaterThanOrEqual(2);
@@ -115,6 +115,12 @@ describe('CalendarSettings', () => {
     expect(sw('showEvents').disabled).toBe(false);
   });
 
+  it('writes only the toggled key plus the other at its stored value after a resize', () => {
+    const onUpdate = renderSettings({ surface: 'desktop', size: '4x2', config: { showGrid: true, showEvents: true } });
+    fireEvent.click(sw('showGrid'));
+    expect(onUpdate).toHaveBeenCalledWith({ showGrid: false, showEvents: true });
+  });
+
   it('lets both be on at 4x4', () => {
     const onUpdate = renderSettings({ surface: 'desktop', size: '4x4', config: { showGrid: false, showEvents: true } });
     fireEvent.click(screen.getByRole('switch', { name: 'panel.widget.calendar.settings.showGrid' }));
@@ -156,7 +162,7 @@ describe('CalendarSettings', () => {
     expect(screen.getAllByRole('button', { name: /panel.widget.calendar.edit.button/ })).toHaveLength(2);
   });
 
-  it.each(['y70', 'phone'] as const)('has no edit button on the %s touch surface', surface => {
+  it.each(['y70', 'phone', 'q60', 'monitor'] as const)('has no edit button on the %s panel surface', surface => {
     renderSettings({ surface });
     expect(screen.queryByRole('button', { name: /panel.widget.calendar.edit.button/ })).toBeNull();
   });

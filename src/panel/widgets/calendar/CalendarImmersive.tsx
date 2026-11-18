@@ -51,8 +51,10 @@ export function CalendarImmersive({ widget, surface, deviceTouch }: WidgetProps)
 
   const [picked, setPicked] = useState<ImmersiveView | null>(null);
   const view = interactive && picked ? picked : defaultView;
-  const [anchor, setAnchor] = useState(() => startOfDay(Date.now()));
+  const [pickedAnchor, setAnchor] = useState(() => startOfDay(Date.now()));
   const today = startOfDay(now);
+  // A panel that cannot navigate follows today, so it rolls over at midnight instead of freezing at mount.
+  const anchor = interactive ? pickedAnchor : today;
 
   const range = useMemo(() => {
     switch (view) {

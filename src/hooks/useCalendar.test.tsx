@@ -48,6 +48,57 @@ afterEach(() => {
   Object.values(api).forEach(fn => fn.mockReset());
 });
 
+describe('calendar store ordering and cache', () => {
+  const deferred = () => {
+    let resolve!: (v: unknown) => void;
+    const promise = new Promise(r => { resolve = r; });
+    return { promise, resolve };
+  };
+
+  it('never lets an older response overwrite a newer one', async () => {
+    const slow = deferred();
+    api.fetchCalendarEvents.mockReset();
+    api.fetchCalendarEvents.mockImplementationOnce(() => slow.promise);
+    api.fetchCalendarEvents.mockResolvedValue({ events: [dto('new', 'a')], syncedAt: 2 });
+    const { result } = renderHook(() => useCalendarEvents(0, 100), { wrapper });
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { invalidateCalendar(); });
+    await waitFor(() => expect(result.current.events.map(e => e.id)).toEqual(['new']));
+    await act(async () => { slow.resolve({ events: [dto('old', 'a')], syncedAt: 1 }); await Promise.resolve(); });
+    expect(result.current.events.map(e => e.id)).toEqual(['new']);
+  });
+
+  it('refetches a range that went stale while off screen, when it is viewed again', async () => {
+    const first = renderHook(() => useCalendarEvents(0, 100), { wrapper });
+    await waitFor(() => expect(first.result.current.loaded).toBe(true));
+    first.unmount();
+    api.fetchCalendarEvents.mockClear();
+    api.fetchCalendarEvents.mockResolvedValue({ events: [dto('fresh', 'a')], syncedAt: 9 });
+    await act(async () => { invalidateCalendar(); });
+    expect(api.fetchCalendarEvents).not.toHaveBeenCalledWith(0, 100);
+    const again = renderHook(() => useCalendarEvents(0, 100), { wrapper });
+    await waitFor(() => expect(again.result.current.events.map(e => e.id)).toEqual(['fresh']));
+  });
+
+  it('carries the truncated flag from the service', async () => {
+    api.fetchCalendarEvents.mockResolvedValue({ events: [], syncedAt: 1, truncated: true });
+    const { result } = renderHook(() => useCalendarEvents(0, 100), { wrapper });
+    await waitFor(() => expect(result.current.truncated).toBe(true));
+  });
+
+  it('evicts the oldest unviewed ranges past the cache cap', async () => {
+    for (let i = 0; i < 15; i++) {
+      const { result, unmount } = renderHook(() => useCalendarEvents(i * 1000, i * 1000 + 100), { wrapper });
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+      unmount();
+    }
+    api.fetchCalendarEvents.mockClear();
+    const { result } = renderHook(() => useCalendarEvents(0, 100), { wrapper });
+    await waitFor(() => expect(api.fetchCalendarEvents).toHaveBeenCalledWith(0, 100));
+    expect(result.current).toBeTruthy();
+  });
+});
+
 describe('calendar store', () => {
   it('makes one request per range however many consumers read it', async () => {
     const { result } = renderHook(() => ({

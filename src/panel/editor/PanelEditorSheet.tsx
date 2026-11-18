@@ -220,7 +220,7 @@ export function PanelEditorSheet({
   const audioReactive = usePanelAudioReactive(surface);
   const { t, language } = useTranslation();
   const def = editingWidget ? lookupApp(editingWidget.type) : undefined;
-  const touchHintKey = touchEditorHintFor(def?.meta, surface, deviceTouch);
+  const touchHintKey = touchEditorHintFor(def?.meta, surface);
   const title = mode === 'panelSettings'
     ? t(panelSettingsSection === 'theme' ? 'panel.actions.theme'
       : panelSettingsSection === 'background' ? 'panel.actions.background'

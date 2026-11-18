@@ -10,7 +10,7 @@ export type CalendarKind = 'ics' | 'google' | 'microsoft';
 export type CalendarSyncStatus = 'ok' | 'syncing' | 'error';
 export type CalendarSyncError = 'unreachable' | 'unauthorized' | 'notFound' | 'notIcs' | 'tooLarge';
 /** Codes a failed add can carry: the sync errors plus a refused address (bad scheme, malformed, private host, source cap). */
-export type CalendarAddError = CalendarSyncError | 'invalidUrl';
+export type CalendarAddError = CalendarSyncError | 'invalidUrl' | 'limitReached';
 export type CalendarRefreshMinutes = 5 | 15 | 30 | 60;
 
 export const CALENDAR_REFRESH_OPTIONS: readonly CalendarRefreshMinutes[] = [5, 15, 30, 60];
@@ -56,6 +56,8 @@ export interface CalendarSettingsDto {
 export interface CalendarEventsResult {
   events: CalendarEventDto[];
   syncedAt: number | null;
+  /** The service cut the response at its event cap. */
+  truncated?: boolean;
 }
 
 export interface AddCalendarInput {
@@ -73,7 +75,7 @@ export class CalendarRequestError extends Error {
   }
 }
 
-const ADD_ERRORS: readonly string[] = ['unreachable', 'unauthorized', 'notFound', 'notIcs', 'tooLarge', 'invalidUrl'];
+const ADD_ERRORS: readonly string[] = ['unreachable', 'unauthorized', 'notFound', 'notIcs', 'tooLarge', 'invalidUrl', 'limitReached'];
 
 type CalendarMockModule = typeof import('./calendarMock');
 

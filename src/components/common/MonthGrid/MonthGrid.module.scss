@@ -1,0 +1,60 @@
+@use '../../../styles/text' as *;
+
+.weekdays,
+.row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.weekdays span {
+  @include text-label;
+  text-align: center;
+  color: var(--text-dim);
+  padding: 0.25rem 0;
+}
+
+.row {
+  gap: 2px;
+  border-radius: var(--radius);
+  padding: 1px 0;
+}
+.rowHighlighted { background: var(--accent-soft); }
+
+.cell {
+  height: 1.9rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: var(--type-small);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-variant-numeric: tabular-nums;
+
+  &:hover:not(:disabled) {
+    background: var(--bg-card-hover);
+    color: var(--accent-glow);
+  }
+}
+.out { color: var(--text-dim); }
+.today {
+  border: 1px dashed var(--accent);
+  color: var(--accent-glow);
+}
+.selected {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: var(--weight-heading);
+  border: none;
+
+  &:hover:not(:disabled) { background: var(--accent); color: var(--accent-text); }
+}
+.disabled {
+  color: var(--text-dim);
+  opacity: 0.35;
+  cursor: not-allowed;
+}

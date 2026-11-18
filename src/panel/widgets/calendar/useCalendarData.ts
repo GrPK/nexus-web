@@ -23,6 +23,7 @@ export interface CalendarData {
   events: CalEvent[];
   sources: CalendarSourceDto[];
   loaded: boolean;
+  truncated: boolean;
   lookFor: (calendarId: string) => CalendarLook;
 }
 
@@ -42,7 +43,7 @@ interface Options {
 export function useCalendarData({ from, to, hidden = [], enabled, preview, now }: Options): CalendarData {
   const live = enabled && !preview;
   const { sources: liveSources, loaded: sourcesLoaded } = useCalendarSources(live);
-  const { events: liveEvents, loaded: eventsLoaded } = useCalendarEvents(from, to, hidden, live);
+  const { events: liveEvents, loaded: eventsLoaded, truncated } = useCalendarEvents(from, to, hidden, live);
   const previewEvents = useMemo(
     () => (preview ? buildPreviewEvents(now).map(normalizeEvent) : []),
     // The fixture is anchored to the day, not the minute.
@@ -55,5 +56,5 @@ export function useCalendarData({ from, to, hidden = [], enabled, preview, now }
     const byId = new Map(sources.map(s => [s.id, { name: s.name, color: s.color }]));
     return (id: string): CalendarLook => byId.get(id) ?? { name: '', color: UNKNOWN_COLOR };
   }, [sources]);
-  return { events, sources, loaded: preview || (sourcesLoaded && eventsLoaded), lookFor };
+  return { events, sources, loaded: preview || (sourcesLoaded && eventsLoaded), truncated: !preview && truncated, lookFor };
 }

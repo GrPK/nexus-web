@@ -370,18 +370,14 @@ export interface CalendarDisplay {
 }
 
 /**
- * The two display toggles. Stored `showGrid` / `showEvents` win; configs from
- * before them map over without being rewritten: a `view` key (date, next,
- * month) and the retired `showGrid` toggle, whose grid carried the event list.
+ * The two display toggles. Stored `showGrid` / `showEvents` win; a config with
+ * only the retired `showGrid` toggle, whose grid carried the event list, reads
+ * as grid plus events without being rewritten.
  * Pass `size` to apply the one-of-the-two rule of the sizes that cannot hold both.
  */
 export function resolveCalendarDisplay(config: Record<string, unknown> | undefined, size?: string): CalendarDisplay {
-  const view = config?.view;
-  const grid = typeof config?.showGrid === 'boolean' ? config.showGrid : view === 'month';
-  let events: boolean;
-  if (typeof config?.showEvents === 'boolean') events = config.showEvents;
-  else if (view === 'date' || view === 'next' || view === 'month') events = view !== 'date';
-  else events = config?.showGrid === true;
+  const grid = config?.showGrid === true;
+  let events = typeof config?.showEvents === 'boolean' ? config.showEvents : grid;
   // Only the 4x4 has room for both; elsewhere the grid wins, without rewriting the stored keys.
   if (size !== undefined && size !== '4x4' && grid && events) events = false;
   return { grid, events };

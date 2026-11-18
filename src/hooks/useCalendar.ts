@@ -10,7 +10,7 @@ import { useMultiplex, useTopicCallback } from './useMultiplexSocket';
 // One shared store for every calendar surface, so several tiles and the page
 // make one request per range, and one `calendar` frame refreshes them all.
 
-interface RangeData { events: CalEvent[]; syncedAt: number | null }
+interface RangeData { events: CalEvent[]; syncedAt: number | null; truncated: boolean }
 
 interface CalendarState {
   sources: CalendarSourceDto[];
@@ -24,6 +24,12 @@ let state: CalendarState = { sources: [], settings: null, loaded: false, ranges:
 const listeners = new Set<() => void>();
 const activeRanges = new Map<string, number>();
 const inFlight = new Map<string, Promise<void>>();
+// Newest request per range: an older response never overwrites a newer one.
+const rangeGeneration = new Map<string, number>();
+// Ranges that changed on the service while nobody was looking; refetched when next viewed.
+const staleRanges = new Set<string>();
+// Ranges kept for instant back-navigation; the oldest with no viewer go first.
+const MAX_CACHED_RANGES = 12;
 let users = 0;
 let stopMock: (() => void) | null = null;
 let metaGeneration = 0;
@@ -46,19 +52,28 @@ async function loadMeta() {
   });
 }
 
-function loadRange(key: string, from: number, to: number): Promise<void> {
+function loadRange(key: string, from: number, to: number, force = false): Promise<void> {
   const pending = inFlight.get(key);
-  if (pending) return pending;
-  const job = fetchCalendarEvents(from, to)
+  if (pending && !force) return pending;
+  const generation = (rangeGeneration.get(key) ?? 0) + 1;
+  rangeGeneration.set(key, generation);
+  const job: Promise<void> = fetchCalendarEvents(from, to)
     .then(res => {
+      if (rangeGeneration.get(key) !== generation) return;
       const ranges = new Map(state.ranges);
-      ranges.set(key, { events: res.events.map(normalizeEvent), syncedAt: res.syncedAt });
+      ranges.delete(key);
+      ranges.set(key, { events: res.events.map(normalizeEvent), syncedAt: res.syncedAt, truncated: res.truncated === true });
+      staleRanges.delete(key);
+      for (const old of ranges.keys()) {
+        if (ranges.size <= MAX_CACHED_RANGES) break;
+        if (!activeRanges.has(old) && old !== key) { ranges.delete(old); staleRanges.delete(old); rangeGeneration.delete(old); }
+      }
       setState({ ranges });
     })
     .catch(() => {
       // A failed refetch keeps whatever the range already held.
     })
-    .finally(() => { inFlight.delete(key); });
+    .finally(() => { if (inFlight.get(key) === job) inFlight.delete(key); });
   inFlight.set(key, job);
   return job;
 }
@@ -72,10 +87,12 @@ export function invalidateCalendar(): void {
   void Promise.resolve().then(() => {
     invalidatePending = false;
     void loadMeta();
+    for (const key of state.ranges.keys()) {
+      if (!activeRanges.has(key)) staleRanges.add(key);
+    }
     for (const key of activeRanges.keys()) {
       const [from, to] = key.split(':').map(Number);
-      inFlight.delete(key);
-      void loadRange(key, from, to);
+      void loadRange(key, from, to, true);
     }
   });
 }
@@ -108,6 +125,8 @@ export function resetCalendarStore(): void {
   state = { sources: [], settings: null, loaded: false, ranges: new Map() };
   activeRanges.clear();
   inFlight.clear();
+  rangeGeneration.clear();
+  staleRanges.clear();
   invalidatePending = false;
   users = 0;
   stopMock?.();
@@ -191,6 +210,8 @@ export interface UseCalendarEvents {
   events: CalEvent[];
   syncedAt: number | null;
   loaded: boolean;
+  // The service capped this range; shorter ranges carry the rest.
+  truncated: boolean;
 }
 
 const NO_EVENTS: CalEvent[] = [];
@@ -202,7 +223,7 @@ export function useCalendarEvents(from: number, to: number, hidden: readonly str
   useEffect(() => {
     if (!enabled) return;
     activeRanges.set(key, (activeRanges.get(key) ?? 0) + 1);
-    if (!state.ranges.has(key)) void loadRange(key, from, to);
+    if (!state.ranges.has(key) || staleRanges.has(key)) void loadRange(key, from, to);
     return () => {
       const left = (activeRanges.get(key) ?? 1) - 1;
       if (left <= 0) activeRanges.delete(key); else activeRanges.set(key, left);
@@ -217,5 +238,5 @@ export function useCalendarEvents(from: number, to: number, hidden: readonly str
     return range.events.filter(ev => !hidden.includes(ev.calendarId));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- hiddenKey is the value identity of `hidden`
   }, [range, hiddenKey]);
-  return { events, syncedAt: range?.syncedAt ?? null, loaded: range !== undefined };
+  return { events, syncedAt: range?.syncedAt ?? null, loaded: range !== undefined, truncated: range?.truncated === true };
 }

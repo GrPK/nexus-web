@@ -163,11 +163,6 @@ describe('CalendarWidget display toggles', () => {
     expect(container.querySelectorAll('[class*="dots"]').length).toBe(0);
   });
 
-  it('maps a stored view key from before the toggles', () => {
-    render(<CalendarWidget widget={widget('2x4', { view: 'next' })} />);
-    expect(screen.getByText('Design review')).toBeTruthy();
-  });
-
   it('shows the month grid without a list at sizes too small for one', () => {
     render(<CalendarWidget widget={widget('4x2', { showGrid: true, showEvents: true })} />);
     expect(screen.queryByText('Design review')).toBeNull();

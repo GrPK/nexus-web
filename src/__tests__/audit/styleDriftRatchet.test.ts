@@ -18,7 +18,7 @@ const RATCHETS = [
     // carry visible line-box padding); it added a second raw type line.
     // The calendar views (time grid, month grid, agenda, tiles) lay out at the
     // panel design-px scale like the other widgets, so their sizes and radii are raw.
-    baseline: 809,
+    baseline: 793,
     hint: 'use the --radius/--shadow/--alpha/--blur/--ease tokens and text mixins instead of raw values (run "npm run audit:styles" for the list)',
   },
   {
@@ -42,7 +42,7 @@ const RATCHETS = [
     // idiom (like the clock).
     // The calendar views' event text sits at fixed design-px sizes inside
     // scaled panel tiles, the same idiom as the gauges.
-    baseline: 551,
+    baseline: 537,
     hint: 'use the @include text-* mixins or var(--type-*/--weight-*) tokens from _text.scss (run "npm run audit:text-styles" for the list)',
   },
 ] as const;

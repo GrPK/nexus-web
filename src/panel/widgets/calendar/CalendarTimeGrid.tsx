@@ -51,6 +51,8 @@ export function CalendarTimeGrid({ days, events, now, fmt, lookFor, fixedWindow,
   const laneCount = lanes.length === 0 ? 0 : Math.max(...lanes.map(l => l.lane)) + 1;
 
   const firstDay = days[0];
+  // A fixed window re-anchors each hour so "now" stays inside it; scrollable grids are left where the user put them.
+  const windowHour = fixedWindow ? Math.floor(nowMin / 60) : 0;
   useLayoutEffect(() => {
     const node = scrollNode.current;
     if (!node) return;
@@ -58,7 +60,7 @@ export function CalendarTimeGrid({ days, events, now, fmt, lookFor, fixedWindow,
     node.scrollTop = startHour * hourHeight;
     // Re-anchor when the visible days or the measured hour height change, not on the minute tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firstDay, days.length, fixedWindow, hourHeight]);
+  }, [firstDay, days.length, fixedWindow, hourHeight, windowHour]);
 
   const hours = Array.from({ length: 23 }, (_, i) => i + 1);
   const rootClass = [styles.root, compact ? styles.compact : '', variant === 'page' ? styles.page : ''].filter(Boolean).join(' ');

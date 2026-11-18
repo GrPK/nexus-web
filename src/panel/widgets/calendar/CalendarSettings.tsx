@@ -1,25 +1,25 @@
 import type { WidgetSettingsProps } from '../types';
-import { surfaceInputMode } from '../../types';
 import { useTranslation } from '../../../lib/i18n';
 import { SettingsSection, SettingsToggle, SettingsSelect } from '../common/SettingsRow/SettingsRow';
 import { hiddenCalendarIds, resolveCalendarDisplay, supportsGridAndEvents } from './calendarEvents';
 import { CalendarSourcesSections } from './CalendarSourcesSections';
 
-export function CalendarSettings({ widget, surface, deviceTouch, desktopEditor, onUpdate }: WidgetSettingsProps) {
+export function CalendarSettings({ widget, surface, desktopEditor, onUpdate }: WidgetSettingsProps) {
   const { t } = useTranslation();
   const config = widget.config;
   const { grid, events: showEvents } = resolveCalendarDisplay(config, widget.size);
+  const stored = resolveCalendarDisplay(config);
   const weekStart = (config?.weekStart as string | undefined) ?? 'auto';
   const showDots = config?.showDots !== false;
-  // Both keys are written together so a toggle never re-derives the other from an older config shape.
-  const setDisplay = (next: Partial<{ showGrid: boolean; showEvents: boolean }>) => onUpdate({ showGrid: grid, showEvents, ...next });
+  // Both keys are written together, the untouched one at its stored value (not the size-clamped one shown above).
+  const setDisplay = (next: Partial<{ showGrid: boolean; showEvents: boolean }>) => onUpdate({ showGrid: stored.grid, showEvents: stored.events, ...next });
   // Sizes with no room for both: while one is on the other is greyed out.
   const exclusive = !supportsGridAndEvents(widget.size);
   const immersiveView = (config?.immersiveView as string | undefined) ?? 'auto';
   const hidden = hiddenCalendarIds(config);
 
-  // Adding needs a keyboard: the desktop editor has one even when it edits a touch panel's layout.
-  const canAdd = desktopEditor === true || !surface || surfaceInputMode(surface, deviceTouch) !== 'touch';
+  // The service only lets the desktop dashboard add, edit or remove calendars; every panel session is refused.
+  const canAdd = desktopEditor === true || surface === 'desktop';
 
   const toggleCalendar = (id: string, on: boolean) => {
     const next = on ? hidden.filter(h => h !== id) : [...hidden.filter(h => h !== id), id];

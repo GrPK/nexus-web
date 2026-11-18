@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CalendarSourceDto } from '../../../api/calendar';
 import type { PanelSurface, PanelWidget } from '../../types';
@@ -101,6 +101,14 @@ describe('CalendarImmersive', () => {
     expect(screen.getByText('panel.widget.calendar.now')).toBeTruthy();
     expect(screen.getByText('panel.widget.calendar.tomorrow')).toBeTruthy();
     expect(screen.getAllByText('Launch week')).toHaveLength(2);
+  });
+
+  it('rolls a display-only panel over at midnight instead of freezing at mount', () => {
+    vi.setSystemTime(new Date(2026, 10, 17, 23, 58).getTime());
+    renderImmersive('q60', { immersiveView: 'day' });
+    expect(screen.getByText('Tuesday, November 17')).toBeTruthy();
+    act(() => { vi.setSystemTime(new Date(2026, 10, 18, 0, 2).getTime()); vi.advanceTimersByTime(60_000); });
+    expect(screen.getByText('Wednesday, November 18')).toBeTruthy();
   });
 
   it('puts the day label above its events when the list is narrow, and keeps two columns when wide', () => {

@@ -16,6 +16,8 @@ export function CalendarSourceEditor({ source, usedColors, onClose }: Props) {
   const { t } = useTranslation();
   const { update, remove } = useCalendarMutations();
   const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   return (
     <>
@@ -23,22 +25,31 @@ export function CalendarSourceEditor({ source, usedColors, onClose }: Props) {
         open={source !== null && !removing}
         source={source}
         usedColors={usedColors}
-        onSave={async patch => { await update(source!.id, patch); onClose(); }}
-        onRemove={() => setRemoving(true)}
-        onClose={onClose}
+        onSave={async patch => { setRemoveError(null); await update(source!.id, patch); onClose(); }}
+        onRemove={() => { setRemoveError(null); setRemoving(true); }}
+        notice={removeError}
+        onClose={() => { setRemoveError(null); onClose(); }}
       />
       <ConfirmModal
         open={source !== null && removing}
         title={t('panel.widget.calendar.remove.title')}
         message={t('panel.widget.calendar.remove.message', { name: source?.name ?? '' })}
         confirmLabel={t('panel.widget.calendar.remove.confirm')}
+        confirmDisabled={busy}
         onConfirm={() => {
           const id = source?.id;
-          setRemoving(false);
-          onClose();
-          if (id) void remove(id).catch(() => undefined);
+          if (!id) return;
+          setBusy(true);
+          remove(id)
+            .then(() => { setRemoving(false); onClose(); })
+            .catch(() => {
+              // Back to the edit dialog, which says the calendar is still there.
+              setRemoving(false);
+              setRemoveError(t('panel.widget.calendar.remove.error'));
+            })
+            .finally(() => setBusy(false));
         }}
-        onCancel={() => setRemoving(false)}
+        onCancel={() => { if (!busy) setRemoving(false); }}
       />
     </>
   );

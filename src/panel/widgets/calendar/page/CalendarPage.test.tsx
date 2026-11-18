@@ -10,6 +10,7 @@ const store = vi.hoisted(() => ({
   sources: [] as CalendarSourceDto[],
   events: [] as CalEvent[],
   hiddenSeen: [] as string[][],
+  truncated: false,
   add: vi.fn(),
   remove: vi.fn(),
   update: vi.fn(),
@@ -27,7 +28,7 @@ vi.mock('../../../../hooks/useCalendar', () => ({
   useCalendarSources: () => ({ sources: store.sources, loaded: true }),
   useCalendarEvents: (_f: number, _t: number, hidden: readonly string[] = []) => {
     store.hiddenSeen.push([...hidden]);
-    return { events: store.events.filter(e => !hidden.includes(e.calendarId)), syncedAt: null, loaded: true };
+    return { events: store.events.filter(e => !hidden.includes(e.calendarId)), syncedAt: null, loaded: true, truncated: store.truncated };
   },
   useCalendarSettings: () => ({
     settings: { refreshMinutes: 15, lastSyncedAt: null, syncing: false },
@@ -74,6 +75,7 @@ beforeEach(() => {
     ev('2', 'home', 'Pick up Leo', 17, 16, 17),
   ];
   store.hiddenSeen = [];
+  store.truncated = false;
   store.add.mockReset();
   store.remove.mockReset();
   store.update.mockReset();
@@ -133,6 +135,12 @@ describe('CalendarPage', () => {
     expect(popoverMaxHeight(600, 900)).toBe(584);
     expect(popoverMaxHeight(null, 750)).toBe(734);
     expect(popoverMaxHeight(40, 900)).toBe(120);
+  });
+
+  it('says so when the service cut the event list', () => {
+    store.truncated = true;
+    render(<CalendarPage tab="day" />);
+    expect(screen.getByText('panel.widget.calendar.events.truncated')).toBeTruthy();
   });
 
   it('toggles the popover when the same event is pressed twice', () => {

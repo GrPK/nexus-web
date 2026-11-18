@@ -6,19 +6,14 @@ import { touchEditorHintFor } from './touchEditorHint';
 const meta = { touchEditorHintKey: 'some.key' };
 
 describe('touchEditorHintFor', () => {
-  it('applies on touch surfaces, the phone included', () => {
-    expect(touchEditorHintFor(meta, 'y70')).toBe('some.key');
-    expect(touchEditorHintFor(meta, 'phone')).toBe('some.key');
+  it('applies on every panel surface, pointer-driven ones included', () => {
+    for (const surface of ['y70', 'phone', 'q60', 'monitor', 'lcd-round'] as const) {
+      expect(touchEditorHintFor(meta, surface)).toBe('some.key');
+    }
   });
 
-  it('stays off the desktop and display-only panels', () => {
+  it('stays off the desktop dashboard', () => {
     expect(touchEditorHintFor(meta, 'desktop')).toBeNull();
-    expect(touchEditorHintFor(meta, 'q60')).toBeNull();
-  });
-
-  it('follows a monitor\'s digitizer', () => {
-    expect(touchEditorHintFor(meta, 'monitor', true)).toBe('some.key');
-    expect(touchEditorHintFor(meta, 'monitor', false)).toBeNull();
   });
 
   it('is opt-in per app', () => {

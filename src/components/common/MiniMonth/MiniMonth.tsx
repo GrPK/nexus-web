@@ -1,5 +1,6 @@
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from '../../../lib/i18n';
+import { MonthGrid } from '../MonthGrid/MonthGrid';
 import styles from './MiniMonth.module.scss';
 
 export interface MiniMonthProps {
@@ -20,8 +21,6 @@ export interface MiniMonthProps {
   onSelectMonth?: (monthStart: number) => void;
 }
 
-const dayStart = (y: number, m: number, d: number) => new Date(y, m, d).getTime();
-
 /**
  * An always-open month grid: header with arrows, weekday initials, day cells. DatePicker's popup look without the popup.
  * The title drills up to a year view of twelve months; Escape or the title again returns.
@@ -33,28 +32,11 @@ export function MiniMonth({ month, selected, today, weekStart, highlightWeek, on
   const year = view.getFullYear();
   const monthIndex = view.getMonth();
 
-  const weeks = useMemo(() => {
-    const first = new Date(year, monthIndex, 1);
-    const lead = (first.getDay() - weekStart + 7) % 7;
-    const rows: number[][] = [];
-    for (let w = 0; w < 6; w++) {
-      const row = Array.from({ length: 7 }, (_, i) => dayStart(year, monthIndex, 1 - lead + w * 7 + i));
-      if (w > 0 && new Date(row[0]).getMonth() !== monthIndex) break;
-      rows.push(row);
-    }
-    return rows;
-  }, [year, monthIndex, weekStart]);
-
-  const initials = useMemo(() => {
-    const fmt = new Intl.DateTimeFormat(language, { weekday: 'narrow' });
-    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2023, 0, 1 + weekStart + i)));
-  }, [language, weekStart]);
   const title = useMemo(() => new Intl.DateTimeFormat(language, { month: 'long', year: 'numeric' }).format(month), [language, month]);
   const monthNames = useMemo(() => {
     const fmt = new Intl.DateTimeFormat(language, { month: 'short' });
     return Array.from({ length: 12 }, (_, i) => fmt.format(new Date(2023, i, 1)));
   }, [language]);
-  const dayNumber = useMemo(() => new Intl.DateTimeFormat(language, { day: 'numeric' }), [language]);
 
   const thisMonth = new Date(today);
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
@@ -91,28 +73,18 @@ export function MiniMonth({ month, selected, today, weekStart, highlightWeek, on
             );
           })}
         </div>
-      ) : (<>
-      <div className={styles.weekdays}>
-        {initials.map((w, i) => <span key={i}>{w}</span>)}
-      </div>
-      {weeks.map(row => {
-        const selectedRow = highlightWeek === true && row.includes(selected);
-        return (
-          <div key={row[0]} className={`${styles.row} ${selectedRow ? styles.rowSelected : ''}`}>
-            {row.map(day => {
-              const out = new Date(day).getMonth() !== monthIndex;
-              const cls = [styles.cell, out ? styles.out : '', day === today ? styles.today : '', day === selected ? styles.selected : '']
-                .filter(Boolean).join(' ');
-              return (
-                <button key={day} type="button" className={cls} onClick={() => onSelect(day)} aria-pressed={day === selected}>
-                  {dayNumber.format(day)}
-                </button>
-              );
-            })}
-          </div>
-        );
-      })}
-      </>)}
+      ) : (
+        <MonthGrid
+          year={year}
+          month={monthIndex}
+          weekStart={weekStart}
+          locale={language}
+          isSelected={day => day === selected}
+          isToday={day => day === today}
+          highlightWeek={highlightWeek ? week => week.includes(selected) : undefined}
+          onPick={onSelect}
+        />
+      )}
     </div>
   );
 }

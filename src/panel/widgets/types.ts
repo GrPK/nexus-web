@@ -85,7 +85,7 @@ export interface WidgetSettingsProps {
   // so free-text fields remain editable even when the target surface (y70/q60)
   // has no keyboard.
   desktopEditor?: boolean;
-  // Companion to `surface` for surfaceInputMode: a monitor or USB glass is touch only when its device has a digitizer.
+  // Companion to `surface` for surfaceInputMode: a monitor or USB display is touch only when its device has a digitizer.
   deviceTouch?: boolean;
   onUpdate: (config: Record<string, PanelConfigValue>) => void;
   onResize: (size: PanelWidgetSize) => void;
@@ -146,7 +146,7 @@ export interface AppMetadata {
   // with its own config - the long-standing behaviour for every built-in.
   singleInstance?: boolean;
   hasConfig: boolean;
-  // i18n key of an info notice the on-device edit sheet shows above the settings on a touch surface, for settings that need a keyboard.
+  // i18n key of an info notice the on-device edit sheet shows above the settings on every surface but the desktop dashboard, for settings only the desktop can change.
   touchEditorHintKey?: string;
   // Whether the widget *requires* a touch / pointer input modality. true
   // means it's hidden on display-only surfaces (currently Q60). false means
