@@ -5005,6 +5005,7 @@
   "panel.widget.calendar.add.error.unauthorized": "Cheste direzion e à refudât l'acès al calendari.",
   "panel.widget.calendar.add.error.unreachable": "Impussibil rivâ a cheste direzion.",
   "panel.widget.calendar.add.name": "Non",
+  "panel.widget.calendar.add.namePlaceholder": "Opzionâl: se al reste vueit, al ven doprât il non dal calendari stes",
   "panel.widget.calendar.add.readOnly": "Dome leture: Nexus al mostre i events di chest calendari. Fâs lis modifichis te aplicazion dal calendari.",
   "panel.widget.calendar.add.title": "Zonte calendari",
   "panel.widget.calendar.ago.days": "{count} dì indaûr",

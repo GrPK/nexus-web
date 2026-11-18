@@ -155,14 +155,36 @@ export async function addCalendarSource(input: AddCalendarInput): Promise<Calend
     if ('error' in result) throw new CalendarRequestError('add failed', result.error);
     return result.source;
   }
-  let code: CalendarAddError | null = null;
+  throw new CalendarRequestError(`add calendar failed: status ${status}`, await errorCodeOf(response));
+}
+
+export interface CalendarProbe {
+  name: string | null;
+  host: string;
+}
+
+async function errorCodeOf(response: Response | null): Promise<CalendarAddError | null> {
   try {
     const body = (await response?.json()) as { error?: unknown } | undefined;
-    if (typeof body?.error === 'string' && ADD_ERRORS.includes(body.error)) code = body.error as CalendarAddError;
+    if (typeof body?.error === 'string' && ADD_ERRORS.includes(body.error)) return body.error as CalendarAddError;
   } catch {
-    // Body absent or not JSON: the caller shows the generic message.
+    // Body absent or not JSON.
   }
-  throw new CalendarRequestError(`add calendar failed: status ${status}`, code);
+  return null;
+}
+
+/** Fetches the feed once to read its own name. Null when the service has no probe route (nothing to fill in); a refused address throws a CalendarRequestError. */
+export async function probeCalendar(url: string): Promise<CalendarProbe | null> {
+  const { response, status } = await authFetchWithStatus('/api/calendar/probe', { method: 'POST', body: { url } });
+  if (response && response.ok) return (await response.json()) as CalendarProbe;
+  if (status === 404) {
+    if (!loadCalendarMock) return null;
+    const result = (await loadCalendarMock()).mockProbe(url);
+    if ('error' in result) throw new CalendarRequestError('probe failed', result.error);
+    return result.probe;
+  }
+  if (status === 400) throw new CalendarRequestError('probe refused', await errorCodeOf(response));
+  return null;
 }
 
 export async function updateCalendarSource(id: string, patch: { name?: string; color?: string }): Promise<CalendarSourceDto> {

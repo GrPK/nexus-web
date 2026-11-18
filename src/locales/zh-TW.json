@@ -5005,6 +5005,7 @@
   "panel.widget.calendar.add.error.unauthorized": "該網址拒絕存取日曆。",
   "panel.widget.calendar.add.error.unreachable": "無法連線至該網址。",
   "panel.widget.calendar.add.name": "名稱",
+  "panel.widget.calendar.add.namePlaceholder": "選填：留空則使用日曆本身的名稱",
   "panel.widget.calendar.add.readOnly": "唯讀：Nexus 只會顯示此日曆中的行程。請在日曆本身的應用程式中進行變更。",
   "panel.widget.calendar.add.title": "新增日曆",
   "panel.widget.calendar.ago.days": "{count} 天前",

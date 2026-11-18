@@ -5005,6 +5005,7 @@
   "panel.widget.calendar.add.error.unauthorized": "이 주소에서 캘린더 접근을 거부했습니다.",
   "panel.widget.calendar.add.error.unreachable": "이 주소에 연결할 수 없습니다.",
   "panel.widget.calendar.add.name": "이름",
+  "panel.widget.calendar.add.namePlaceholder": "선택 사항: 비워 두면 캘린더 자체 이름을 사용합니다",
   "panel.widget.calendar.add.readOnly": "읽기 전용: Nexus는 이 캘린더의 일정을 표시만 합니다. 변경은 캘린더 앱에서 하세요.",
   "panel.widget.calendar.add.title": "캘린더 추가",
   "panel.widget.calendar.ago.days": "{count}일 전",

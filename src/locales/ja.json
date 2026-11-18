@@ -5005,6 +5005,7 @@
   "panel.widget.calendar.add.error.unauthorized": "このアドレスはカレンダーへのアクセスを拒否しました。",
   "panel.widget.calendar.add.error.unreachable": "このアドレスに接続できませんでした。",
   "panel.widget.calendar.add.name": "名前",
+  "panel.widget.calendar.add.namePlaceholder": "任意: 空欄の場合はカレンダー自身の名前を使用します",
   "panel.widget.calendar.add.readOnly": "読み取り専用: Nexus はこのカレンダーの予定を表示します。変更はカレンダー本来のアプリで行ってください。",
   "panel.widget.calendar.add.title": "カレンダーを追加",
   "panel.widget.calendar.ago.days": "{count}日前",

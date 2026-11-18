@@ -5005,6 +5005,7 @@
   "panel.widget.calendar.add.error.unauthorized": "Esa dirección rechazó el acceso al calendario.",
   "panel.widget.calendar.add.error.unreachable": "No se pudo acceder a esa dirección.",
   "panel.widget.calendar.add.name": "Nombre",
+  "panel.widget.calendar.add.namePlaceholder": "Opcional: si se deja en blanco, se usa el nombre del propio calendario",
   "panel.widget.calendar.add.readOnly": "Solo lectura: Nexus muestra los eventos de este calendario. Haz los cambios en la app del propio calendario.",
   "panel.widget.calendar.add.title": "Añadir calendario",
   "panel.widget.calendar.ago.days": "hace {count} d",

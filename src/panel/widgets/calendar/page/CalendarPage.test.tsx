@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CalendarRequestError, type CalendarSourceDto } from '../../../../api/calendar';
+import { CalendarRequestError, type CalendarProbe, type CalendarSourceDto } from '../../../../api/calendar';
 import { normalizeEvent, type CalEvent } from '../calendarEvents';
 import { timedEvent } from '../calendarPreviewData';
 import { CalendarPage } from './CalendarPage';
@@ -15,6 +15,12 @@ const store = vi.hoisted(() => ({
   update: vi.fn(),
   refreshNow: vi.fn(() => Promise.resolve()),
   setRefreshMinutes: vi.fn(() => Promise.resolve()),
+}));
+
+const probe = vi.hoisted(() => ({ fn: vi.fn() }));
+vi.mock('../../../../api/calendar', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../../api/calendar')>()),
+  probeCalendar: (url: string) => probe.fn(url),
 }));
 
 vi.mock('../../../../hooks/useCalendar', () => ({
@@ -71,6 +77,8 @@ beforeEach(() => {
   store.add.mockReset();
   store.remove.mockReset();
   store.update.mockReset();
+  probe.fn.mockReset();
+  probe.fn.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -234,6 +242,14 @@ describe('Edit calendar dialog', () => {
     expect(custom.style.background).not.toBe('');
   });
 
+  it('sends an empty name when the name is cleared and saved', async () => {
+    store.update.mockResolvedValue({});
+    const dialog = openEdit();
+    fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.name'), { target: { value: '' } });
+    fireEvent.click(within(dialog).getByText('panel.widget.calendar.edit.save'));
+    await waitFor(() => expect(store.update).toHaveBeenCalledWith('home', { name: '', color: '#ff9f0a' }));
+  });
+
   it('closes without saving on Cancel', () => {
     const dialog = openEdit();
     fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.name'), { target: { value: 'X' } });
@@ -261,6 +277,89 @@ describe('Edit calendar dialog', () => {
     fireEvent.click(screen.getByText('panel.widget.calendar.remove.title'));
     fireEvent.click(screen.getByText('panel.widget.calendar.remove.confirm'));
     await waitFor(() => expect(store.remove).toHaveBeenCalledWith('home'));
+  });
+});
+
+describe('Add calendar name autofill', () => {
+  const open = () => {
+    render(<CalendarPage tab="day" />);
+    fireEvent.click(screen.getByText('panel.widget.calendar.add.button'));
+    return screen.getByRole('alertdialog');
+  };
+  const typeUrl = (dialog: HTMLElement, value: string) =>
+    fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.address'), { target: { value } });
+  const nameField = (dialog: HTMLElement) => within(dialog).getByLabelText('panel.widget.calendar.add.name') as HTMLInputElement;
+  const settle = async () => { await act(async () => { vi.advanceTimersByTime(600); await Promise.resolve(); await Promise.resolve(); }); };
+
+  it('fills a blank name from the probe after the debounce, once', async () => {
+    probe.fn.mockResolvedValue({ name: 'Team Calendar', host: 'x.test' } satisfies CalendarProbe);
+    const dialog = open();
+    typeUrl(dialog, 'https://x.test/a.ics');
+    expect(probe.fn).not.toHaveBeenCalled();
+    await settle();
+    expect(probe.fn).toHaveBeenCalledTimes(1);
+    expect(probe.fn).toHaveBeenCalledWith('https://x.test/a.ics');
+    expect(nameField(dialog).value).toBe('Team Calendar');
+  });
+
+  it('leaves the name empty when the feed has none', async () => {
+    probe.fn.mockResolvedValue({ name: null, host: 'x.test' });
+    const dialog = open();
+    typeUrl(dialog, 'https://x.test/a.ics');
+    await settle();
+    expect(nameField(dialog).value).toBe('');
+  });
+
+  it('never overwrites a name the user typed', async () => {
+    probe.fn.mockResolvedValue({ name: 'Feed Name', host: 'x.test' });
+    const dialog = open();
+    fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.name'), { target: { value: 'Mine' } });
+    typeUrl(dialog, 'https://x.test/a.ics');
+    await settle();
+    expect(nameField(dialog).value).toBe('Mine');
+  });
+
+  it('ignores a stale response when the address changed again', async () => {
+    let first!: (v: CalendarProbe) => void;
+    probe.fn.mockImplementationOnce(() => new Promise<CalendarProbe>(resolve => { first = resolve; }));
+    probe.fn.mockResolvedValueOnce({ name: 'Second', host: 'y.test' });
+    const dialog = open();
+    typeUrl(dialog, 'https://x.test/a.ics');
+    await settle();
+    typeUrl(dialog, 'https://y.test/b.ics');
+    await settle();
+    expect(nameField(dialog).value).toBe('Second');
+    await act(async () => { first({ name: 'First', host: 'x.test' }); await Promise.resolve(); });
+    expect(nameField(dialog).value).toBe('Second');
+  });
+
+  it('shows a refused address early with the mapped message', async () => {
+    probe.fn.mockRejectedValue(new CalendarRequestError('bad', 'invalidUrl'));
+    const dialog = open();
+    typeUrl(dialog, 'https://192.168.1.5/a.ics');
+    await settle();
+    expect(within(dialog).getByRole('alert').textContent).toBe('panel.widget.calendar.add.error.invalidUrl');
+  });
+
+  it('stays silent when the service has no probe route', async () => {
+    probe.fn.mockResolvedValue(null);
+    const dialog = open();
+    typeUrl(dialog, 'https://x.test/a.ics');
+    await settle();
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    expect(nameField(dialog).value).toBe('');
+  });
+
+  it('does not probe text that is not a URL, and probes on blur without waiting', async () => {
+    probe.fn.mockResolvedValue({ name: 'N', host: 'x.test' });
+    const dialog = open();
+    typeUrl(dialog, 'not a url');
+    await settle();
+    expect(probe.fn).not.toHaveBeenCalled();
+    typeUrl(dialog, 'https://x.test/a.ics');
+    fireEvent.blur(within(dialog).getByLabelText('panel.widget.calendar.add.address'));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(probe.fn).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -305,13 +404,13 @@ describe('Add calendar dialog', () => {
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   });
 
-  it('defaults the name to the feed host', async () => {
+  it('sends an empty name when the field is blank, leaving the default to the service', async () => {
     store.add.mockResolvedValue({});
     const dialog = open();
     fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.address'), { target: { value: 'webcal://cal.example.org/feed.ics' } });
     fireEvent.click(within(dialog).getByText('panel.widget.calendar.add.confirm'));
     await waitFor(() => expect(store.add).toHaveBeenCalled());
-    expect(store.add.mock.calls[0][0].name).toBe('cal.example.org');
+    expect(store.add.mock.calls[0][0].name).toBe('');
   });
 
   it('shows the service refusal inline and stays open', async () => {

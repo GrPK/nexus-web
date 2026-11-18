@@ -63,10 +63,24 @@ export function mockAddSource(input: AddCalendarInput): { source: CalendarSource
   return { source };
 }
 
+export function mockProbe(url: string): { probe: { name: string | null; host: string } } | { error: CalendarAddError } {
+  const address = url.trim();
+  if (!/^(https?|webcal):\/\//i.test(address)) return { error: 'invalidUrl' };
+  try {
+    const parsed = new URL(address.replace(/^webcal:/i, 'https:'));
+    const leaf = decodeURIComponent(parsed.pathname.split('/').filter(Boolean).pop() ?? '').replace(/\.ics$/i, '');
+    const words = leaf.replace(/[-_]+/g, ' ').trim();
+    const name = words && !/^basic$/i.test(words) ? words.replace(/\b\w/g, c => c.toUpperCase()) : null;
+    return { probe: { name, host: parsed.hostname } };
+  } catch {
+    return { error: 'invalidUrl' };
+  }
+}
+
 export function mockUpdateSource(id: string, patch: { name?: string; color?: string }): CalendarSourceDto | null {
   const current = sources.find(s => s.id === id);
   if (!current) return null;
-  const next = { ...current, name: patch.name ?? current.name, color: patch.color ?? current.color };
+  const next = { ...current, name: patch.name === undefined ? current.name : patch.name.trim() || current.host || current.name, color: patch.color ?? current.color };
   sources = sources.map(s => (s.id === id ? next : s));
   changed();
   return { ...next };

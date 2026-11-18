@@ -5005,6 +5005,7 @@
   "panel.widget.calendar.add.error.unauthorized": "该地址拒绝访问日历。",
   "panel.widget.calendar.add.error.unreachable": "无法访问该地址。",
   "panel.widget.calendar.add.name": "名称",
+  "panel.widget.calendar.add.namePlaceholder": "可选：留空则使用日历自身的名称",
   "panel.widget.calendar.add.readOnly": "只读：Nexus 仅显示此日历中的日程。请在日历自己的应用中进行更改。",
   "panel.widget.calendar.add.title": "添加日历",
   "panel.widget.calendar.ago.days": "{count} 天前",

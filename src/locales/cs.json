@@ -5055,6 +5055,7 @@
   "panel.widget.calendar.add.error.unauthorized": "Tato adresa odmítla přístup ke kalendáři.",
   "panel.widget.calendar.add.error.unreachable": "Tuto adresu se nepodařilo načíst.",
   "panel.widget.calendar.add.name": "Název",
+  "panel.widget.calendar.add.namePlaceholder": "Volitelné: když zůstane prázdné, použije se název samotného kalendáře",
   "panel.widget.calendar.add.readOnly": "Pouze pro čtení: Nexus zobrazuje události z tohoto kalendáře. Změny provádějte v samotné aplikaci kalendáře.",
   "panel.widget.calendar.add.title": "Přidat kalendář",
   "panel.widget.calendar.ago.days": "před {count} d",

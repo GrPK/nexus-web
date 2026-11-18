@@ -5005,6 +5005,7 @@
   "panel.widget.calendar.add.error.unauthorized": "Dit adres weigerde toegang tot de kalender.",
   "panel.widget.calendar.add.error.unreachable": "Dit adres is niet bereikbaar.",
   "panel.widget.calendar.add.name": "Naam",
+  "panel.widget.calendar.add.namePlaceholder": "Optioneel: als dit leeg blijft, wordt de naam van de agenda zelf gebruikt",
   "panel.widget.calendar.add.readOnly": "Alleen-lezen: Nexus toont de afspraken van deze agenda. Wijzigingen maak je in de app van de agenda zelf.",
   "panel.widget.calendar.add.title": "Kalender toevoegen",
   "panel.widget.calendar.ago.days": "{count} d geleden",

@@ -5005,6 +5005,7 @@
   "panel.widget.calendar.add.error.unauthorized": "Bu adres takvime erişimi reddetti.",
   "panel.widget.calendar.add.error.unreachable": "Bu adrese ulaşılamadı.",
   "panel.widget.calendar.add.name": "Ad",
+  "panel.widget.calendar.add.namePlaceholder": "İsteğe bağlı: boş bırakılırsa takvimin kendi adı kullanılır",
   "panel.widget.calendar.add.readOnly": "Salt okunur: Nexus bu takvimdeki etkinlikleri gösterir. Değişiklikleri takvimin kendi uygulamasında yapın.",
   "panel.widget.calendar.add.title": "Takvim ekle",
   "panel.widget.calendar.ago.days": "{count} g önce",

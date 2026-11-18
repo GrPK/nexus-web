@@ -7,10 +7,13 @@ import { ColorPickerWithPresets } from '../../../../components/common/ColorPicke
 import { useStackOnOverflow } from '../../../../components/common/ConfirmModal/useStackOnOverflow';
 import { ADD_CALENDAR_GUIDE_URL } from '../../../../lib/externalLinks';
 import { TroubleshootLink } from '../../../../components/common/TroubleshootLink/TroubleshootLink';
-import { CalendarRequestError, type AddCalendarInput, type CalendarAddError, type CalendarSourceDto } from '../../../../api/calendar';
+import { Spinner } from '../../../../components/common/Spinner/Spinner';
+import { CalendarRequestError, probeCalendar, type AddCalendarInput, type CalendarAddError, type CalendarSourceDto } from '../../../../api/calendar';
 import styles from './CalendarSourceModal.module.scss';
 
 const PICKER_PLACEMENT = 'top-end' as const;
+const PROBE_DELAY_MS = 500;
+const LOOKS_LIKE_URL = /^(https?|webcal):\/\/[^\s/]+\.[^\s/]+/i;
 const ADDRESS_PLACEHOLDER = 'https://example.com/calendar.ics';
 
 export const CALENDAR_COLORS: readonly string[] = [
@@ -68,6 +71,12 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
   const [customColor, setCustomColor] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [probing, setProbing] = useState(false);
+  const nameTyped = useRef(false);
+  const probeSeq = useRef(0);
+  const lastProbed = useRef('');
+  const probeTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (probeTimer.current !== null) window.clearTimeout(probeTimer.current); }, []);
   const attempt = useRef(0);
   const actionsRef = useRef<HTMLDivElement>(null);
   const errorId = useId();
@@ -80,6 +89,10 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
     setName(source?.name ?? '');
     setError(null);
     setBusy(false);
+    setProbing(false);
+    nameTyped.current = false;
+    probeSeq.current += 1;
+    lastProbed.current = '';
     const start = source?.color ?? nextCalendarColor(usedColors);
     setColor(start);
     setCustomColor(CALENDAR_COLORS.includes(start.toLowerCase()) ? '' : start);
@@ -87,10 +100,40 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const errorFor = (e: unknown, address: string): string => {
+    const code = e instanceof CalendarRequestError ? e.code : null;
+    const googlePublic = (code === 'notFound' || code === 'unauthorized') && isGooglePublicAddress(address);
+    return t(googlePublic ? 'panel.widget.calendar.add.error.googlePublic' : code ? ERROR_KEYS[code] : 'panel.widget.calendar.add.error.generic');
+  };
+
+  // Reads the feed's own name for the Name field; the latest address wins and a typed name is never replaced.
+  const runProbe = (address: string) => {
+    const wanted = address.trim();
+    if (editing || !LOOKS_LIKE_URL.test(wanted) || lastProbed.current === wanted) return;
+    lastProbed.current = wanted;
+    const mine = ++probeSeq.current;
+    setProbing(true);
+    probeCalendar(wanted)
+      .then(result => {
+        if (mine !== probeSeq.current) return;
+        if (result && !nameTyped.current) setName(result.name ?? '');
+      })
+      .catch(e => {
+        if (mine !== probeSeq.current) return;
+        if (e instanceof CalendarRequestError && e.code) setError(errorFor(e, wanted));
+      })
+      .finally(() => { if (mine === probeSeq.current) setProbing(false); });
+  };
+
+  const scheduleProbe = (address: string) => {
+    if (probeTimer.current !== null) window.clearTimeout(probeTimer.current);
+    probeTimer.current = window.setTimeout(() => runProbe(address), PROBE_DELAY_MS);
+  };
+
   if (!open) return null;
 
   const changed = editing && (name.trim() !== source.name || color.toLowerCase() !== source.color.toLowerCase());
-  const canSubmit = !busy && (editing ? name.trim() !== '' && changed : url.trim() !== '');
+  const canSubmit = !busy && (editing ? changed : url.trim() !== '');
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -100,7 +143,7 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
     const address = url.trim();
     try {
       if (editing) await onSave?.({ name: name.trim(), color });
-      else await onAdd?.({ url: address, name: name.trim() || hostOfAddress(address) || t('panel.widget.calendar'), color });
+      else await onAdd?.({ url: address, name: name.trim(), color });
       if (attempt.current === mine) onClose();
     } catch (e) {
       if (attempt.current !== mine) return;
@@ -109,9 +152,7 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
         setBusy(false);
         return;
       }
-      const code = e instanceof CalendarRequestError ? e.code : null;
-      const googlePublic = (code === 'notFound' || code === 'unauthorized') && isGooglePublicAddress(address);
-      setError(t(googlePublic ? 'panel.widget.calendar.add.error.googlePublic' : code ? ERROR_KEYS[code] : 'panel.widget.calendar.add.error.generic'));
+      setError(errorFor(e, address));
       setBusy(false);
     }
   };
@@ -142,7 +183,8 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
             value={url}
             placeholder={ADDRESS_PLACEHOLDER}
             ariaLabel={t('panel.widget.calendar.add.address')}
-            onInput={value => { setUrl(value); setError(null); }}
+            onInput={value => { setUrl(value); setError(null); scheduleProbe(value); }}
+            onBlur={value => runProbe(value)}
             invalid={error !== null}
             autoComplete="off"
           />
@@ -152,12 +194,16 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
         </div>
         )}
         <div className={styles.field}>
-          <span className={styles.label}>{t('panel.widget.calendar.add.name')}</span>
+          <span className={styles.label}>
+            {t('panel.widget.calendar.add.name')}
+            {probing && <Spinner size={12} />}
+          </span>
           <TextInput
             value={name}
+            placeholder={t('panel.widget.calendar.add.namePlaceholder')}
             maxLength={60}
             ariaLabel={t('panel.widget.calendar.add.name')}
-            onInput={setName}
+            onInput={value => { nameTyped.current = true; setName(value); }}
             autoComplete="off"
           />
         </div>

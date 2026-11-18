@@ -5005,6 +5005,7 @@
   "panel.widget.calendar.add.error.unauthorized": "Diese Adresse hat den Zugriff auf den Kalender verweigert.",
   "panel.widget.calendar.add.error.unreachable": "Diese Adresse ist nicht erreichbar.",
   "panel.widget.calendar.add.name": "Name",
+  "panel.widget.calendar.add.namePlaceholder": "Optional: Bei leerem Feld wird der Name des Kalenders selbst verwendet",
   "panel.widget.calendar.add.readOnly": "Nur lesend: Nexus zeigt die Termine dieses Kalenders an. Änderungen nehmen Sie in der Kalender-App selbst vor.",
   "panel.widget.calendar.add.title": "Kalender hinzufügen",
   "panel.widget.calendar.ago.days": "vor {count} Tg.",

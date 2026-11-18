@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addCalendarSource, CalendarRequestError, fetchCalendarEvents, fetchCalendarSettings, fetchCalendarSources,
-  postCalendarRefresh, putCalendarRefreshMinutes, removeCalendarSource,
+  postCalendarRefresh, probeCalendar, putCalendarRefreshMinutes, removeCalendarSource,
 } from './calendar';
 
 const service = vi.hoisted(() => ({ authFetchWithStatus: vi.fn() }));
@@ -71,6 +71,17 @@ describe('calendar api client', () => {
     const failure = await addCalendarSource({ url: 'x', name: 'N', color: '#fff' }).catch(e => e);
     expect(failure).toBeInstanceOf(CalendarRequestError);
     expect(failure.code).toBeNull();
+  });
+
+  it('probes a feed for its name, maps a refusal, and falls back to a plausible dev name on a missing route', async () => {
+    service.authFetchWithStatus.mockResolvedValueOnce(json({ name: 'Team', host: 'x.test' }));
+    expect(await probeCalendar('https://x.test/a.ics')).toEqual({ name: 'Team', host: 'x.test' });
+    service.authFetchWithStatus.mockResolvedValueOnce(json({ error: 'invalidUrl', msg: 'invalidUrl' }, 400));
+    const refused = await probeCalendar('http://10.0.0.1/a.ics').catch(e => e);
+    expect(refused).toBeInstanceOf(CalendarRequestError);
+    expect(refused.code).toBe('invalidUrl');
+    service.authFetchWithStatus.mockResolvedValueOnce(noRoute());
+    expect(await probeCalendar('https://x.test/team-holidays.ics')).toEqual({ name: 'Team Holidays', host: 'x.test' });
   });
 
   it('accepts a bare 204 on delete and encodes the id', async () => {

@@ -5055,6 +5055,7 @@
   "panel.widget.calendar.add.error.unauthorized": "Этот адрес отказал в доступе к календарю.",
   "panel.widget.calendar.add.error.unreachable": "Не удалось подключиться к этому адресу.",
   "panel.widget.calendar.add.name": "Название",
+  "panel.widget.calendar.add.namePlaceholder": "Необязательно: если пусто, используется название самого календаря",
   "panel.widget.calendar.add.readOnly": "Только чтение: Nexus показывает события этого календаря. Изменения вносите в самом приложении календаря.",
   "panel.widget.calendar.add.title": "Добавить календарь",
   "panel.widget.calendar.ago.days": "{count} дн. назад",
