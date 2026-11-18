@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { Ban, CheckCheck, ListChecks, Eye, EyeOff, Lightbulb, Maximize2, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
   startAnimate, setAnimateSimple, startStatic, startScreenMirror, stopLighting,
@@ -195,6 +195,11 @@ const layoutHistoryStore = {
 
 // How long the rail keeps saying a scan is running when none was ever reported.
 const DISCOVERY_GRACE_MS = 4000;
+// A selected device that stays off the list this long is dropped from the stored selection.
+const SELECTION_ABSENT_GRACE_MS = 60_000;
+// One refresh counts at most this much toward the grace window, so a sleep or a stalled
+// page between two refreshes cannot expire an absent device.
+const SELECTION_ABSENT_STEP_CAP_MS = 15_000;
 const DEVICE_ORDER_KEY = 'lighting.deviceOrder';
 
 /** Devices that play their own effect unless set to `lightingPageMode`, keyed by their cards' deviceIds. */
@@ -301,8 +306,37 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // and the member a stacked frame's label names; every focused frame shows
   // its LED dots.
   useState(clearLegacyLightingKeys);
-  const [selectedDeviceIds, setSelectedDeviceIds] = usePersistentIdSet(SELECTED_DEVICES_STORAGE_KEY);
-  const [primaryDeviceId, setPrimaryDeviceId] = usePersistentState<string | null>(PRIMARY_DEVICE_STORAGE_KEY, null);
+  const [storedSelectionIds, setStoredSelection] = usePersistentIdSet(SELECTED_DEVICES_STORAGE_KEY);
+  const [storedPrimaryId, setPrimaryDeviceId] = usePersistentState<string | null>(PRIMARY_DEVICE_STORAGE_KEY, null);
+  // The stored selection can name a device that is off the list for the moment
+  // (a wireless chain re-pairing). Everything reads the effective selection,
+  // the stored one cut to the cards a click can select now, so an absent id
+  // never reaches a pin or the canvas. An empty result means "nothing selected".
+  const selectionHoldableIds = useMemo(
+    () => new Set(visibleCards(devices).filter(zoneCardSelectionHoldable).map(d => d.id)),
+    [devices],
+  );
+  const selectedDeviceIds = useMemo(
+    () => (storedSelectionIds.size === 0 || [...storedSelectionIds].every(id => selectionHoldableIds.has(id))
+      ? storedSelectionIds
+      : new Set([...storedSelectionIds].filter(id => selectionHoldableIds.has(id)))),
+    [storedSelectionIds, selectionHoldableIds],
+  );
+  const primaryDeviceId = storedPrimaryId && selectionHoldableIds.has(storedPrimaryId) ? storedPrimaryId : null;
+  // Every edit writes through here: a stored id that is absent right now (still
+  // inside its grace window) rides along, so toggling a card during a dropout
+  // does not forget the device that dropped. Any edit that leaves nothing selected
+  // (select none, or toggling off the last visible card) clears them all.
+  const holdableRef = useRef(selectionHoldableIds);
+  holdableRef.current = selectionHoldableIds;
+  const setSelectedDeviceIds = useCallback((update: SetStateAction<Set<string>>) => {
+    setStoredSelection(prev => {
+      const next = typeof update === 'function' ? update(prev) : update;
+      if (next.size === 0) return next;
+      const absent = [...prev].filter(id => !holdableRef.current.has(id) && !next.has(id));
+      return absent.length === 0 ? next : new Set([...next, ...absent]);
+    });
+  }, [setStoredSelection]);
   // Canvas focus: which of the drawn frames take the frame-level edits (drag,
   // resize, rotate, power, LED dots). Kept apart from the list selection so a
   // click on empty canvas recedes the frames instead of clearing the canvas.
@@ -524,9 +558,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // fully parked device shows one card with its zero-enabled badge so it
   // stays selectable and its LED map editor remains reachable.
   const visibleDevices = useMemo(() => visibleCards(devices), [devices]);
-  // The list selection, which is what the canvas frames, also shrinks without
-  // passing through those handlers: the prune drops devices which stopped
-  // being selectable (unplugged, or their LEDs switched off). A focus id for a
+  // The effective list selection, which is what the canvas frames, also shrinks
+  // without passing through those handlers: it loses devices which stopped
+  // being selectable (unplugged, or off the list). A focus id for a
   // frame the canvas no longer draws would keep the group-drag branch armed
   // on a one-frame canvas, so drop it here.
   useEffect(() => {
@@ -1680,10 +1714,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Cards a SELECTION can hold, which is wider: a click lands on a dark or
   // un-driven card too, since selecting it is how its menu gets opened.
   const hiddenDeviceIdsRef = useRef<ReadonlySet<string>>(new Set());
-  const selectionKeepIds = useMemo(
-    () => orderedDevices.filter(zoneCardSelectionHoldable).map(d => d.id),
-    [orderedDevices],
-  );
   // Select all takes dark cards too, but skips Nexus Control off ones, which the
   // eye can hide - so it never builds a selection the user cannot see. A search
   // narrows it to the matches for the same reason.
@@ -1784,21 +1814,45 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     ? 'off'
     : (leftOff ? 'detecting' : undefined);
 
-  // A restored selection can name devices that are gone (unplugged between
-  // visits). Drop those once the list has loaded. Judged against what a click
-  // can select, NOT the pick targets: this effect re-runs on every device
-  // poll, so pruning to the narrower set would quietly undo the selection of a
-  // card the user picked precisely because its lights were off.
+  // A stored selection can name devices that are gone for good (unplugged
+  // between visits). Each id gets SELECTION_ABSENT_GRACE_MS off the list before
+  // it is dropped, so a device that drops for a moment, or one OpenRGB has not
+  // enumerated yet, keeps its selection. Time counts only across consecutive
+  // refreshes, each capped, so a sleep between two refreshes adds one step, not
+  // the whole sleep. Reappearing resets the clock. Judged against what a click
+  // can select, NOT the pick targets, so a card picked while its lights were
+  // off stays selected. Checked on each devices refresh.
+  const absentMsRef = useRef(new Map<string, number>());
+  const lastRefreshAtRef = useRef<number | null>(null);
+  const storedSelectionRef = useRef(storedSelectionIds);
+  storedSelectionRef.current = storedSelectionIds;
+  const storedPrimaryRef = useRef(storedPrimaryId);
+  storedPrimaryRef.current = storedPrimaryId;
   useEffect(() => {
-    if (orderedDevices.length === 0) return;
+    const absentMs = absentMsRef.current;
+    const now = Date.now();
+    const step = lastRefreshAtRef.current === null ? 0 : Math.min(Math.max(0, now - lastRefreshAtRef.current), SELECTION_ABSENT_STEP_CAP_MS);
+    lastRefreshAtRef.current = now;
+    if (devices.length === 0) { absentMs.clear(); return; }
     // Hidden OpenRGB cards come back with the daemon, so their ids stay selected.
-    const keep = new Set([...selectionKeepIds, ...hiddenDeviceIdsRef.current]);
-    setSelectedDeviceIds(prev => {
-      if ([...prev].every(id => keep.has(id))) return prev;
-      return new Set([...prev].filter(id => keep.has(id)));
-    });
-    setPrimaryDeviceId(prev => (prev && !keep.has(prev) ? null : prev));
-  }, [orderedDevices, selectionKeepIds, setSelectedDeviceIds, setPrimaryDeviceId]);
+    const present = (id: string) => selectionHoldableIds.has(id) || hiddenDeviceIdsRef.current.has(id);
+    const expired = new Set<string>();
+    const tracked = new Set(storedSelectionRef.current);
+    if (storedPrimaryRef.current) tracked.add(storedPrimaryRef.current);
+    for (const id of tracked) {
+      if (present(id)) { absentMs.delete(id); continue; }
+      const total = (absentMs.get(id) ?? 0) + (absentMs.has(id) ? step : 0);
+      absentMs.set(id, total);
+      if (total >= SELECTION_ABSENT_GRACE_MS) expired.add(id);
+    }
+    for (const id of [...absentMs.keys()]) if (!tracked.has(id)) absentMs.delete(id);
+    if (expired.size === 0) return;
+    for (const id of expired) absentMs.delete(id);
+    setStoredSelection(prev => (
+      [...prev].some(id => expired.has(id)) ? new Set([...prev].filter(id => !expired.has(id))) : prev
+    ));
+    setPrimaryDeviceId(prev => (prev && expired.has(prev) ? null : prev));
+  }, [devices, selectionHoldableIds, setStoredSelection, setPrimaryDeviceId]);
 
   // Devices list: fetch on entry + profile change, then refresh push-driven.
   // The `lighting` topic fires on every /lighting mutation (layout edits,
