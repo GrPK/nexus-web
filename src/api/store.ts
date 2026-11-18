@@ -50,6 +50,8 @@ export interface StoreApp {
   releaseDate?: string | null;
   rating: StoreRating;
   latest: StoreVersion | null;
+  /** Lowest Nexus version that can install the app, set only when this build is below every release's minimum (latest is then null). */
+  requiresNexus?: string | null;
   /** Present only on an app gated to specific hardware; `matched` says whether this machine has it attached. */
   hardware?: StoreHardware;
   /** DEV_TOOLS service only: synthesized from a sideloaded app's manifest and store/ folder because the cloud catalog lacks it. Never installable from here (latest.sha256 is empty). */

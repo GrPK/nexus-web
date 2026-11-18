@@ -266,10 +266,8 @@ export function CoolingCase3D({ channels, selectedChannelId, selectedChannelIds,
 
   // Choosing a device links it to these fans: each fan's earlier device is replaced, and the device keeps its other fans. Unlinking a fan that has a derived default (GPU, AIO and installed case fans) stores the `none` marker instead of letting the default return.
   const linkChannels = useCallback((channelId: string, keys: readonly string[]) => {
-    // A PSU fan stays simulated: no real device can be linked to it.
-    const linkable = isSimChannel(channelId) ? keys : keys.filter(k => !isPsuSlotKey(k));
-    if (linkable.length === 0) return;
-    edit(l => ({ ...l, bindings: linkChannelToSlots(canonOf ? normalizeBindings(l.bindings, canonOf) : l.bindings, channelId, linkable, (b, id, key) => linkChannelToSlot(b, id, key, hasDerivedLink(key) || installedKeys.has(key))) }));
+    if (keys.length === 0) return;
+    edit(l => ({ ...l, bindings: linkChannelToSlots(canonOf ? normalizeBindings(l.bindings, canonOf) : l.bindings, channelId, keys, (b, id, key) => linkChannelToSlot(b, id, key, hasDerivedLink(key) || installedKeys.has(key))) }));
   }, [edit, canonOf, installedKeys]);
   const linkChannel = useCallback((channelId: string, key: string) => linkChannels(channelId, [key]), [linkChannels]);
 
@@ -384,9 +382,7 @@ export function CoolingCase3D({ channels, selectedChannelId, selectedChannelIds,
 
   // Every device of the left-hand list, by the name it shows there; one already on another fan says which, and choosing it moves it here.
   const deviceTargets = multi ? multiKeys : activeSlot ? [activeSlot.key] : [];
-  // A lone PSU fan offers only the simulated choice.
-  const psuOnly = deviceTargets.length > 0 && deviceTargets.every(isPsuSlotKey);
-  const deviceOptions: SelectOption[] = psuOnly ? [{ value: SIM_VALUE, label: t('cooling.case3d.sim.fan') }] : deviceTargets.length > 0 ? [
+  const deviceOptions: SelectOption[] = deviceTargets.length > 0 ? [
     { value: NONE, label: t('cooling.case3d.noneLinked') },
     ...channels.map(c => {
       const elsewhere = [...new Set(bindings.filter(b => b.channelId === c.id).flatMap(b => b.slotKeys).filter(k => !deviceTargets.includes(k)).map(k => positionName(slotPosition(k))))];
