@@ -66,7 +66,7 @@ function loadRange(key: string, from: number, to: number, force = false): Promis
       staleRanges.delete(key);
       for (const old of ranges.keys()) {
         if (ranges.size <= MAX_CACHED_RANGES) break;
-        if (!activeRanges.has(old) && old !== key) { ranges.delete(old); staleRanges.delete(old); rangeGeneration.delete(old); }
+        if (!activeRanges.has(old) && !inFlight.has(old) && old !== key) { ranges.delete(old); staleRanges.delete(old); rangeGeneration.delete(old); }
       }
       setState({ ranges });
     })
@@ -89,6 +89,10 @@ export function invalidateCalendar(): void {
     void loadMeta();
     for (const key of state.ranges.keys()) {
       if (!activeRanges.has(key)) staleRanges.add(key);
+    }
+    // A fetch started for a range nobody is viewing may carry pre-change data: drop its result.
+    for (const key of inFlight.keys()) {
+      if (!activeRanges.has(key)) rangeGeneration.set(key, (rangeGeneration.get(key) ?? 0) + 1);
     }
     for (const key of activeRanges.keys()) {
       const [from, to] = key.split(':').map(Number);
@@ -119,6 +123,16 @@ function subscribe(listener: () => void): () => void {
 }
 
 const getState = () => state;
+
+/** Marks a cached range as just used, so eviction drops the least recently viewed first. Order only: no re-render. */
+function touchRange(key: string) {
+  const data = state.ranges.get(key);
+  if (!data) return;
+  const ranges = new Map(state.ranges);
+  ranges.delete(key);
+  ranges.set(key, data);
+  state = { ...state, ranges };
+}
 
 /** Test seam: forget everything the store holds. */
 export function resetCalendarStore(): void {
@@ -224,6 +238,7 @@ export function useCalendarEvents(from: number, to: number, hidden: readonly str
     if (!enabled) return;
     activeRanges.set(key, (activeRanges.get(key) ?? 0) + 1);
     if (!state.ranges.has(key) || staleRanges.has(key)) void loadRange(key, from, to);
+    else touchRange(key);
     return () => {
       const left = (activeRanges.get(key) ?? 1) - 1;
       if (left <= 0) activeRanges.delete(key); else activeRanges.set(key, left);

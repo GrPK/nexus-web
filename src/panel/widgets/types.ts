@@ -147,7 +147,7 @@ export interface AppMetadata {
   singleInstance?: boolean;
   hasConfig: boolean;
   // i18n key of an info notice the on-device edit sheet shows above the settings on every surface but the desktop dashboard, for settings only the desktop can change.
-  touchEditorHintKey?: string;
+  desktopOnlyHintKey?: string;
   // Whether the widget *requires* a touch / pointer input modality. true
   // means it's hidden on display-only surfaces (currently Q60). false means
   // it's available on every surface that can fit one of its `sizes` - desktop

@@ -111,6 +111,21 @@ describe('CalendarImmersive', () => {
     expect(screen.getByText('Wednesday, November 18')).toBeTruthy();
   });
 
+  it('rolls a touch panel over at midnight while it still follows today, but not after the user navigated', () => {
+    vi.setSystemTime(new Date(2026, 10, 17, 23, 58).getTime());
+    const followed = renderImmersive('y70', { immersiveView: 'day' });
+    act(() => { vi.setSystemTime(new Date(2026, 10, 18, 0, 2).getTime()); vi.advanceTimersByTime(60_000); });
+    expect(screen.getByText('Wednesday, November 18')).toBeTruthy();
+    followed.unmount();
+
+    vi.setSystemTime(new Date(2026, 10, 17, 23, 58).getTime());
+    renderImmersive('y70', { immersiveView: 'day' });
+    fireEvent.click(screen.getByRole('button', { name: 'panel.widget.calendar.next' }));
+    expect(screen.getByText('Wednesday, November 18')).toBeTruthy();
+    act(() => { vi.setSystemTime(new Date(2026, 10, 18, 0, 2).getTime()); vi.advanceTimersByTime(60_000); });
+    expect(screen.getByText('Wednesday, November 18')).toBeTruthy();
+  });
+
   it('puts the day label above its events when the list is narrow, and keeps two columns when wide', () => {
     const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get');
     const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(700);

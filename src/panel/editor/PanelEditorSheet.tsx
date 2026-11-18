@@ -27,7 +27,7 @@ import { useTranslation } from '../../lib/i18n';
 import { pluralKey } from '../../lib/pluralKey';
 import type { ThemeMode } from '../../lib/settings';
 import type { EffectState } from '../../types/lighting';
-import { touchEditorHintFor } from './touchEditorHint';
+import { desktopOnlyEditorHintFor } from './desktopOnlyEditorHint';
 import type { PanelConfigValue, PanelSurface, PanelWidget, PanelWidgetSize } from '../types';
 import { isSingleWidgetSurface, surfaceDisplayShape, surfaceSupportsTouch, type ForcedGrid } from '../types';
 import type { PanelBackgroundMode } from '../background/panelBackground';
@@ -220,7 +220,7 @@ export function PanelEditorSheet({
   const audioReactive = usePanelAudioReactive(surface);
   const { t, language } = useTranslation();
   const def = editingWidget ? lookupApp(editingWidget.type) : undefined;
-  const touchHintKey = touchEditorHintFor(def?.meta, surface);
+  const touchHintKey = desktopOnlyEditorHintFor(def?.meta, surface);
   const title = mode === 'panelSettings'
     ? t(panelSettingsSection === 'theme' ? 'panel.actions.theme'
       : panelSettingsSection === 'background' ? 'panel.actions.background'

@@ -53,8 +53,9 @@ export function CalendarImmersive({ widget, surface, deviceTouch }: WidgetProps)
   const view = interactive && picked ? picked : defaultView;
   const [pickedAnchor, setAnchor] = useState(() => startOfDay(Date.now()));
   const today = startOfDay(now);
-  // A panel that cannot navigate follows today, so it rolls over at midnight instead of freezing at mount.
-  const anchor = interactive ? pickedAnchor : today;
+  // Until the user navigates away, the view follows today and rolls over at midnight, so a kiosk left on overnight shows the new day.
+  const [following, setFollowing] = useState(true);
+  const anchor = interactive && !following ? pickedAnchor : today;
 
   const range = useMemo(() => {
     switch (view) {
@@ -74,12 +75,14 @@ export function CalendarImmersive({ widget, surface, deviceTouch }: WidgetProps)
   const data = useCalendarData({ from: range.from, to: range.to, hidden: hiddenCalendarIds(config), enabled: true, preview: false, now });
 
   const step = (dir: 1 | -1) => {
+    setFollowing(false);
     if (view === 'day') setAnchor(addDays(anchor, dir));
     else if (view === 'month') setAnchor(addMonths(anchor, dir));
     else setAnchor(addDays(anchor, 7 * dir));
   };
   const pick = (next: ImmersiveView) => {
     setPicked(next);
+    if (following) return;
     if (view === 'month' && next !== 'month' && startOfMonth(anchor) === startOfMonth(today)) setAnchor(today);
     if (next === 'month') setAnchor(startOfMonth(anchor));
   };
@@ -99,7 +102,7 @@ export function CalendarImmersive({ widget, surface, deviceTouch }: WidgetProps)
               ))}
             </div>
             <div className={styles.nav}>
-              <button type="button" className={styles.todayButton} onClick={() => setAnchor(view === 'month' ? startOfMonth(today) : today)}>
+              <button type="button" className={styles.todayButton} onClick={() => setFollowing(true)}>
                 {t('panel.widget.calendar.today')}
               </button>
               <button type="button" className={styles.arrow} aria-label={t('panel.widget.calendar.prev')} onClick={() => step(-1)}>

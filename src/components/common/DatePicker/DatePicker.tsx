@@ -194,6 +194,7 @@ export function DatePicker({ value, max, min, onChange, ariaLabel }: DatePickerP
             year={viewYear}
             month={viewMonthIndex}
             weekStart={0}
+            monoDays
             isSelected={day => toIso(new Date(day)) === value}
             isToday={day => toIso(new Date(day)) === todayIso}
             isDisabled={day => { const iso = toIso(new Date(day)); return (!!max && iso > max) || (!!min && iso < min); }}

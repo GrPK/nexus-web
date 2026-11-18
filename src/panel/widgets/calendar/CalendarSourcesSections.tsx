@@ -19,13 +19,14 @@ const REFRESH_LABEL_KEYS: Record<CalendarRefreshMinutes, string> = {
   60: 'panel.widget.calendar.refresh.hour1',
 };
 
-// Known service sync codes; anything else reads as a generic failure.
+// Known service sync codes (a stored address the service refuses reads as invalidUrl); anything else is a generic failure.
 const SOURCE_ERROR_KEYS: Readonly<Record<string, string>> = {
   unreachable: 'panel.widget.calendar.add.error.unreachable',
   unauthorized: 'panel.widget.calendar.add.error.unauthorized',
   notFound: 'panel.widget.calendar.add.error.notFound',
   notIcs: 'panel.widget.calendar.add.error.notIcs',
   tooLarge: 'panel.widget.calendar.add.error.tooLarge',
+  invalidUrl: 'panel.widget.calendar.source.error.invalidUrl',
 };
 
 const KIND_LABEL_KEYS: Record<CalendarSourceDto['kind'], string> = {

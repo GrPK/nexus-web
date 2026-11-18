@@ -19,7 +19,7 @@ export const calendarApp: AppManifest = {
     hasConfig: true,
     // A newly added widget is the date card: no grid, no events.
     defaultConfig: () => ({ showGrid: false, showEvents: false }),
-    touchEditorHintKey: 'panel.widget.calendar.touchEditorHint',
+    desktopOnlyHintKey: 'panel.widget.calendar.desktopOnlyHint',
     touch: false,
   },
   Widget: CalendarWidget,

@@ -27,13 +27,15 @@ export interface MonthGridProps {
   /** Tint a whole week row (week-based views). */
   highlightWeek?: (week: readonly number[]) => boolean;
   onPick: (day: number) => void;
+  /** Day numbers in the monospace face (DatePicker); the inherited face otherwise. */
+  monoDays?: boolean;
 }
 
 /**
  * The weekday header and day cells of a month: the one grid under DatePicker's popup and MiniMonth. Days arrive
  * and leave as local-midnight epoch ms; the caller decides what selected, today and disabled mean.
  */
-export function MonthGrid({ year, month, weekStart, locale, isSelected, isToday, isDisabled, highlightWeek, onPick }: MonthGridProps) {
+export function MonthGrid({ year, month, weekStart, locale, isSelected, isToday, isDisabled, highlightWeek, onPick, monoDays }: MonthGridProps) {
   const weeks = useMemo(() => monthWeeks(year, month, weekStart), [year, month, weekStart]);
   const initials = useMemo(() => {
     const fmt = new Intl.DateTimeFormat(locale, { weekday: 'narrow' });
@@ -53,6 +55,7 @@ export function MonthGrid({ year, month, weekStart, locale, isSelected, isToday,
             const disabled = isDisabled?.(day) === true;
             const cls = [
               styles.cell,
+              monoDays ? styles.mono : '',
               new Date(day).getMonth() !== month ? styles.out : '',
               isToday(day) && !selected ? styles.today : '',
               selected ? styles.selected : '',

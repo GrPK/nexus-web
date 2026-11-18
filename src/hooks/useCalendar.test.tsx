@@ -80,6 +80,33 @@ describe('calendar store ordering and cache', () => {
     await waitFor(() => expect(again.result.current.events.map(e => e.id)).toEqual(['fresh']));
   });
 
+  it('does not evict a range whose fetch is still in flight', async () => {
+    const slow = deferred();
+    api.fetchCalendarEvents.mockImplementationOnce(() => slow.promise);
+    renderHook(() => useCalendarEvents(5000, 5100), { wrapper }).unmount();
+    for (let i = 0; i < 14; i++) {
+      api.fetchCalendarEvents.mockResolvedValueOnce({ events: [], syncedAt: 1 });
+      const { result, unmount } = renderHook(() => useCalendarEvents(i * 10, i * 10 + 5), { wrapper });
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+      unmount();
+    }
+    const back = renderHook(() => useCalendarEvents(5000, 5100), { wrapper });
+    await act(async () => { slow.resolve({ events: [dto('late', 'a')], syncedAt: 3 }); await Promise.resolve(); await Promise.resolve(); });
+    await waitFor(() => expect(back.result.current.loaded).toBe(true));
+    expect(back.result.current.events.map(e => e.id)).toEqual(['late']);
+  });
+
+  it('drops the result of a non-viewed fetch that an invalidate overtook', async () => {
+    const slow = deferred();
+    api.fetchCalendarEvents.mockImplementationOnce(() => slow.promise);
+    renderHook(() => useCalendarEvents(7000, 7100), { wrapper }).unmount();
+    await act(async () => { invalidateCalendar(); });
+    api.fetchCalendarEvents.mockResolvedValue({ events: [dto('fresh', 'a')], syncedAt: 5 });
+    await act(async () => { slow.resolve({ events: [dto('stale', 'a')], syncedAt: 1 }); await Promise.resolve(); await Promise.resolve(); });
+    const back = renderHook(() => useCalendarEvents(7000, 7100), { wrapper });
+    await waitFor(() => expect(back.result.current.events.map(e => e.id)).toEqual(['fresh']));
+  });
+
   it('carries the truncated flag from the service', async () => {
     api.fetchCalendarEvents.mockResolvedValue({ events: [], syncedAt: 1, truncated: true });
     const { result } = renderHook(() => useCalendarEvents(0, 100), { wrapper });
