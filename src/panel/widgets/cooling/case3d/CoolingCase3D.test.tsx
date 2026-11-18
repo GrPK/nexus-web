@@ -1605,3 +1605,30 @@ describe('CoolingCase3D fan product', () => {
     expect(screen.queryByTestId('fan-product')).toBeNull();
   });
 });
+
+describe('CoolingCase3D PSU fan source', () => {
+  const psuKey = 'psu:fan:0';
+  const mountPsu = (bindings: CoolingLayout['bindings'] = []) => {
+    const layout = caseLayout();
+    layout.fanSlots.push({ key: psuKey, position: 'psu', size: 140, index: 0, taken: 'fan', box: { min: [300, 10, 10], size: [10, 140, 140] }, axis: [-1, 0, 0] } as never);
+    h.setup = { record: { rev: 1, setup: { version: 1, case: {}, items: [], resolved: { objects: [], caseLayout: layout } } }, loaded: true };
+    setLayout({ settled: true, layout: { directions: {}, bindings, tests: [] } });
+    const all = [...channels, { id: 'corsair-psu:1', name: 'Corsair HX1500i', rpm: 600, dutyPercent: 30, maxRpm: 2000, kind: 'Fan' }, { id: 'ro-fan', name: 'Read-only fan', rpm: 900, dutyPercent: 0, controlled: false, readOnly: true }] as FanChannel[];
+    render(<CoolingCase3D channels={all} selectedChannelId={null} onSelectChannel={vi.fn()} />);
+    act(() => h.pick.current?.(psuKey, 10, 10));
+    fireEvent.click(screen.getByRole('button', { name: 'cooling.case3d.product.source' }));
+  };
+
+  it('offers every fan channel, read-only ones included, plus the simulated fan', () => {
+    mountPsu();
+    const text = screen.getAllByRole('option').map(o => o.textContent ?? '');
+    for (const name of ['Fan A', 'Fan B', 'Corsair HX1500i', 'Read-only fan', 'cooling.case3d.sim.fan']) expect(text.some(t => t.includes(name))).toBe(true);
+  });
+
+  it('links the PSU fan channel to the PSU slot', () => {
+    mountPsu();
+    fireEvent.click(screen.getAllByRole('option').find(o => o.textContent?.includes('Corsair HX1500i'))!);
+    const edited = (h.layout.edit.mock.calls.at(-1)![0] as (l: CoolingLayout) => CoolingLayout)({ directions: {}, bindings: [], tests: [] });
+    expect(edited.bindings).toEqual([{ channelId: 'corsair-psu:1', slotKeys: [psuKey] }]);
+  });
+});
