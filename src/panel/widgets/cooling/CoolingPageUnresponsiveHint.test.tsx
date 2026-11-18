@@ -81,7 +81,7 @@ describe('CoolingPage unresponsive hint', () => {
     await waitFor(() => expect(bubble()).not.toBeNull());
     expect(bubble()?.getAttribute('data-hint-id')).toBe('cooling-unresponsive');
     const selector = bubble()?.getAttribute('data-target') ?? '';
-    expect(document.querySelector(selector)).toBe(screen.getByLabelText('devices.hidden.hide'));
+    expect(document.querySelector(selector)).toBe(screen.getByLabelText('cooling.hidden.hide'));
   });
 
   it('stays hidden with no Unresponsive fan', async () => {
@@ -132,7 +132,7 @@ describe('CoolingPage unresponsive hint', () => {
   it('dismisses through the service when the eye is pressed', async () => {
     renderPage();
     await waitFor(() => expect(bubble()).not.toBeNull());
-    fireEvent.click(screen.getByLabelText('devices.hidden.hide'));
+    fireEvent.click(screen.getByLabelText('cooling.hidden.hide'));
     expect(dismissOnboardingHint).toHaveBeenCalledWith('cooling-unresponsive');
     expect(bubble()).toBeNull();
   });
