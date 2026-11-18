@@ -11,6 +11,7 @@ const store = vi.hoisted(() => ({
   hiddenSeen: [] as string[][],
   add: vi.fn(),
   remove: vi.fn(),
+  update: vi.fn(),
   refreshNow: vi.fn(() => Promise.resolve()),
   setRefreshMinutes: vi.fn(() => Promise.resolve()),
 }));
@@ -26,7 +27,7 @@ vi.mock('../../../../hooks/useCalendar', () => ({
     setRefreshMinutes: store.setRefreshMinutes,
     refreshNow: store.refreshNow,
   }),
-  useCalendarMutations: () => ({ add: store.add, remove: store.remove }),
+  useCalendarMutations: () => ({ add: store.add, remove: store.remove, update: store.update }),
 }));
 
 vi.mock('../../../../lib/i18n', () => ({
@@ -68,6 +69,7 @@ beforeEach(() => {
   store.hiddenSeen = [];
   store.add.mockReset();
   store.remove.mockReset();
+  store.update.mockReset();
 });
 
 afterEach(() => {
@@ -84,6 +86,16 @@ describe('CalendarPage', () => {
     expect(within(dialog).getByText('Work')).toBeTruthy();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Design review' })).toBeNull();
+  });
+
+  it('marks the event whose popover is open and clears it on close', () => {
+    render(<CalendarPage tab="day" />);
+    const chip = screen.getByRole('button', { name: 'Design review' });
+    expect(chip.getAttribute('data-selected')).toBeNull();
+    fireEvent.click(chip);
+    expect(screen.getByRole('button', { name: 'Design review' }).getAttribute('data-selected')).toBe('true');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Design review' }).getAttribute('data-selected')).toBeNull();
   });
 
   it('toggles the popover when the same event is pressed twice', () => {
@@ -111,7 +123,7 @@ describe('CalendarPage', () => {
   it('hides a calendar from the view only, and remembers the choice', () => {
     render(<CalendarPage tab="day" />);
     expect(screen.getByRole('button', { name: 'Pick up Leo' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('checkbox', { name: /Home/ }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Home' }));
     expect(screen.queryByRole('button', { name: 'Pick up Leo' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Design review' })).toBeTruthy();
     expect(JSON.parse(window.localStorage.getItem('nexus.calendar.hiddenCalendars') ?? '[]')).toEqual(['home']);
@@ -142,11 +154,62 @@ describe('CalendarPage', () => {
     expect(store.refreshNow).toHaveBeenCalledTimes(1);
   });
 
-  it('asks before removing a calendar', async () => {
-    store.remove.mockResolvedValue(undefined);
+});
+
+describe('Edit calendar dialog', () => {
+  const openEdit = () => {
     render(<CalendarPage tab="day" />);
-    fireEvent.click(screen.getByRole('button', { name: 'panel.widget.calendar.remove.button|Home' }));
+    fireEvent.click(screen.getByRole('button', { name: 'panel.widget.calendar.edit.button|Home' }));
+    return screen.getByRole('alertdialog');
+  };
+
+  it('shows the feed host read-only and keeps Save disabled until something changes', () => {
+    store.sources = [{ ...source('home', 'Home', '#ff9f0a'), host: 'calendar.example.org' }, source('work', 'Work', '#8b7cff')];
+    const dialog = openEdit();
+    expect(within(dialog).getByText('calendar.example.org')).toBeTruthy();
+    const save = within(dialog).getByText('panel.widget.calendar.edit.save').closest('button') as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.name'), { target: { value: 'Household' } });
+    expect(save.disabled).toBe(false);
+  });
+
+  it('saves the new name and color then closes, with Cancel first in the footer', async () => {
+    store.update.mockResolvedValue({});
+    const dialog = openEdit();
+    const labels = within(dialog).getAllByRole('button').map(b => b.textContent);
+    expect(labels.indexOf('confirm.cancel')).toBeLessThan(labels.indexOf('panel.widget.calendar.edit.save'));
+    fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.name'), { target: { value: ' Household ' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '#0a84ff' }));
+    fireEvent.click(within(dialog).getByText('panel.widget.calendar.edit.save'));
+    await waitFor(() => expect(store.update).toHaveBeenCalledWith('home', { name: 'Household', color: '#0a84ff' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  });
+
+  it('closes without saving on Cancel', () => {
+    const dialog = openEdit();
+    fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.name'), { target: { value: 'X' } });
+    fireEvent.click(within(dialog).getByText('confirm.cancel'));
+    expect(store.update).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('shows an inline error and stays open when saving fails', async () => {
+    store.update.mockRejectedValue(new Error('boom'));
+    const dialog = openEdit();
+    fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.name'), { target: { value: 'X' } });
+    fireEvent.click(within(dialog).getByText('panel.widget.calendar.edit.save'));
+    expect((await screen.findByRole('alert')).textContent).toBe('panel.widget.calendar.edit.error');
+  });
+
+  it('asks before removing, and Cancel keeps the calendar', async () => {
+    store.remove.mockResolvedValue(undefined);
+    const dialog = openEdit();
+    fireEvent.click(within(dialog).getByText('panel.widget.calendar.remove.title'));
     expect(store.remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('confirm.cancel'));
+    expect(store.remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'panel.widget.calendar.edit.button|Home' }));
+    fireEvent.click(screen.getByText('panel.widget.calendar.remove.title'));
     fireEvent.click(screen.getByText('panel.widget.calendar.remove.confirm'));
     await waitFor(() => expect(store.remove).toHaveBeenCalledWith('home'));
   });
@@ -155,7 +218,7 @@ describe('CalendarPage', () => {
 describe('Add calendar dialog', () => {
   const open = () => {
     render(<CalendarPage tab="day" />);
-    fireEvent.click(screen.getAllByText('panel.widget.calendar.add.button')[0]);
+    fireEvent.click(screen.getByText('panel.widget.calendar.add.button'));
     return screen.getByRole('alertdialog');
   };
 
@@ -200,6 +263,14 @@ describe('Add calendar dialog', () => {
     expect(screen.getByRole('alertdialog')).toBeTruthy();
   });
 
+  it.each(['notFound', 'unauthorized'] as const)('points a refused Google public address to the secret iCal address (%s)', async code => {
+    store.add.mockRejectedValue(new CalendarRequestError('bad', code));
+    const dialog = open();
+    fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.address'), { target: { value: 'https://calendar.google.com/calendar/ical/me%40x.com/public/basic.ics' } });
+    fireEvent.click(within(dialog).getByText('panel.widget.calendar.add.confirm'));
+    expect((await screen.findByRole('alert')).textContent).toBe('panel.widget.calendar.add.error.googlePublic');
+  });
+
   it('falls back to a generic message for an unknown failure', async () => {
     store.add.mockRejectedValue(new Error('boom'));
     const dialog = open();
@@ -208,9 +279,21 @@ describe('Add calendar dialog', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('panel.widget.calendar.add.error.generic');
   });
 
-  it('shows the Google and Microsoft sign-in as disabled with a note', () => {
+  it('keeps the address help collapsed, then lists each provider and the guide link', () => {
     const dialog = open();
-    expect((within(dialog).getByText('panel.widget.calendar.add.signIn').closest('button') as HTMLButtonElement).disabled).toBe(true);
-    expect(within(dialog).getByText('panel.widget.calendar.add.comingLater')).toBeTruthy();
+    expect(within(dialog).queryByText('panel.widget.calendar.add.help.google')).toBeNull();
+    fireEvent.click(within(dialog).getByText('panel.widget.calendar.add.help.title'));
+    for (const key of ['google', 'outlook', 'icloud', 'other']) {
+      expect(within(dialog).getByText(`panel.widget.calendar.add.help.${key}`)).toBeTruthy();
+    }
+    const link = within(dialog).getByRole('link', { name: 'panel.widget.calendar.add.help.learnMore' }) as HTMLAnchorElement;
+    expect(link.href).toBe('https://hellonexus.com/docs/guides/remote-devices/add-a-calendar');
+    expect(link.target).toBe('_blank');
+  });
+
+  it('says the calendar is read-only and offers no sign-in row', () => {
+    const dialog = open();
+    expect(within(dialog).getByText('panel.widget.calendar.add.readOnly')).toBeTruthy();
+    expect(within(dialog).queryByText(/signIn|comingLater/)).toBeNull();
   });
 });

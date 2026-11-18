@@ -27,6 +27,7 @@ interface Props {
   // Dashboard page sizing and its event buttons.
   variant?: 'panel' | 'page';
   onEventPress?: (ev: CalEvent, el: HTMLElement) => void;
+  selectedEventId?: string | null;
 }
 
 const minutesOf = (ms: number) => {
@@ -34,7 +35,7 @@ const minutesOf = (ms: number) => {
   return d.getHours() * 60 + d.getMinutes();
 };
 
-export function CalendarTimeGrid({ days, events, now, fmt, lookFor, fixedWindow, compact, variant = 'panel', onEventPress }: Props) {
+export function CalendarTimeGrid({ days, events, now, fmt, lookFor, fixedWindow, compact, variant = 'panel', onEventPress, selectedEventId }: Props) {
   const { t } = useTranslation();
   const { ref, size } = useElementSize();
   const scrollNode = useRef<HTMLDivElement | null>(null);
@@ -85,6 +86,7 @@ export function CalendarTimeGrid({ days, events, now, fmt, lookFor, fixedWindow,
                   color={look.color}
                   style={{ gridColumn: `${l.startCol + 1} / ${l.endCol + 2}`, gridRow: l.lane + 1 }}
                   label={l.ev.title}
+                  selected={l.ev.id === selectedEventId}
                   onPress={onEventPress ? el => onEventPress(l.ev, el) : undefined}
                 >
                   {l.ev.title}
@@ -130,6 +132,7 @@ export function CalendarTimeGrid({ days, events, now, fmt, lookFor, fixedWindow,
                           width: `calc(${100 / cols}% - 2px)`,
                         }}
                         label={ev.title}
+                        selected={ev.id === selectedEventId}
                         onPress={onEventPress ? el => onEventPress(ev, el) : undefined}
                       >
                         <div className={styles.blockTitle}>{ev.title}</div>

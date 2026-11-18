@@ -16,10 +16,11 @@ interface Props {
   lookFor: (calendarId: string) => CalendarLook;
   variant?: 'panel' | 'page';
   onEventPress?: (ev: CalEvent, el: HTMLElement) => void;
+  selectedEventId?: string | null;
 }
 
 /** Schedule-style list: days that have events, all-day rows first, the current event marked "Now". */
-export function CalendarAgendaList({ from, events, now, fmt, lookFor, variant = 'panel', onEventPress }: Props) {
+export function CalendarAgendaList({ from, events, now, fmt, lookFor, variant = 'panel', onEventPress, selectedEventId }: Props) {
   const { t } = useTranslation();
   const today = startOfDay(now);
   const groups = useMemo(() => groupAgenda(events, from, AGENDA_DAYS), [events, from]);
@@ -55,6 +56,7 @@ export function CalendarAgendaList({ from, events, now, fmt, lookFor, variant = 
                   className={[styles.row, past ? styles.past : '', current ? styles.current : '', onEventPress ? styles.press : ''].filter(Boolean).join(' ')}
                   color={look.color}
                   label={ev.title}
+                  selected={ev.id === selectedEventId}
                   onPress={onEventPress ? el => onEventPress(ev, el) : undefined}
                 >
                   <div className={styles.time}>

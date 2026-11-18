@@ -21,10 +21,11 @@ interface Props {
   variant?: 'panel' | 'page';
   onEventPress?: (ev: CalEvent, el: HTMLElement) => void;
   onMorePress?: (day: number, el: HTMLElement) => void;
+  selectedEventId?: string | null;
 }
 
 export function CalendarMonthGrid({
-  monthStart, weekStart, events, now, fmt, lookFor, rows, showTimes = false, compact, variant = 'panel', onEventPress, onMorePress,
+  monthStart, weekStart, events, now, fmt, lookFor, rows, showTimes = false, compact, variant = 'panel', onEventPress, onMorePress, selectedEventId,
 }: Props) {
   const { t } = useTranslation();
   const today = startOfDay(now);
@@ -64,6 +65,7 @@ export function CalendarMonthGrid({
                   color={look.color}
                   style={{ gridColumn: `${bar.startCol + 1} / ${bar.endCol + 2}`, gridRow: bar.lane + 2 }}
                   label={bar.ev.title}
+                  selected={bar.ev.id === selectedEventId}
                   onPress={onEventPress ? el => onEventPress(bar.ev, el) : undefined}
                 >
                   {bar.ev.title}
@@ -82,6 +84,7 @@ export function CalendarMonthGrid({
                   lookFor={lookFor}
                   showTimes={showTimes}
                   onEventPress={onEventPress}
+                  selectedEventId={selectedEventId}
                   moreLabel={(count: number) => t('panel.widget.calendar.moreCount', { count })}
                   onMorePress={onMorePress ? el => onMorePress(week.days[i], el) : undefined}
                 />
@@ -95,7 +98,7 @@ export function CalendarMonthGrid({
 }
 
 function DayLines({
-  plan, col, firstRow, fmt, lookFor, showTimes, onEventPress, moreLabel, onMorePress,
+  plan, col, firstRow, fmt, lookFor, showTimes, onEventPress, selectedEventId, moreLabel, onMorePress,
 }: {
   plan: { lines: CalEvent[]; more: number };
   col: number;
@@ -104,6 +107,7 @@ function DayLines({
   lookFor: (id: string) => CalendarLook;
   showTimes: boolean;
   onEventPress?: (ev: CalEvent, el: HTMLElement) => void;
+  selectedEventId?: string | null;
   moreLabel: (count: number) => string;
   onMorePress?: (el: HTMLElement) => void;
 }) {
@@ -116,6 +120,7 @@ function DayLines({
           color={lookFor(ev.calendarId).color}
           style={{ gridColumn: col, gridRow: firstRow + k }}
           label={ev.title}
+          selected={ev.id === selectedEventId}
           onPress={onEventPress ? el => onEventPress(ev, el) : undefined}
         >
           <i />

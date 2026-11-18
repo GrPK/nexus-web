@@ -4,8 +4,8 @@ import { widgetLayoutSize, type PanelWidgetSize } from '../../types';
 import { useTranslation } from '../../../lib/i18n';
 import { buildMonthCells, resolveWeekStart, weekdayInitials, type WeekStartConfig } from './calendar';
 import {
-  addDays, addMonths, dotCalendarsOnDay, hiddenCalendarIds, resolveCalendarView, startOfDay, startOfMonth,
-  type CalEvent, type CalendarView,
+  addDays, addMonths, dotCalendarsOnDay, hiddenCalendarIds, resolveCalendarDisplay, startOfDay, startOfMonth,
+  type CalEvent,
 } from './calendarEvents';
 import { NextEventTile, TodayList, UpNextTile, type TileContext } from './CalendarTiles';
 import { previewNow, useCalendarData, type CalendarLook } from './useCalendarData';
@@ -16,11 +16,11 @@ import { StableDigits } from '../common/StableDigits';
 import styles from './CalendarWidget.module.scss';
 
 /**
- * Calendar widget. `config.view` picks the content:
- *   date  - a glanceable date card (weekday / big day number / month).
- *   next  - the date plus the upcoming events (the Up Next list at 4x4).
- *   month - the month grid with today circled and an event dot per calendar;
- *           the 4x4 adds today's list.
+ * Calendar widget. Two toggles pick the content:
+ *   neither     - a glanceable date card (weekday / big day number / month).
+ *   events      - the date plus the upcoming events (the Up Next list at 4x4).
+ *   grid        - the month grid with today circled and an event dot per calendar.
+ *   grid+events - the grid, with today's list under it at 4x4.
  * The tile is non-interactive so it works identically on touch and
  * display-only (Q60) surfaces.
  */
@@ -38,19 +38,18 @@ export function CalendarWidget({ widget }: WidgetProps) {
 
   const now = preview ? previewNow(realNow) : realNow;
   const config = widget.config;
-  const view: CalendarView = preview && config?.view === undefined && config?.showGrid === undefined
-    ? 'next'
-    : resolveCalendarView(config);
+  const unset = config?.view === undefined && config?.showGrid === undefined && config?.showEvents === undefined;
+  const { grid, events: showEvents } = preview && unset ? { grid: false, events: true } : resolveCalendarDisplay(config);
   const showDots = config?.showDots !== false;
   const weekStartCfg = (config?.weekStart as WeekStartConfig | undefined) ?? 'auto';
   const size = widgetLayoutSize(widget.size);
 
   const today = startOfDay(now);
   const monthStart = startOfMonth(now);
-  const wantsEvents = view === 'next' || (view === 'month' && (showDots || size === '4x4'));
+  const wantsEvents = showEvents || (grid && showDots);
   const data = useCalendarData({
-    from: view === 'month' ? monthStart : today,
-    to: view === 'month' ? addMonths(monthStart, 1) : addDays(today, 2),
+    from: grid ? monthStart : today,
+    to: grid ? addMonths(monthStart, 1) : addDays(today, 2),
     hidden: hiddenCalendarIds(config),
     enabled: wantsEvents,
     preview,
@@ -60,12 +59,12 @@ export function CalendarWidget({ widget }: WidgetProps) {
     now, events: data.events, fmt, lookFor: data.lookFor, noCalendars: data.loaded && data.sources.length === 0,
   };
 
-  if (view === 'next') {
+  if (!grid && showEvents) {
     return size === '4x4'
       ? <UpNextTile ctx={ctx} />
       : <NextEventTile size={widget.size === '2x2round' ? '2x2round' : size} ctx={ctx} />;
   }
-  if (view === 'month') {
+  if (grid) {
     return (
       <MonthView
         now={new Date(now)}
@@ -74,7 +73,7 @@ export function CalendarWidget({ widget }: WidgetProps) {
         weekStart={resolveWeekStart(weekStartCfg, language)}
         events={showDots ? data.events : NO_EVENTS}
         lookFor={data.lookFor}
-        list={size === '4x4' && !ctx.noCalendars ? <TodayList ctx={ctx} /> : null}
+        list={showEvents && size === '4x4' && !ctx.noCalendars ? <TodayList ctx={ctx} /> : null}
       />
     );
   }

@@ -15,10 +15,8 @@ export interface CalEvent {
   tentative: boolean;
 }
 
-export type CalendarView = 'date' | 'next' | 'month';
 export type ImmersiveView = 'day' | 'week' | 'month' | 'list';
 
-export const CALENDAR_VIEWS: readonly CalendarView[] = ['date', 'next', 'month'];
 export const IMMERSIVE_VIEWS: readonly ImmersiveView[] = ['day', 'week', 'month', 'list'];
 
 export const MAX_EVENT_DOTS = 3;
@@ -366,11 +364,24 @@ export function groupAgenda(events: readonly CalEvent[], from: number, maxDays: 
 
 // ── Config ──────────────────────────────────────────────────────
 
-/** Reads `config.view`, falling back to the retired `showGrid` toggle. The old key is never rewritten. */
-export function resolveCalendarView(config: Record<string, unknown> | undefined): CalendarView {
+export interface CalendarDisplay {
+  grid: boolean;
+  events: boolean;
+}
+
+/**
+ * The two display toggles. Stored `showGrid` / `showEvents` win; configs from
+ * before them map over without being rewritten: a `view` key (date, next,
+ * month) and the retired `showGrid` toggle, whose grid carried the event list.
+ */
+export function resolveCalendarDisplay(config: Record<string, unknown> | undefined): CalendarDisplay {
   const view = config?.view;
-  if (typeof view === 'string' && (CALENDAR_VIEWS as readonly string[]).includes(view)) return view as CalendarView;
-  return config?.showGrid === true ? 'month' : 'date';
+  const grid = typeof config?.showGrid === 'boolean' ? config.showGrid : view === 'month';
+  let events: boolean;
+  if (typeof config?.showEvents === 'boolean') events = config.showEvents;
+  else if (view === 'date' || view === 'next' || view === 'month') events = view !== 'date';
+  else events = config?.showGrid === true;
+  return { grid, events };
 }
 
 export function resolveImmersiveView(config: Record<string, unknown> | undefined, landscape: boolean): ImmersiveView {

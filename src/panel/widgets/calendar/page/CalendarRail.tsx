@@ -1,15 +1,14 @@
-import { Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useTranslation } from '../../../../lib/i18n';
 import {
   CALENDAR_REFRESH_OPTIONS, DEFAULT_REFRESH_MINUTES, type CalendarRefreshMinutes, type CalendarSettingsDto, type CalendarSourceDto,
 } from '../../../../api/calendar';
 import { Button } from '../../../../components/common/Button/Button';
-import { Checkbox } from '../../../../components/common/Checkbox/Checkbox';
-import { IconLabelButton } from '../../../../components/common/IconLabelButton/IconLabelButton';
 import { MiniMonth } from '../../../../components/common/MiniMonth/MiniMonth';
 import { Select } from '../../../../components/common/Select/Select';
 import { SettingsSection } from '../../../../components/common/SettingsSection/SettingsSection';
 import { syncedText } from '../calendarEvents';
+import { CalendarSourceRow } from '../CalendarSourceRow';
 import styles from './CalendarRail.module.scss';
 
 const REFRESH_LABEL_KEYS: Record<CalendarRefreshMinutes, string> = {
@@ -27,10 +26,12 @@ interface Props {
   highlightWeek: boolean;
   onSelectDay: (day: number) => void;
   onMonthChange: (delta: number) => void;
+  onSelectMonth: (monthStart: number) => void;
   sources: readonly CalendarSourceDto[];
   hidden: readonly string[];
   onToggle: (id: string, visible: boolean) => void;
-  onRemove: (source: CalendarSourceDto) => void;
+  onEdit: (source: CalendarSourceDto) => void;
+  onAdd: () => void;
   settings: CalendarSettingsDto | null;
   onRefreshMinutes: (value: CalendarRefreshMinutes) => void;
   onRefreshNow: () => void;
@@ -39,7 +40,7 @@ interface Props {
 }
 
 export function CalendarRail({
-  miniMonth, selected, today, weekStart, highlightWeek, onSelectDay, onMonthChange, sources, hidden, onToggle, onRemove,
+  miniMonth, selected, today, weekStart, highlightWeek, onSelectDay, onMonthChange, onSelectMonth, sources, hidden, onToggle, onEdit, onAdd,
   settings, onRefreshMinutes, onRefreshNow, refreshing, now,
 }: Props) {
   const { t } = useTranslation();
@@ -55,33 +56,27 @@ export function CalendarRail({
           highlightWeek={highlightWeek}
           onSelect={onSelectDay}
           onMonthChange={onMonthChange}
+          onSelectMonth={onSelectMonth}
         />
       </div>
       <SettingsSection title={t('panel.widget.calendar.settings.calendars')}>
         {sources.map(source => (
-          <div key={source.id} className={styles.sourceRow}>
-            <Checkbox
-              className={styles.sourceCheck}
-              checked={!hidden.includes(source.id)}
-              onChange={visible => onToggle(source.id, visible)}
-              label={(
-                <span className={styles.sourceText} style={{ ['--cal-color' as string]: source.color }}>
-                  <span className={styles.name}><span className={styles.dot} />{source.name}</span>
-                  <small className={source.error ? styles.error : undefined}>
-                    {source.error ? t(`panel.widget.calendar.add.error.${source.error}`) : syncedText(t, source.lastSyncedAt, now)}
-                  </small>
-                </span>
-              )}
-            />
-            <IconLabelButton
-              variant="bare"
-              icon={<Trash2 size={15} aria-hidden />}
-              ariaLabel={t('panel.widget.calendar.remove.button', { name: source.name })}
-              title={t('panel.widget.calendar.remove.title')}
-              onPress={() => onRemove(source)}
-            />
-          </div>
+          <CalendarSourceRow
+            key={source.id}
+            name={source.name}
+            color={source.color}
+            isError={source.error !== null}
+            description={source.error ? t(`panel.widget.calendar.add.error.${source.error}`) : syncedText(t, source.lastSyncedAt, now)}
+            checked={!hidden.includes(source.id)}
+            onChange={visible => onToggle(source.id, visible)}
+            onEdit={() => onEdit(source)}
+          />
         ))}
+        <div className={styles.addRow}>
+          <Button size="sm" tone="neutral" icon={<Plus size={16} aria-hidden />} onClick={onAdd}>
+            {t('panel.widget.calendar.add.button')}
+          </Button>
+        </div>
         <div className={styles.refresh}>
           <span className={styles.refreshLabel}>{t('panel.widget.calendar.settings.refreshEvery')}</span>
           <Select

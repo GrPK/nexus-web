@@ -207,3 +207,12 @@
   white-space: nowrap;
 }
 .compact .nowLabel { font-size: 9px; }
+
+// The event whose popover is open.
+.block[data-selected='true'],
+.allDayChip[data-selected='true'] {
+  box-shadow: 0 0 0 2px var(--cal-color);
+  z-index: 4;
+
+  &::before { opacity: 0.6; }
+}

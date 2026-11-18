@@ -17,7 +17,7 @@ vi.mock('../../../hooks/useCalendar', () => ({
     setRefreshMinutes: hooks.setRefreshMinutes,
     refreshNow: hooks.refreshNow,
   }),
-  useCalendarMutations: () => ({ add: vi.fn(), remove: vi.fn() }),
+  useCalendarMutations: () => ({ add: vi.fn(), remove: vi.fn(), update: vi.fn() }),
 }));
 
 vi.mock('../../../components/common/Select/Select', () => ({
@@ -32,7 +32,7 @@ vi.mock('../../../components/common/Select/Select', () => ({
 
 vi.mock('../../../lib/i18n', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string, params?: Record<string, string | number>) => (params && Object.keys(params).length > 0 ? `${key}|${Object.values(params).join('|')}` : key),
     language: 'en',
   }),
 }));
@@ -94,11 +94,33 @@ describe('CalendarSettings', () => {
     expect(onUpdate).toHaveBeenCalledWith({ hiddenCalendars: ['b'] });
   });
 
-  it('writes the view and shows the dots toggle only for the month grid', () => {
-    const onUpdate = renderSettings({ surface: 'desktop', config: { view: 'next' } });
+  it('writes both display toggles together and shows the dots toggle only with the grid on', () => {
+    const onUpdate = renderSettings({ surface: 'desktop', config: { showGrid: false, showEvents: true } });
     expect(screen.queryByRole('switch', { name: 'panel.widget.calendar.settings.showDots' })).toBeNull();
-    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'month' } });
-    expect(onUpdate).toHaveBeenCalledWith({ view: 'month' });
+    fireEvent.click(screen.getByRole('switch', { name: 'panel.widget.calendar.settings.showGrid' }));
+    expect(onUpdate).toHaveBeenCalledWith({ showGrid: true, showEvents: true });
+  });
+
+  it('turns events off while keeping the grid, starting from a legacy showGrid', () => {
+    const onUpdate = renderSettings({ surface: 'desktop', config: { showGrid: true } });
+    expect(screen.getByRole('switch', { name: 'panel.widget.calendar.settings.showDots' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('switch', { name: 'panel.widget.calendar.settings.showEvents' }));
+    expect(onUpdate).toHaveBeenCalledWith({ showGrid: true, showEvents: false });
+  });
+
+  it('offers an edit button per calendar on a pointer surface only', () => {
+    renderSettings({ surface: 'desktop' });
+    expect(screen.getAllByRole('button', { name: /panel.widget.calendar.edit.button/ })).toHaveLength(2);
+  });
+
+  it.each(['y70', 'phone'] as const)('has no edit button on the %s touch surface', surface => {
+    renderSettings({ surface });
+    expect(screen.queryByRole('button', { name: /panel.widget.calendar.edit.button/ })).toBeNull();
+  });
+
+  it('keeps edit in the desktop editor for a touch panel', () => {
+    renderSettings({ surface: 'y70', desktopEditor: true });
+    expect(screen.getAllByRole('button', { name: /panel.widget.calendar.edit.button/ })).toHaveLength(2);
   });
 
   it('refreshes every calendar from one button', () => {

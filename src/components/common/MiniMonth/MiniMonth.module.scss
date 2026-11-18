@@ -99,3 +99,55 @@
 
   &:hover { background: var(--accent); color: var(--accent-text); }
 }
+
+.titleButton {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.2rem 0.4rem;
+  font-family: inherit;
+  font-size: var(--type-body);
+  font-weight: var(--weight-heading);
+  color: var(--text);
+  text-align: center;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--bg-card-hover);
+    color: var(--accent-glow);
+  }
+
+  &:focus-visible {
+    background: var(--bg-card-hover);
+    color: var(--accent-glow);
+  }
+}
+
+.months {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding-top: 0.25rem;
+}
+
+.monthCell {
+  height: 2.6rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: var(--type-small);
+  color: var(--text);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--bg-card-hover);
+    color: var(--accent-glow);
+  }
+
+  &:focus-visible {
+    background: var(--bg-card-hover);
+    color: var(--accent-glow);
+  }
+}

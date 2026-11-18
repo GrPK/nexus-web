@@ -74,38 +74,38 @@ describe('CalendarWidget views', () => {
   });
 
   it('lists the in-progress and upcoming events in Next event at 2x4', () => {
-    render(<CalendarWidget widget={widget('2x4', { view: 'next' })} />);
+    render(<CalendarWidget widget={widget('2x4', { showEvents: true })} />);
     expect(screen.getByText('Design review')).toBeTruthy();
     expect(screen.getByText('Pick up Leo')).toBeTruthy();
     expect(screen.getByText('panel.widget.calendar.when.nowUntil|3:00 PM')).toBeTruthy();
   });
 
   it('fits only the lead event in the 2x2 tile', () => {
-    render(<CalendarWidget widget={widget('2x2', { view: 'next' })} />);
+    render(<CalendarWidget widget={widget('2x2', { showEvents: true })} />);
     expect(screen.getByText('Design review')).toBeTruthy();
     expect(screen.queryByText('Pick up Leo')).toBeNull();
   });
 
   it('summarizes what is left on the round tile with its own count', () => {
-    render(<CalendarWidget widget={widget('2x2round', { view: 'next' })} />);
+    render(<CalendarWidget widget={widget('2x2round', { showEvents: true })} />);
     expect(screen.getByText('Design review')).toBeTruthy();
   });
 
   it('says there is nothing left and offers tomorrow when today is done', () => {
     vi.setSystemTime(at(17, 23, 30));
-    render(<CalendarWidget widget={widget('4x2', { view: 'next' })} />);
+    render(<CalendarWidget widget={widget('4x2', { showEvents: true })} />);
     expect(screen.getByText('panel.widget.calendar.noMoreToday')).toBeTruthy();
     expect(screen.getByText('Sprint planning')).toBeTruthy();
   });
 
   it('shows the all-day event only when no timed event remains today', () => {
     store.events = [normalizeEvent(allDayEvent('a', 'work', 'Launch week', at(16, 12), at(18, 12))), ...store.events];
-    render(<CalendarWidget widget={widget('4x2', { view: 'next' })} />);
+    render(<CalendarWidget widget={widget('4x2', { showEvents: true })} />);
     expect(screen.queryByText('Launch week')).toBeNull();
   });
 
   it('renders Up Next at 4x4 with today and tomorrow', () => {
-    render(<CalendarWidget widget={widget('4x4', { view: 'next' })} />);
+    render(<CalendarWidget widget={widget('4x4', { showEvents: true })} />);
     expect(screen.getByText('Design review')).toBeTruthy();
     expect(screen.getByText('Sprint planning')).toBeTruthy();
     expect(screen.getByText('panel.widget.calendar.upNext')).toBeTruthy();
@@ -117,19 +117,19 @@ describe('CalendarWidget views', () => {
       normalizeEvent(timedEvent('4', 'c3', 'x', at(17, 9), at(17, 10))),
       normalizeEvent(timedEvent('5', 'c4', 'y', at(17, 9), at(17, 10))),
     ];
-    const { container } = render(<CalendarWidget widget={widget('4x2', { view: 'month' })} />);
+    const { container } = render(<CalendarWidget widget={widget('4x2', { showGrid: true, showEvents: true })} />);
     const dotRows = Array.from(container.querySelectorAll('[class*="dots"]'));
     const counts = dotRows.map(row => row.children.length);
     expect(Math.max(...counts)).toBe(3);
   });
 
   it('hides the dots when the setting is off', () => {
-    const { container } = render(<CalendarWidget widget={widget('4x2', { view: 'month', showDots: false })} />);
+    const { container } = render(<CalendarWidget widget={widget('4x2', { showGrid: true, showEvents: true, showDots: false })} />);
     expect(container.querySelectorAll('[class*="dots"]').length).toBe(0);
   });
 
   it('adds today\'s list under the 4x4 month grid', () => {
-    render(<CalendarWidget widget={widget('4x4', { view: 'month' })} />);
+    render(<CalendarWidget widget={widget('4x4', { showGrid: true, showEvents: true })} />);
     expect(screen.getByText('Design review')).toBeTruthy();
     expect(screen.getByText('panel.widget.calendar.today')).toBeTruthy();
   });
@@ -137,16 +137,40 @@ describe('CalendarWidget views', () => {
   it('names an empty calendar set instead of claiming the day is free', () => {
     store.sources = [];
     store.events = [];
-    render(<CalendarWidget widget={widget('4x2', { view: 'next' })} />);
+    render(<CalendarWidget widget={widget('4x2', { showEvents: true })} />);
     expect(screen.getByText('panel.widget.calendar.noCalendars')).toBeTruthy();
   });
 
   it('re-evaluates now on the minute tick', () => {
-    render(<CalendarWidget widget={widget('2x2', { view: 'next' })} />);
+    render(<CalendarWidget widget={widget('2x2', { showEvents: true })} />);
     expect(screen.getByText('Design review')).toBeTruthy();
     act(() => { vi.setSystemTime(at(17, 15, 5)); vi.advanceTimersByTime(60_000); });
     expect(screen.queryByText('Design review')).toBeNull();
     expect(screen.getByText('Pick up Leo')).toBeTruthy();
+  });
+});
+
+describe('CalendarWidget display toggles', () => {
+  it('shows only the month grid, with no list at 4x4, when events are off', () => {
+    const { container } = render(<CalendarWidget widget={widget('4x4', { showGrid: true, showEvents: false })} />);
+    expect(screen.queryByText('Design review')).toBeNull();
+    expect(screen.queryByText('panel.widget.calendar.today')).toBeNull();
+    expect(container.querySelectorAll('[class*="dots"]').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the dots independent of the event list', () => {
+    const { container } = render(<CalendarWidget widget={widget('4x2', { showGrid: true, showEvents: false, showDots: false })} />);
+    expect(container.querySelectorAll('[class*="dots"]').length).toBe(0);
+  });
+
+  it('maps a stored view key from before the toggles', () => {
+    render(<CalendarWidget widget={widget('2x4', { view: 'next' })} />);
+    expect(screen.getByText('Design review')).toBeTruthy();
+  });
+
+  it('shows the month grid without a list at sizes too small for one', () => {
+    render(<CalendarWidget widget={widget('4x2', { showGrid: true, showEvents: true })} />);
+    expect(screen.queryByText('Design review')).toBeNull();
   });
 });
 

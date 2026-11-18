@@ -105,3 +105,14 @@
 .lineTitle { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .more { color: var(--text-dim); padding-left: 6px; }
 .page .more:hover { color: var(--text); }
+
+.bar[data-selected='true'] {
+  box-shadow: 0 0 0 2px var(--cal-color);
+
+  &::before { opacity: 0.6; }
+}
+.line[data-selected='true'] {
+  background: var(--bg-card-hover);
+  box-shadow: 0 0 0 2px var(--cal-color);
+  border-radius: 4px;
+}

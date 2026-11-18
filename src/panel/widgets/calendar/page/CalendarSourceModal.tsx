@@ -5,8 +5,11 @@ import { Button } from '../../../../components/common/Button/Button';
 import { TextInput } from '../../../../components/common/TextInput/TextInput';
 import { ColorPickerWithPresets } from '../../../../components/common/ColorPickerWithPresets/ColorPickerWithPresets';
 import { useStackOnOverflow } from '../../../../components/common/ConfirmModal/useStackOnOverflow';
-import { CalendarRequestError, type AddCalendarInput, type CalendarAddError } from '../../../../api/calendar';
-import styles from './AddCalendarModal.module.scss';
+import { ADD_CALENDAR_GUIDE_URL } from '../../../../lib/externalLinks';
+import { CollapsibleSection } from '../../../../components/common/CollapsibleSection/CollapsibleSection';
+import { TroubleshootLink } from '../../../../components/common/TroubleshootLink/TroubleshootLink';
+import { CalendarRequestError, type AddCalendarInput, type CalendarAddError, type CalendarSourceDto } from '../../../../api/calendar';
+import styles from './CalendarSourceModal.module.scss';
 
 const ADDRESS_PLACEHOLDER = 'https://example.com/calendar.ics';
 
@@ -29,6 +32,11 @@ export function nextCalendarColor(used: readonly string[]): string {
   return CALENDAR_COLORS.find(c => !taken.has(c)) ?? CALENDAR_COLORS[0];
 }
 
+/** Google's public iCal address, which a calendar that is not public refuses. */
+export function isGooglePublicAddress(address: string): boolean {
+  return /^(https?|webcal):\/\/calendar\.google\.com\/calendar\/ical\/.+\/public\//i.test(address.trim());
+}
+
 /** The feed's host, for a default name; null when the address does not parse. */
 export function hostOfAddress(address: string): string | null {
   try {
@@ -38,20 +46,28 @@ export function hostOfAddress(address: string): string | null {
   }
 }
 
-interface AddCalendarModalProps {
+interface CalendarSourceModalProps {
   open: boolean;
   usedColors: readonly string[];
-  onAdd: (input: AddCalendarInput) => Promise<unknown>;
   onClose: () => void;
+  // Add mode.
+  onAdd?: (input: AddCalendarInput) => Promise<unknown>;
+  // Edit mode: the calendar being edited, with save and remove.
+  source?: CalendarSourceDto | null;
+  onSave?: (patch: { name: string; color: string }) => Promise<unknown>;
+  onRemove?: () => void;
 }
 
-export function AddCalendarModal({ open, usedColors, onAdd, onClose }: AddCalendarModalProps) {
+/** The Add calendar dialog, and the same dialog in edit mode for a calendar that exists. */
+export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, onRemove, onClose }: CalendarSourceModalProps) {
   const { t } = useTranslation();
+  const editing = source != null;
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
   const [color, setColor] = useState(CALENDAR_COLORS[0]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const attempt = useRef(0);
   const actionsRef = useRef<HTMLDivElement>(null);
   const errorId = useId();
@@ -61,17 +77,19 @@ export function AddCalendarModal({ open, usedColors, onAdd, onClose }: AddCalend
     if (!open) return;
     attempt.current += 1;
     setUrl('');
-    setName('');
+    setName(source?.name ?? '');
     setError(null);
     setBusy(false);
-    setColor(nextCalendarColor(usedColors));
+    setHelpOpen(false);
+    setColor(source?.color ?? nextCalendarColor(usedColors));
     // Reset only on the closed to open edge; the palette pick follows the colours in use at that moment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!open) return null;
 
-  const canSubmit = url.trim() !== '' && !busy;
+  const changed = editing && (name.trim() !== source.name || color.toLowerCase() !== source.color.toLowerCase());
+  const canSubmit = !busy && (editing ? name.trim() !== '' && changed : url.trim() !== '');
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -80,12 +98,19 @@ export function AddCalendarModal({ open, usedColors, onAdd, onClose }: AddCalend
     setError(null);
     const address = url.trim();
     try {
-      await onAdd({ url: address, name: name.trim() || hostOfAddress(address) || t('panel.widget.calendar'), color });
+      if (editing) await onSave?.({ name: name.trim(), color });
+      else await onAdd?.({ url: address, name: name.trim() || hostOfAddress(address) || t('panel.widget.calendar'), color });
       if (attempt.current === mine) onClose();
     } catch (e) {
       if (attempt.current !== mine) return;
+      if (editing) {
+        setError(t('panel.widget.calendar.edit.error'));
+        setBusy(false);
+        return;
+      }
       const code = e instanceof CalendarRequestError ? e.code : null;
-      setError(t(code ? ERROR_KEYS[code] : 'panel.widget.calendar.add.error.generic'));
+      const googlePublic = (code === 'notFound' || code === 'unauthorized') && isGooglePublicAddress(address);
+      setError(t(googlePublic ? 'panel.widget.calendar.add.error.googlePublic' : code ? ERROR_KEYS[code] : 'panel.widget.calendar.add.error.generic'));
       setBusy(false);
     }
   };
@@ -98,10 +123,18 @@ export function AddCalendarModal({ open, usedColors, onAdd, onClose }: AddCalend
       onEnter={() => { void submit(); }}
       backdropClassName={styles.backdrop}
       className={styles.modal}
-      ariaLabel={t('panel.widget.calendar.add.title')}
+      ariaLabel={t(editing ? 'panel.widget.calendar.edit.title' : 'panel.widget.calendar.add.title')}
     >
-      <h2 className={styles.title}>{t('panel.widget.calendar.add.title')}</h2>
+      <h2 className={styles.title}>{t(editing ? 'panel.widget.calendar.edit.title' : 'panel.widget.calendar.add.title')}</h2>
       <div className={styles.body}>
+        {editing ? (
+          <div className={styles.field}>
+            <span className={styles.label}>{t('panel.widget.calendar.edit.feed')}</span>
+            <span className={styles.readonly}>{source.host ?? ''}</span>
+            <span className={styles.note}>{t('panel.widget.calendar.add.readOnly')}</span>
+            {error && <p id={errorId} className={styles.error} role="alert">{error}</p>}
+          </div>
+        ) : (
         <div className={styles.field}>
           <span className={styles.label}>{t('panel.widget.calendar.add.address')}</span>
           <TextInput
@@ -113,7 +146,18 @@ export function AddCalendarModal({ open, usedColors, onAdd, onClose }: AddCalend
             autoComplete="off"
           />
           {error && <p id={errorId} className={styles.error} role="alert">{error}</p>}
+          <span className={styles.note}>{t('panel.widget.calendar.add.readOnly')}</span>
+          <CollapsibleSection compact open={helpOpen} onToggle={() => setHelpOpen(o => !o)} title={t('panel.widget.calendar.add.help.title')}>
+            <div className={styles.help}>
+              <p>{t('panel.widget.calendar.add.help.google')}</p>
+              <p>{t('panel.widget.calendar.add.help.outlook')}</p>
+              <p>{t('panel.widget.calendar.add.help.icloud')}</p>
+              <p>{t('panel.widget.calendar.add.help.other')}</p>
+              <TroubleshootLink label={t('panel.widget.calendar.add.help.learnMore')} href={ADD_CALENDAR_GUIDE_URL} />
+            </div>
+          </CollapsibleSection>
         </div>
+        )}
         <div className={styles.field}>
           <span className={styles.label}>{t('panel.widget.calendar.add.name')}</span>
           <TextInput
@@ -133,19 +177,15 @@ export function AddCalendarModal({ open, usedColors, onAdd, onClose }: AddCalend
             className={styles.swatches}
           />
         </div>
-        <div className={styles.account}>
-          <span className={styles.label}>{t('panel.widget.calendar.add.accountLabel')}</span>
-          <div className={styles.accountRow}>
-            <Button tone="neutral" size="sm" disabled>{t('panel.widget.calendar.add.signIn')}</Button>
-            <span className={styles.soon}>{t('panel.widget.calendar.add.comingLater')}</span>
-          </div>
-        </div>
       </div>
       <div ref={actionsRef} className={styles.actions}>
         <Button tone="neutral" size="md" onClick={onClose}>{t('confirm.cancel')}</Button>
         <div className={styles.actionsEnd}>
+          {editing && onRemove && (
+            <Button tone="danger" size="md" onClick={onRemove} disabled={busy}>{t('panel.widget.calendar.remove.title')}</Button>
+          )}
           <Button tone="accent" size="md" onClick={() => { void submit(); }} disabled={!canSubmit} loading={busy}>
-            {t('panel.widget.calendar.add.confirm')}
+            {t(editing ? 'panel.widget.calendar.edit.save' : 'panel.widget.calendar.add.confirm')}
           </Button>
         </div>
       </div>

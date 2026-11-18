@@ -52,7 +52,7 @@ export function CalendarEventPopover({ event, anchor, fmt, look, onClose }: Even
       {look.name && (
         <div className={styles.calendar} style={{ ['--cal-color' as string]: look.color }}>
           <span className={styles.dot} />
-          {look.name}
+          <span>{look.name}</span>
         </div>
       )}
       {event.location && (

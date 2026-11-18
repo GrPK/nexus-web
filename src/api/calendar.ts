@@ -165,6 +165,21 @@ export async function addCalendarSource(input: AddCalendarInput): Promise<Calend
   throw new CalendarRequestError(`add calendar failed: status ${status}`, code);
 }
 
+export async function updateCalendarSource(id: string, patch: { name?: string; color?: string }): Promise<CalendarSourceDto> {
+  const { data, status } = await requestJson<CalendarSourceDto>(`/api/calendar/calendars/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch });
+  switch (classifyFetchOutcome(data, status, loadCalendarMock !== null)) {
+    case 'ok':
+      return data as CalendarSourceDto;
+    case 'mockFallback': {
+      const updated = (await loadCalendarMock!()).mockUpdateSource(id, patch);
+      if (updated) return updated;
+      throw new Error('update calendar failed: unknown calendar');
+    }
+    default:
+      throw new Error(`update calendar failed: status ${status}`);
+  }
+}
+
 export async function removeCalendarSource(id: string): Promise<void> {
   const { response, status } = await authFetchWithStatus(`/api/calendar/calendars/${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (response && response.ok) return;

@@ -55,25 +55,6 @@
   max-width: none;
 }
 
-.account {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--separator);
-}
-
-.accountRow {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.soon {
-  font-size: var(--type-small);
-  color: var(--text-dim);
-}
-
 .actions {
   display: flex;
   justify-content: space-between;
@@ -93,4 +74,30 @@
   justify-content: flex-end;
   gap: 0.55rem;
   margin-left: auto;
+}
+
+.readonly {
+  font-size: var(--type-body);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.help {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  padding: 0.25rem 0.25rem 0;
+  font-size: var(--type-small);
+  color: var(--text-dim);
+  line-height: 1.45;
+
+  p { margin: 0; }
+}
+
+.note {
+  font-size: var(--type-small);
+  color: var(--text-dim);
+  line-height: 1.4;
 }

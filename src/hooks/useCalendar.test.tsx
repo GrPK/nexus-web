@@ -14,7 +14,7 @@ const api = vi.hoisted(() => ({
 
 vi.mock('../api/calendar', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/calendar')>();
-  return { ...actual, ...api, subscribeCalendarMock: () => () => {}, addCalendarSource: vi.fn(), removeCalendarSource: vi.fn() };
+  return { ...actual, ...api, subscribeCalendarMock: () => () => {}, addCalendarSource: vi.fn(), removeCalendarSource: vi.fn(), updateCalendarSource: vi.fn() };
 });
 
 const dto = (id: string, calendarId: string) => ({

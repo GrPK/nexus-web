@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import {
   addCalendarSource, fetchCalendarEvents, fetchCalendarSettings, fetchCalendarSources, postCalendarRefresh,
-  putCalendarRefreshMinutes, removeCalendarSource, subscribeCalendarMock,
+  putCalendarRefreshMinutes, removeCalendarSource, subscribeCalendarMock, updateCalendarSource,
   type AddCalendarInput, type CalendarRefreshMinutes, type CalendarSettingsDto, type CalendarSourceDto,
 } from '../api/calendar';
 import { normalizeEvent, type CalEvent } from '../panel/widgets/calendar/calendarEvents';
@@ -165,12 +165,18 @@ export function useCalendarSettings(enabled = true): UseCalendarSettings {
 export interface CalendarMutations {
   add: (input: AddCalendarInput) => Promise<CalendarSourceDto>;
   remove: (id: string) => Promise<void>;
+  update: (id: string, patch: { name?: string; color?: string }) => Promise<CalendarSourceDto>;
 }
 
 export function useCalendarMutations(): CalendarMutations {
   return useMemo(() => ({
     add: async (input: AddCalendarInput) => {
       const source = await addCalendarSource(input);
+      invalidateCalendar();
+      return source;
+    },
+    update: async (id: string, patch: { name?: string; color?: string }) => {
+      const source = await updateCalendarSource(id, patch);
       invalidateCalendar();
       return source;
     },

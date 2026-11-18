@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Calendar1, CalendarDays, CalendarRange, ChevronLeft, ChevronRight, List } from 'lucide-react';
 import { useTranslation } from '../../../../lib/i18n';
 import type { CalendarRefreshMinutes, CalendarSourceDto } from '../../../../api/calendar';
 import { useCalendarMutations, useCalendarSettings } from '../../../../hooks/useCalendar';
 import { Button } from '../../../../components/common/Button/Button';
-import { ConfirmModal } from '../../../../components/common/ConfirmModal/ConfirmModal';
 import { HoverTooltip } from '../../../../components/common/HoverTooltip/HoverTooltip';
 import { Notice } from '../../../../components/common/Notice/Notice';
 import { ViewHeader } from '../../../../components/common/ViewHeader/ViewHeader';
@@ -19,7 +18,8 @@ import { CalendarMonthGrid } from '../CalendarMonthGrid';
 import { CalendarTimeGrid } from '../CalendarTimeGrid';
 import { useCalendarData } from '../useCalendarData';
 import { useCalendarFormat } from '../useCalendarFormat';
-import { AddCalendarModal } from './AddCalendarModal';
+import { CalendarSourceEditor } from '../CalendarSourceEditor';
+import { CalendarSourceModal } from './CalendarSourceModal';
 import { CalendarRail } from './CalendarRail';
 import styles from './CalendarPage.module.scss';
 
@@ -30,6 +30,13 @@ const LIST_DAYS = 21;
 const MONTH_VIEW_CHROME_PX = 40;
 const MONTH_LINE_PX = 16;
 const MONTH_DAY_NUMBER_PX = 28;
+
+const VIEW_ICONS: Record<ImmersiveView, ReactNode> = {
+  day: <Calendar1 size={14} />,
+  week: <CalendarRange size={14} />,
+  month: <CalendarDays size={14} />,
+  list: <List size={14} />,
+};
 
 const VIEW_KEYS: Record<ImmersiveView, string> = {
   day: 'panel.widget.calendar.view.day',
@@ -86,11 +93,11 @@ export function CalendarPage({ tab, onTabChange }: Props) {
   const [hidden, setHidden] = useState<string[]>(readHidden);
   const [popup, setPopup] = useState<Popup | null>(null);
   const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState<CalendarSourceDto | null>(null);
+  const [editing, setEditing] = useState<CalendarSourceDto | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const { settings, setRefreshMinutes, refreshNow } = useCalendarSettings();
-  const { add, remove } = useCalendarMutations();
+  const { add } = useCalendarMutations();
   const { ref: viewRef, size } = useElementSize();
 
   const monthStart = startOfMonth(anchor);
@@ -143,12 +150,6 @@ export function CalendarPage({ tab, onTabChange }: Props) {
     setRefreshing(true);
     try { await refreshNow(); } catch { /* the rail's sync line reports the outcome */ } finally { setRefreshing(false); }
   };
-  const confirmRemove = async () => {
-    const target = removing;
-    setRemoving(null);
-    if (target) await remove(target.id).catch(() => undefined);
-  };
-
   const title = (() => {
     if (view === 'day') return { main: fmt.fullDate(anchor) };
     if (view === 'week') {
@@ -170,14 +171,9 @@ export function CalendarPage({ tab, onTabChange }: Props) {
     <div className={styles.page}>
       <ViewHeader
         title={t('panel.widget.calendar')}
-        tabs={PAGE_VIEWS.map(v => ({ key: v, label: t(VIEW_KEYS[v]) }))}
+        tabs={PAGE_VIEWS.map(v => ({ key: v, label: t(VIEW_KEYS[v]), icon: VIEW_ICONS[v] }))}
         activeTab={view}
         onTabChange={changeView}
-        tabActions={(
-          <Button size="sm" tone="neutral" icon={<Plus size={16} aria-hidden />} onClick={() => setAdding(true)}>
-            {t('panel.widget.calendar.add.button')}
-          </Button>
-        )}
       />
       <div className="pageBodyFill">
         <div className={styles.body}>
@@ -189,10 +185,12 @@ export function CalendarPage({ tab, onTabChange }: Props) {
             highlightWeek={view === 'week' || view === 'list'}
             onSelectDay={selectDay}
             onMonthChange={delta => setMiniMonth(addMonths(miniMonth, delta))}
+          onSelectMonth={monthStart => { setPopup(null); setAnchor(monthStart); }}
             sources={data.sources}
             hidden={hidden}
             onToggle={toggleCalendar}
-            onRemove={setRemoving}
+            onEdit={setEditing}
+            onAdd={() => setAdding(true)}
             settings={settings}
             onRefreshMinutes={(value: CalendarRefreshMinutes) => { void setRefreshMinutes(value).catch(() => undefined); }}
             onRefreshNow={() => { void doRefresh(); }}
@@ -229,6 +227,7 @@ export function CalendarPage({ tab, onTabChange }: Props) {
                   lookFor={data.lookFor}
                   variant="page"
                   onEventPress={openEvent}
+                  selectedEventId={popupEvent?.id}
                 />
               )}
               {view === 'month' && (
@@ -244,10 +243,11 @@ export function CalendarPage({ tab, onTabChange }: Props) {
                   variant="page"
                   onEventPress={openEvent}
                   onMorePress={openMore}
+                  selectedEventId={popupEvent?.id}
                 />
               )}
               {view === 'list' && (
-                <CalendarAgendaList from={anchor} events={data.events} now={now} fmt={fmt} lookFor={data.lookFor} variant="page" onEventPress={openEvent} />
+                <CalendarAgendaList from={anchor} events={data.events} now={now} fmt={fmt} lookFor={data.lookFor} variant="page" onEventPress={openEvent} selectedEventId={popupEvent?.id} />
               )}
             </div>
           </div>
@@ -271,15 +271,8 @@ export function CalendarPage({ tab, onTabChange }: Props) {
         onPick={(ev, el) => setPopup({ kind: 'event', event: ev, anchor: el })}
         onClose={closePopup}
       />
-      <AddCalendarModal open={adding} usedColors={data.sources.map(s => s.color)} onAdd={add} onClose={() => setAdding(false)} />
-      <ConfirmModal
-        open={removing !== null}
-        title={t('panel.widget.calendar.remove.title')}
-        message={t('panel.widget.calendar.remove.message', { name: removing?.name ?? '' })}
-        confirmLabel={t('panel.widget.calendar.remove.confirm')}
-        onConfirm={() => { void confirmRemove(); }}
-        onCancel={() => setRemoving(null)}
-      />
+      <CalendarSourceModal open={adding} usedColors={data.sources.map(s => s.color)} onAdd={add} onClose={() => setAdding(false)} />
+      <CalendarSourceEditor source={editing} usedColors={data.sources.map(c => c.color)} onClose={() => setEditing(null)} />
     </div>
   );
 }

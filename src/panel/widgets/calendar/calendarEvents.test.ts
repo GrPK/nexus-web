@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { CalendarEventDto } from '../../../api/calendar';
 import {
   addDays, buildUpNext, describeAgo, describeWhen, dotCalendarsOnDay, eventsOnDay, groupAgenda, layoutAllDayLanes,
-  layoutDaySegments, monthWeeks, normalizeEvent, planMonthWeek, resolveCalendarView, resolveImmersiveView,
+  layoutDaySegments, monthWeeks, normalizeEvent, planMonthWeek, resolveCalendarDisplay, resolveImmersiveView,
   selectNextEvents, startOfDay, startOfMonth, startOfWeek, syncedText, type CalEvent,
 } from './calendarEvents';
 
@@ -306,14 +306,19 @@ describe('groupAgenda', () => {
 });
 
 describe('config resolution', () => {
-  it('migrates the retired showGrid toggle without requiring the new key', () => {
-    expect(resolveCalendarView({ showGrid: true })).toBe('month');
-    expect(resolveCalendarView({ showGrid: false })).toBe('date');
-    expect(resolveCalendarView(undefined)).toBe('date');
+  it('maps the retired showGrid toggle to grid plus events without needing the new keys', () => {
+    expect(resolveCalendarDisplay({ showGrid: true })).toEqual({ grid: true, events: true });
+    expect(resolveCalendarDisplay({ showGrid: false })).toEqual({ grid: false, events: false });
+    expect(resolveCalendarDisplay(undefined)).toEqual({ grid: false, events: false });
   });
-  it('prefers an explicit view over showGrid', () => {
-    expect(resolveCalendarView({ view: 'next', showGrid: true })).toBe('next');
-    expect(resolveCalendarView({ view: 'bogus', showGrid: true })).toBe('month');
+  it('maps a view key from before the toggles', () => {
+    expect(resolveCalendarDisplay({ view: 'date' })).toEqual({ grid: false, events: false });
+    expect(resolveCalendarDisplay({ view: 'next' })).toEqual({ grid: false, events: true });
+    expect(resolveCalendarDisplay({ view: 'month' })).toEqual({ grid: true, events: true });
+  });
+  it('prefers the stored toggles over older keys', () => {
+    expect(resolveCalendarDisplay({ view: 'month', showGrid: true, showEvents: false })).toEqual({ grid: true, events: false });
+    expect(resolveCalendarDisplay({ view: 'next', showGrid: false, showEvents: true })).toEqual({ grid: false, events: true });
   });
   it('defaults the immersive view by orientation', () => {
     expect(resolveImmersiveView(undefined, true)).toBe('week');

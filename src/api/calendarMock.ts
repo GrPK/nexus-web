@@ -63,6 +63,15 @@ export function mockAddSource(input: AddCalendarInput): { source: CalendarSource
   return { source };
 }
 
+export function mockUpdateSource(id: string, patch: { name?: string; color?: string }): CalendarSourceDto | null {
+  const current = sources.find(s => s.id === id);
+  if (!current) return null;
+  const next = { ...current, name: patch.name ?? current.name, color: patch.color ?? current.color };
+  sources = sources.map(s => (s.id === id ? next : s));
+  changed();
+  return { ...next };
+}
+
 export function mockRemoveSource(id: string): void {
   sources = sources.filter(s => s.id !== id);
   changed();

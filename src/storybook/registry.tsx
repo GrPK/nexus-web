@@ -292,6 +292,7 @@ function PreviewMiniMonth() {
         highlightWeek
         onSelect={setSelected}
         onMonthChange={delta => { const d = new Date(month); setMonth(new Date(d.getFullYear(), d.getMonth() + delta, 1).getTime()); }}
+        onSelectMonth={setMonth}
       />
     </div>
   );
@@ -3039,7 +3040,7 @@ export const REGISTRY: StorybookEntry[] = [
     name: 'MiniMonth', category: 'inputs',
     filePath: 'src/components/common/MiniMonth/MiniMonth.tsx',
     description: 'An always-open month grid with arrow navigation, for a side rail that picks a day (the Calendar page). DatePicker without the trigger and popup.', Preview: PreviewMiniMonth,
-    notes: 'Controlled: the caller owns the shown month and the selected day. `highlightWeek` tints the selected day\'s whole row for week-based views.',
+    notes: 'Controlled: the caller owns the shown month and the selected day. The title opens a year view of twelve months (arrows step a year, Escape or the title returns); a picked month goes to `onSelectMonth`. `highlightWeek` tints the selected day\'s whole row for week-based views.',
   },
   {
     name: 'InfoTooltip', category: 'status',

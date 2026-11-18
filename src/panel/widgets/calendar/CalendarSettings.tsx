@@ -10,8 +10,10 @@ import { useCalendarMutations, useCalendarSettings, useCalendarSources } from '.
 import { Button } from '../../../components/common/Button/Button';
 import { SettingRow } from '../../../components/common/SettingRow/SettingRow';
 import { SettingsSection, SettingsToggle, SettingsSelect } from '../common/SettingsRow/SettingsRow';
-import { hiddenCalendarIds, resolveCalendarView, syncedText } from './calendarEvents';
-import { AddCalendarModal } from './page/AddCalendarModal';
+import { hiddenCalendarIds, resolveCalendarDisplay, syncedText } from './calendarEvents';
+import { CalendarSourceRow } from './CalendarSourceRow';
+import { CalendarSourceEditor } from './CalendarSourceEditor';
+import { CalendarSourceModal } from './page/CalendarSourceModal';
 import styles from './CalendarSettings.module.scss';
 
 const REFRESH_LABEL_KEYS: Record<CalendarRefreshMinutes, string> = {
@@ -30,9 +32,11 @@ const KIND_LABEL_KEYS: Record<CalendarSourceDto['kind'], string> = {
 export function CalendarSettings({ widget, surface, deviceTouch, desktopEditor, onUpdate }: WidgetSettingsProps) {
   const { t } = useTranslation();
   const config = widget.config;
-  const view = resolveCalendarView(config);
+  const { grid, events: showEvents } = resolveCalendarDisplay(config);
   const weekStart = (config?.weekStart as string | undefined) ?? 'auto';
   const showDots = config?.showDots !== false;
+  // Both keys are written together so a toggle never re-derives the other from an older config shape.
+  const setDisplay = (next: Partial<{ showGrid: boolean; showEvents: boolean }>) => onUpdate({ showGrid: grid, showEvents, ...next });
   const immersiveView = (config?.immersiveView as string | undefined) ?? 'auto';
   const hidden = hiddenCalendarIds(config);
 
@@ -40,6 +44,7 @@ export function CalendarSettings({ widget, surface, deviceTouch, desktopEditor, 
   const { settings, setRefreshMinutes, refreshNow } = useCalendarSettings();
   const { add } = useCalendarMutations();
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<CalendarSourceDto | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   // Adding needs a keyboard: the desktop editor has one even when it edits a touch panel's layout.
@@ -58,18 +63,15 @@ export function CalendarSettings({ widget, surface, deviceTouch, desktopEditor, 
   return (
     <>
       <SettingsSection title={t('panel.widget.calendar.settings.display')}>
-        <SettingsSelect
-          label={t('panel.widget.calendar.settings.view')}
-          value={view}
-          options={[
-            // eslint-disable-next-line i18next/no-literal-string -- enum value
-            { value: 'date', label: t('panel.widget.calendar.settings.viewDate') },
-            // eslint-disable-next-line i18next/no-literal-string -- enum value
-            { value: 'next', label: t('panel.widget.calendar.settings.viewNext') },
-            // eslint-disable-next-line i18next/no-literal-string -- enum value
-            { value: 'month', label: t('panel.widget.calendar.settings.viewMonth') },
-          ]}
-          onChange={value => onUpdate({ view: value })}
+        <SettingsToggle
+          label={t('panel.widget.calendar.settings.showGrid')}
+          checked={grid}
+          onChange={value => setDisplay({ showGrid: value })}
+        />
+        <SettingsToggle
+          label={t('panel.widget.calendar.settings.showEvents')}
+          checked={showEvents}
+          onChange={value => setDisplay({ showEvents: value })}
         />
         <SettingsSelect
           label={t('panel.widget.calendar.settings.weekStart')}
@@ -84,7 +86,7 @@ export function CalendarSettings({ widget, surface, deviceTouch, desktopEditor, 
           ]}
           onChange={value => onUpdate({ weekStart: value })}
         />
-        {view === 'month' && (
+        {grid && (
           <SettingsToggle
             label={t('panel.widget.calendar.settings.showDots')}
             checked={showDots}
@@ -112,15 +114,17 @@ export function CalendarSettings({ widget, surface, deviceTouch, desktopEditor, 
 
       <SettingsSection title={t('panel.widget.calendar.settings.calendars')}>
         {sources.map(source => (
-          <SettingsToggle
+          <CalendarSourceRow
             key={source.id}
-            label={source.name}
-            icon={<span className={styles.dot} style={{ background: source.color }} />}
+            name={source.name}
+            color={source.color}
+            isError={source.error !== null}
             description={source.error
               ? t(`panel.widget.calendar.add.error.${source.error}`)
               : syncedText(t, source.lastSyncedAt, Date.now(), t(KIND_LABEL_KEYS[source.kind]))}
             checked={!hidden.includes(source.id)}
             onChange={on => toggleCalendar(source.id, on)}
+            onEdit={canAdd ? () => setEditing(source) : undefined}
           />
         ))}
         <SettingsSelect
@@ -147,13 +151,14 @@ export function CalendarSettings({ widget, surface, deviceTouch, desktopEditor, 
       </SettingsSection>
 
       {canAdd && (
-        <AddCalendarModal
+        <CalendarSourceModal
           open={adding}
           usedColors={sources.map(s => s.color)}
           onAdd={add}
           onClose={() => setAdding(false)}
         />
       )}
+      {canAdd && <CalendarSourceEditor source={editing} usedColors={sources.map(s => s.color)} onClose={() => setEditing(null)} />}
     </>
   );
 }
