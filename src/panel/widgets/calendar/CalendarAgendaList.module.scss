@@ -82,3 +82,17 @@
   box-shadow: 0 0 0 2px var(--cal-color);
   border-radius: 6px;
 }
+
+// Narrow: the day label takes its own row and the time column shrinks, so titles keep the width.
+.narrow {
+  .group { grid-template-columns: 1fr; /* c83:allow - .group is display: grid */ row-gap: 6px; }
+
+  .groupHead {
+    flex-direction: row;
+    align-items: baseline;
+    @include hgap(8px);
+  }
+
+  .time { flex-basis: 52px; font-size: 11.5px; }
+  .row { @include hgap(8px); }
+}

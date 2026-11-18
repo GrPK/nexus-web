@@ -38,8 +38,7 @@ export function CalendarWidget({ widget }: WidgetProps) {
 
   const now = preview ? previewNow(realNow) : realNow;
   const config = widget.config;
-  const unset = config?.view === undefined && config?.showGrid === undefined && config?.showEvents === undefined;
-  const { grid, events: showEvents } = preview && unset ? { grid: false, events: true } : resolveCalendarDisplay(config, widget.size);
+  const { grid, events: showEvents } = resolveCalendarDisplay(config, widget.size);
   const showDots = config?.showDots !== false;
   const weekStartCfg = (config?.weekStart as WeekStartConfig | undefined) ?? 'auto';
   const size = widgetLayoutSize(widget.size);

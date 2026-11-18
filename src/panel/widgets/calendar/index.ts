@@ -17,6 +17,8 @@ export const calendarApp: AppManifest = {
     defaultSize: '4x2',
     supportsImmersive: { portrait: true, landscape: true },
     hasConfig: true,
+    // A newly added widget is the date card: no grid, no events.
+    defaultConfig: () => ({ showGrid: false, showEvents: false }),
     touchEditorHintKey: 'panel.widget.calendar.touchEditorHint',
     touch: false,
   },

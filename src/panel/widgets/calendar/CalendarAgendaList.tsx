@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useElementSize } from '../common/useElementSize';
 import { useTranslation } from '../../../lib/i18n';
 import { addDays, groupAgenda, startOfDay, type CalEvent } from './calendarEvents';
 import { CalendarEventChip } from './CalendarEventChip';
@@ -7,6 +8,8 @@ import type { CalendarFormat } from './useCalendarFormat';
 import styles from './CalendarAgendaList.module.scss';
 
 const AGENDA_DAYS = 21;
+// Below this width the day label sits on its own row above that day's events.
+const NARROW_WIDTH = 520;
 
 interface Props {
   from: number;
@@ -23,6 +26,8 @@ interface Props {
 export function CalendarAgendaList({ from, events, now, fmt, lookFor, variant = 'panel', onEventPress, selectedEventId }: Props) {
   const { t } = useTranslation();
   const today = startOfDay(now);
+  const { ref, size } = useElementSize();
+  const narrow = size !== null && size.width < NARROW_WIDTH;
   const groups = useMemo(() => groupAgenda(events, from, AGENDA_DAYS), [events, from]);
 
   if (groups.length === 0) {
@@ -36,7 +41,7 @@ export function CalendarAgendaList({ from, events, now, fmt, lookFor, variant = 
   };
 
   return (
-    <div className={`${styles.list} ${variant === 'page' ? styles.page : ''}`} data-panel-scrollable="true">
+    <div ref={ref} className={`${styles.list} ${variant === 'page' ? styles.page : ''} ${narrow ? styles.narrow : ''}`} data-panel-scrollable="true">
       {groups.map(group => (
         <div key={group.day} className={styles.group}>
           <div className={`${styles.groupHead} ${group.day === today ? styles.groupToday : ''}`}>

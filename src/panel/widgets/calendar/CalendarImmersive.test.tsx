@@ -103,6 +103,20 @@ describe('CalendarImmersive', () => {
     expect(screen.getAllByText('Launch week')).toHaveLength(2);
   });
 
+  it('puts the day label above its events when the list is narrow, and keeps two columns when wide', () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get');
+    const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(700);
+    width.mockReturnValue(380);
+    const narrow = renderImmersive('y70', { immersiveView: 'list' });
+    expect(narrow.container.querySelector('[class*="narrow"]')).not.toBeNull();
+    narrow.unmount();
+    width.mockReturnValue(800);
+    const wide = renderImmersive('y70', { immersiveView: 'list' });
+    expect(wide.container.querySelector('[class*="narrow"]')).toBeNull();
+    width.mockRestore();
+    height.mockRestore();
+  });
+
   it('says so when nothing is coming up', () => {
     store.events = [];
     renderImmersive('y70', { immersiveView: 'list' });

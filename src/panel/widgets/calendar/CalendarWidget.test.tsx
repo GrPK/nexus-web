@@ -174,16 +174,32 @@ describe('CalendarWidget display toggles', () => {
   });
 });
 
-describe('CalendarWidget catalog preview', () => {
-  it('renders the fixture without enabling any data hook', () => {
+describe('CalendarWidget catalog preview and defaults', () => {
+  const renderPreview = (config?: Record<string, unknown>) => {
     store.events = [];
     store.sources = [];
-    render(
+    return render(
       <PanelPreviewProvider value>
-        <CalendarWidget widget={widget('4x2')} />
+        <CalendarWidget widget={widget('4x2', config)} />
       </PanelPreviewProvider>,
     );
+  };
+
+  it('previews a default calendar as the date card, with no events and no fetch', () => {
+    renderPreview();
+    expect(screen.getByText('November 2026'.replace('November', new Intl.DateTimeFormat('en', { month: 'long' }).format(new Date())).replace('2026', String(new Date().getFullYear())))).toBeTruthy();
+    expect(screen.queryByText('Design review')).toBeNull();
+    expect(store.eventCalls.every(enabled => enabled === false)).toBe(true);
+  });
+
+  it('previews the fixture events when events are switched on', () => {
+    renderPreview({ showEvents: true });
     expect(screen.getByText('Design review')).toBeTruthy();
     expect(store.eventCalls.every(enabled => enabled === false)).toBe(true);
+  });
+
+  it('declares the date card as the default config of a newly added widget', async () => {
+    const { calendarApp } = await import('./index');
+    expect(calendarApp.meta.defaultConfig?.('4x2')).toEqual({ showGrid: false, showEvents: false });
   });
 });
