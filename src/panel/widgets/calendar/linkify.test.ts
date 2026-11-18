@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { linkify } from './linkify';
+import { collapseBlankLines, linkify, shortenUrl } from './linkify';
 
 const links = (text: string) => linkify(text).filter(p => p.href).map(p => p.href);
 
@@ -46,5 +46,29 @@ describe('linkify', () => {
   it('rebuilds the original text from its parts', () => {
     const text = 'a https://x.test/1, b (https://y.test/2). c';
     expect(linkify(text).map(p => p.text).join('')).toBe(text);
+  });
+});
+
+describe('shortenUrl', () => {
+  it('drops the scheme and keeps short URLs whole', () => {
+    expect(shortenUrl('https://meet.example.com/abc')).toBe('meet.example.com/abc');
+    expect(shortenUrl('https://a.test/')).toBe('a.test');
+  });
+
+  it('cuts a 400-character safelink to one line with an ellipsis, host first', () => {
+    const url = `https://nam06.safelinks.protection.outlook.com/?url=${'a'.repeat(400)}&data=05`;
+    const short = shortenUrl(url);
+    expect(short.length).toBe(56);
+    expect(short.startsWith('nam06.safelinks.protection.outlook.com/')).toBe(true);
+    expect(short.endsWith('\u2026')).toBe(true);
+  });
+});
+
+describe('collapseBlankLines', () => {
+  it('turns three or more blank lines into one and keeps single and double breaks', () => {
+    expect(collapseBlankLines('a\n\n\n\n\nb')).toBe('a\n\nb');
+    expect(collapseBlankLines('a\n\n\nb')).toBe('a\n\n\nb');
+    expect(collapseBlankLines('a\nb\n\nc')).toBe('a\nb\n\nc');
+    expect(collapseBlankLines('a\r\n \r\n\t\r\n\r\n\r\nb')).toBe('a\n\nb');
   });
 });

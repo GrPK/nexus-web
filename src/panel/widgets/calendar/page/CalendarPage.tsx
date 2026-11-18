@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Calendar1, CalendarDays, CalendarRange, ChevronLeft, ChevronRight, List } from 'lucide-react';
 import { useTranslation } from '../../../../lib/i18n';
-import type { CalendarRefreshMinutes, CalendarSourceDto } from '../../../../api/calendar';
-import { useCalendarMutations, useCalendarSettings } from '../../../../hooks/useCalendar';
 import { Button } from '../../../../components/common/Button/Button';
 import { HoverTooltip } from '../../../../components/common/HoverTooltip/HoverTooltip';
 import { Notice } from '../../../../components/common/Notice/Notice';
@@ -18,8 +16,6 @@ import { CalendarMonthGrid } from '../CalendarMonthGrid';
 import { CalendarTimeGrid } from '../CalendarTimeGrid';
 import { useCalendarData } from '../useCalendarData';
 import { useCalendarFormat } from '../useCalendarFormat';
-import { CalendarSourceEditor } from '../CalendarSourceEditor';
-import { CalendarSourceModal } from './CalendarSourceModal';
 import { CalendarRail } from './CalendarRail';
 import styles from './CalendarPage.module.scss';
 
@@ -92,13 +88,9 @@ export function CalendarPage({ tab, onTabChange }: Props) {
 
   const [hidden, setHidden] = useState<string[]>(readHidden);
   const [popup, setPopup] = useState<Popup | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<CalendarSourceDto | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const { settings, setRefreshMinutes, refreshNow } = useCalendarSettings();
-  const { add } = useCalendarMutations();
   const { ref: viewRef, size } = useElementSize();
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const monthStart = startOfMonth(anchor);
   const weeks = useMemo(() => monthWeeks(monthStart, weekStart), [monthStart, weekStart]);
@@ -146,10 +138,6 @@ export function CalendarPage({ tab, onTabChange }: Props) {
     setHidden(next);
     writeHidden(next);
   };
-  const doRefresh = async () => {
-    setRefreshing(true);
-    try { await refreshNow(); } catch { /* the rail's sync line reports the outcome */ } finally { setRefreshing(false); }
-  };
   const title = (() => {
     if (view === 'day') return { main: fmt.fullDate(anchor) };
     if (view === 'week') {
@@ -175,7 +163,7 @@ export function CalendarPage({ tab, onTabChange }: Props) {
         activeTab={view}
         onTabChange={changeView}
       />
-      <div className="pageBodyFill">
+      <div ref={bodyRef} className="pageBodyFill">
         <div className={styles.body}>
           <CalendarRail
             miniMonth={miniMonth}
@@ -186,24 +174,12 @@ export function CalendarPage({ tab, onTabChange }: Props) {
             onSelectDay={selectDay}
             onMonthChange={delta => setMiniMonth(addMonths(miniMonth, delta))}
           onSelectMonth={monthStart => { setPopup(null); setAnchor(monthStart); }}
-            sources={data.sources}
             hidden={hidden}
             onToggle={toggleCalendar}
-            onEdit={setEditing}
-            onAdd={() => setAdding(true)}
-            settings={settings}
-            onRefreshMinutes={(value: CalendarRefreshMinutes) => { void setRefreshMinutes(value).catch(() => undefined); }}
-            onRefreshNow={() => { void doRefresh(); }}
-            refreshing={refreshing}
-            now={now}
           />
           <div className={styles.main}>
             {noCalendars && (
-              <Notice
-                tone="info"
-                role="status"
-                actions={<Button size="sm" tone="neutral" onClick={() => setAdding(true)}>{t('panel.widget.calendar.add.button')}</Button>}
-              >
+              <Notice tone="info" role="status">
                 {t('panel.widget.calendar.page.empty')}
               </Notice>
             )}
@@ -258,6 +234,7 @@ export function CalendarPage({ tab, onTabChange }: Props) {
         event={popupEvent}
         anchor={popup?.anchor ?? null}
         fmt={fmt}
+        boundsRef={bodyRef}
         look={popupEvent ? data.lookFor(popupEvent.calendarId) : { name: '', color: '' }}
         onClose={closePopup}
       />
@@ -268,11 +245,10 @@ export function CalendarPage({ tab, onTabChange }: Props) {
         now={now}
         fmt={fmt}
         lookFor={data.lookFor}
+        boundsRef={bodyRef}
         onPick={(ev, el) => setPopup({ kind: 'event', event: ev, anchor: el })}
         onClose={closePopup}
       />
-      <CalendarSourceModal open={adding} usedColors={data.sources.map(s => s.color)} onAdd={add} onClose={() => setAdding(false)} />
-      <CalendarSourceEditor source={editing} usedColors={data.sources.map(c => c.color)} onClose={() => setEditing(null)} />
     </div>
   );
 }

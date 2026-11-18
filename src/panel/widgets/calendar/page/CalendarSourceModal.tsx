@@ -6,11 +6,11 @@ import { TextInput } from '../../../../components/common/TextInput/TextInput';
 import { ColorPickerWithPresets } from '../../../../components/common/ColorPickerWithPresets/ColorPickerWithPresets';
 import { useStackOnOverflow } from '../../../../components/common/ConfirmModal/useStackOnOverflow';
 import { ADD_CALENDAR_GUIDE_URL } from '../../../../lib/externalLinks';
-import { CollapsibleSection } from '../../../../components/common/CollapsibleSection/CollapsibleSection';
 import { TroubleshootLink } from '../../../../components/common/TroubleshootLink/TroubleshootLink';
 import { CalendarRequestError, type AddCalendarInput, type CalendarAddError, type CalendarSourceDto } from '../../../../api/calendar';
 import styles from './CalendarSourceModal.module.scss';
 
+const PICKER_PLACEMENT = 'top-end' as const;
 const ADDRESS_PLACEHOLDER = 'https://example.com/calendar.ics';
 
 export const CALENDAR_COLORS: readonly string[] = [
@@ -65,9 +65,9 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
   const [color, setColor] = useState(CALENDAR_COLORS[0]);
+  const [customColor, setCustomColor] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
   const attempt = useRef(0);
   const actionsRef = useRef<HTMLDivElement>(null);
   const errorId = useId();
@@ -80,8 +80,9 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
     setName(source?.name ?? '');
     setError(null);
     setBusy(false);
-    setHelpOpen(false);
-    setColor(source?.color ?? nextCalendarColor(usedColors));
+    const start = source?.color ?? nextCalendarColor(usedColors);
+    setColor(start);
+    setCustomColor(CALENDAR_COLORS.includes(start.toLowerCase()) ? '' : start);
     // Reset only on the closed to open edge; the palette pick follows the colours in use at that moment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -147,15 +148,7 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
           />
           {error && <p id={errorId} className={styles.error} role="alert">{error}</p>}
           <span className={styles.note}>{t('panel.widget.calendar.add.readOnly')}</span>
-          <CollapsibleSection compact open={helpOpen} onToggle={() => setHelpOpen(o => !o)} title={t('panel.widget.calendar.add.help.title')}>
-            <div className={styles.help}>
-              <p>{t('panel.widget.calendar.add.help.google')}</p>
-              <p>{t('panel.widget.calendar.add.help.outlook')}</p>
-              <p>{t('panel.widget.calendar.add.help.icloud')}</p>
-              <p>{t('panel.widget.calendar.add.help.other')}</p>
-              <TroubleshootLink label={t('panel.widget.calendar.add.help.learnMore')} href={ADD_CALENDAR_GUIDE_URL} />
-            </div>
-          </CollapsibleSection>
+          <TroubleshootLink className={styles.helpLink} label={t('panel.widget.calendar.add.addressHelp')} href={ADD_CALENDAR_GUIDE_URL} />
         </div>
         )}
         <div className={styles.field}>
@@ -174,6 +167,11 @@ export function CalendarSourceModal({ open, usedColors, onAdd, source, onSave, o
             value={color}
             presets={CALENDAR_COLORS}
             onCommit={setColor}
+            allowCustom
+            customColor={customColor || undefined}
+            onCustomCommit={setCustomColor}
+            pickerPortal
+            pickerPlacement={PICKER_PLACEMENT}
             className={styles.swatches}
           />
         </div>

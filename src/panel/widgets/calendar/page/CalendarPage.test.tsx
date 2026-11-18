@@ -4,6 +4,7 @@ import { CalendarRequestError, type CalendarSourceDto } from '../../../../api/ca
 import { normalizeEvent, type CalEvent } from '../calendarEvents';
 import { timedEvent } from '../calendarPreviewData';
 import { CalendarPage } from './CalendarPage';
+import { popoverMaxHeight } from '../CalendarEventPopover';
 
 const store = vi.hoisted(() => ({
   sources: [] as CalendarSourceDto[],
@@ -102,11 +103,28 @@ describe('CalendarPage', () => {
     store.events = [ev('1', 'work', 'Call', 17, 14, 15, { notes: 'Join https://meet.example.com/a?x=1&y=2. Not javascript:alert(1)' })];
     render(<CalendarPage tab="day" />);
     fireEvent.click(screen.getByRole('button', { name: 'Call' }));
-    const link = screen.getByRole('link', { name: 'https://meet.example.com/a?x=1&y=2' }) as HTMLAnchorElement;
+    const link = screen.getByRole('link', { name: 'meet.example.com/a?x=1&y=2' }) as HTMLAnchorElement;
     expect(link.href).toBe('https://meet.example.com/a?x=1&y=2');
     expect(link.target).toBe('_blank');
     expect(link.rel).toBe('noopener noreferrer');
     expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('shortens long URLs to one line while keeping the full href', () => {
+    const long = `https://nam06.safelinks.protection.outlook.com/?url=${'a'.repeat(400)}&data=05`;
+    store.events = [ev('1', 'work', 'Teams', 17, 14, 15, { notes: `Join ${long}\n\n\n\n\nAfter` })];
+    render(<CalendarPage tab="day" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Teams' }));
+    const link = screen.getByRole('link') as HTMLAnchorElement;
+    expect(link.href).toBe(long);
+    expect(link.textContent!.length).toBe(56);
+    expect(link.textContent!.endsWith('\u2026')).toBe(true);
+  });
+
+  it('caps the popover height to the bounds, leaving margins', () => {
+    expect(popoverMaxHeight(600, 900)).toBe(584);
+    expect(popoverMaxHeight(null, 750)).toBe(734);
+    expect(popoverMaxHeight(40, 900)).toBe(120);
   });
 
   it('toggles the popover when the same event is pressed twice', () => {
@@ -159,6 +177,18 @@ describe('CalendarPage', () => {
     expect(screen.getByText('November')).toBeTruthy();
   });
 
+  it('orders the rail as Calendars, Add calendar, then Sync with the refresh controls', () => {
+    render(<CalendarPage tab="day" />);
+    const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    const titles = ['calendars', 'sync'].map(k => screen.getByText(`panel.widget.calendar.settings.${k}`));
+    const add = screen.getByText('panel.widget.calendar.add.button');
+    const refresh = screen.getByText('panel.widget.calendar.settings.refreshNow');
+    expect(follows(titles[0], add)).toBe(true);
+    expect(follows(add, titles[1])).toBe(true);
+    expect(follows(titles[1], refresh)).toBe(true);
+    expect(screen.getAllByText('panel.widget.calendar.add.button')).toHaveLength(1);
+  });
+
   it('refreshes from the rail', () => {
     render(<CalendarPage tab="day" />);
     fireEvent.click(screen.getByText('panel.widget.calendar.settings.refreshNow'));
@@ -194,6 +224,14 @@ describe('Edit calendar dialog', () => {
     fireEvent.click(within(dialog).getByText('panel.widget.calendar.edit.save'));
     await waitFor(() => expect(store.update).toHaveBeenCalledWith('home', { name: 'Household', color: '#0a84ff' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  });
+
+  it('opens a custom color selected in the last swatch', () => {
+    store.sources = [source('home', 'Home', '#12ab34'), source('work', 'Work', '#8b7cff')];
+    const dialog = openEdit();
+    const custom = within(dialog).getByRole('button', { name: 'common.customColor' });
+    expect(custom.getAttribute('aria-current')).toBe('true');
+    expect(custom.style.background).not.toBe('');
   });
 
   it('closes without saving on Cancel', () => {
@@ -244,6 +282,17 @@ describe('Add calendar dialog', () => {
     expect(add.disabled).toBe(false);
   });
 
+  it('saves a custom color picked from the last swatch', async () => {
+    store.add.mockResolvedValue({});
+    const dialog = open();
+    fireEvent.input(within(dialog).getByLabelText('panel.widget.calendar.add.address'), { target: { value: 'https://x.test/a.ics' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'common.customColor' }));
+    fireEvent.change(await screen.findByLabelText('common.hexColor'), { target: { value: '#12AB34' } });
+    fireEvent.click(within(dialog).getByText('panel.widget.calendar.add.confirm'));
+    await waitFor(() => expect(store.add).toHaveBeenCalled());
+    expect(store.add.mock.calls[0][0].color).toBe('#12ab34');
+  });
+
   it('sends the address, a name and a color, then closes', async () => {
     store.add.mockResolvedValue({});
     const dialog = open();
@@ -290,16 +339,15 @@ describe('Add calendar dialog', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('panel.widget.calendar.add.error.generic');
   });
 
-  it('keeps the address help collapsed, then lists each provider and the guide link', () => {
+  it('offers one external link to the guide and no step text', () => {
     const dialog = open();
-    expect(within(dialog).queryByText('panel.widget.calendar.add.help.google')).toBeNull();
-    fireEvent.click(within(dialog).getByText('panel.widget.calendar.add.help.title'));
-    for (const key of ['google', 'outlook', 'icloud', 'other']) {
-      expect(within(dialog).getByText(`panel.widget.calendar.add.help.${key}`)).toBeTruthy();
-    }
-    const link = within(dialog).getByRole('link', { name: 'panel.widget.calendar.add.help.learnMore' }) as HTMLAnchorElement;
+    const links = within(dialog).getAllByRole('link');
+    expect(links).toHaveLength(1);
+    const link = links[0] as HTMLAnchorElement;
+    expect(link.textContent).toBe('panel.widget.calendar.add.addressHelp');
     expect(link.href).toBe('https://hellonexus.com/docs/guides/remote-devices/add-a-calendar');
     expect(link.target).toBe('_blank');
+    expect(within(dialog).queryByText(/add\.help\./)).toBeNull();
   });
 
   it('says the calendar is read-only and offers no sign-in row', () => {

@@ -39,3 +39,17 @@ function isSafeHttpUrl(url: string): boolean {
     return false;
   }
 }
+
+const SHORT_URL_MAX = 56;
+
+/** One-line label for a long URL: host plus the start of the path, with an ellipsis. The href is never altered. */
+export function shortenUrl(url: string, max: number = SHORT_URL_MAX): string {
+  let label = url.replace(/^https?:\/\//i, '');
+  if (label.endsWith('/') && label.indexOf('/') === label.length - 1) label = label.slice(0, -1);
+  return label.length <= max ? label : `${label.slice(0, max - 1)}\u2026`;
+}
+
+/** Notes keep their line breaks, but a run of three or more blank lines becomes one. */
+export function collapseBlankLines(text: string): string {
+  return text.replace(/(?:\r?\n[ \t]*){4,}/g, '\n\n');
+}

@@ -120,6 +120,9 @@ function generate(from: number, to: number): CalendarEventDto[] {
     timedEvent('mock-t10', 'mock-personal', 'Dentist', dayAt(base, 6, 17), dayAt(base, 6, 17, 45), 'Dr. Okafor'),
     timedEvent('mock-t11', 'mock-work', 'Quarter planning', dayAt(base, 14, 9), dayAt(base, 14, 12), 'Main hall'),
   ];
+  const longLink = (n: number) => `https://nam06.safelinks.protection.outlook.com/?url=https%3A%2F%2Fteams.microsoft.com%2Fl%2Fmeetup-join%2F${'19%3Ameeting_Zm'.repeat(18)}${n}&data=05%7C02%7C`;
+  const longNotes = Array.from({ length: 60 }, (_, i) => (i % 9 === 0 ? `Join the meeting: ${longLink(i)}` : i % 9 === 4 ? '\n\n\n\n' : `Agenda item ${i + 1}: review the numbers and decide next steps.`)).join('\n');
+  fixed.push({ ...timedEvent('mock-long', 'mock-work', 'Weekly review (long notes)', dayAt(base, 0, 17), dayAt(base, 0, 18), 'Teams meeting'), notes: longNotes });
   const withNotes = fixed.map(e => (e.id === 'mock-t1' ? { ...e, notes: 'Bring the updated mockups and the usage numbers from last sprint.' } : e));
   return [...out, ...withNotes];
 }

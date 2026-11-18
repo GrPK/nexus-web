@@ -137,6 +137,20 @@ describe('CalendarSettings', () => {
     expect(sw('showGrid').disabled).toBe(false);
   });
 
+  it('puts Add calendar last in Calendars, then a separate Sync section with the refresh controls', () => {
+    renderSettings({ surface: 'desktop' });
+    const order = (el: Element, other: Element) => el.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING;
+    const calendars = screen.getByText('panel.widget.calendar.settings.calendars');
+    const add = screen.getByText('panel.widget.calendar.add.button');
+    const sync = screen.getByText('panel.widget.calendar.settings.sync');
+    const every = screen.getByLabelText('panel.widget.calendar.settings.refreshEvery');
+    const refresh = screen.getByText('panel.widget.calendar.settings.refreshNow');
+    expect(order(calendars, add)).toBeTruthy();
+    expect(order(add, sync)).toBeTruthy();
+    expect(order(sync, every)).toBeTruthy();
+    expect(order(every, refresh)).toBeTruthy();
+  });
+
   it('offers an edit button per calendar on a pointer surface only', () => {
     renderSettings({ surface: 'desktop' });
     expect(screen.getAllByRole('button', { name: /panel.widget.calendar.edit.button/ })).toHaveLength(2);
