@@ -21,10 +21,12 @@ import {
 } from '../../widgets/marketplaceRegistry';
 import { DEV_TOOLS } from '../../lib/devTools';
 import { PanelCatalogCell, type CatalogCellDrag } from '../dnd/PanelDragCells';
+import { splitPanelFontStyle } from '../theme/panelFont';
 import { playlistDisplayOrder } from '../engine/widgetPlaylist';
 import { SIZE_ICONS } from '../widgets/common/SizeIcons';
 import panelStyles from '../PanelApp.module.scss';
 import styles from './PanelWidgetCatalog.module.scss';
+import { usePanelSkinAttrs, type PanelSkinAttributes } from '../../components/common/ThemeScope/PanelSkinScope';
 
 // The catalog IS a panel grid. The column count is a multiple of 4 sized so
 // each cell lands near this target, then widgets pack row-major via the panel's
@@ -115,6 +117,8 @@ export interface PanelWidgetCatalogProps {
   // modal) the surrounding stylesheet sets --accent to the desktop's accent;
   // without this prop the search input + previews highlight in the wrong hue.
   themeStyle?: CSSProperties;
+  // Skin attributes for a catalog outside a panel skin scope (the desktop device page); they scope the previews only.
+  skinAttrs?: PanelSkinAttributes;
   className?: string;
   // Highlight the card matching this widget type. Used by single-widget
   // surfaces (q-series) to mark the device's active widget.
@@ -152,6 +156,7 @@ export function PanelWidgetCatalog({
   remote = false,
   themeMode,
   themeStyle,
+  skinAttrs: skinAttrsProp,
   className,
   selectedWidgetType,
   playlist,
@@ -162,6 +167,8 @@ export function PanelWidgetCatalog({
   transposedTile = false,
   glassAspect,
 }: PanelWidgetCatalogProps) {
+  const scopeSkinAttrs = usePanelSkinAttrs();
+  const skinAttrs = skinAttrsProp ? undefined : scopeSkinAttrs;
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   // Post-add confirmation on the card that was just clicked (desktop catalog
@@ -345,6 +352,8 @@ export function PanelWidgetCatalog({
         <PanelCatalogCell
           key={w.id}
           widget={w}
+          previewStyle={previewFont}
+          previewScope={previewScope}
           surface={surface}
           deviceTouch={deviceTouch}
           label={def ? t(def.meta.i18nKey) || w.type : w.type}
@@ -382,11 +391,19 @@ export function PanelWidgetCatalog({
 
   // The widget browser always renders cards opaque; the device's widget-opacity
   // setting applies only on-device and in the device preview, not while browsing.
+  // In the desktop app the catalog chrome (search, chips, captions) keeps the app font; only the previews take the panel's.
+  const { chrome: chromeThemeStyle, font: previewFont } = variant === 'desktop-modal'
+    ? splitPanelFontStyle(themeStyle)
+    : { chrome: themeStyle, font: undefined };
   const catalogStyle = {
-    ...themeStyle,
+    ...chromeThemeStyle,
     ...panelGridVars,
     '--panel-card-bg-opacity': '100%',
   } as CSSProperties;
+
+  const previewScope = skinAttrsProp
+    ? { attrs: { ...skinAttrsProp, ...(themeMode ? { 'data-theme': themeMode } : {}), ...(surface ? { 'data-surface': surface } : {}) }, style: { ...themeStyle, ...catalogStyle } as CSSProperties }
+    : undefined;
 
   const rootClass = [
     'panel-root',
@@ -399,6 +416,7 @@ export function PanelWidgetCatalog({
   return (
     <div
       className={rootClass}
+      {...skinAttrs}
       data-theme={themeMode}
       data-surface={surface}
       style={catalogStyle}

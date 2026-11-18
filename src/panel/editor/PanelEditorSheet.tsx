@@ -17,6 +17,7 @@ import type { PanelBackdrop } from '../background/panelBackground';
 import { PanelThemeSettings, type PanelSlideshowSettings, type PanelThemeSettingsSection, type ResolvedPanelThemeMode } from './PanelThemeSettings';
 import type { TextColorMode } from '../theme/textColor';
 import type { PanelFont } from '../theme/panelFont';
+import type { PanelSkinId } from '../skins/skins';
 import { PairRemoteContent } from '../../components/common/PairRemote/PairRemoteContent';
 import { PairedPcsContent } from '../../components/common/PairedPcs/PairedPcsContent';
 import { IconLabelButton } from '../../components/common/IconLabelButton/IconLabelButton';
@@ -26,12 +27,14 @@ import { useTranslation } from '../../lib/i18n';
 import { pluralKey } from '../../lib/pluralKey';
 import type { ThemeMode } from '../../lib/settings';
 import type { EffectState } from '../../types/lighting';
+import { desktopOnlyEditorHintFor } from './desktopOnlyEditorHint';
 import type { PanelConfigValue, PanelSurface, PanelWidget, PanelWidgetSize } from '../types';
 import { isSingleWidgetSurface, surfaceDisplayShape, surfaceSupportsTouch, type ForcedGrid } from '../types';
 import type { PanelBackgroundMode } from '../background/panelBackground';
 import { usePanelAudioReactive } from '../background/panelAudio';
 import type { PanelThemeState } from '../theme/panelTheme';
 import styles from '../PanelApp.module.scss';
+import { usePanelSkinAttrs } from '../../components/common/ThemeScope/PanelSkinScope';
 
 export type SheetMode = 'catalog' | 'settings' | 'panelSettings' | 'pairRemote' | 'pairedPcs';
 
@@ -90,6 +93,8 @@ export function PanelEditorSheet({
   onThemeTextColorPreview,
   onThemeTextColorCommit,
   onThemeFontCommit,
+  onThemeSkinCommit,
+  onThemeSkinReset,
   onThemeWidgetPaddingPreview,
   onThemeWidgetPaddingCommit,
   showMediaTab = false,
@@ -182,6 +187,8 @@ export function PanelEditorSheet({
   onThemeTextColorPreview: (hex: string) => void;
   onThemeTextColorCommit: (hex: string) => void;
   onThemeFontCommit: (font: PanelFont | null) => void;
+  onThemeSkinCommit: (skin: PanelSkinId | null) => void;
+  onThemeSkinReset: () => void;
   onThemeWidgetPaddingPreview: (percent: number) => void;
   onThemeWidgetPaddingCommit: (percent: number) => void;
   showSystemFonts?: boolean;
@@ -209,9 +216,11 @@ export function PanelEditorSheet({
   editView: DeckEditView;
   onEditViewChange: (view: DeckEditView) => void;
 }) {
+  const skinAttrs = usePanelSkinAttrs();
   const audioReactive = usePanelAudioReactive(surface);
   const { t, language } = useTranslation();
   const def = editingWidget ? lookupApp(editingWidget.type) : undefined;
+  const touchHintKey = desktopOnlyEditorHintFor(def?.meta, surface);
   const title = mode === 'panelSettings'
     ? t(panelSettingsSection === 'theme' ? 'panel.actions.theme'
       : panelSettingsSection === 'background' ? 'panel.actions.background'
@@ -313,6 +322,7 @@ export function PanelEditorSheet({
   return (
     <div
       className={`panel-root ${styles.editorBackdrop}`}
+      {...skinAttrs}
       data-mode={mode}
       data-state={closing ? 'closing' : 'open'}
       data-surface={surface}
@@ -328,6 +338,7 @@ export function PanelEditorSheet({
       <aside
         ref={sheetRef}
         className={styles.editorSheet}
+        data-skin-part="surface"
         data-drag={swipe.state === 'idle' ? undefined : swipe.state}
         data-entered={didEnter ? 'true' : undefined}
         style={sheetTransform}
@@ -355,6 +366,12 @@ export function PanelEditorSheet({
         {mode === 'settings' && saveForbidden && (
           <div className={styles.editorForbiddenNotice}>
             <Notice tone="info" role="status">{t('panel.settings.deck.saveForbidden')}</Notice>
+          </div>
+        )}
+
+        {mode === 'settings' && touchHintKey && (
+          <div className={styles.editorForbiddenNotice}>
+            <Notice tone="info" role="status">{t(touchHintKey)}</Notice>
           </div>
         )}
 
@@ -426,6 +443,7 @@ export function PanelEditorSheet({
               <Settings
                 widget={editingWidget}
                 surface={surface}
+                deviceTouch={deviceTouch}
                 onUpdate={config => onUpdate(editingWidget.id, config)}
                 onResize={handleResize}
                 selectedSlot={usesSlotSelection ? selectedMonitoringSlot : undefined}
@@ -505,6 +523,8 @@ export function PanelEditorSheet({
               onTextColorPreview={onThemeTextColorPreview}
               onTextColorCommit={onThemeTextColorCommit}
               onFontCommit={onThemeFontCommit}
+              onSkinCommit={onThemeSkinCommit}
+              onSkinReset={onThemeSkinReset}
               hideWidgetChromeControls={isSingleWidgetSurface(surface)}
               showImmersiveBackdrop={surfaceSupportsTouch(surface, deviceTouch)}
             />
