@@ -63,3 +63,10 @@
 .rowBar { width: 3px; height: 16px; border-radius: 2px; flex: none; background: var(--cal-color); }
 .rowTime { color: var(--text-dim); flex: none; min-width: 58px; }
 .rowTitle { font-weight: var(--weight-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.link {
+  color: var(--accent-glow);
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -98,6 +98,17 @@ describe('CalendarPage', () => {
     expect(screen.getByRole('button', { name: 'Design review' }).getAttribute('data-selected')).toBeNull();
   });
 
+  it('links http(s) URLs in the notes as external anchors and leaves other text plain', () => {
+    store.events = [ev('1', 'work', 'Call', 17, 14, 15, { notes: 'Join https://meet.example.com/a?x=1&y=2. Not javascript:alert(1)' })];
+    render(<CalendarPage tab="day" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Call' }));
+    const link = screen.getByRole('link', { name: 'https://meet.example.com/a?x=1&y=2' }) as HTMLAnchorElement;
+    expect(link.href).toBe('https://meet.example.com/a?x=1&y=2');
+    expect(link.target).toBe('_blank');
+    expect(link.rel).toBe('noopener noreferrer');
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
   it('toggles the popover when the same event is pressed twice', () => {
     render(<CalendarPage tab="day" />);
     const chip = screen.getByRole('button', { name: 'Design review' });

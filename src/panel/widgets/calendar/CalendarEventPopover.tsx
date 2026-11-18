@@ -3,6 +3,7 @@ import { AlignLeft, MapPin } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { Popover } from '../../../components/common/Popover/Popover';
 import { addDays, eventsOnDay, startOfDay, type CalEvent } from './calendarEvents';
+import { linkify } from './linkify';
 import type { CalendarLook } from './useCalendarData';
 import type { CalendarFormat } from './useCalendarFormat';
 import styles from './CalendarEventPopover.module.scss';
@@ -59,7 +60,11 @@ export function CalendarEventPopover({ event, anchor, fmt, look, onClose }: Even
         <div className={styles.line}><MapPin size={14} aria-hidden /><span>{event.location}</span></div>
       )}
       {event.notes && (
-        <div className={styles.line}><AlignLeft size={14} aria-hidden /><span className={styles.notes}>{event.notes}</span></div>
+        <div className={styles.line}><AlignLeft size={14} aria-hidden /><span className={styles.notes}>
+            {linkify(event.notes).map((part, i) => (part.href
+              ? <a key={i} className={styles.link} href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>
+              : <span key={i}>{part.text}</span>))}
+          </span></div>
       )}
     </Popover>
   );
