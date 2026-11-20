@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SensorAlertRule, SensorAlertState } from '../../../api/diagnosticsAlerts';
 import {
-  baseBounds, chipState, defaultHigh, defaultRule, displayBounds, formatAlertValue, formatDisplayValue, fromDisplay, ALERT_SENSOR_CATEGORIES, delayChoices, delayLabel, rowState, seedBound, alertBannerText, isBannerAlert, sensorLabel, stateColor, snapDisplay, toDisplay, widenBounds, padBounds, stateLabelKey, ruleLabel, findTrackedRule, rowTitles, isNotReported,
+  ALERT_SENSOR_TYPES, baseBounds, chipState, stepFor, defaultHigh, defaultRule, displayBounds, formatAlertValue, formatDisplayValue, fromDisplay, ALERT_SENSOR_CATEGORIES, delayChoices, delayLabel, rowState, seedBound, alertBannerText, isBannerAlert, sensorLabel, stateColor, snapDisplay, toDisplay, widenBounds, padBounds, stateLabelKey, ruleLabel, findTrackedRule, rowTitles, isNotReported,
 } from './sensorAlertHelpers';
 
 const rule = (over: Partial<SensorAlertRule> = {}): SensorAlertRule => ({
@@ -44,6 +44,47 @@ describe('temperature unit conversion', () => {
     expect(formatDisplayValue(175, 'Temperature', 'f', 'dot')).toBe('175°F');
     expect(formatDisplayValue(80, 'Temperature', 'c', 'dot')).toBe('80°C');
     expect(formatDisplayValue(9.5, 'Current', 'f', 'dot')).toBe('9.5 A');
+  });
+});
+
+describe('data and throughput types', () => {
+  const MB = 1024 * 1024;
+
+  it('are offered in the picker', () => {
+    expect(ALERT_SENSOR_TYPES).toContain('Data');
+    expect(ALERT_SENSOR_TYPES).toContain('Throughput');
+  });
+
+  it('shows throughput stored in bytes per second as MB/s and converts back', () => {
+    expect(toDisplay(250 * MB, 'Throughput', 'c')).toBe(250);
+    expect(fromDisplay(250, 'Throughput', 'c')).toBe(250 * MB);
+    expect(formatAlertValue(1.5 * MB, 'Throughput', 'c', 'dot')).toBe('1.5 MB/s');
+    expect(stepFor('Throughput')).toBe(10);
+  });
+
+  it('shows data in GB unchanged', () => {
+    expect(toDisplay(12.5, 'Data', 'c')).toBe(12.5);
+    expect(formatAlertValue(12.5, 'Data', 'c', 'dot')).toBe('12.5 GB');
+    expect(formatAlertValue(12.5, 'Data', 'c', 'dot', true)).toBe('13 GB');
+  });
+
+  it('seeds the upper limit in the stored unit', () => {
+    expect(defaultHigh('Data', null)).toBe(100);
+    expect(defaultHigh('Data', 50)).toBe(60);
+    expect(defaultHigh('Throughput', null)).toBe(500 * MB);
+    expect(defaultHigh('Throughput', 100 * MB)).toBe(120 * MB);
+  });
+
+  it('sizes the track from the reading', () => {
+    expect(baseBounds('Throughput', 10 * MB, null, 500 * MB)).toEqual({ min: 0, max: 1024 * MB });
+    expect(baseBounds('Throughput', 2048 * MB, null, null).max).toBeCloseTo(2457.6 * MB);
+    expect(baseBounds('Data', 50, null, 100)).toEqual({ min: 0, max: 100 });
+    expect(displayBounds({ min: 0, max: 1024 * MB }, 'Throughput', 'c')).toEqual({ min: 0, max: 1030 });
+  });
+
+  it('keeps a seeded throughput limit a display step clear of the other', () => {
+    const bounds = { min: 0, max: 1024 * MB };
+    expect(seedBound('high', 'Throughput', 0, bounds, 100 * MB)).toBeGreaterThanOrEqual(110 * MB);
   });
 });
 

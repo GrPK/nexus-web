@@ -11,7 +11,7 @@ import { convertTemperature, formatDateTime, formatNumber, hour12OptionFor, temp
 export interface AlertUnitPrefs { monitoringTempUnit: TempUnit; numberFormat: NumberFormat; monitoringWholeNumbers: boolean }
 
 /** Sensor types a threshold makes sense for, in picker order. */
-export const ALERT_SENSOR_TYPES = ['Temperature', 'Current', 'Power', 'Voltage', 'Fan', 'Load', 'Clock', 'Control', 'Level'] as const;
+export const ALERT_SENSOR_TYPES = ['Temperature', 'Current', 'Power', 'Voltage', 'Fan', 'Load', 'Clock', 'Control', 'Level', 'Data', 'Throughput'] as const;
 
 /** Resolver categories the service can re-find a sensor in. */
 export const ALERT_SENSOR_CATEGORIES = ['cpu', 'gpu', 'memory', 'motherboard', 'storage', 'smart', 'psu', 'cooler'] as const;
@@ -44,9 +44,14 @@ interface TypeSpec {
   decimals: number;
   /** Slider step in the displayed unit. */
   step: number;
-  /** Upper limit seed when the sensor has no usable reading. */
+  /** Upper limit seed, in the stored unit, when the sensor has no usable reading. */
   fallbackHigh: number;
+  /** Stored units per displayed unit; omitted when they match. */
+  scale?: number;
 }
+
+// Throughput is stored in bytes per second and shown in MB/s on the same 1024 base as formatRate.
+const BYTES_PER_MB = 1024 * 1024;
 
 const TYPE_SPECS: Record<string, TypeSpec> = {
   Temperature: { unit: '', decimals: 1, step: 1, fallbackHigh: 80 },
@@ -58,6 +63,8 @@ const TYPE_SPECS: Record<string, TypeSpec> = {
   Clock: { unit: 'MHz', decimals: 0, step: 10, fallbackHigh: 4000 },
   Control: { unit: '%', decimals: 0, step: 1, fallbackHigh: 90 },
   Level: { unit: '%', decimals: 0, step: 1, fallbackHigh: 90 },
+  Data: { unit: 'GB', decimals: 1, step: 1, fallbackHigh: 100 },
+  Throughput: { unit: 'MB/s', decimals: 1, step: 10, fallbackHigh: 500 * BYTES_PER_MB, scale: BYTES_PER_MB },
 };
 
 const GENERIC_SPEC: TypeSpec = { unit: '', decimals: 1, step: 1, fallbackHigh: 100 };
@@ -81,13 +88,16 @@ export function stepFor(type: string): number {
 
 /** A stored (native) value as the user sees it: Fahrenheit for a temperature when the user prefers it. */
 export function toDisplay(value: number, type: string, tempUnit: TempUnit): number {
-  return type === 'Temperature' ? roundTo(convertTemperature(value, tempUnit), 1) : value;
+  if (type === 'Temperature') return roundTo(convertTemperature(value, tempUnit), 1);
+  const scale = specOf(type).scale;
+  return scale ? roundTo(value / scale, 2) : value;
 }
 
 /** A value the user typed or dragged to, back in the stored unit; temperatures go to Celsius rounded to one decimal. */
 export function fromDisplay(value: number, type: string, tempUnit: TempUnit): number {
   if (type === 'Temperature') return roundTo(tempUnit === 'f' ? (value - 32) * 5 / 9 : value, 1);
-  return roundTo(value, specOf(type).decimals + 1);
+  const spec = specOf(type);
+  return roundTo(value * (spec.scale ?? 1), spec.decimals + 1);
 }
 
 /** A displayed value snapped to the slider step, so a converted Fahrenheit value sits on the grid. */
@@ -97,7 +107,7 @@ export function snapDisplay(value: number, type: string): number {
 }
 
 // Types the whole-numbers monitoring setting rounds to an integer.
-const WHOLE_NUMBER_TYPES = new Set(['Temperature', 'Power', 'Load', 'Control', 'Level']);
+const WHOLE_NUMBER_TYPES = new Set(['Temperature', 'Power', 'Load', 'Control', 'Level', 'Data', 'Throughput']);
 
 /** A value with its unit, in the user's temperature unit and number format; whole-number types drop decimals when asked. */
 export function formatAlertValue(value: number, type: string, tempUnit: TempUnit, numberFormat: NumberFormat, wholeNumbers = false): string {
@@ -125,6 +135,7 @@ export function baseBounds(type: string, observed: number | null, low: number | 
     case 'Power': bounds = { min: 0, max: Math.max(100, 1.5 * (seen ?? 0)) }; break;
     case 'Fan': bounds = { min: 0, max: Math.max(5000, 1.2 * (seen ?? 0)) }; break;
     case 'Clock': bounds = { min: 0, max: Math.max(5000, 1.2 * (seen ?? 0)) }; break;
+    case 'Throughput': bounds = { min: 0, max: Math.max(1024 * BYTES_PER_MB, 1.2 * (seen ?? 0)) }; break;
     case 'Voltage': {
       const set = [low, high].filter((v): v is number => v !== null);
       const center = seen ?? (set.length ? set.reduce((a, b) => a + b, 0) / set.length : 12);
@@ -208,7 +219,7 @@ export function seedBound(
   other: number | null,
 ): number {
   const step = stepFor(type);
-  const gap = Math.max(step, (bounds.max - bounds.min) / 40);
+  const gap = Math.max(step * (specOf(type).scale ?? 1), (bounds.max - bounds.min) / 40);
   const decimals = specOf(type).decimals + 1;
   const around = observed !== null && Number.isFinite(observed) ? observed : (bounds.min + bounds.max) / 2;
   let v = side === 'high' ? around * 1.2 : around * 0.8;
