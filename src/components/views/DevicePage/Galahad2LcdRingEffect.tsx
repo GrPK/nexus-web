@@ -1,20 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Lightbulb } from 'lucide-react';
+import { Button } from '../../common/Button/Button';
+import { ColorSlots } from '../../common/ColorSlots/ColorSlots';
 import { HsvPicker } from '../../common/HsvPicker/HsvPicker';
 import { SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import {
   getGalahad2LcdRingEffect,
   setGalahad2LcdRingEffect,
+  type Galahad2LcdRingEffect,
   type Galahad2LcdRingEffectSpec,
 } from '../../../api/lianli-galahad2-lcd';
 import { useTranslation } from '../../../lib/i18n';
 import lianli from './LianLiDevicePage.module.scss';
-import styles from './Galahad2LcdRingEffect.module.scss';
 
 const SPEED_KEYS = ['slowest', 'slower', 'normal', 'faster', 'fastest'];
 const DEFAULT_COLOR = '#ff0000';
 
 interface Draft {
+  /** Empty until an animation has been written once. */
   effect: string;
   speed: number;
   brightness: number;
@@ -28,11 +32,25 @@ export function fitColors(colors: string[], count: number): string[] {
   return next;
 }
 
+function draftOf(data: Galahad2LcdRingEffect): Draft {
+  const spec = data.effects.find(e => e.id === data.effect);
+  return {
+    effect: spec ? spec.id : '',
+    speed: data.speed,
+    brightness: data.brightness,
+    colors: fitColors(data.colors, spec?.colors ?? 0),
+  };
+}
+
+interface Galahad2LcdRingEffectSectionProps {
+  onSectionNavigate?: (section: string) => void;
+}
+
 /**
  * The animations the pump ring plays on its own. The panel cannot report what it plays,
  * so the values shown are the last write Nexus made. Every change is written at once.
  */
-export function Galahad2LcdRingEffectSection() {
+export function Galahad2LcdRingEffectSection({ onSectionNavigate }: Galahad2LcdRingEffectSectionProps) {
   const { t } = useTranslation();
   const [effects, setEffects] = useState<Galahad2LcdRingEffectSpec[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -40,48 +58,70 @@ export function Galahad2LcdRingEffectSection() {
   const [active, setActive] = useState(0);
   const [failed, setFailed] = useState(false);
   const aliveRef = useRef(true);
+  /** Writes go out one at a time, in order, so the ring ends on the last one made. */
+  const chainRef = useRef<Promise<unknown>>(Promise.resolve());
+  /** Only the newest write may touch state when it settles. */
+  const seqRef = useRef(0);
 
   useEffect(() => {
     aliveRef.current = true;
     void (async () => {
       const data = await getGalahad2LcdRingEffect();
       if (!aliveRef.current || data === null || !data.isConnected || data.effects.length === 0) return;
-      const spec = data.effects.find(e => e.id === data.effect) ?? data.effects[0];
       setEffects(data.effects);
       setNexusDriven(data.nexusDriven);
-      setDraft({
-        effect: spec.id,
-        speed: data.speed,
-        brightness: data.brightness,
-        colors: fitColors(data.colors, spec.colors),
-      });
+      setDraft(draftOf(data));
     })();
-    return () => { aliveRef.current = false; };
+
+    // The flag flips on another page, so re-read it whenever this one is looked at again.
+    const refreshDriven = () => {
+      if (document.visibilityState === 'hidden') return;
+      void (async () => {
+        const data = await getGalahad2LcdRingEffect();
+        if (aliveRef.current && data !== null) setNexusDriven(data.nexusDriven);
+      })();
+    };
+    window.addEventListener('focus', refreshDriven);
+    document.addEventListener('visibilitychange', refreshDriven);
+    return () => {
+      aliveRef.current = false;
+      window.removeEventListener('focus', refreshDriven);
+      document.removeEventListener('visibilitychange', refreshDriven);
+    };
   }, []);
 
-  const apply = useCallback(async (next: Draft) => {
+  const apply = useCallback((next: Draft) => {
+    const seq = ++seqRef.current;
     setDraft(next);
     setFailed(false);
-    const ok = await setGalahad2LcdRingEffect(next);
-    if (!aliveRef.current || ok !== null) return;
-    // A refusal usually means the ring was handed to Nexus lighting meanwhile, so re-read
-    // that flag and only report a failure when the ring is still free to take the write.
-    const fresh = await getGalahad2LcdRingEffect();
-    if (!aliveRef.current) return;
-    if (fresh?.nexusDriven) setNexusDriven(true);
-    else setFailed(true);
+    chainRef.current = chainRef.current.then(async () => {
+      const ok = await setGalahad2LcdRingEffect(next);
+      if (!aliveRef.current || seq !== seqRef.current || ok !== null) return;
+      // A refusal usually means the ring was handed to Nexus lighting meanwhile. Re-read so
+      // the controls show what the ring really plays, and only report a failure when the
+      // ring was still free to take the write.
+      const fresh = await getGalahad2LcdRingEffect();
+      if (!aliveRef.current || seq !== seqRef.current) return;
+      if (fresh) {
+        setDraft(draftOf(fresh));
+        setNexusDriven(fresh.nexusDriven);
+        setFailed(!fresh.nexusDriven);
+      } else {
+        setFailed(true);
+      }
+    });
   }, []);
 
-  const effectLabel = (id: string) => (id === 'breathing' ? t('devices.fwAnimation.breathing') : t(`devices.galahad2Ring.${id}`));
   if (!draft) return null;
-  const spec = effects.find(e => e.id === draft.effect) ?? effects[0];
-  if (!spec) return null;
-  const activeIndex = Math.min(active, Math.max(spec.colors - 1, 0));
+  const spec = effects.find(e => e.id === draft.effect);
+  const activeIndex = Math.min(active, Math.max((spec?.colors ?? 1) - 1, 0));
+  const locked = nexusDriven;
+  const effectLabel = (id: string) => (id === 'breathing' ? t('devices.fwAnimation.breathing') : t(`devices.galahad2Ring.${id}`));
 
   const setColor = (hex: string, commit: boolean) => {
     const colors = [...draft.colors];
     colors[activeIndex] = hex;
-    if (commit) void apply({ ...draft, colors });
+    if (commit) apply({ ...draft, colors });
     else setDraft({ ...draft, colors });
   };
 
@@ -91,86 +131,93 @@ export function Galahad2LcdRingEffectSection() {
       boxClassName={lianli.sectionBox}
       description={<p>{t('devices.q60.lightingFirmwareHelp')}</p>}
     >
-      <div className={styles.block}>
-        <SettingSelect
-          label={t('devices.fwAnimation.effect')}
-          value={draft.effect}
-          disabled={nexusDriven}
-          onChange={v => {
-            const next = effects.find(e => e.id === v);
-            if (!next) return;
-            setActive(0);
-            void apply({ ...draft, effect: v, colors: fitColors(draft.colors, next.colors) });
-          }}
-          options={effects.map(e => ({ value: e.id, label: effectLabel(e.id) }))}
-        />
+      <SettingSelect
+        label={t('devices.fwAnimation.effect')}
+        value={draft.effect}
+        placeholder={t('devices.galahad2Ring.noEffect')}
+        disabled={locked}
+        onChange={v => {
+          const next = effects.find(e => e.id === v);
+          if (!next) return;
+          setActive(0);
+          apply({ ...draft, effect: v, colors: fitColors(draft.colors, next.colors) });
+        }}
+        options={effects.map(e => ({ value: e.id, label: effectLabel(e.id) }))}
+      />
 
-        <SettingSlider
-          editable
-          trackFill
-          disabled={nexusDriven}
-          label={t('devices.lianli.lightingSpeed')}
-          value={draft.speed}
-          min={0}
-          max={4}
-          step={1}
-          formatValue={v => t(`devices.nzxt-kraken.speed.${SPEED_KEYS[Math.round(v)] ?? 'normal'}`)}
-          ariaLabel={t('devices.lianli.lightingSpeedAria')}
-          onChange={(v: number) => { setDraft({ ...draft, speed: Math.round(v) }); }}
-          onCommit={(v: number) => { void apply({ ...draft, speed: Math.round(v) }); }}
-        />
+      <SettingSlider
+        editable
+        trackFill
+        disabled={locked || !spec}
+        label={t('devices.lianli.lightingSpeed')}
+        value={draft.speed}
+        min={0}
+        max={4}
+        step={1}
+        formatValue={v => t(`devices.nzxt-kraken.speed.${SPEED_KEYS[Math.round(v)] ?? 'normal'}`)}
+        ariaLabel={t('devices.lianli.lightingSpeedAria')}
+        onChange={(v: number) => { setDraft({ ...draft, speed: Math.round(v) }); }}
+        onCommit={(v: number) => { apply({ ...draft, speed: Math.round(v) }); }}
+      />
 
-        <SettingSlider
-          editable
-          trackFill
-          disabled={nexusDriven}
-          label={t('devices.lianli.lightingBrightness')}
-          value={draft.brightness}
-          min={0}
-          max={4}
-          step={1}
-          ariaLabel={t('devices.lianli.lightingBrightnessAria')}
-          onChange={(v: number) => { setDraft({ ...draft, brightness: Math.round(v) }); }}
-          onCommit={(v: number) => { void apply({ ...draft, brightness: Math.round(v) }); }}
-        />
+      <SettingSlider
+        editable
+        trackFill
+        disabled={locked || !spec}
+        label={t('devices.lianli.lightingBrightness')}
+        value={draft.brightness}
+        min={0}
+        max={4}
+        step={1}
+        ariaLabel={t('devices.lianli.lightingBrightnessAria')}
+        onChange={(v: number) => { setDraft({ ...draft, brightness: Math.round(v) }); }}
+        onCommit={(v: number) => { apply({ ...draft, brightness: Math.round(v) }); }}
+      />
 
-        {spec.colors > 0 && !nexusDriven && (
-          <>
-            <div className={styles.swatchRow}>
-              {draft.colors.map((hex, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`${styles.swatch} ${i === activeIndex ? styles.swatchActive : ''}`}
-                  style={{ background: hex }}
-                  aria-label={t('devices.nzxt-kraken.colorSlot', { n: i + 1 })}
-                  aria-pressed={i === activeIndex}
-                  onClick={() => { setActive(i); }}
-                />
-              ))}
-            </div>
-            <div className={lianli.colorBlock} data-settings-aside="true">
-              <HsvPicker
-                value={draft.colors[activeIndex] ?? DEFAULT_COLOR}
-                onPreview={(hex: string) => { setColor(hex, false); }}
-                onCommit={(hex: string) => { setColor(hex, true); }}
-              />
-            </div>
-          </>
-        )}
+      {spec && spec.colors > 0 && !locked && (
+        <>
+          {spec.colors > 1 && (
+            <ColorSlots
+              ariaLabel={t('devices.lianli.colorN', { n: activeIndex + 1 })}
+              colors={draft.colors}
+              activeIndex={activeIndex}
+              onSelect={setActive}
+              slotLabel={i => t('devices.lianli.colorN', { n: i + 1 })}
+            />
+          )}
+          <div className={lianli.colorBlock} data-settings-aside="true">
+            <HsvPicker
+              value={draft.colors[activeIndex] ?? DEFAULT_COLOR}
+              onPreview={(hex: string) => { setColor(hex, false); }}
+              onCommit={(hex: string) => { setColor(hex, true); }}
+            />
+          </div>
+        </>
+      )}
 
-        {failed && (
-          <p className={lianli.customNote} data-settings-aside="true">
-            {t('devices.galahad2Ring.failed')}
-          </p>
-        )}
+      {failed && (
+        <p className={lianli.customNote} data-settings-aside="true">
+          {t('devices.galahad2Ring.failed')}
+        </p>
+      )}
 
-        {nexusDriven && (
+      {nexusDriven && (
+        <>
           <p className={lianli.customNote} data-settings-aside="true">
             {t('devices.galahad2Ring.overridden')}
           </p>
-        )}
-      </div>
+          {onSectionNavigate && (
+            <Button
+              size="sm"
+              tone="neutral"
+              icon={<Lightbulb size={14} />}
+              onClick={() => onSectionNavigate('lighting')}
+            >
+              {t('smartLights.colorOnLightingPage')}
+            </Button>
+          )}
+        </>
+      )}
     </SettingsSection>
   );
 }

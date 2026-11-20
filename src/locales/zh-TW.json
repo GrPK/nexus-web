@@ -1094,6 +1094,7 @@
   "devices.fwAnimation.solidColor": "純色",
   "devices.galahad2Ring.failed": "無法將該動畫寫入水泵光環。",
   "devices.galahad2Ring.meteor": "流星",
+  "devices.galahad2Ring.noEffect": "選擇效果",
   "devices.galahad2Ring.overridden": "Nexus 正在控制光環，因此會覆蓋該動畫，直到為其關閉 Nexus Control。",
   "devices.galahad2Ring.rainbowMorph": "彩虹漸變",
   "devices.galahad2Ring.runway": "跑道",

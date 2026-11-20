@@ -1094,6 +1094,7 @@
   "devices.fwAnimation.solidColor": "Cor sólida",
   "devices.galahad2Ring.failed": "Não foi possível gravar essa animação no anel da bomba.",
   "devices.galahad2Ring.meteor": "Meteoro",
+  "devices.galahad2Ring.noEffect": "Escolha um efeito",
   "devices.galahad2Ring.overridden": "O Nexus está a controlar o anel, por isso substitui a animação até o Nexus Control ser desativado para ele.",
   "devices.galahad2Ring.rainbowMorph": "Transição arco-íris",
   "devices.galahad2Ring.runway": "Passarela",

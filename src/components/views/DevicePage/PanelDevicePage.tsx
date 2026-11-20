@@ -2184,7 +2184,7 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                   )}
                   {activeTab === 'settings' && isGalahad2LcdPanel && (
                     <div className={styles.settingsContent}>
-                      <Galahad2LcdRingEffectSection />
+                      <Galahad2LcdRingEffectSection onSectionNavigate={onSectionNavigate} />
                     </div>
                   )}
                   {activeTab === 'settings' && isKrakenPanel && !isSimulated && (

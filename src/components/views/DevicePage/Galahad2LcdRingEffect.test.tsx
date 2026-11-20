@@ -66,7 +66,7 @@ describe('Galahad2LcdRingEffectSection', () => {
   it('shows one swatch per color the effect reads', async () => {
     mockGet.mockResolvedValue(state());
     await mount();
-    expect(screen.getAllByRole('button', { name: /devices.nzxt-kraken.colorSlot/ })).toHaveLength(2);
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
   });
 
   it('shows the override notice only while Nexus drives the ring', async () => {
@@ -79,7 +79,7 @@ describe('Galahad2LcdRingEffectSection', () => {
     mockGet.mockResolvedValue(state({ nexusDriven: true }));
     await mount();
     expect((screen.getByRole('button', { name: 'devices.fwAnimation.effect' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.queryAllByRole('button', { name: /devices.nzxt-kraken.colorSlot/ })).toHaveLength(0);
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
   });
 
   it('shows the override notice instead of a failure when a write is refused for it', async () => {
@@ -112,6 +112,51 @@ describe('Galahad2LcdRingEffectSection', () => {
       brightness: 4,
       colors: ['#112233', '#445566', '#ff0000', '#ff0000'],
     });
+  });
+
+  it('shows no effect selected when nothing has been saved yet', async () => {
+    mockGet.mockResolvedValue(state({ effect: '', colors: [] }));
+    await mount();
+    expect(screen.getByRole('button', { name: 'devices.fwAnimation.effect' }).textContent).toContain('devices.galahad2Ring.noEffect');
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.queryByText('devices.galahad2Ring.meteor')).toBeNull();
+  });
+
+  it('ignores a stale failure once a newer write has been made', async () => {
+    mockGet.mockResolvedValue(state());
+    let rejectFirst: (v: unknown) => void = () => {};
+    mockSet
+      .mockImplementationOnce(() => new Promise(r => { rejectFirst = r; }))
+      .mockResolvedValueOnce({ error: false });
+    await mount();
+    const pick = async (name: string) => {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'devices.fwAnimation.effect' }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('option', { name }));
+      });
+    };
+    await pick('devices.galahad2Ring.meteor');
+    await pick('devices.fwAnimation.breathing');
+    await act(async () => { rejectFirst(null); });
+    expect(mockSet).toHaveBeenCalledTimes(2);
+    expect(mockSet.mock.calls[1][0].effect).toBe('breathing');
+    expect(screen.queryByText('devices.galahad2Ring.failed')).toBeNull();
+  });
+
+  it('reverts the draft to the service state after a failed write', async () => {
+    mockGet.mockResolvedValue(state());
+    await mount();
+    mockSet.mockResolvedValue(null);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'devices.fwAnimation.effect' }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('option', { name: 'devices.galahad2Ring.meteor' }));
+    });
+    expect(screen.getByText('devices.galahad2Ring.failed')).toBeTruthy();
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
   });
 
   it('flags a failed write', async () => {

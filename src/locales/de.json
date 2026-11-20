@@ -1094,6 +1094,7 @@
   "devices.fwAnimation.solidColor": "Einfarbig",
   "devices.galahad2Ring.failed": "Diese Animation konnte nicht auf den Pumpenring geschrieben werden.",
   "devices.galahad2Ring.meteor": "Meteor",
+  "devices.galahad2Ring.noEffect": "Effekt auswählen",
   "devices.galahad2Ring.overridden": "Nexus steuert den Ring und überschreibt die Animation, bis Nexus Control dafür deaktiviert wird.",
   "devices.galahad2Ring.rainbowMorph": "Regenbogen-Morphing",
   "devices.galahad2Ring.runway": "Lauflicht",

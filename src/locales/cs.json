@@ -1103,6 +1103,7 @@
   "devices.fwAnimation.solidColor": "Jednolitá barva",
   "devices.galahad2Ring.failed": "Tuto animaci se nepodařilo zapsat do kroužku pumpy.",
   "devices.galahad2Ring.meteor": "Meteor",
+  "devices.galahad2Ring.noEffect": "Vyberte efekt",
   "devices.galahad2Ring.overridden": "Nexus ovládá kroužek, a proto přepisuje animaci, dokud pro něj nevypnete Nexus Control.",
   "devices.galahad2Ring.rainbowMorph": "Duhový přechod",
   "devices.galahad2Ring.runway": "Dráha",

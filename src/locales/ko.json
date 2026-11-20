@@ -1094,6 +1094,7 @@
   "devices.fwAnimation.solidColor": "단색",
   "devices.galahad2Ring.failed": "이 애니메이션을 펌프 링에 쓰지 못했습니다.",
   "devices.galahad2Ring.meteor": "메테오",
+  "devices.galahad2Ring.noEffect": "효과 선택",
   "devices.galahad2Ring.overridden": "Nexus가 링을 제어하고 있어, Nexus Control을 끄기 전까지 애니메이션을 덮어씁니다.",
   "devices.galahad2Ring.rainbowMorph": "레인보우 모프",
   "devices.galahad2Ring.runway": "런웨이",

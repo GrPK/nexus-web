@@ -1094,6 +1094,7 @@
   "devices.fwAnimation.solidColor": "Color sólido",
   "devices.galahad2Ring.failed": "No se pudo escribir esa animación en el anillo de la bomba.",
   "devices.galahad2Ring.meteor": "Meteoro",
+  "devices.galahad2Ring.noEffect": "Elige un efecto",
   "devices.galahad2Ring.overridden": "Nexus controla el anillo, así que anula la animación hasta que desactives Nexus Control para él.",
   "devices.galahad2Ring.rainbowMorph": "Transición arcoíris",
   "devices.galahad2Ring.runway": "Pista",

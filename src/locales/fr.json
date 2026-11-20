@@ -1094,6 +1094,7 @@
   "devices.fwAnimation.solidColor": "Couleur unie",
   "devices.galahad2Ring.failed": "Cette animation n’a pas pu être écrite sur l’anneau de la pompe.",
   "devices.galahad2Ring.meteor": "Météore",
+  "devices.galahad2Ring.noEffect": "Choisissez un effet",
   "devices.galahad2Ring.overridden": "Nexus pilote l’anneau et remplace donc l’animation tant que Nexus Control n’est pas désactivé pour lui.",
   "devices.galahad2Ring.rainbowMorph": "Fondu arc-en-ciel",
   "devices.galahad2Ring.runway": "Piste",
