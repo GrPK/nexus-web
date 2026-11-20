@@ -59,13 +59,15 @@ describe('data and throughput types', () => {
     expect(toDisplay(250 * MB, 'Throughput', 'c')).toBe(250);
     expect(fromDisplay(250, 'Throughput', 'c')).toBe(250 * MB);
     expect(formatAlertValue(1.5 * MB, 'Throughput', 'c', 'dot')).toBe('1.5 MB/s');
-    expect(stepFor('Throughput')).toBe(10);
+    expect(stepFor('Throughput')).toBe(1);
+    expect(stepFor('Data')).toBe(0.1);
   });
 
   it('shows data in GB unchanged', () => {
     expect(toDisplay(12.5, 'Data', 'c')).toBe(12.5);
     expect(formatAlertValue(12.5, 'Data', 'c', 'dot')).toBe('12.5 GB');
-    expect(formatAlertValue(12.5, 'Data', 'c', 'dot', true)).toBe('13 GB');
+    expect(formatAlertValue(12.5, 'Data', 'c', 'dot', true)).toBe('12.5 GB');
+    expect(formatAlertValue(1.5 * MB, 'Throughput', 'c', 'dot', true)).toBe('1.5 MB/s');
   });
 
   it('seeds the upper limit in the stored unit', () => {
@@ -75,11 +77,27 @@ describe('data and throughput types', () => {
     expect(defaultHigh('Throughput', 100 * MB)).toBe(120 * MB);
   });
 
+  it('never seeds a throughput limit below one display step on an idle reading', () => {
+    expect(defaultHigh('Throughput', 2400)).toBe(1 * MB);
+    expect(formatAlertValue(defaultHigh('Throughput', 2400), 'Throughput', 'c', 'dot')).toBe('1 MB/s');
+  });
+
+  it('keeps sub-step limits and the other knob when snapping', () => {
+    expect(snapDisplay(0.4, 'Data')).toBe(0.4);
+    expect(snapDisplay(3, 'Throughput')).toBe(3);
+    expect(fromDisplay(0.4, 'Data', 'c')).toBe(0.4);
+  });
+
+  it('seeds a throughput limit in display units', () => {
+    const bounds = { min: 0, max: 1024 * MB };
+    expect(seedBound('high', 'Throughput', 100 * MB, bounds, null)).toBe(120 * MB);
+  });
+
   it('sizes the track from the reading', () => {
     expect(baseBounds('Throughput', 10 * MB, null, 500 * MB)).toEqual({ min: 0, max: 1024 * MB });
     expect(baseBounds('Throughput', 2048 * MB, null, null).max).toBeCloseTo(2457.6 * MB);
     expect(baseBounds('Data', 50, null, 100)).toEqual({ min: 0, max: 100 });
-    expect(displayBounds({ min: 0, max: 1024 * MB }, 'Throughput', 'c')).toEqual({ min: 0, max: 1030 });
+    expect(displayBounds({ min: 0, max: 1024 * MB }, 'Throughput', 'c')).toEqual({ min: 0, max: 1024 });
   });
 
   it('keeps a seeded throughput limit a display step clear of the other', () => {

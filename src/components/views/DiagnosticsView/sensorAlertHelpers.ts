@@ -63,8 +63,8 @@ const TYPE_SPECS: Record<string, TypeSpec> = {
   Clock: { unit: 'MHz', decimals: 0, step: 10, fallbackHigh: 4000 },
   Control: { unit: '%', decimals: 0, step: 1, fallbackHigh: 90 },
   Level: { unit: '%', decimals: 0, step: 1, fallbackHigh: 90 },
-  Data: { unit: 'GB', decimals: 1, step: 1, fallbackHigh: 100 },
-  Throughput: { unit: 'MB/s', decimals: 1, step: 10, fallbackHigh: 500 * BYTES_PER_MB, scale: BYTES_PER_MB },
+  Data: { unit: 'GB', decimals: 1, step: 0.1, fallbackHigh: 100 },
+  Throughput: { unit: 'MB/s', decimals: 1, step: 1, fallbackHigh: 500 * BYTES_PER_MB, scale: BYTES_PER_MB },
 };
 
 const GENERIC_SPEC: TypeSpec = { unit: '', decimals: 1, step: 1, fallbackHigh: 100 };
@@ -107,7 +107,7 @@ export function snapDisplay(value: number, type: string): number {
 }
 
 // Types the whole-numbers monitoring setting rounds to an integer.
-const WHOLE_NUMBER_TYPES = new Set(['Temperature', 'Power', 'Load', 'Control', 'Level', 'Data', 'Throughput']);
+const WHOLE_NUMBER_TYPES = new Set(['Temperature', 'Power', 'Load', 'Control', 'Level']);
 
 /** A value with its unit, in the user's temperature unit and number format; whole-number types drop decimals when asked. */
 export function formatAlertValue(value: number, type: string, tempUnit: TempUnit, numberFormat: NumberFormat, wholeNumbers = false): string {
@@ -184,9 +184,12 @@ export function displayBounds(bounds: Bounds, type: string, tempUnit: TempUnit):
 export function defaultHigh(type: string, observed: number | null): number {
   const spec = specOf(type);
   if (observed === null || !Number.isFinite(observed) || observed <= 0) return spec.fallbackHigh;
+  const scale = spec.scale ?? 1;
   const decimals = type === 'Temperature' ? 0 : spec.decimals;
-  const next = roundTo(observed * 1.2, decimals);
-  return next > observed ? next : spec.fallbackHigh;
+  // Rounded in the displayed unit; a scaled type never seeds below one display step, so an idle reading does not seed a limit that any burst trips.
+  const shown = observed / scale;
+  const next = scale === 1 ? roundTo(shown * 1.2, decimals) : Math.max(roundTo(shown * 1.2, decimals), spec.step);
+  return next > shown ? roundTo(next * scale, spec.decimals + 1) : spec.fallbackHigh;
 }
 
 export function sensorRefOf(category: string, sensor: { id: string; name: string; type: string; parent: { name: string } }): SensorRef {
@@ -218,13 +221,14 @@ export function seedBound(
   bounds: Bounds,
   other: number | null,
 ): number {
-  const step = stepFor(type);
-  const gap = Math.max(step * (specOf(type).scale ?? 1), (bounds.max - bounds.min) / 40);
-  const decimals = specOf(type).decimals + 1;
-  const around = observed !== null && Number.isFinite(observed) ? observed : (bounds.min + bounds.max) / 2;
+  const spec = specOf(type);
+  const scale = spec.scale ?? 1;
+  // Worked in the displayed unit, so the gap and rounding mean display steps and decimals.
+  const gap = Math.max(spec.step, (bounds.max - bounds.min) / scale / 40);
+  const around = (observed !== null && Number.isFinite(observed) ? observed : (bounds.min + bounds.max) / 2) / scale;
   let v = side === 'high' ? around * 1.2 : around * 0.8;
-  if (other !== null) v = side === 'high' ? Math.max(v, other + gap) : Math.min(v, other - gap);
-  return roundTo(v, decimals);
+  if (other !== null) v = side === 'high' ? Math.max(v, other / scale + gap) : Math.min(v, other / scale - gap);
+  return roundTo(roundTo(v, spec.decimals + 1) * scale, spec.decimals + 1);
 }
 
 export type AlertChipState = 'ok' | 'pending' | 'active' | 'unavailable';

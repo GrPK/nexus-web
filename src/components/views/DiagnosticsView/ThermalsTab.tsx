@@ -21,7 +21,7 @@ import { GenericSkeleton } from '../PageSkeleton/PageSkeleton';
 import { SectionLoadError } from './DiagnosticsSectionStates';
 import { SensorAlertBanner } from './SensorAlertBanner';
 import { SensorAlertsBanner, type BannerAlert } from './SensorAlertsBanner';
-import { ALERT_SENSOR_CATEGORIES, ALERT_SENSOR_TYPES, defaultRule, findTrackedRule, formatDisplayValue, isBannerAlert, rowTitles, ruleLabel, sensorRefOf } from './sensorAlertHelpers';
+import { ALERT_SENSOR_CATEGORIES, ALERT_SENSOR_TYPES, defaultRule, findTrackedRule, formatAlertValue, isBannerAlert, rowTitles, ruleLabel, sensorRefOf } from './sensorAlertHelpers';
 import { Card } from '../../common/Card/Card';
 import { SearchInput } from '../../common/SearchInput/SearchInput';
 import { SectionHeader } from '../../common/SectionHeader/SectionHeader';
@@ -218,7 +218,7 @@ export function ThermalsTab({
   );
   const groupType = groupRules[0]?.sensor.type ?? 'Temperature';
   const groupFormat = useMemo(
-    () => (v: number) => formatDisplayValue(v, groupType, monitoringTempUnit, numberFormat, monitoringWholeNumbers),
+    () => (v: number) => formatAlertValue(v, groupType, monitoringTempUnit, numberFormat, monitoringWholeNumbers),
     [groupType, monitoringTempUnit, numberFormat, monitoringWholeNumbers],
   );
   const thresholds = useMemo(() => ruleThresholds(selectedRule), [selectedRule]);
