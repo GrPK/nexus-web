@@ -25,7 +25,6 @@
   flex: 1;
   min-width: 0;
   color: var(--text-dim);
-  text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -147,7 +146,6 @@
   flex: 0 0 auto;
   max-width: 100%;
   color: var(--panel-accent);
-  text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
