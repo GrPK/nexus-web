@@ -2,6 +2,7 @@ import type { BuiltInSensorKind, NewSensorAlertRule, SensorAlertRule, SensorAler
 import { SLIDESHOW_INTERVALS, slideshowIntervalLabel } from '../../../panel/slideshow/slideshow';
 import { CATEGORY_LABEL_KEYS } from '../../../panel/widgets/monitoring/sensorPicker';
 import { bareSensorLabel } from '../../../panel/widgets/monitoring/sensorNames';
+import { smartSensorOptionLabel } from '../../../panel/widgets/monitoring/sensorCategories';
 import type { DeviceKey } from '../../../panel/widgets/monitoring/perfSlots';
 import type { Language } from '../../../lib/settings';
 import { pluralKey } from '../../../lib/pluralKey';
@@ -412,6 +413,8 @@ function pickerSensorLabel(sensor: SensorRef): string {
       return sensor.name;
     case 'network':
       return bareSensorLabel(device, sensor.name) || sensor.name;
+    case 'smart':
+      return smartSensorOptionLabel(sensor.parentName, bareSensorLabel(device, sensor.name) || sensor.name, sensor.type);
     default:
       return `${bareSensorLabel(device, sensor.name) || sensor.name} (${sensor.type})`;
   }

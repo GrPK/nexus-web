@@ -117,6 +117,22 @@ export function smartStorageSensors(sensors: SensorState): HardwareSensor[] {
     .flatMap(([, component]) => component.sensors ?? []);
 }
 
+/**
+ * Picker label of a SMART sensor with its drive in front ("Samsung SSD 990 PRO 2TB: Data Written (24 h) (Data)").
+ * Every drive reports the same derived sensor names, so without the drive a multi-drive box lists identical options.
+ */
+export function smartSensorOptionLabel(drive: string | undefined, bareName: string, type: string): string {
+  const label = `${bareName} (${type})`;
+  return drive ? `${drive}: ${label}` : label;
+}
+
+/** Drive name of a SMART sensor: its component's name, else the sensor's parent. */
+export function smartSensorDrive(sensors: SensorState, sensor: HardwareSensor): string | undefined {
+  const component = Object.entries(sensors.storageComponents)
+    .find(([id, c]) => isSmartStorageComponentId(id) && c.sensors?.some(s => s.id === sensor.id))?.[1];
+  return component?.name || sensor.parent?.name || undefined;
+}
+
 /** The name an iCUE LINK QX probe carried before it was a fan sensor, as its current one; any other text unchanged. */
 export function currentFanProbeName(name: string): string {
   const match = /^iCUE LINK QX RGB probe \((.*)\)$/.exec(name);

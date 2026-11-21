@@ -330,6 +330,7 @@ describe('findTrackedRule and rowTitles', () => {
     expect(row({ category: 'motherboard', name: '+12V', type: 'Voltage' }).subtitle).toBe('+12V (Voltage)');
     expect(row({ category: 'fan', name: 'Fan #2', type: 'Fan' })).toEqual({ title: 'monitoring.settings.category.motherboard', subtitle: 'Fan #2' });
     expect(row({ category: 'storage', name: 'Temperature', type: 'Temperature' }).subtitle).toBe('Temperature');
+    expect(row({ category: 'smart', name: 'Data Written (24 h)', type: 'Data', parentName: 'Samsung SSD 990 PRO 2TB' }).subtitle).toBe('Samsung SSD 990 PRO 2TB: Data Written (24 h) (Data)');
   });
 
   it('prefers the live picker label when one is supplied and keeps the old shape for an unknown category', () => {
