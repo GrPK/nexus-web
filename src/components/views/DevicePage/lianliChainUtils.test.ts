@@ -1,7 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import type { LianLiWirelessChainLighting } from '../../../api/lianli-wireless';
-import { applyChainPatch, canMerge, mergeLeaderMac, moveInSequence, numberDuplicateTitles, patchAffectsLeader, sortBySequence } from './lianliChainUtils';
+import type { LianLiWirelessChainLighting, LianLiWirelessChainPatch } from '../../../api/lianli-wireless';
+import {
+  applyChainPatch, canMerge, chainLookOf, hasOwnHalves, mergeLeaderMac, moveInSequence, numberDuplicateTitles, patchAffectsLeader, sortBySequence,
+} from './lianliChainUtils';
 
 function chain(mac: string, extra: Partial<LianLiWirelessChainLighting> = {}): LianLiWirelessChainLighting {
   return {
@@ -29,6 +31,64 @@ describe('applyChainPatch', () => {
 
   it('ignores a zone patch on a chain without zones', () => {
     expect(applyChainPatch(chain('A'), { zones: [{ id: 'up', mode: 'static' }] }).zones).toBeUndefined();
+  });
+});
+
+describe('applyChainPatch on a wireless TL chain', () => {
+  const tl = (extra: Partial<LianLiWirelessChainLighting> = {}) =>
+    chain('T', { supportsScope: true, mode: 'meteor', colors: ['#111111'], up: null, down: null, lastScope: null, ...extra });
+  const half = { mode: 'static', speed: 0, direction: 0, brightness: 2, colors: ['#222222'] };
+
+  it('a scoped patch gives that half its own look, starting from the whole fan, and leaves the fan look alone', () => {
+    const next = applyChainPatch(tl(), { scope: 'down', speed: 1, effectMode: 'static' });
+    expect(next.down).toEqual({ mode: 'meteor', speed: 1, direction: 0, brightness: 4, colors: ['#111111'] });
+    expect(next.up).toBeNull();
+    expect(next.lastScope).toBe('down');
+    expect(next).toMatchObject({ mode: 'meteor', speed: 3, colors: ['#111111'] });
+    expect(next.effectMode).toBeUndefined();
+  });
+
+  it('a scoped patch edits a half that already has its own look', () => {
+    expect(applyChainPatch(tl({ up: half }), { scope: 'up', colors: ['#abcdef'] }).up).toEqual({ ...half, colors: ['#abcdef'] });
+  });
+
+  it('a whole-fan look drops both halves', () => {
+    const next = applyChainPatch(tl({ up: half, down: half, lastScope: 'up' }), { mode: 'rainbow', colors: [] });
+    expect(next).toMatchObject({ mode: 'rainbow', colors: [], up: null, down: null, lastScope: null });
+  });
+
+  it('the Lighting page, the swap and merge keep the halves', () => {
+    const start = tl({ up: half, lastScope: 'up' });
+    const patches: LianLiWirelessChainPatch[] = [{ mode: 'custom' }, { upDownSwap: true }, { merge: true }];
+    for (const patch of patches) {
+      expect(applyChainPatch(start, patch)).toMatchObject({ up: half, lastScope: 'up' });
+    }
+  });
+
+  it('a whole-fan look on a chain without scope adds no halves', () => {
+    expect(applyChainPatch(chain('A'), { mode: 'static' })).not.toHaveProperty('up');
+  });
+});
+
+describe('chainLookOf and hasOwnHalves', () => {
+  const look = { mode: 'static', speed: 0, direction: 0, brightness: 4, colors: [] };
+
+  it('starts a half from the effect the fan returns to off the Lighting page', () => {
+    expect(chainLookOf(chain('A', { mode: 'custom', effectMode: 'static' })).mode).toBe('static');
+    expect(chainLookOf(chain('A', { mode: 'custom' })).mode).toBe('rainbow');
+    expect(chainLookOf(chain('A', { mode: 'meteor' })).mode).toBe('meteor');
+  });
+
+  it('counts a half as its own only on a chain with scope', () => {
+    expect(hasOwnHalves(chain('A', { supportsScope: true, up: null, down: look }))).toBe(true);
+    expect(hasOwnHalves(chain('A', { supportsScope: true, up: null, down: null }))).toBe(false);
+    expect(hasOwnHalves(chain('A', { down: look }))).toBe(false);
+  });
+
+  it('a chain whose halves have their own looks cannot merge', () => {
+    const modes = [{ key: 'rainbow', hasSpeed: true, hasDirection: true, colorsMin: 0, colorsMax: 0, mergeable: true }];
+    expect(canMerge(chain('A', { modes, supportsScope: true }))).toBe(true);
+    expect(canMerge(chain('A', { modes, supportsScope: true, up: look }))).toBe(false);
   });
 });
 

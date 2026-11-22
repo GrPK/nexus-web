@@ -1,11 +1,51 @@
 // Pure helpers for the Lighting tab's chain list, free of React so they are unit-testable.
 
-import type { LianLiWirelessChainLighting, LianLiWirelessChainPatch } from '../../../api/lianli-wireless';
+import type { LianLiWirelessChainLighting, LianLiWirelessChainPatch, LianLiWirelessHalfLook } from '../../../api/lianli-wireless';
 
-/** Applies a patch to a chain locally; a zone patch merges into the zone with the same id. */
+const LOOK_KEYS = ['mode', 'speed', 'direction', 'brightness', 'colors'] as const;
+
+/** The look a wireless TL half starts from: the chain's own, or the effect it returns to off the Lighting page. */
+export function chainLookOf(chain: LianLiWirelessChainLighting): LianLiWirelessHalfLook {
+  const mode = chain.mode === 'custom' || chain.mode === 'perLane' ? chain.effectMode ?? 'rainbow' : chain.mode;
+  return { mode, speed: chain.speed, direction: chain.direction, brightness: chain.brightness, colors: chain.colors };
+}
+
+/** A wireless TL chain whose halves play looks of their own (L-Connect's Up / Down scope). */
+export function hasOwnHalves(chain: LianLiWirelessChainLighting): boolean {
+  return chain.supportsScope === true && (chain.up != null || chain.down != null);
+}
+
+/**
+ * Applies a patch to a chain locally, as the service does: a zone patch merges into the zone with the
+ * same id; a wireless TL patch with a scope sets that half only, and a whole-fan look drops both halves.
+ */
 export function applyChainPatch(chain: LianLiWirelessChainLighting, patch: LianLiWirelessChainPatch): LianLiWirelessChainLighting {
-  const { zones, ...rest } = patch;
+  const { zones, scope, ...rest } = patch;
+  if (scope && chain.supportsScope) {
+    const { mode, speed, direction, brightness, colors, ...other } = rest;
+    // The effect a chain returns to off the Lighting page is the whole fan's, so a half's look never sets it.
+    delete other.effectMode;
+    const base = chain[scope] ?? chainLookOf(chain);
+    const half: LianLiWirelessHalfLook = {
+      mode: mode ?? base.mode,
+      speed: speed ?? base.speed,
+      direction: direction ?? base.direction,
+      brightness: brightness ?? base.brightness,
+      colors: colors ?? base.colors,
+    };
+    const next: LianLiWirelessChainLighting = { ...chain, ...other, lastScope: scope };
+    if (scope === 'up') next.up = half;
+    else next.down = half;
+    return next;
+  }
   const next = { ...chain, ...rest };
+  const wholeLook = (rest.mode !== undefined && rest.mode !== 'custom')
+    || LOOK_KEYS.some(key => key !== 'mode' && rest[key] !== undefined);
+  if (chain.supportsScope && wholeLook) {
+    next.up = null;
+    next.down = null;
+    next.lastScope = null;
+  }
   if (zones && chain.zones) {
     next.zones = chain.zones.map(z => {
       const change = zones.find(p => p.id === z.id);
@@ -29,7 +69,8 @@ const NON_EFFECT_MODES = ['custom', 'perZone', 'perLane'];
 
 /** The chain plays an effect that has a merged variant, so its Merge switch can take effect. */
 export function canMerge(chain: LianLiWirelessChainLighting): boolean {
-  if (NON_EFFECT_MODES.includes(chain.mode)) return false;
+  // Halves with looks of their own play per half, like a wired fan's per-zone mode.
+  if (NON_EFFECT_MODES.includes(chain.mode) || hasOwnHalves(chain)) return false;
   return chain.modes.some(e => e.key === chain.mode && e.mergeable === true);
 }
 

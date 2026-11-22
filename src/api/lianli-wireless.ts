@@ -167,8 +167,16 @@ export interface LianLiWirelessChainLighting {
   /** Wired LCD Flex only: the fan has zones that can each play their own effect (mode 'perZone'). */
   supportsZones?: boolean;
   zones?: LianLiFlexZone[];
-  /** Wired TL Flex only: the two halves are exchanged. Null or absent when the fan has no such switch. */
+  /** TL fans: the two halves are exchanged. Null or absent when the fan has no such switch. */
   upDownSwap?: boolean | null;
+  /** Wireless TL chains: each half of a fan can play a look of its own (L-Connect's Up / Down scope). Absent on an older service. */
+  supportsScope?: boolean;
+  /** Wireless TL chains: the look of LED 0..12 of each fan when it has one of its own; null plays the chain look. */
+  up?: LianLiWirelessHalfLook | null;
+  /** Wireless TL chains: the look of LED 13..25 of each fan when it has one of its own; null plays the chain look. */
+  down?: LianLiWirelessHalfLook | null;
+  /** Wireless TL chains: the half set last, whose speed both halves play at; null after a whole-fan look. */
+  lastScope?: LianLiWirelessHalf | null;
   /** Wired LCD Flex only: position in the light sequence. */
   sortIndex?: number;
 }
@@ -191,11 +199,30 @@ export interface LianLiWirelessLighting {
   chains: LianLiWirelessChainLighting[];
 }
 
+/** One half of a wireless TL fan: "up" is LED 0..12, "down" LED 13..25. */
+export type LianLiWirelessHalf = 'up' | 'down';
+
+/** The look one half of a wireless TL fan plays on its own. */
+export interface LianLiWirelessHalfLook {
+  mode: string;
+  speed: number;
+  direction: number;
+  brightness: number;
+  colors: string[];
+}
+
 export type LianLiFlexZonePatch = Partial<Omit<LianLiFlexZone, 'ledCount'>> & Pick<LianLiFlexZone, 'id'>;
 
 export type LianLiWirelessChainPatch = Partial<Pick<LianLiWirelessChainLighting,
   'mode' | 'effectMode' | 'speed' | 'direction' | 'brightness' | 'colors' | 'merge' | 'laneSettings' | 'motherboardArgb'
-  | 'upDownSwap' | 'sortIndex'>> & { zones?: LianLiFlexZonePatch[] };
+  | 'upDownSwap' | 'sortIndex'>> & {
+    zones?: LianLiFlexZonePatch[];
+    /**
+     * Wireless TL chains: "up" or "down" puts the look fields on that half of each fan only; absent puts them
+     * on the whole fan, which drops both halves' own looks.
+     */
+    scope?: LianLiWirelessHalf;
+  };
 
 /** The lighting endpoints of one Lian Li fan family; the Lighting tab is written against this. */
 export interface LianLiChainLightingApi {
