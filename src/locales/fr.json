@@ -2134,6 +2134,7 @@
   "diagnostics.reason.smart.uncorrectable": "Secteurs non corrigibles",
   "diagnostics.reason.smart.vendorHealth": "Indicateur d'état constructeur",
   "diagnostics.reason.storage.noSmartSource": "Données SMART indisponibles",
+  "diagnostics.reason.storage.notResponding": "Le disque ne répond pas",
   "diagnostics.reason.system.bugchecks": "Plantages système",
   "diagnostics.reason.system.dirtyShutdowns": "Arrêts inattendus",
   "diagnostics.reason.system.failedUnits": "Services système en échec",

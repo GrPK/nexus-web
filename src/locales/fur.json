@@ -2134,6 +2134,7 @@
   "diagnostics.reason.smart.uncorrectable": "Setôrs no corezibii",
   "diagnostics.reason.smart.vendorHealth": "Indicadôr di stât dal fabricant",
   "diagnostics.reason.storage.noSmartSource": "Dâts SMART no disponibii",
+  "diagnostics.reason.storage.notResponding": "Il disc nol rispuint",
   "diagnostics.reason.system.bugchecks": "Colàs dal sisteme",
   "diagnostics.reason.system.dirtyShutdowns": "Distacaments inspietâts",
   "diagnostics.reason.system.failedUnits": "Servizis di sisteme falîts",

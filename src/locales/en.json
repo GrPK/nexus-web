@@ -2134,6 +2134,7 @@
   "diagnostics.reason.smart.uncorrectable": "Uncorrectable sectors",
   "diagnostics.reason.smart.vendorHealth": "Vendor health indicator",
   "diagnostics.reason.storage.noSmartSource": "SMART data unavailable",
+  "diagnostics.reason.storage.notResponding": "Drive not responding",
   "diagnostics.reason.system.bugchecks": "System crashes",
   "diagnostics.reason.system.dirtyShutdowns": "Unexpected shutdowns",
   "diagnostics.reason.system.failedUnits": "Failed system services",

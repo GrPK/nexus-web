@@ -2134,6 +2134,7 @@
   "diagnostics.reason.smart.uncorrectable": "Sectores no corregibles",
   "diagnostics.reason.smart.vendorHealth": "Indicador de estado del fabricante",
   "diagnostics.reason.storage.noSmartSource": "Datos SMART no disponibles",
+  "diagnostics.reason.storage.notResponding": "La unidad no responde",
   "diagnostics.reason.system.bugchecks": "Fallos del sistema",
   "diagnostics.reason.system.dirtyShutdowns": "Apagados inesperados",
   "diagnostics.reason.system.failedUnits": "Servicios del sistema con fallos",

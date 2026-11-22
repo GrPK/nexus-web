@@ -2134,6 +2134,7 @@
   "diagnostics.reason.smart.uncorrectable": "Nicht korrigierbare Sektoren",
   "diagnostics.reason.smart.vendorHealth": "Herstellerspezifischer Zustandsindikator",
   "diagnostics.reason.storage.noSmartSource": "SMART-Daten nicht verfügbar",
+  "diagnostics.reason.storage.notResponding": "Laufwerk antwortet nicht",
   "diagnostics.reason.system.bugchecks": "Systemabstürze",
   "diagnostics.reason.system.dirtyShutdowns": "Unerwartete Herunterfahrvorgänge",
   "diagnostics.reason.system.failedUnits": "Fehlgeschlagene Systemdienste",

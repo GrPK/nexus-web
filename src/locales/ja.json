@@ -2134,6 +2134,7 @@
   "diagnostics.reason.smart.uncorrectable": "訂正不能セクタ",
   "diagnostics.reason.smart.vendorHealth": "ベンダー健全性指標",
   "diagnostics.reason.storage.noSmartSource": "SMARTデータを取得できません",
+  "diagnostics.reason.storage.notResponding": "ドライブが応答していません",
   "diagnostics.reason.system.bugchecks": "システムクラッシュ",
   "diagnostics.reason.system.dirtyShutdowns": "予期しないシャットダウン",
   "diagnostics.reason.system.failedUnits": "失敗したシステムサービス",
