@@ -128,7 +128,7 @@ import { HydroShift2CurveHeadSettings } from './HydroShift2CurveHeadSettings';
 import { HydroShift2CurveSettings } from './HydroShift2CurveSettings';
 import { AsusGlacialLcdControls } from './AsusGlacialLcdDevicePage';
 import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
-import { hydroShift2CurveMediaPreviewUrl } from '../../../api/hydroshift2Curve';
+import { HYDROSHIFT2_CURVE_LIGHTING_API, hydroShift2CurveMediaPreviewUrl } from '../../../api/hydroshift2Curve';
 import { useFirmwareStatus } from '../../../hooks/useFirmwareStatus';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { Button } from '../../common/Button/Button';
@@ -2172,6 +2172,7 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                     <div className={styles.settingsContent}>
                       <HydroShift2CurveHeadSettings />
                       <HydroShift2CurveSettings screen={curveScreen} />
+                      <HydroShift2RingSettings api={HYDROSHIFT2_CURVE_LIGHTING_API} onSectionNavigate={onSectionNavigate} />
                     </div>
                   )}
                   {activeTab === 'settings' && isGlacialLcdPanel && (

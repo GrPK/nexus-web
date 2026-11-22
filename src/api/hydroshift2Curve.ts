@@ -1,6 +1,7 @@
 import { serializeCrop, type NormalizedCrop } from '../components/common/MediaCropper/mediaCrop';
 import { getTokenSync } from './auth';
 import { fetchService, postService, postServiceForm, putService, resolveHttp } from './service';
+import type { HydroShift2Lighting, HydroShift2LightingApi, HydroShift2LightingPatch } from './hydroshift2';
 
 export interface HydroShift2CurveHead {
   connected: boolean;
@@ -32,6 +33,20 @@ export function recalibrateHydroShift2CurveHead(): Promise<unknown | null> {
 }
 
 const BASE_DEVICE = '/devices/lianli-hydroshift2-curve';
+
+/** The OLED Curved's edge lights: follow the Lighting page ('canvas'), or play one of L-Connect's edge effects. */
+export function getHydroShift2CurveLighting(): Promise<HydroShift2Lighting | null> {
+  return fetchService<HydroShift2Lighting>(`${BASE_DEVICE}/lighting`);
+}
+
+export function setHydroShift2CurveLighting(patch: HydroShift2LightingPatch): Promise<unknown | null> {
+  return putService(`${BASE_DEVICE}/lighting`, patch);
+}
+
+export const HYDROSHIFT2_CURVE_LIGHTING_API: HydroShift2LightingApi = {
+  get: () => getHydroShift2CurveLighting(),
+  set: patch => setHydroShift2CurveLighting(patch),
+};
 
 /** The glass's pixel size; the upload cropper uses the same aspect. */
 export const HYDROSHIFT2_CURVE_SCREEN_ASPECT = 2288 / 1080;
