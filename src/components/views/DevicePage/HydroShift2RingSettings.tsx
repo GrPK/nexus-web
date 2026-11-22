@@ -7,7 +7,9 @@ import {
   getHydroShift2Lighting,
   setHydroShift2Lighting,
   type HydroShift2Lighting,
+  type HydroShift2LightingApi,
   type HydroShift2LightingPatch,
+  type HydroShift2RingMode,
 } from '../../../api/hydroshift2';
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
@@ -16,7 +18,13 @@ import styles from './LianLiDevicePage.module.scss';
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
-const PERCENT_PER_LEVEL = 25;
+const RING_LIGHTING_API: HydroShift2LightingApi = {
+  get: () => getHydroShift2Lighting(),
+  set: patch => setHydroShift2Lighting(patch),
+};
+
+// Speed and brightness levels a service reports no top for.
+const DEFAULT_MAX_LEVEL = 4;
 // Mode key under which the Lighting page drives the ring.
 const LIGHTING_PAGE_MODE = 'canvas';
 // The pump head's own palette, used for any colour the user has not set.
@@ -26,25 +34,30 @@ function effectLabel(t: Translate, key: string): string {
   return t(`devices.lianliEffect.${key}` as Parameters<Translate>[0]);
 }
 
-function fullPalette(colors: string[]): string[] {
-  return DEFAULT_PALETTE.map((fallback, i) => colors[i] ?? fallback);
+/** Every palette slot: the colours set, then the effect's own defaults (or the pump head's), as many as it uses. */
+function fullPalette(colors: string[], mode: HydroShift2RingMode | null): string[] {
+  const fallbacks = mode?.defaultColors?.length ? mode.defaultColors : DEFAULT_PALETTE;
+  const slots = Math.max(DEFAULT_PALETTE.length, fallbacks.length, mode?.colors ?? 0);
+  return Array.from({ length: slots }, (_, i) => colors[i] ?? fallbacks[i] ?? DEFAULT_PALETTE[i % DEFAULT_PALETTE.length]);
 }
 
 interface HydroShift2RingSettingsProps {
   onSectionNavigate?: (section: string) => void;
+  /** The light's lighting endpoints; the pump ring's by default. */
+  api?: HydroShift2LightingApi;
 }
 
-/** The HydroShift II pump ring: follow the Lighting page, or loop one of the pump head's own effects. */
-export function HydroShift2RingSettings({ onSectionNavigate }: HydroShift2RingSettingsProps) {
+/** A HydroShift II light (the pump ring, the OLED Curved's edge): follow the Lighting page, or loop one of its own effects. */
+export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING_API }: HydroShift2RingSettingsProps) {
   const { t } = useTranslation();
   const { numberFormat } = useUnitPrefs();
   const [lighting, setLighting] = useState<HydroShift2Lighting | null>(null);
   const aliveRef = useRef(true);
 
   const refresh = useCallback(async () => {
-    const lt = await getHydroShift2Lighting();
+    const lt = await api.get();
     if (aliveRef.current && lt) setLighting(lt);
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -53,15 +66,16 @@ export function HydroShift2RingSettings({ onSectionNavigate }: HydroShift2RingSe
   }, [refresh]);
 
   const commit = useCallback((patch: HydroShift2LightingPatch) => {
-    void setHydroShift2Lighting(patch);
-  }, []);
+    void api.set(patch);
+  }, [api]);
 
   const loaded = lighting !== null;
   const followsLightingPage = lighting?.mode === LIGHTING_PAGE_MODE;
   const effectKey = lighting ? (followsLightingPage ? lighting.effectMode : lighting.mode) : '';
   const selected = lighting?.modes.find(m => m.key === effectKey) ?? null;
-  const palette = fullPalette(lighting?.colors ?? []);
+  const palette = fullPalette(lighting?.colors ?? [], selected);
   const disabled = !loaded || followsLightingPage;
+  const percentPerLevel = 100 / (lighting?.maxLevel || DEFAULT_MAX_LEVEL);
 
   const levelSlider = (
     label: string,
@@ -73,20 +87,20 @@ export function HydroShift2RingSettings({ onSectionNavigate }: HydroShift2RingSe
       editable
       trackFill
       label={label}
-      value={value * PERCENT_PER_LEVEL}
+      value={value * percentPerLevel}
       min={0}
       max={100}
-      step={PERCENT_PER_LEVEL}
+      step={percentPerLevel}
       formatValue={v => localizeNumbers(`${v}%`, numberFormat)}
       ariaLabel={ariaLabel}
       disabled={disabled}
       onChange={(v: number, done?: boolean) => {
         if (!lighting) return;
-        const level = Math.round(v / PERCENT_PER_LEVEL);
+        const level = Math.round(v / percentPerLevel);
         setLighting({ ...lighting, [key]: level });
         if (done) commit({ [key]: level });
       }}
-      onCommit={(v: number) => commit({ [key]: Math.round(v / PERCENT_PER_LEVEL) })}
+      onCommit={(v: number) => commit({ [key]: Math.round(v / percentPerLevel) })}
     />
   );
 
@@ -160,13 +174,13 @@ export function HydroShift2RingSettings({ onSectionNavigate }: HydroShift2RingSe
                   value={color}
                   onPreview={(hex: string) => {
                     if (!lighting) return;
-                    const next = fullPalette(lighting.colors);
+                    const next = fullPalette(lighting.colors, selected);
                     next[i] = hex;
                     setLighting({ ...lighting, colors: next });
                   }}
                   onCommit={(hex: string) => {
                     if (!lighting) return;
-                    const next = fullPalette(lighting.colors);
+                    const next = fullPalette(lighting.colors, selected);
                     next[i] = hex;
                     setLighting({ ...lighting, colors: next });
                     commit({ colors: next });
