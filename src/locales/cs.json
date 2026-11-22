@@ -1188,6 +1188,8 @@
   "devices.lianli-flex.zoneInner": "Vnitřní",
   "devices.lianli-flex.zoneOuter": "Vnější",
   "devices.lianli-flex.zoneUp": "Horní",
+  "devices.lianli-hub.syncAll": "Synchronizovat všechna světla Lian Li",
+  "devices.lianli-hub.syncAllHint": "Všechna světla Lian Li přehrávají společně jeden efekt.",
   "devices.lianli-tl.addColor": "Přidat barvu",
   "devices.lianli-tl.colorsNote": "Barvy platí jen pro režimy, které je používají, řadič případné další ignoruje.",
   "devices.lianli-tl.directionN": "Směr {n}",

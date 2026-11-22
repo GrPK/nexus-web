@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "Intérieur",
   "devices.lianli-flex.zoneOuter": "Extérieur",
   "devices.lianli-flex.zoneUp": "Haut",
+  "devices.lianli-hub.syncAll": "Synchroniser toutes les lumières Lian Li",
+  "devices.lianli-hub.syncAllHint": "Toutes les lumières Lian Li jouent un même effet ensemble.",
   "devices.lianli-tl.addColor": "Ajouter une couleur",
   "devices.lianli-tl.colorsNote": "Les couleurs ne s'appliquent qu'aux modes qui les utilisent ; le contrôleur ignore les autres.",
   "devices.lianli-tl.directionN": "Direction {n}",

@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "内圈",
   "devices.lianli-flex.zoneOuter": "外圈",
   "devices.lianli-flex.zoneUp": "上",
+  "devices.lianli-hub.syncAll": "同步所有 Lian Li 灯光",
+  "devices.lianli-hub.syncAllHint": "所有 Lian Li 灯光一起播放同一个效果。",
   "devices.lianli-tl.addColor": "添加颜色",
   "devices.lianli-tl.colorsNote": "颜色仅对使用颜色的模式生效，多余的颜色会被控制器忽略。",
   "devices.lianli-tl.directionN": "方向 {n}",

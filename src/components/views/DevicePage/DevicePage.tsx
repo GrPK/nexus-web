@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, Unplug } from 'lucide-react';
-import { useUnifiedDevices, controlGateIsPanel, claimsKey, type UnifiedDevice } from '../../../hooks/useUnifiedDevices';
+import {
+  useUnifiedDevices, controlGateIsPanel, claimsKey, groupMembers, LIANLI_GROUP, LIANLI_HUB_KEY, type UnifiedDevice,
+} from '../../../hooks/useUnifiedDevices';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { ServiceRequired } from '../ServiceRequired';
@@ -16,6 +18,7 @@ import { SdkMarketplacePage } from '../../../panel/widgets/marketplace/SdkMarket
 import { typeForMarketplace } from '../../../widgets/marketplaceRegistry';
 import { LianLiTlDevicePage } from './LianLiTlDevicePage';
 import { LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
+import { LianLiHubPage } from './LianLiHubPage';
 import { Galahad2DevicePage } from './Galahad2DevicePage';
 import { AsiahorseUmbraDevicePage } from './AsiahorseUmbraDevicePage';
 import { AsusGlacialLcdDevicePage } from './AsusGlacialLcdDevicePage';
@@ -218,7 +221,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
       )}
       <div className={holdBody ? styles.bodyHeld : styles.bodyShown}>
         <DeviceDetectingContext.Provider value={reportWaiting}>
-          <DeviceBody device={device} controlDevice={controlDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />
+          <DeviceBody device={device} unified={unified} controlDevice={controlDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />
         </DeviceDetectingContext.Provider>
       </div>
     </>
@@ -227,13 +230,19 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
 
 interface DeviceBodyProps {
   device: UnifiedDevice;
+  /** Every listed device, for a group entry's page. */
+  unified: readonly UnifiedDevice[];
   controlDevice: (id: string, nextEnabled: boolean) => Promise<unknown>;
   platform: string;
   onOpenFirmware?: () => void;
   onSectionNavigate?: DashboardSectionNavigate;
 }
 
-function DeviceBody({ device, controlDevice, platform, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
+function DeviceBody({ device, unified, controlDevice, platform, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
+  if (device.key === LIANLI_HUB_KEY) {
+    return <LianLiHubPage key={device.key} members={groupMembers(unified, LIANLI_GROUP)} controlDevice={controlDevice} onSectionNavigate={onSectionNavigate} />;
+  }
+
   if (device.kind === 'panel' && device.panelDevice && device.curatedId === 'asus-glacial-lcd') {
     return <GlacialPanelRoute key={device.key} device={device.panelDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />;
   }

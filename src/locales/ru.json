@@ -1188,6 +1188,8 @@
   "devices.lianli-flex.zoneInner": "Внутренняя",
   "devices.lianli-flex.zoneOuter": "Внешняя",
   "devices.lianli-flex.zoneUp": "Верх",
+  "devices.lianli-hub.syncAll": "Синхронизировать всю подсветку Lian Li",
+  "devices.lianli-hub.syncAllHint": "Вся подсветка Lian Li воспроизводит один эффект одновременно.",
   "devices.lianli-tl.addColor": "Добавить цвет",
   "devices.lianli-tl.colorsNote": "Цвета применяются только к режимам, которые их используют; лишние контроллер игнорирует.",
   "devices.lianli-tl.directionN": "Направление {n}",

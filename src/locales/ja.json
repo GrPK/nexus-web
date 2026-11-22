@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "内側",
   "devices.lianli-flex.zoneOuter": "外側",
   "devices.lianli-flex.zoneUp": "上",
+  "devices.lianli-hub.syncAll": "すべての Lian Li ライトを同期",
+  "devices.lianli-hub.syncAllHint": "すべての Lian Li ライトが 1 つのエフェクトを一緒に再生します。",
   "devices.lianli-tl.addColor": "色を追加",
   "devices.lianli-tl.colorsNote": "色は使用するモードにのみ適用され、余分な色はコントローラーが無視します。",
   "devices.lianli-tl.directionN": "方向 {n}",

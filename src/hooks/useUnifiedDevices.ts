@@ -77,6 +77,58 @@ export interface UnifiedDevice {
   bus?: 'usb' | 'smbus';
   // 'failing' while Nexus controls the device but its lighting writes keep failing.
   writeHealth?: 'failing';
+  // Set on a device the sidebar and the Devices list show inside a group entry
+  // (the Lian Li page) instead of on its own row. Its own page still opens.
+  groupKey?: typeof LIANLI_GROUP;
+}
+
+/** The group the Lian Li devices share, and the key of its entry. */
+export const LIANLI_GROUP = 'lianli' as const;
+export const LIANLI_HUB_KEY = 'lianli-hub';
+// Below this many connected Lian Li devices each keeps its own row.
+const LIANLI_GROUP_MIN = 2;
+
+/** A Lian Li device by its handler or panel source id: the Uni hubs, TL, Galahad, L-Wireless, Flex, Strimer and the Lian Li screens. */
+export function isLianLiMemberId(id: string | undefined): boolean {
+  return !!id && (id === 'strimer' || id.startsWith('lianli'));
+}
+
+/**
+ * With two or more Lian Li devices connected, marks each as a member of the
+ * Lian Li group and adds one "Lian Li" entry for them, like L-Connect's single
+ * window. The members stay in the list, so their own pages, search and Nexus
+ * Control keep working; the sidebar and the Devices list show the entry.
+ */
+export function groupLianLiDevices(list: readonly UnifiedDevice[]): UnifiedDevice[] {
+  const memberKeys = new Set(
+    list.filter(d => d.connected && !d.simulated && isLianLiMemberId(d.curatedId)).map(d => d.key),
+  );
+  if (memberKeys.size < LIANLI_GROUP_MIN) return [...list];
+  const grouped = list.map((d): UnifiedDevice => (memberKeys.has(d.key) ? { ...d, groupKey: LIANLI_GROUP } : d));
+  const warning = grouped.find(d => d.groupKey && d.warning)?.warning;
+  grouped.push({
+    key: LIANLI_HUB_KEY,
+    shortName: 'Lian Li',
+    name: 'Lian Li',
+    subtitle: 'cooler',
+    category: 'cooler',
+    iconSrc: CURATED_ICONS.lianli ?? FALLBACK_ICON,
+    connected: true,
+    kind: 'curated',
+    navigable: true,
+    nexusControlEnabled: true,
+    supportsNexusControl: false,
+    experimental: false,
+    requiresBeta: false,
+    warning,
+    bus: 'usb',
+  });
+  return grouped;
+}
+
+/** The devices a group entry stands for. */
+export function groupMembers(list: readonly UnifiedDevice[], group: string): UnifiedDevice[] {
+  return list.filter(d => d.groupKey === group);
 }
 
 // A simulated panel carries the marker on its panel record; the Tryx sim sets
@@ -329,7 +381,7 @@ export function useUnifiedDevices(enabled: boolean) {
         bus: 'usb',
       });
     }
-    return list;
+    return groupLianLiDevices(list);
   }, [panels.devices, devices, deviceApps, streamDecks, tryxSimulated, t]);
 
   const turnedOffMonitorKeys = useMemo(

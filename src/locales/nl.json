@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "Binnen",
   "devices.lianli-flex.zoneOuter": "Buiten",
   "devices.lianli-flex.zoneUp": "Boven",
+  "devices.lianli-hub.syncAll": "Alle Lian Li-verlichting synchroniseren",
+  "devices.lianli-hub.syncAllHint": "Alle Lian Li-verlichting speelt samen één effect.",
   "devices.lianli-tl.addColor": "Kleur toevoegen",
   "devices.lianli-tl.colorsNote": "Kleuren gelden alleen voor modi die ze gebruiken; de controller negeert de rest.",
   "devices.lianli-tl.directionN": "Richting {n}",

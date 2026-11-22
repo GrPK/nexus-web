@@ -129,6 +129,7 @@ import { HydroShift2CurveSettings } from './HydroShift2CurveSettings';
 import { AsusGlacialLcdControls } from './AsusGlacialLcdDevicePage';
 import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
 import { HYDROSHIFT2_CURVE_LIGHTING_API, hydroShift2CurveMediaPreviewUrl } from '../../../api/hydroshift2Curve';
+import { LIANLI_SCREEN88_LIGHTING_API } from '../../../api/lianliScreen88';
 import { useFirmwareStatus } from '../../../hooks/useFirmwareStatus';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { Button } from '../../common/Button/Button';
@@ -556,6 +557,8 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
   const isCorsairLinkLcdPanel = recordFamily === 'corsair-link-lcd' && !isSimulated;
   const isHydroShift2Panel = recordFamily === 'lianli-hydroshift2' && !isSimulated;
   const isHydroShift2CurvePanel = recordFamily === 'lianli-hydroshift2-curve' && !isSimulated;
+  // The Universal Screen 8.8: its bezel LEDs are the service's own, set from this page's settings tab.
+  const isScreen88Panel = recordFamily === 'lianli-screen88' && !isSimulated;
   const isGlacialLcdPanel = recordFamily === 'asus-glacial-lcd' && !isSimulated;
   const curveScreen = useHydroShift2CurveScreen(isHydroShift2CurvePanel);
   // Cooler LCDs whose firmware takes a backlight command. The service decides
@@ -654,7 +657,8 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
     || isDimmableLcdPanel
     || isSecondaryMonitorCapablePanel
     || hasFrameRateSetting
-    || isGlacialLcdPanel;
+    || isGlacialLcdPanel
+    || isScreen88Panel;
   const activeTab: Tab = tab === 'settings' && !settingsAvailable ? 'widgets' : tab;
   // Theme and layout read and write the panel record for simulators and hardware alike;
   // a simulator has no display or cooler, so its hardware controls are off.
@@ -2173,6 +2177,11 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                       <HydroShift2CurveHeadSettings />
                       <HydroShift2CurveSettings screen={curveScreen} />
                       <HydroShift2RingSettings api={HYDROSHIFT2_CURVE_LIGHTING_API} onSectionNavigate={onSectionNavigate} />
+                    </div>
+                  )}
+                  {activeTab === 'settings' && isScreen88Panel && (
+                    <div className={styles.settingsContent}>
+                      <HydroShift2RingSettings api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={onSectionNavigate} />
                     </div>
                   )}
                   {activeTab === 'settings' && isGlacialLcdPanel && (

@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "İç",
   "devices.lianli-flex.zoneOuter": "Dış",
   "devices.lianli-flex.zoneUp": "Üst",
+  "devices.lianli-hub.syncAll": "Tüm Lian Li ışıklarını eşitle",
+  "devices.lianli-hub.syncAllHint": "Tüm Lian Li ışıkları tek bir efekti birlikte oynatır.",
   "devices.lianli-tl.addColor": "Renk ekle",
   "devices.lianli-tl.colorsNote": "Renkler yalnızca onları kullanan modlarda geçerlidir; denetleyici fazlalıkları yok sayar.",
   "devices.lianli-tl.directionN": "Yön {n}",
