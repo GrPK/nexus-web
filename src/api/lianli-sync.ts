@@ -8,6 +8,11 @@ import { fetchService, putService } from './service';
 /** One effect the synced lights can play together, with its own saved look. */
 export interface LianLiSyncEffect {
   key: string;
+  /**
+   * One of L-Connect's merged ("wireless", W*) Quick Sync effects: drawn once across every
+   * device in `devices` order. False or absent for the ones each device plays on its own.
+   */
+  merge?: boolean;
   hasSpeed: boolean;
   hasDirection: boolean;
   /** The effect takes exactly this many colours. */

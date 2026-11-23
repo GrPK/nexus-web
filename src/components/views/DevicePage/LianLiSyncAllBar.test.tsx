@@ -1,7 +1,24 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LianLiSyncAllBar } from './LianLiSyncAllBar';
-import type { LianLiSyncAll } from '../../../api/lianli-sync';
+import { LianLiSyncAllBar, syncEffectOptions } from './LianLiSyncAllBar';
+import type { LianLiSyncAll, LianLiSyncEffect } from '../../../api/lianli-sync';
+import en from '../../../locales/en.json';
+
+/**
+ * Every effect key GET /devices/lianli/sync can send: the six each device plays
+ * (service LianLiSync.Effects) and L-Connect's 19 merged ones (LianLiMerge.Effects).
+ */
+const SERVICE_EFFECT_KEYS = [
+  'rainbow', 'rainbowMorph', 'static', 'breathing', 'meteor', 'runway',
+  'mergeRainbow', 'mergeRainbowMorph', 'mergeStatic', 'mergeBreathing', 'mergeMeteor', 'mergeRunway',
+  'mergeStack', 'mergeTwinkle', 'mergeColorCycle', 'mergeCoverCycle', 'mergeWave', 'mergeMeteorShower',
+  'mergeDisco', 'mergeBlowUp', 'mergeHeartBeat', 'mergeWarning', 'mergeSeaFlow', 'mergeRipple', 'mergeEcho',
+];
+
+const mergeEffect = (key: string): LianLiSyncEffect => ({
+  key, merge: true, hasSpeed: true, hasDirection: true, colorsMax: 0, defaultSpeed: 3, defaultColors: [],
+  speed: 3, brightness: 4, direction: 0, colors: [],
+});
 
 vi.mock('../../../lib/i18n', () => ({
   useTranslation: () => ({
@@ -128,6 +145,36 @@ describe('LianLiSyncAllBar', () => {
     expect(inputs.map(i => i.value.toLowerCase())).toEqual(['#ff0000']);
     fireEvent.change(inputs[0], { target: { value: '#00ffaa' } });
     expect(set).toHaveBeenLastCalledWith({ colors: ['#00ffaa'] });
+  });
+
+  it('every effect key the service can send has an English label', () => {
+    const labels = en as Record<string, string>;
+    expect(SERVICE_EFFECT_KEYS.filter(k => !labels[`devices.lianliEffect.${k}`])).toEqual([]);
+  });
+
+  it('lists L-Connect\'s merged effects under their own heading, after the ones each device plays', async () => {
+    const effects = [...sync.effects, mergeEffect('mergeRainbow'), mergeEffect('mergeEcho')];
+    expect(syncEffectOptions((k: string) => k, effects).map(o => (o.header ? `# ${o.label}` : o.value))).toEqual([
+      '# devices.lianli-hub.syncEachDevice', 'rainbow', 'meteor', 'static',
+      '# devices.lianli-hub.syncMerged', 'mergeRainbow', 'mergeEcho',
+    ]);
+    await renderBar({ ...sync, enabled: true, effects });
+    fireEvent.click(screen.getByLabelText('devices.lianli.lightingMode'));
+    const options = await screen.findAllByRole('option');
+    expect(options.map(o => o.textContent)).toEqual([
+      'devices.lianliEffect.rainbow', 'devices.lianliEffect.meteor', 'devices.lianliEffect.static',
+      'devices.lianliEffect.mergeRainbow', 'devices.lianliEffect.mergeEcho',
+    ]);
+    expect(screen.getByText('devices.lianli-hub.syncMerged')).toBeInTheDocument();
+  });
+
+  it('picking a merged effect sends its key', async () => {
+    await renderBar({ ...sync, enabled: true, effects: [...sync.effects, mergeEffect('mergeWave')] });
+    fireEvent.click(screen.getByLabelText('devices.lianli.lightingMode'));
+    await act(async () => {
+      fireEvent.click(await screen.findByRole('option', { name: 'devices.lianliEffect.mergeWave' }));
+    });
+    expect(set).toHaveBeenCalledWith({ effect: 'mergeWave' });
   });
 
   it('speed, brightness and direction go to the current effect', async () => {

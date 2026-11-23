@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SettingRow, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
+import type { SelectOption } from '../../common/Select/Select';
 import {
   LIANLI_SYNC_ALL_API, type LianLiSyncAll, type LianLiSyncAllApi, type LianLiSyncAllPatch, type LianLiSyncEffect,
 } from '../../../api/lianli-sync';
@@ -17,6 +18,32 @@ interface LianLiSyncAllBarProps {
   api?: LianLiSyncAllApi;
   /** Runs after a write the service accepted, so the per-device looks below are read again. */
   onWritten?: () => void;
+}
+
+type Translate = ReturnType<typeof useTranslation>['t'];
+
+/**
+ * The effect picker's options in the service's order. When both kinds are listed, a heading
+ * goes before the ones each device plays on its own and before L-Connect's merged ones, which
+ * L-Connect marks "(W*)" as their labels here do.
+ */
+export function syncEffectOptions(t: Translate, effects: readonly LianLiSyncEffect[]): SelectOption[] {
+  const grouped = effects.some(e => e.merge) && effects.some(e => !e.merge);
+  const options: SelectOption[] = [];
+  let group: boolean | null = null;
+  for (const e of effects) {
+    const merge = e.merge === true;
+    if (grouped && merge !== group) {
+      group = merge;
+      options.push({
+        value: merge ? 'group-merged' : 'group-each',
+        label: t(merge ? 'devices.lianli-hub.syncMerged' : 'devices.lianli-hub.syncEachDevice'),
+        header: true,
+      });
+    }
+    options.push({ value: e.key, label: effectLabel(t, e.key) });
+  }
+  return options;
 }
 
 /** The sync effects as the shared effect controls read them: each takes exactly its colour count. */
@@ -118,7 +145,7 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten }: LianL
       <LianLiChainEffectControls
         modes={asModes(data.effects)}
         value={value}
-        modeOptions={data.effects.map(e => ({ value: e.key, label: effectLabel(t, e.key) }))}
+        modeOptions={syncEffectOptions(t, data.effects)}
         modeValue={current.key}
         disabled={!data.enabled}
         paletteDimmed={!data.enabled}
