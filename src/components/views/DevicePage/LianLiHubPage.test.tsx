@@ -178,11 +178,11 @@ describe('LianLiHubPage', () => {
     ]);
   });
 
-  it('the Curve\'s head position stays with its screen under Screens; only the pump option goes under Cooling', async () => {
+  it('the Curve\'s head position is on neither tab (only its own page); only the pump option goes under Cooling', async () => {
     await renderHub([curve, screen88]);
     expect(screen.getAllByRole('tab').map(t => t.textContent)).toContain('cooling.title');
     await openTab('devices.lianli-wireless.tab.screen');
-    expect(screen.getByTestId('curve-head')).toBeInTheDocument();
+    expect(screen.queryByTestId('curve-head')).not.toBeInTheDocument();
     expect(screen.getByTestId('curve-screen')).toBeInTheDocument();
     expect(screen.queryByTestId('curve-pump')).not.toBeInTheDocument();
     await openTab('cooling.title');

@@ -18,7 +18,6 @@ import { DeviceCard } from '../../../panel/widgets/devices/DevicesPage';
 import { lianLiFlexCoolingAnchors, lianLiFlexLightingAnchors, lianLiWirelessCoolingAnchors, lianLiWirelessLightingAnchors } from '../../../lib/pageAnchors';
 import { useTranslation } from '../../../lib/i18n';
 import { CoolingPageShortcut, LightingPageShortcut } from './CoolingPageLink';
-import { HydroShift2CurveHeadSettings } from './HydroShift2CurveHeadSettings';
 import { HydroShift2CurvePumpSettings, HydroShift2CurveSettings } from './HydroShift2CurveSettings';
 import { HydroShift2RingSettings } from './HydroShift2RingSettings';
 import { LianLiScreen88Settings } from './LianLiScreen88Settings';
@@ -54,8 +53,8 @@ interface LianLiHubPageProps {
  * Devices tab (each card opens its own page; the L-Wireless and Flex ones show
  * only their connection and wireless devices there), all their lights on
  * Lighting (Sync all, the chains, and the HydroShift II ring, Curve edge and 8.8"
- * bezel on one card), their screens on Screens (the Curve with its head
- * position), and their fans and pumps on Cooling.
+ * bezel on one card), their screens on Screens, and their fans and pumps on Cooling (the Curve's
+ * head position lives only on its own panel page).
  */
 export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: LianLiHubPageProps) {
   const { t } = useTranslation();
@@ -92,7 +91,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
 
   const hasLighting = wireless || flex || !!ring || !!curve || !!screen88 || !!screen88Led || ownPage.length > 0;
   const hasScreens = wireless || flex || panels.length > 0 || screen88Windows;
-  // The Curve's pump option is a cooling setting; its head position stays with its screen.
+  // The Curve's pump option is a cooling setting; its head position is on its own panel page only.
   const hasCooling = wireless || flex || !!curve;
   const tabs = [
     { key: 'devices', label: t('devices.lianli-wireless.tab.devices'), icon: <RadioReceiver size={14} /> },
@@ -194,7 +193,6 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
               {units.filter(u => u.hasScreen).map(unit => (
                 <LianLiUnitTabBody key={unit.flex ? FLEX_ID : WIRELESS_ID} unit={unit} tab="screen" onSectionNavigate={onSectionNavigate} embedded />
               ))}
-              {curve && <HydroShift2CurveHeadSettings />}
               {curve && <HydroShift2CurveSettings screen={curveScreen} />}
               {(screen88Panel || screen88Windows) && <LianLiScreen88Settings screen={screen88Screen} title={screen88Title} />}
               {panels.map(p => openRow(p, p.name, t('devices.lianli-wireless.openPanel')))}
