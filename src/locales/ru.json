@@ -4343,6 +4343,7 @@
   "monitoring.settings.customLabel": "Своя подпись",
   "monitoring.settings.description": "Выберите, статистика какого GPU отображается на всей панели.",
   "monitoring.settings.design": "Дизайн",
+  "monitoring.settings.designColumns": "Вертикальные столбцы",
   "monitoring.settings.designSimple": "Подпись + значение",
   "monitoring.settings.device": "Устройство",
   "monitoring.settings.gradientReset": "Сбросить цвета",

@@ -4343,6 +4343,7 @@
   "monitoring.settings.customLabel": "Vlastní popisek",
   "monitoring.settings.description": "Vyberte GPU, jejíž statistiky se zobrazují v celém dashboardu.",
   "monitoring.settings.design": "Design",
+  "monitoring.settings.designColumns": "Svislé sloupce",
   "monitoring.settings.designSimple": "Popisek + hodnota",
   "monitoring.settings.device": "Zařízení",
   "monitoring.settings.gradientReset": "Obnovit barvy",

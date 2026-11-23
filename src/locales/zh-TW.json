@@ -4299,6 +4299,7 @@
   "monitoring.settings.customLabel": "自訂標籤",
   "monitoring.settings.description": "選擇要在整個儀表板中顯示統計資料的 GPU。",
   "monitoring.settings.design": "設計",
+  "monitoring.settings.designColumns": "垂直長條",
   "monitoring.settings.designSimple": "標籤 + 值",
   "monitoring.settings.device": "裝置",
   "monitoring.settings.gradientReset": "重設顏色",

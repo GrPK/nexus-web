@@ -4299,6 +4299,7 @@
   "monitoring.settings.customLabel": "Etichete personalizade",
   "monitoring.settings.description": "Sielç di cuâl GPU mostrâ lis statistichis tal cruscot.",
   "monitoring.settings.design": "Design",
+  "monitoring.settings.designColumns": "Bares verticâls",
   "monitoring.settings.designSimple": "Etichete + valôr",
   "monitoring.settings.device": "Dispositîf",
   "monitoring.settings.gradientReset": "Ripristine i colôrs",

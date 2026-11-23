@@ -123,7 +123,8 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
   // keeps all rows in one column.
   const microDesign = microDesignOf(widget.config);
   const microAlign = microAlignOf(widget.config);
-  const twoColumn = isTwoColumnMicro(widget.size, count);
+  const verticalBars = microDesign === 'columns';
+  const twoColumn = !verticalBars && isTwoColumnMicro(widget.size, count);
 
   const selectable = typeof onSelectSlot === 'function';
   const activeSlot = selectedSlot == null ? 0 : Math.max(0, Math.min(selectedSlot, count - 1));
@@ -195,7 +196,7 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
           <div className={styles.rows}>{rowEls.slice(half)}</div>
         </div>
       ) : (
-        <div className={styles.rows}>{rowEls}</div>
+        <div className={verticalBars ? styles.barColumns : styles.rows}>{rowEls}</div>
       )}
       {!categoryHidden && (
         <HoverTooltip body={bottomLabel} side="top">

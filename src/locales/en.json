@@ -4299,6 +4299,7 @@
   "monitoring.settings.customLabel": "Custom label",
   "monitoring.settings.description": "Choose which GPU's stats appear across the dashboard.",
   "monitoring.settings.design": "Design",
+  "monitoring.settings.designColumns": "Vertical Bars",
   "monitoring.settings.designSimple": "Label + Value",
   "monitoring.settings.device": "Device",
   "monitoring.settings.gradientReset": "Reset colors",

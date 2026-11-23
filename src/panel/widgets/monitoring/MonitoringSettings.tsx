@@ -429,7 +429,7 @@ export function MonitoringSettings({ widget, surface, desktopEditor, onUpdate, s
     // Row style shared by every row.
     const microDesign = microDesignOf(widget.config);
     const microAlign = microAlignOf(widget.config);
-    const microDesignLabel = (k: MicroDesignKey) => (k === 'simple' ? t('monitoring.settings.designSimple') : GAUGE_DESIGN_LABELS[k]);
+    const microDesignLabel = (k: MicroDesignKey) => (k === 'simple' ? t('monitoring.settings.designSimple') : k === 'columns' ? t('monitoring.settings.designColumns') : GAUGE_DESIGN_LABELS[k]);
     // Micro has one shared range for every bar (no per-slot scale). The default
     // Fixed ceiling is the device's static max; the user types free overrides.
     const microScale = (widget.config?.micro_scale as ScaleMode | undefined) ?? DEFAULT_SCALE_MODE;

@@ -51,8 +51,10 @@ export const MICRO_WIDE_COUNTS = [6, 8] as const;
 // sweeping the whole row behind the caption), and Backdrop (dim filled history
 // graph behind the caption). Rendered by MicroBar, not the tile GaugeComponents.
 // 'simple' is Micro-only: label above value, no track, fill, or graph.
-export type MicroDesignKey = Extract<GaugeDesignKey, 'bar' | 'fill' | 'backdrop'> | 'simple';
-export const MICRO_DESIGN_KEYS: MicroDesignKey[] = ['bar', 'fill', 'backdrop', 'simple'];
+// 'columns' is Micro-only: every row becomes a vertical fill column with its
+// value underneath, side by side in one row; labels are dropped.
+export type MicroDesignKey = Extract<GaugeDesignKey, 'bar' | 'fill' | 'backdrop'> | 'simple' | 'columns';
+export const MICRO_DESIGN_KEYS: MicroDesignKey[] = ['bar', 'fill', 'backdrop', 'simple', 'columns'];
 export const DEFAULT_MICRO_DESIGN: MicroDesignKey = 'bar';
 
 export function microDesignOf(config: Record<string, PanelConfigValue> | undefined): MicroDesignKey {

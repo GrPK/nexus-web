@@ -4299,6 +4299,7 @@
   "monitoring.settings.customLabel": "カスタムラベル",
   "monitoring.settings.description": "ダッシュボード全体で統計を表示する GPU を選択します。",
   "monitoring.settings.design": "デザイン",
+  "monitoring.settings.designColumns": "縦棒",
   "monitoring.settings.designSimple": "ラベル + 値",
   "monitoring.settings.device": "デバイス",
   "monitoring.settings.gradientReset": "色をリセット",

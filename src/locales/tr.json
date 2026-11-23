@@ -4299,6 +4299,7 @@
   "monitoring.settings.customLabel": "Özel etiket",
   "monitoring.settings.description": "Pano genelinde hangi GPU'nun istatistiklerinin gösterileceğini seçin.",
   "monitoring.settings.design": "Tasarım",
+  "monitoring.settings.designColumns": "Dikey çubuklar",
   "monitoring.settings.designSimple": "Etiket + değer",
   "monitoring.settings.device": "Cihaz",
   "monitoring.settings.gradientReset": "Renkleri sıfırla",

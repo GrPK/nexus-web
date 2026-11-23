@@ -40,7 +40,7 @@ import { FRAME_FILLING_DESIGNS, GAUGE_DESIGN_KEYS } from './gauges';
 describe('perfSlots', () => {
   describe('Micro simple design', () => {
     it('is offered alongside the bar designs', () => {
-      expect(MICRO_DESIGN_KEYS).toEqual(['bar', 'fill', 'backdrop', 'simple']);
+      expect(MICRO_DESIGN_KEYS).toEqual(['bar', 'fill', 'backdrop', 'simple', 'columns']);
     });
     it('microDesignOf falls back to bar for unknown or missing values', () => {
       expect(microDesignOf(undefined)).toBe('bar');

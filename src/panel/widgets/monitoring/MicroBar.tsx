@@ -28,6 +28,23 @@ interface MicroBarProps {
   style?: CSSProperties;
 }
 
+function ColumnRow({ label, formatted, fillPercent, style }: { label: string; formatted: string; fillPercent: number; style?: CSSProperties }) {
+  const { boxRef, contentRef, scale } = useFitWidth(1, false);
+  const clamped = Math.max(0, Math.min(100, fillPercent));
+  return (
+    <div className={styles.rowColumn} style={style} role="group" aria-label={label || undefined}>
+      <div className={styles.columnTrack}>
+        <div className={styles.columnFill} style={{ height: `${clamped}%` }} />
+      </div>
+      <div ref={boxRef} className={styles.columnValueBox}>
+        <div ref={contentRef} className={styles.columnValueContent} style={{ transform: `scale(${scale})` }}>
+          <GaugeValue formatted={formatted} className={styles.columnValue} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SimpleRow({ label, formatted, align, style }: { label: string; formatted: string; align: MicroAlign; style?: CSSProperties }) {
   const { boxRef, contentRef, scale } = useFitWidth(1, true);
   return (
@@ -48,6 +65,7 @@ export function MicroBar(props: MicroBarProps) {
 }
 
 function MicroBarRow({ label, formatted, fillPercent, design = 'bar', align = 'left', history, historyDomain, gradient, style }: MicroBarProps) {
+  if (design === 'columns') return <ColumnRow label={label} formatted={formatted} fillPercent={fillPercent} style={style} />;
   if (design === 'simple') return <SimpleRow label={label} formatted={formatted} align={align} style={style} />;
 
   const head = (

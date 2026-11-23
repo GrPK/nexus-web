@@ -4299,6 +4299,7 @@
   "monitoring.settings.customLabel": "Rótulo personalizado",
   "monitoring.settings.description": "Escolha de qual GPU as estatísticas são exibidas em todo o painel.",
   "monitoring.settings.design": "Design",
+  "monitoring.settings.designColumns": "Barras verticais",
   "monitoring.settings.designSimple": "Rótulo + valor",
   "monitoring.settings.device": "Dispositivo",
   "monitoring.settings.gradientReset": "Redefinir cores",

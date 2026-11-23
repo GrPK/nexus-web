@@ -4343,6 +4343,7 @@
   "monitoring.settings.customLabel": "Własna etykieta",
   "monitoring.settings.description": "Wybierz, którego GPU statystyki są wyświetlane na całym pulpicie.",
   "monitoring.settings.design": "Wygląd",
+  "monitoring.settings.designColumns": "Słupki pionowe",
   "monitoring.settings.designSimple": "Etykieta + wartość",
   "monitoring.settings.device": "Urządzenie",
   "monitoring.settings.gradientReset": "Resetuj kolory",

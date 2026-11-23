@@ -4299,6 +4299,7 @@
   "monitoring.settings.customLabel": "Aangepast label",
   "monitoring.settings.description": "Kies welke GPU-statistieken overal op het dashboard verschijnen.",
   "monitoring.settings.design": "Ontwerp",
+  "monitoring.settings.designColumns": "Verticale balken",
   "monitoring.settings.designSimple": "Label + waarde",
   "monitoring.settings.device": "Apparaat",
   "monitoring.settings.gradientReset": "Kleuren herstellen",

@@ -4299,6 +4299,7 @@
   "monitoring.settings.customLabel": "Eigene Beschriftung",
   "monitoring.settings.description": "Wähle, welche GPU-Werte im gesamten Dashboard angezeigt werden.",
   "monitoring.settings.design": "Design",
+  "monitoring.settings.designColumns": "Vertikale Balken",
   "monitoring.settings.designSimple": "Beschriftung + Wert",
   "monitoring.settings.device": "Gerät",
   "monitoring.settings.gradientReset": "Farben zurücksetzen",

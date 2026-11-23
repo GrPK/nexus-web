@@ -4299,6 +4299,7 @@
   "monitoring.settings.customLabel": "사용자 지정 라벨",
   "monitoring.settings.description": "대시보드 전반에 통계를 표시할 GPU를 선택하세요.",
   "monitoring.settings.design": "디자인",
+  "monitoring.settings.designColumns": "세로 막대",
   "monitoring.settings.designSimple": "라벨 + 값",
   "monitoring.settings.device": "장치",
   "monitoring.settings.gradientReset": "색상 초기화",
