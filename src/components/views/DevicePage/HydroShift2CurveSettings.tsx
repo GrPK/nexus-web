@@ -29,8 +29,28 @@ interface CropTarget {
   file: File;
 }
 
-/** The HydroShift II Curved screen (Nexus panel or an uploaded video), screen saver, clock and pump options. */
-export function HydroShift2CurveSettings({ screen }: { screen: HydroShift2CurveScreen }) {
+/** The pump option: the pump follows the motherboard's pump header. Shown with the cooling where the screen and cooling are apart (the Lian Li page). */
+export function HydroShift2CurvePumpSettings({ screen }: { screen: HydroShift2CurveScreen }) {
+  const { settings, write } = screen;
+  const { t } = useTranslation();
+  if (!settings || !settings.connected) return null;
+  return (
+    <SettingsSection title={t('devices.lianliCurve.pumpSection')}>
+      <SettingToggle
+        label={t('devices.lianliCurve.pumpFollowsMotherboard')}
+        description={t('devices.lianliCurve.pumpFollowsMotherboardHint')}
+        checked={settings.pumpFollowsMotherboard}
+        onChange={pumpFollowsMotherboard => { void write({ pumpFollowsMotherboard }); }}
+      />
+    </SettingsSection>
+  );
+}
+
+/**
+ * The HydroShift II Curved screen (Nexus panel or an uploaded video), screen saver, clock and pump options.
+ * `hidePump` leaves the pump option out, for a page that shows it with the cooling.
+ */
+export function HydroShift2CurveSettings({ screen, hidePump = false }: { screen: HydroShift2CurveScreen; hidePump?: boolean }) {
   const { settings, write, previewBrightness, commitBrightness, refresh: refreshSettings } = screen;
   const { t } = useTranslation();
   const { numberFormat } = useUnitPrefs();
@@ -239,14 +259,7 @@ export function HydroShift2CurveSettings({ screen }: { screen: HydroShift2CurveS
         />
       </SettingsSection>
 
-      <SettingsSection title={t('devices.lianliCurve.pumpSection')}>
-        <SettingToggle
-          label={t('devices.lianliCurve.pumpFollowsMotherboard')}
-          description={t('devices.lianliCurve.pumpFollowsMotherboardHint')}
-          checked={settings.pumpFollowsMotherboard}
-          onChange={pumpFollowsMotherboard => { void write({ pumpFollowsMotherboard }); }}
-        />
-      </SettingsSection>
+      {!hidePump && <HydroShift2CurvePumpSettings screen={screen} />}
 
       <ConfirmModal
         open={pendingDelete != null}

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HydroShift2CurveSettings } from './HydroShift2CurveSettings';
+import { HydroShift2CurvePumpSettings, HydroShift2CurveSettings } from './HydroShift2CurveSettings';
 import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
 import type { HydroShift2CurveMediaItem, HydroShift2CurveSettings as Settings } from '../../../api/hydroshift2Curve';
 
@@ -36,9 +36,11 @@ vi.mock('../../../api/hydroshift2Curve', async importOriginal => ({
   deleteHydroShift2CurveMedia: (...a: any[]) => mockDelete(...a),
 }));
 
-function Harness() {
+function Harness({ part = 'all' }: { part?: 'all' | 'screen' | 'pump' }) {
   const screen = useHydroShift2CurveScreen(true);
-  return <HydroShift2CurveSettings screen={screen} />;
+  return part === 'pump'
+    ? <HydroShift2CurvePumpSettings screen={screen} />
+    : <HydroShift2CurveSettings screen={screen} hidePump={part === 'screen'} />;
 }
 
 const settings: Settings = {
@@ -71,6 +73,35 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('HydroShift2CurveSettings split for the Lian Li page', () => {
+  it('the device page shows the pump option with the screen', async () => {
+    await renderSettings();
+    expect(screen.getByRole('switch', { name: 'devices.lianliCurve.pumpFollowsMotherboard' })).toBeInTheDocument();
+    expect(screen.getByText('devices.lianliCurve.screenSection')).toBeInTheDocument();
+  });
+
+  it('hidePump leaves only the screen options', async () => {
+    mockGetSettings.mockResolvedValue(settings);
+    mockGetMedia.mockResolvedValue([]);
+    await act(async () => {
+      render(<Harness part="screen" />);
+    });
+    expect(screen.getByText('devices.lianliCurve.screenSection')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'devices.lianliCurve.pumpFollowsMotherboard' })).not.toBeInTheDocument();
+  });
+
+  it('the pump option alone saves its switch', async () => {
+    mockGetSettings.mockResolvedValue(settings);
+    mockGetMedia.mockResolvedValue([]);
+    await act(async () => {
+      render(<Harness part="pump" />);
+    });
+    expect(screen.queryByText('devices.lianliCurve.screenSection')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: 'devices.lianliCurve.pumpFollowsMotherboard' }));
+    await waitFor(() => expect(mockSetSettings).toHaveBeenCalledWith({ pumpFollowsMotherboard: true }));
+  });
 });
 
 describe('HydroShift2CurveSettings', () => {

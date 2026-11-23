@@ -46,7 +46,11 @@ vi.mock('./HydroShift2RingSettings', () => ({
     return <div data-testid="light-card">{title}</div>;
   },
 }));
-vi.mock('./HydroShift2CurveSettings', () => ({ HydroShift2CurveSettings: () => <div data-testid="curve-screen" /> }));
+vi.mock('./HydroShift2CurveSettings', () => ({
+  HydroShift2CurveSettings: ({ hidePump }: any) => <div data-testid="curve-screen" data-hide-pump={String(!!hidePump)} />,
+  HydroShift2CurvePumpSettings: () => <div data-testid="curve-pump" />,
+}));
+vi.mock('./HydroShift2CurveHeadSettings', () => ({ HydroShift2CurveHeadSettings: () => <div data-testid="curve-head" /> }));
 vi.mock('./useHydroShift2CurveScreen', () => ({ useHydroShift2CurveScreen: () => ({ settings: null, write: vi.fn() }) }));
 const mockRequestEnable = vi.fn();
 vi.mock('../../../hooks/useConflictGuardedEnable', () => ({
@@ -110,27 +114,27 @@ describe('LianLiHubPage', () => {
     expect(nav).toHaveBeenCalledWith('device', { deviceKey: 'Universal Screen 8.8' });
   });
 
-  it('the L-Wireless controller and the Flex hub live on this page: their cards open nothing but keep Nexus Control', async () => {
+  it('the L-Wireless and Flex cards open their own page (which then keeps only the connection and wireless devices)', async () => {
     await renderHub([wireless, flexHub, tl]);
-    expect(screen.queryByRole('button', { name: 'L-Wireless' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'LCD Flex' })).not.toBeInTheDocument();
-    expect(screen.getByText('L-Wireless')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'L-Wireless' }));
+    expect(nav).toHaveBeenCalledWith('device', { deviceKey: 'L-Wireless' });
+    fireEvent.click(screen.getByRole('button', { name: 'LCD Flex' }));
+    expect(nav).toHaveBeenCalledWith('device', { deviceKey: 'LCD Flex' });
     fireEvent.click(screen.getByRole('button', { name: 'toggle L-Wireless' }));
     expect(controlDevice).toHaveBeenCalledWith('lianli-wireless', false);
-    expect(nav).not.toHaveBeenCalled();
   });
 
-  it('Devices holds both units\' fan chains and binding, without links to their own pages', async () => {
+  it('Devices holds the cards only: the wireless device list stays on the controller page', async () => {
     await renderHub([wireless, flexHub]);
-    expect(screen.getByTestId('wireless-fans')).toHaveAttribute('data-embedded', 'true');
-    expect(screen.getByTestId('flex-fans')).toHaveAttribute('data-embedded', 'true');
+    expect(screen.queryByTestId('wireless-fans')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('flex-fans')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('device-card')).toHaveLength(2);
   });
 
   it('reads only the units that are present', async () => {
     await renderHub([wireless, curve]);
     expect(unitCalls.filter(c => !c.flex).every(c => c.enabled === true)).toBe(true);
     expect(unitCalls.filter(c => c.flex).every(c => c.enabled === false)).toBe(true);
-    expect(screen.queryByTestId('flex-fans')).not.toBeInTheDocument();
   });
 
   it('a card switches Nexus Control: off at once, on through the conflict check', async () => {
@@ -149,11 +153,24 @@ describe('LianLiHubPage', () => {
     ]);
   });
 
-  it('without the controller or Flex hub there is no Cooling tab', async () => {
-    await renderHub([curve, screen88]);
+  it('without a controller, Flex hub or Curve there is no Cooling tab', async () => {
+    await renderHub([screen88, tl]);
     expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual([
       'devices.lianli-wireless.tab.devices', 'lighting.title', 'devices.lianli-wireless.tab.screen',
     ]);
+  });
+
+  it('the Curve\'s head and pump go under Cooling, only its screen under Screens', async () => {
+    await renderHub([curve, screen88]);
+    expect(screen.getAllByRole('tab').map(t => t.textContent)).toContain('cooling.title');
+    await openTab('devices.lianli-wireless.tab.screen');
+    expect(screen.getByTestId('curve-screen')).toHaveAttribute('data-hide-pump', 'true');
+    expect(screen.queryByTestId('curve-pump')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('curve-head')).not.toBeInTheDocument();
+    await openTab('cooling.title');
+    expect(screen.getByTestId('curve-head')).toBeInTheDocument();
+    expect(screen.getByTestId('curve-pump')).toBeInTheDocument();
+    expect(screen.queryByTestId('curve-screen')).not.toBeInTheDocument();
   });
 
   it('Lighting holds Sync all and every light: the units\' chains, the Curve edge and the 8.8 bezel on their own endpoints, a page link for the rest', async () => {

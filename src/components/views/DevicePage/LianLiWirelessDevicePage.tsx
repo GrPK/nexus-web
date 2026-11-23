@@ -310,6 +310,11 @@ interface LianLiWirelessDevicePageProps {
   onSectionNavigate?: DashboardSectionNavigate;
   /** The wired LCD Flex fans: the same tabs without the controller link, bind or lock. */
   flex?: boolean;
+  /**
+   * Opened from the Lian Li page, which holds the lighting, screens and cooling:
+   * only the connection and the wireless devices (the Devices tab), with no tab bar.
+   */
+  devicesOnly?: boolean;
 }
 
 /**
@@ -317,18 +322,18 @@ interface LianLiWirelessDevicePageProps {
  * Owns the active-tab state; the unit's poll lives in useLianLiUnit and each
  * tab renders its own controls from its own file.
  */
-export function LianLiWirelessDevicePage({ onSectionNavigate, flex = false }: LianLiWirelessDevicePageProps) {
+export function LianLiWirelessDevicePage({ onSectionNavigate, flex = false, devicesOnly = false }: LianLiWirelessDevicePageProps) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<LianLiWirelessTab>('fans');
-  const unit = useLianLiUnit({ flex, lightingActive: activeTab === 'lighting', onSectionNavigate });
+  const unit = useLianLiUnit({ flex, lightingActive: !devicesOnly && activeTab === 'lighting', onSectionNavigate });
   useReportDeviceWaiting(unit.connection !== 'connected');
   const { disconnected, hintKey, blockingApp, boundMacs } = unit;
 
   const tabs = [
     { key: 'fans', label: t('devices.lianli-wireless.tab.devices'), icon: <RadioReceiver size={14} /> },
-    ...(unit.hasLighting ? [{ key: 'lighting', label: t('lighting.title'), icon: <Lightbulb size={14} /> }] : []),
-    ...(unit.hasFans ? [{ key: 'cooling', label: t('cooling.title'), icon: <Fan size={14} /> }] : []),
-    ...(unit.hasScreen ? [{ key: 'screen', label: t('devices.lianli-wireless.tab.screen'), icon: <CircleEqual size={14} /> }] : []),
+    ...(!devicesOnly && unit.hasLighting ? [{ key: 'lighting', label: t('lighting.title'), icon: <Lightbulb size={14} /> }] : []),
+    ...(!devicesOnly && unit.hasFans ? [{ key: 'cooling', label: t('cooling.title'), icon: <Fan size={14} /> }] : []),
+    ...(!devicesOnly && unit.hasScreen ? [{ key: 'screen', label: t('devices.lianli-wireless.tab.screen'), icon: <CircleEqual size={14} /> }] : []),
   ];
   // A tab that disappears (its chain unbound or out of range) falls back to Devices.
   const tab: LianLiWirelessTab = tabs.some(x => x.key === activeTab) ? activeTab : 'fans';
@@ -338,7 +343,7 @@ export function LianLiWirelessDevicePage({ onSectionNavigate, flex = false }: Li
       <ViewHeader
         // eslint-disable-next-line i18next/no-literal-string -- brand + model name
         title={flex ? (unit.p28Only ? 'Lian Li P28 V2' : 'Lian Li LCD Flex') : 'Lian Li L-Wireless Controller'}
-        tabs={disconnected ? undefined : tabs}
+        tabs={disconnected || devicesOnly ? undefined : tabs}
         activeTab={tab}
         onTabChange={key => setActiveTab(key as LianLiWirelessTab)}
         tabActions={disconnected || !onSectionNavigate ? undefined

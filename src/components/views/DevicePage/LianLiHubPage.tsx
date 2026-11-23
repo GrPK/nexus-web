@@ -16,7 +16,8 @@ import { DeviceCard } from '../../../panel/widgets/devices/DevicesPage';
 import { lianLiFlexCoolingAnchors, lianLiFlexLightingAnchors, lianLiWirelessCoolingAnchors, lianLiWirelessLightingAnchors } from '../../../lib/pageAnchors';
 import { useTranslation } from '../../../lib/i18n';
 import { CoolingPageShortcut, LightingPageShortcut } from './CoolingPageLink';
-import { HydroShift2CurveSettings } from './HydroShift2CurveSettings';
+import { HydroShift2CurveHeadSettings } from './HydroShift2CurveHeadSettings';
+import { HydroShift2CurvePumpSettings, HydroShift2CurveSettings } from './HydroShift2CurveSettings';
 import { HydroShift2RingSettings } from './HydroShift2RingSettings';
 import { LianLiSyncAllBar } from './LianLiSyncAllBar';
 import { LianLiUnitTabBody, useLianLiUnit } from './LianLiWirelessDevicePage';
@@ -31,8 +32,9 @@ const RING_ID = 'lianli-hydroshift2';
 const CURVE_ID = 'lianli-hydroshift2-curve';
 // The 8.8" Universal Screen, whose bezel LEDs the service drives itself.
 const SCREEN88_ID = 'lianli-screen88';
-// The units whose whole page lives in this one: their cards keep Nexus Control but open nothing.
-const COVERED_IDS = new Set([WIRELESS_ID, FLEX_ID]);
+// The units whose lighting, screens and cooling live on this page; their own page keeps only
+// the connection and the wireless devices (LianLiWirelessDevicePage devicesOnly).
+const UNIT_IDS = new Set([WIRELESS_ID, FLEX_ID]);
 
 type LianLiHubTab = 'devices' | 'lighting' | 'screens' | 'cooling';
 
@@ -45,11 +47,11 @@ interface LianLiHubPageProps {
 
 /**
  * The Lian Li page, like L-Connect's one window: every Lian Li device on the
- * Devices tab (with the L-Wireless and Flex units' fan chains and binding), all
- * their lights on Lighting (Sync all, the chains, and the HydroShift II ring,
- * Curve edge and 8.8" bezel on one card), their screens on Screens, and their
- * fans and pump on Cooling. The L-Wireless and Flex pages live here whole; every
- * other device keeps its own page, opened from its card.
+ * Devices tab (each card opens its own page; the L-Wireless and Flex ones show
+ * only their connection and wireless devices there), all their lights on
+ * Lighting (Sync all, the chains, and the HydroShift II ring, Curve edge and 8.8"
+ * bezel on one card), their screens on Screens, and their fans, pump and the
+ * Curve's head on Cooling.
  */
 export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: LianLiHubPageProps) {
   const { t } = useTranslation();
@@ -71,11 +73,12 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   const curve = panels.find(m => m.curatedId === CURVE_ID);
   const screen88 = sorted.find(m => m.curatedId === SCREEN88_ID);
   // The Uni hubs, Uni Fan TL, Galahad II and Strimer: their controls stay on their own pages.
-  const ownPage = sorted.filter(m => m.kind !== 'panel' && !COVERED_IDS.has(m.curatedId ?? ''));
+  const ownPage = sorted.filter(m => m.kind !== 'panel' && !UNIT_IDS.has(m.curatedId ?? ''));
 
   const hasLighting = wireless || flex || !!ring || !!curve || !!screen88 || ownPage.length > 0;
   const hasScreens = wireless || flex || panels.length > 0;
-  const hasCooling = wireless || flex;
+  // The Curve's pump and head are cooling, not screen, settings.
+  const hasCooling = wireless || flex || !!curve;
   const tabs = [
     { key: 'devices', label: t('devices.lianli-wireless.tab.devices'), icon: <RadioReceiver size={14} /> },
     ...(hasLighting ? [{ key: 'lighting', label: t('lighting.title'), icon: <Lightbulb size={14} /> }] : []),
@@ -88,7 +91,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   const wirelessUnit = useLianLiUnit({ flex: false, enabled: wireless, lightingActive: tab === 'lighting', onSectionNavigate });
   const flexUnit = useLianLiUnit({ flex: true, enabled: flex, lightingActive: tab === 'lighting', onSectionNavigate });
   const units = [...(wireless ? [wirelessUnit] : []), ...(flex ? [flexUnit] : [])];
-  const curveScreen = useHydroShift2CurveScreen(!!curve && tab === 'screens');
+  const curveScreen = useHydroShift2CurveScreen(!!curve && (tab === 'screens' || tab === 'cooling'));
 
   const open = (deviceKey: string) => onSectionNavigate?.('device', { deviceKey });
   const controlGuard = useConflictGuardedEnable();
@@ -144,21 +147,11 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
       <div className={`${styles.pageBody} pageBody`}>
         <div className={styles.tabBody}>
           {tab === 'devices' && (
-            <>
-              <div className={devicesStyles.list}>
-                {sorted.map(d => (
-                  <DeviceCard
-                    key={d.key}
-                    device={COVERED_IDS.has(d.curatedId ?? '') ? { ...d, navigable: false } : d}
-                    onClick={() => open(d.key)}
-                    onToggleControl={toggleFor(d)}
-                  />
-                ))}
-              </div>
-              {units.map(unit => (
-                <LianLiUnitTabBody key={unit.flex ? FLEX_ID : WIRELESS_ID} unit={unit} tab="fans" onSectionNavigate={onSectionNavigate} embedded />
+            <div className={devicesStyles.list}>
+              {sorted.map(d => (
+                <DeviceCard key={d.key} device={d} onClick={() => open(d.key)} onToggleControl={toggleFor(d)} />
               ))}
-            </>
+            </div>
           )}
 
           {tab === 'lighting' && (
@@ -186,14 +179,20 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
               {units.filter(u => u.hasScreen).map(unit => (
                 <LianLiUnitTabBody key={unit.flex ? FLEX_ID : WIRELESS_ID} unit={unit} tab="screen" onSectionNavigate={onSectionNavigate} embedded />
               ))}
-              {curve && <HydroShift2CurveSettings screen={curveScreen} />}
+              {curve && <HydroShift2CurveSettings screen={curveScreen} hidePump />}
               {panels.map(p => openRow(p, p.name, t('devices.lianli-wireless.openPanel')))}
             </>
           )}
 
-          {tab === 'cooling' && units.map(unit => (
-            <LianLiUnitTabBody key={unit.flex ? FLEX_ID : WIRELESS_ID} unit={unit} tab="cooling" onSectionNavigate={onSectionNavigate} embedded />
-          ))}
+          {tab === 'cooling' && (
+            <>
+              {units.map(unit => (
+                <LianLiUnitTabBody key={unit.flex ? FLEX_ID : WIRELESS_ID} unit={unit} tab="cooling" onSectionNavigate={onSectionNavigate} embedded />
+              ))}
+              {curve && <HydroShift2CurveHeadSettings />}
+              {curve && <HydroShift2CurvePumpSettings screen={curveScreen} />}
+            </>
+          )}
         </div>
       </div>
 

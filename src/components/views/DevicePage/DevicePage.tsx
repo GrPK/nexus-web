@@ -318,12 +318,14 @@ function DeviceBody({ device, unified, controlDevice, platform, onOpenFirmware, 
     return <KrakenDevicePage key={device.key} onSectionNavigate={onSectionNavigate} />;
   }
 
+  // Opened from the Lian Li page, which holds their lighting, screens and cooling,
+  // the L-Wireless and Flex pages show only their connection and wireless devices.
   if (device.curatedId === 'lianli-wireless') {
-    return <LianLiWirelessDevicePage key={device.key} onSectionNavigate={onSectionNavigate} />;
+    return <LianLiWirelessDevicePage key={device.key} onSectionNavigate={onSectionNavigate} devicesOnly={device.groupKey === LIANLI_GROUP} />;
   }
 
   if (device.curatedId === 'lianli-flex') {
-    return <LianLiWirelessDevicePage key={device.key} flex onSectionNavigate={onSectionNavigate} />;
+    return <LianLiWirelessDevicePage key={device.key} flex onSectionNavigate={onSectionNavigate} devicesOnly={device.groupKey === LIANLI_GROUP} />;
   }
 
   if (device.curatedId === 'strimer') {

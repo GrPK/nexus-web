@@ -182,6 +182,16 @@ describe('LianLiWirelessDevicePage', () => {
     expect(screen.getByRole('tab', { name: /cooling\.title/ })).toBeInTheDocument();
   });
 
+  it('opened from the Lian Li page it shows only the connection and the wireless devices, no tabs', async () => {
+    await act(async () => {
+      render(<LianLiWirelessDevicePage devicesOnly />);
+    });
+    expect(screen.getByText('devices.lianli-wireless.connectionSection')).toBeInTheDocument();
+    expect(screen.getByText('devices.lianli-wireless.fanTypeSlv3Lcd')).toBeInTheDocument();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /lighting\.title|cooling\.title/ })).not.toBeInTheDocument();
+  });
+
   it('drops a state read that was sent earlier but resolved after a newer one', async () => {
     await act(async () => {
       render(<LianLiWirelessDevicePage />);
