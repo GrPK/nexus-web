@@ -131,7 +131,7 @@ import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
 import { LianLiScreen88Settings } from './LianLiScreen88Settings';
 import { useLianLiScreen88Screen } from './useLianLiScreen88Screen';
 import { HYDROSHIFT2_CURVE_LIGHTING_API, hydroShift2CurveMediaPreviewUrl } from '../../../api/hydroshift2Curve';
-import { LIANLI_SCREEN88_LIGHTING_API, lianLiScreen88MediaPreviewUrl } from '../../../api/lianliScreen88';
+import { lianLiScreen88MediaPreviewUrl } from '../../../api/lianliScreen88';
 import { useFirmwareStatus } from '../../../hooks/useFirmwareStatus';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { Button } from '../../common/Button/Button';
@@ -559,7 +559,7 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
   const isCorsairLinkLcdPanel = recordFamily === 'corsair-link-lcd' && !isSimulated;
   const isHydroShift2Panel = recordFamily === 'lianli-hydroshift2' && !isSimulated;
   const isHydroShift2CurvePanel = recordFamily === 'lianli-hydroshift2-curve' && !isSimulated;
-  // The Universal Screen 8.8: its screen options and bezel LEDs are the service's own, set from this page's settings tab.
+  // The Universal Screen 8.8: its screen options are the service's own, set from this page's settings tab.
   const isScreen88Panel = recordFamily === 'lianli-screen88' && !isSimulated;
   const isGlacialLcdPanel = recordFamily === 'asus-glacial-lcd' && !isSimulated;
   const curveScreen = useHydroShift2CurveScreen(isHydroShift2CurvePanel);
@@ -2182,10 +2182,10 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                       <HydroShift2RingSettings api={HYDROSHIFT2_CURVE_LIGHTING_API} onSectionNavigate={onSectionNavigate} />
                     </div>
                   )}
+                  {/* The 8.8's bezel LEDs are set on the Lian Li page's Lighting tab, like every other Lian Li light. */}
                   {activeTab === 'settings' && isScreen88Panel && (
                     <div className={styles.settingsContent}>
                       <LianLiScreen88Settings screen={screen88Screen} />
-                      <HydroShift2RingSettings api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={onSectionNavigate} />
                     </div>
                   )}
                   {activeTab === 'settings' && isGlacialLcdPanel && (
