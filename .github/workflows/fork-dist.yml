@@ -1,0 +1,58 @@
+# Fork-only fast path for live iterations (not part of the PR): installs and builds the service
+# dashboard and uploads it first. Then it runs the lint of the files changed since the round's base
+# (FAST_BASE), the tests next to them or importing them directly, and the locale parity check.
+# The full fork-check runs once at the end of a round.
+name: fork-dist
+
+on:
+  push:
+    branches: [ci-fast-lianli-screen88]
+  workflow_dispatch:
+
+env:
+  FAST_BASE: efd14b551
+
+jobs:
+  dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Type check and service build
+        run: npm run build:service
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nexus-web-service-dist
+          path: dist
+          retention-days: 14
+      - name: Files changed since the round's base
+        if: always()
+        run: |
+          git diff --name-only --diff-filter=d "$FAST_BASE" HEAD -- src | grep -E '\.(ts|tsx)$' > changed.txt || true
+          : > tests.txt
+          while read -r f; do
+            case "$f" in
+              *.test.ts|*.test.tsx) echo "$f" >> tests.txt ;;
+              *) for t in "${f%.*}.test.ts" "${f%.*}.test.tsx"; do if [ -f "$t" ]; then echo "$t" >> tests.txt; fi; done
+                 # and the tests that import the changed module directly
+                 b=$(basename "${f%.*}")
+                 grep -rlE "from '[./]+(/[^']*)?/$b'" src --include='*.test.ts' --include='*.test.tsx' >> tests.txt || true ;;
+            esac
+          done < changed.txt
+          sort -u -o tests.txt tests.txt
+          echo "changed:"; cat changed.txt; echo "tests:"; cat tests.txt
+      - name: Tests of the changed files
+        if: always()
+        run: if [ -s tests.txt ]; then npx vitest run $(cat tests.txt); else echo "no tests"; fi
+      - name: Lint of the changed files
+        if: always()
+        run: if [ -s changed.txt ]; then npx eslint $(cat changed.txt); else echo "nothing to lint"; fi
+      - name: Locale parity
+        if: always()
+        run: node scripts/audit-locales.mjs
