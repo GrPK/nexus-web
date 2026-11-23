@@ -641,6 +641,29 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
   // renders, so the immersive-on-load toggle offers exactly the immersive views
   // the device can actually open.
   const previewLandscape = !!previewCanvas && previewCanvas.width > previewCanvas.height;
+  // An orientation change that crosses portrait/landscape restacks the page (a landscape
+  // strip docks its preview under the options, a portrait one sits beside them), and the
+  // settings reflow at the new width; left alone, the scroller keeps its old offset and the
+  // view lands somewhere else, often at the bottom. The Mounting section, where the change
+  // was made, is held at the same place on screen instead.
+  const tabContentRef = useRef<HTMLDivElement | null>(null);
+  const mountingRef = useRef<HTMLDivElement | null>(null);
+  const mountingOffsetRef = useRef<number | null>(null);
+  const holdMountingInView = () => {
+    const scroller = tabContentRef.current;
+    const mounting = mountingRef.current;
+    mountingOffsetRef.current = scroller && mounting
+      ? mounting.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+      : null;
+  };
+  useLayoutEffect(() => {
+    const offset = mountingOffsetRef.current;
+    const scroller = tabContentRef.current;
+    const mounting = mountingRef.current;
+    mountingOffsetRef.current = null;
+    if (offset === null || !scroller || !mounting) return;
+    scroller.scrollTop += mounting.getBoundingClientRect().top - scroller.getBoundingClientRect().top - offset;
+  }, [previewLandscape, dockPreview]);
   const settingsAvailable = supportsDisplayControls || supportsAutoLaunch || ddcSupported
     || monitorRotation || monitorReserve || isMonitorPanel
     // The Xeneon Edge's native settings replace DDC brightness for this
@@ -1690,7 +1713,7 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
               </PanelGaugeGradientProvider>
             ) : (
               <>
-                <div className={`${styles.tabContent}${activeTab === 'widgets' ? ` ${styles.tabContentCatalog}` : ''}`}>
+                <div ref={tabContentRef} className={`${styles.tabContent}${activeTab === 'widgets' ? ` ${styles.tabContentCatalog}` : ''}`}>
                   {activeTab === 'widgets' && (
                     <>
                       <div className={styles.catalogHost}>
@@ -2093,7 +2116,7 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                       (its own section below), so the software rotation would double-apply. */}
                   {activeTab === 'settings' && (supportsMountOrientation || recordSupportsPortrait)
                     && !isSimulated && !isCorsairLinkLcdPanel && (
-                    <div className={styles.settingsContent}>
+                    <div ref={mountingRef} className={styles.settingsContent}>
                       <SettingsSection title={t('devices.lcd.mounting')} boxClassName={styles.deviceSettingsBox}>
                         {recordSupportedRotations.length > 1 && (
                           <SettingSelect
@@ -2104,6 +2127,7 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                               if (next === undefined) return;
                               const seq = ++rotationSeqRef.current;
                               const previous = confirmedRotationRef.current;
+                              if (rotationCrossesClass(previous, next)) holdMountingInView();
                               setRecordRotation(next);
                               const id = device?.panelRecordId;
                               if (!id) return;
