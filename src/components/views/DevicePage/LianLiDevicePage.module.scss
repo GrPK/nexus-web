@@ -153,6 +153,22 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+// The Universal Screen 8.8's "Import from L-Connect" list: a few dozen rows, scrolled inside the dialog.
+.importList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.importItem {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;

@@ -52,6 +52,20 @@ vi.mock('./HydroShift2CurveSettings', () => ({
 }));
 vi.mock('./HydroShift2CurveHeadSettings', () => ({ HydroShift2CurveHeadSettings: () => <div data-testid="curve-head" /> }));
 vi.mock('./useHydroShift2CurveScreen', () => ({ useHydroShift2CurveScreen: () => ({ settings: null, write: vi.fn() }) }));
+// What the 8.8's settings route answers, and when the page reads it.
+const { screen88Route } = vi.hoisted(() => ({
+  screen88Route: { settings: null as null | { connected: boolean; inWindowsDisplay: boolean }, reads: [] as boolean[] },
+}));
+vi.mock('./useLianLiScreen88Screen', () => ({
+  useLianLiScreen88Screen: (enabled: boolean) => {
+    screen88Route.reads.push(enabled);
+    return { settings: enabled ? screen88Route.settings : null, loaded: enabled, write: vi.fn() };
+  },
+  isScreen88InWindowsDisplay: (s: { connected: boolean; inWindowsDisplay: boolean } | null) => !!s && !s.connected && s.inWindowsDisplay,
+}));
+vi.mock('./LianLiScreen88Settings', () => ({
+  LianLiScreen88Settings: ({ title }: any) => <div data-testid="screen88-screen">{title}</div>,
+}));
 const mockRequestEnable = vi.fn();
 vi.mock('../../../hooks/useConflictGuardedEnable', () => ({
   useConflictGuardedEnable: () => ({
@@ -76,6 +90,8 @@ const flexHub = device('LCD Flex', 'lianli-flex');
 const tl = device('Uni Fan TL', 'lianli-tl');
 const curve = device('HydroShift II Curved', 'lianli-hydroshift2-curve', { kind: 'panel', supportsNexusControl: false });
 const screen88 = device('Universal Screen 8.8', 'lianli-screen88', { kind: 'panel', supportsNexusControl: false });
+// The bezel LED board, listed on its own switch with no page of its own.
+const screen88Led = device('Universal Screen 8.8 LEDs', 'lianli-screen88-led', { navigable: false });
 
 const nav = vi.fn();
 const controlDevice = vi.fn();
@@ -96,6 +112,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   unitCalls.length = 0;
   lightCards.length = 0;
+  screen88Route.settings = null;
+  screen88Route.reads.length = 0;
   controlDevice.mockResolvedValue(undefined);
 });
 
@@ -203,6 +221,39 @@ describe('LianLiHubPage', () => {
     expect(opens).toHaveLength(2);
     fireEvent.click(opens[1]);
     expect(nav).toHaveBeenCalledWith('device', { deviceKey: 'Universal Screen 8.8' });
+  });
+
+  it('Screens holds the 8.8 screen under its name, read only while Screens is open', async () => {
+    screen88Route.settings = { connected: true, inWindowsDisplay: false };
+    await renderHub([wireless, screen88]);
+    expect(screen88Route.reads.every(r => r === false)).toBe(true);
+    expect(screen.queryByTestId('screen88-screen')).not.toBeInTheDocument();
+    await openTab('devices.lianli-wireless.tab.screen');
+    expect(screen88Route.reads.slice(-1)[0]).toBe(true);
+    expect(screen.getByTestId('screen88-screen')).toHaveTextContent('Universal Screen 8.8');
+    expect(screen.getAllByRole('button', { name: 'devices.lianli-wireless.openPanel' })).toHaveLength(1);
+  });
+
+  it('with the glass a Windows display, its LED board alone brings the 8.8 to Screens and Lighting', async () => {
+    screen88Route.settings = { connected: false, inWindowsDisplay: true };
+    await renderHub([tl, screen88Led]);
+    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual([
+      'devices.lianli-wireless.tab.devices', 'lighting.title', 'devices.lianli-wireless.tab.screen',
+    ]);
+    await openTab('devices.lianli-wireless.tab.screen');
+    expect(screen.getByTestId('screen88-screen')).toHaveTextContent('Lian Li Universal Screen 8.8');
+    await openTab('lighting.title');
+    expect(apiOfCard('Lian Li Universal Screen 8.8')).toBe(LIANLI_SCREEN88_LIGHTING_API);
+    // The LED board has no page: only the TL gets an "Open device page" row.
+    expect(screen.getAllByRole('button', { name: 'lighting.devices.menuOpenDevicePage' })).toHaveLength(1);
+  });
+
+  it('the LED board without a Windows display adds no Screens tab', async () => {
+    screen88Route.settings = { connected: false, inWindowsDisplay: false };
+    await renderHub([tl, screen88Led]);
+    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual([
+      'devices.lianli-wireless.tab.devices', 'lighting.title',
+    ]);
   });
 
   it('Cooling holds the fans and pump of the controller and the Flex hub', async () => {

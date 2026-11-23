@@ -128,8 +128,10 @@ import { HydroShift2CurveHeadSettings } from './HydroShift2CurveHeadSettings';
 import { HydroShift2CurveSettings } from './HydroShift2CurveSettings';
 import { AsusGlacialLcdControls } from './AsusGlacialLcdDevicePage';
 import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
+import { LianLiScreen88Settings } from './LianLiScreen88Settings';
+import { useLianLiScreen88Screen } from './useLianLiScreen88Screen';
 import { HYDROSHIFT2_CURVE_LIGHTING_API, hydroShift2CurveMediaPreviewUrl } from '../../../api/hydroshift2Curve';
-import { LIANLI_SCREEN88_LIGHTING_API } from '../../../api/lianliScreen88';
+import { LIANLI_SCREEN88_LIGHTING_API, lianLiScreen88MediaPreviewUrl } from '../../../api/lianliScreen88';
 import { useFirmwareStatus } from '../../../hooks/useFirmwareStatus';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { Button } from '../../common/Button/Button';
@@ -557,10 +559,11 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
   const isCorsairLinkLcdPanel = recordFamily === 'corsair-link-lcd' && !isSimulated;
   const isHydroShift2Panel = recordFamily === 'lianli-hydroshift2' && !isSimulated;
   const isHydroShift2CurvePanel = recordFamily === 'lianli-hydroshift2-curve' && !isSimulated;
-  // The Universal Screen 8.8: its bezel LEDs are the service's own, set from this page's settings tab.
+  // The Universal Screen 8.8: its screen options and bezel LEDs are the service's own, set from this page's settings tab.
   const isScreen88Panel = recordFamily === 'lianli-screen88' && !isSimulated;
   const isGlacialLcdPanel = recordFamily === 'asus-glacial-lcd' && !isSimulated;
   const curveScreen = useHydroShift2CurveScreen(isHydroShift2CurvePanel);
+  const screen88Screen = useLianLiScreen88Screen(isScreen88Panel);
   // Cooler LCDs whose firmware takes a backlight command. The service decides
   // which those are and stamps the capability on the record, so a new dimmable
   // model needs no edit here. The setting lives on the record, so it rides the
@@ -2181,6 +2184,7 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                   )}
                   {activeTab === 'settings' && isScreen88Panel && (
                     <div className={styles.settingsContent}>
+                      <LianLiScreen88Settings screen={screen88Screen} />
                       <HydroShift2RingSettings api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={onSectionNavigate} />
                     </div>
                   )}
@@ -2362,6 +2366,19 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                   key={curveScreen.playingClip}
                   className={styles.curveVideoPreview}
                   src={hydroShift2CurveMediaPreviewUrl(curveScreen.playingClip)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  aria-hidden="true"
+                />
+              )}
+              {/* The 8.8's previews are landscape; a portrait mount keeps the panel preview. */}
+              {isScreen88Panel && previewLandscape && screen88Screen.playingClip && (
+                <video
+                  key={screen88Screen.playingClip}
+                  className={styles.screen88VideoPreview}
+                  src={lianLiScreen88MediaPreviewUrl(screen88Screen.playingClip)}
                   autoPlay
                   loop
                   muted

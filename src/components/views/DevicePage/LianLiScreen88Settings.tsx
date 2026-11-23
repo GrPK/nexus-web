@@ -1,0 +1,508 @@
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Film } from 'lucide-react';
+import { Button } from '../../common/Button/Button';
+import { Checkbox } from '../../common/Checkbox/Checkbox';
+import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
+import { EffectCard } from '../../common/EffectCard/EffectCard';
+import { EmptyState } from '../../common/EmptyState/EmptyState';
+import { MediaCropper, type NormalizedCrop } from '../../common/MediaCropper/MediaCropper';
+import { Notice, NoticeSecondary } from '../../common/Notice/Notice';
+import { SettingSelect, SettingSlider, SettingToggle } from '../../common/SettingRow/SettingRow';
+import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
+import { Spinner } from '../../common/Spinner/Spinner';
+import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
+import {
+  LIANLI_SCREEN88_SAVER_MINUTES,
+  LIANLI_SCREEN88_SCREEN_ASPECT,
+  deleteLianLiScreen88Media,
+  getLianLiScreen88LConnectVideos,
+  getLianLiScreen88Media,
+  importLianLiScreen88LConnectVideos,
+  uploadLianLiScreen88Media,
+  type LConnectVideos,
+  type LianLiScreen88MediaItem,
+} from '../../../api/lianliScreen88';
+import { useUnitPrefs } from '../../../hooks/useUiSettings';
+import { useTranslation } from '../../../lib/i18n';
+import { localizeNumbers } from '../../../lib/units';
+import { isScreen88InWindowsDisplay, useLianLiScreen88Screen, type LianLiScreen88Screen } from './useLianLiScreen88Screen';
+import styles from './LianLiDevicePage.module.scss';
+import pageStyles from './DevicePage.module.scss';
+
+const MEDIA_POLL_MS = 2000;
+const BYTES_PER_MB = 1024 * 1024;
+// A refused import is a failure, not a hint.
+const IMPORT_FAILED_TONE = 'critical' as const;
+
+interface CropTarget {
+  src: string;
+  file: File;
+}
+
+interface SectionProps {
+  screen: LianLiScreen88Screen;
+  /** The Screen section's title; "Screen" by default (the Lian Li page names the device). */
+  title?: string;
+}
+
+/**
+ * The Universal Screen 8.8's screen: a Nexus panel or a video on the glass's own decoder,
+ * the video library (uploads and L-Connect's own videos), the screen saver, Offline Mode
+ * and the Windows display switch. While the glass sits in its own Windows display mode it
+ * shows that instead, with the switch back. The screen, library and saver wording is the
+ * OLED Curved's: the same decoder features under the same names.
+ */
+export function LianLiScreen88Settings({ screen, title }: SectionProps) {
+  const { settings } = screen;
+  if (isScreen88InWindowsDisplay(settings)) return <LianLiScreen88WindowsDisplay screen={screen} title={title} />;
+  if (!settings?.connected) return null;
+  return <LianLiScreen88PanelSettings screen={screen} title={title} />;
+}
+
+/**
+ * The 8.8's own page while no panel is attached. In its Windows display mode the glass is an
+ * ordinary monitor, so the page says so and offers the switch back; otherwise `fallback`
+ * (the usual not-connected page) shows.
+ */
+export function LianLiScreen88AbsentPage({ name, fallback }: { name: string; fallback: ReactNode }) {
+  const screen = useLianLiScreen88Screen(true);
+  // The first read decides, so "not connected" never flashes before the Windows display view.
+  if (!screen.loaded) return null;
+  if (!isScreen88InWindowsDisplay(screen.settings)) return <>{fallback}</>;
+  return (
+    <div className={pageStyles.page}>
+      <ViewHeader title={name} />
+      <div className={`${pageStyles.pageBody} pageBody`}>
+        {/* The page header shows no name of its own here, so the section carries it. */}
+        <LianLiScreen88Settings screen={screen} title={name} />
+      </div>
+    </div>
+  );
+}
+
+function LianLiScreen88WindowsDisplay({ screen, title }: SectionProps) {
+  const { t } = useTranslation();
+  return (
+    <SettingsSection title={title ?? t('devices.lianliCurve.screenSection')}>
+      <Notice tone="info" role="status">
+        <span>{t('devices.lianliScreen88.windowsDisplayActive')}</span>
+        <NoticeSecondary>{t('devices.lianliScreen88.windowsDisplayActiveHint')}</NoticeSecondary>
+      </Notice>
+      <WindowsDisplaySwitch screen={screen} />
+    </SettingsSection>
+  );
+}
+
+/**
+ * The glass as an ordinary Windows monitor (L-Connect's secondary screen) or a Nexus screen.
+ * Either way restarts the glass, so both ask first. Only the user flips it: Nexus never does.
+ */
+function WindowsDisplaySwitch({ screen }: { screen: LianLiScreen88Screen }) {
+  const { settings, write } = screen;
+  const { t } = useTranslation();
+  const [confirm, setConfirm] = useState<'on' | 'off' | null>(null);
+  if (!settings) return null;
+  const asWindows = isScreen88InWindowsDisplay(settings);
+  // The asked-for mode while the restart is still pending, else the one the glass is in.
+  const pending = asWindows ? settings.windowsDisplay === false : settings.windowsDisplay === true;
+  const checked = asWindows !== pending;
+  const description = asWindows
+    ? t(pending ? 'devices.lianliScreen88.windowsDisplayReturning' : 'devices.lianliScreen88.windowsDisplayBackHint')
+    : t(pending ? 'devices.lianliScreen88.windowsDisplaySwitching' : 'devices.lianliScreen88.windowsDisplayHint');
+  const onChange = (on: boolean) => {
+    // Back to the mode the glass is in only drops the pending switch: nothing restarts.
+    if (on === asWindows) {
+      void write({ windowsDisplay: on });
+      return;
+    }
+    setConfirm(on ? 'on' : 'off');
+  };
+  return (
+    <>
+      <SettingToggle
+        label={t('devices.lianliScreen88.windowsDisplay')}
+        description={description}
+        checked={checked}
+        onChange={onChange}
+      />
+      <ConfirmModal
+        open={confirm !== null}
+        title={t(confirm === 'off' ? 'devices.lianliScreen88.windowsDisplayOffTitle' : 'devices.lianliScreen88.windowsDisplayOnTitle')}
+        message={t(confirm === 'off' ? 'devices.lianliScreen88.windowsDisplayOffMessage' : 'devices.lianliScreen88.windowsDisplayOnMessage')}
+        confirmLabel={t('devices.lianliScreen88.restartScreen')}
+        destructive={false}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const on = confirm === 'on';
+          setConfirm(null);
+          void write({ windowsDisplay: on });
+        }}
+      />
+    </>
+  );
+}
+
+function LianLiScreen88PanelSettings({ screen, title }: SectionProps) {
+  const { settings, write, previewBrightness, commitBrightness, refresh: refreshSettings } = screen;
+  const { t } = useTranslation();
+  const { numberFormat } = useUnitPrefs();
+  const [media, setMedia] = useState<LianLiScreen88MediaItem[]>([]);
+  const [cropTarget, setCropTarget] = useState<CropTarget | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [mediaError, setMediaError] = useState<'upload' | 'delete' | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<LianLiScreen88MediaItem | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const aliveRef = useRef(true);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const cropTargetRef = useRef<CropTarget | null>(null);
+
+  const refreshMedia = useCallback(async () => {
+    const m = await getLianLiScreen88Media();
+    if (aliveRef.current && m) setMedia(m);
+  }, []);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    void refreshMedia();
+    return () => {
+      aliveRef.current = false;
+      if (cropTargetRef.current) URL.revokeObjectURL(cropTargetRef.current.src);
+    };
+  }, [refreshMedia]);
+
+  const processing = media.some(m => !m.ready);
+  useEffect(() => {
+    if (!processing) return undefined;
+    const id = window.setInterval(() => { if (!document.hidden) void refreshMedia(); }, MEDIA_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [processing, refreshMedia]);
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setMediaError(null);
+    const target = { src: URL.createObjectURL(file), file };
+    cropTargetRef.current = target;
+    setCropTarget(target);
+  };
+
+  const closeCropper = useCallback((target: CropTarget) => {
+    URL.revokeObjectURL(target.src);
+    cropTargetRef.current = null;
+    setCropTarget(null);
+  }, []);
+
+  const onCropConfirm = useCallback(async (crop: NormalizedCrop) => {
+    if (!cropTarget) return;
+    setUploading(true);
+    try {
+      const uploaded = await uploadLianLiScreen88Media(cropTarget.file, crop);
+      if (aliveRef.current) setMediaError(uploaded ? null : 'upload');
+      if (uploaded?.name) void write({ screenMode: 'video', video: uploaded.name });
+      await refreshMedia();
+    } finally {
+      if (aliveRef.current) {
+        setUploading(false);
+        closeCropper(cropTarget);
+      }
+    }
+  }, [cropTarget, closeCropper, refreshMedia, write]);
+
+  if (!settings) return null;
+
+  const videoMode = settings.screenMode === 'video';
+  const saverOn = settings.screenSaverMinutes > 0;
+  const readyMedia = media.filter(m => m.ready);
+  const playingLabel = settings.playing
+    ? (media.find(m => m.name === settings.playing)?.label ?? settings.playing)
+    : null;
+  const modeOptions = [
+    { value: 'nexus', label: t('devices.lianliCurve.screenModeNexus') },
+    { value: 'video', label: t('devices.lianliCurve.screenModeVideo') },
+  ];
+  const saverVideoValue = settings.screenSaverVideo ?? '';
+
+  return (
+    <>
+      <SettingsSection title={title ?? t('devices.lianliCurve.screenSection')}>
+        <SettingSelect
+          label={t('devices.lianliCurve.screenContent')}
+          value={settings.screenMode}
+          onChange={v => { void write({ screenMode: v === 'video' ? 'video' : 'nexus' }); }}
+          options={modeOptions}
+        />
+
+        {videoMode && (
+          <div className={styles.libraryBlock} data-settings-aside="true">
+            <div className={styles.libraryHeaderRow}>
+              <Button size="sm" tone="neutral" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                {uploading ? t('devices.lianliCurve.mediaUploading') : t('devices.lianliCurve.mediaUpload')}
+              </Button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="video/*"
+                className={styles.hiddenInput}
+                onChange={onPickFile}
+              />
+              <Button size="sm" tone="neutral" onClick={() => setImportOpen(true)}>
+                {t('devices.lianliScreen88.lconnectImport')}
+              </Button>
+              {playingLabel && (
+                <span className={styles.customNote}>
+                  {t('devices.lianliCurve.mediaNowPlaying', { name: playingLabel })}
+                </span>
+              )}
+            </div>
+            {mediaError && (
+              <p className={styles.customNote} role="alert">
+                {mediaError === 'upload'
+                  ? t('devices.lianliCurve.mediaUploadFailed')
+                  : t('devices.lianliCurve.mediaDeleteFailed')}
+              </p>
+            )}
+
+            {media.length > 0 ? (
+              <div className={styles.mediaGrid}>
+                {media.map(item => (
+                  item.ready ? (
+                    <EffectCard
+                      key={item.name}
+                      asDiv
+                      label={item.label}
+                      thumbUrl={item.thumb ?? null}
+                      thumbStatic
+                      thumbAspect={LIANLI_SCREEN88_SCREEN_ASPECT}
+                      active={item.name === settings.video}
+                      onClick={() => { void write({ screenMode: 'video', video: item.name }); }}
+                      onDelete={() => setPendingDelete(item)}
+                      deleteAriaLabel={t('devices.lianliCurve.mediaDeleteAria')}
+                    />
+                  ) : (
+                    <EffectCard
+                      key={item.name}
+                      asDiv
+                      nonInteractive
+                      label={item.label}
+                      meta={t('devices.lianliCurve.mediaProcessing')}
+                      thumbUrl={item.thumb ?? null}
+                      thumbStatic
+                      thumbAspect={LIANLI_SCREEN88_SCREEN_ASPECT}
+                      active={false}
+                      thumbOverlay={<span className={styles.mediaOverlay} role="status" aria-label={t('devices.lianliCurve.mediaProcessing')}><Spinner size={26} /></span>}
+                    />
+                  )
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={<Film size={28} />}
+                title={t('devices.lianliCurve.mediaEmpty')}
+                hint={t('devices.lianliScreen88.mediaEmptyHint')}
+                compact
+              />
+            )}
+          </div>
+        )}
+        <SettingToggle
+          label={t('devices.lianliCurve.offlineMode')}
+          description={t('devices.lianliCurve.offlineModeHint')}
+          checked={settings.offlineMode === true}
+          onChange={offlineMode => { void write({ offlineMode }); }}
+        />
+        <WindowsDisplaySwitch screen={screen} />
+      </SettingsSection>
+
+      <SettingsSection title={t('devices.lianliCurve.saverSection')}>
+        <SettingSelect
+          label={t('devices.lianliCurve.saverInterval')}
+          description={t('devices.lianliScreen88.saverHint')}
+          value={String(settings.screenSaverMinutes)}
+          onChange={v => { void write({ screenSaverMinutes: Number(v) }); }}
+          options={LIANLI_SCREEN88_SAVER_MINUTES.map(n => ({
+            value: String(n),
+            label: n === 0
+              ? t('devices.lianliCurve.saverOff')
+              : t('devices.lianliCurve.saverMinutes', { n: localizeNumbers(String(n), numberFormat) }),
+          }))}
+        />
+        <SettingSelect
+          label={t('devices.lianliCurve.saverVideo')}
+          value={saverVideoValue}
+          onChange={v => { void write({ screenSaverVideo: v }); }}
+          options={[
+            { value: '', label: t('devices.lianliCurve.saverVideoNone') },
+            ...readyMedia.map(m => ({ value: m.name, label: m.label })),
+          ]}
+          disabled={!saverOn || readyMedia.length === 0}
+        />
+        <SettingSlider
+          editable
+          trackFill
+          label={t('devices.lianliCurve.saverBrightness')}
+          value={settings.screenSaverBrightness}
+          min={0}
+          max={100}
+          step={1}
+          formatValue={v => localizeNumbers(`${v}%`, numberFormat)}
+          ariaLabel={t('devices.lianliCurve.saverBrightnessAria')}
+          disabled={!saverOn}
+          onChange={(v: number, done?: boolean) => {
+            previewBrightness(v);
+            if (done) commitBrightness(v);
+          }}
+          onCommit={commitBrightness}
+        />
+      </SettingsSection>
+
+      <ConfirmModal
+        open={pendingDelete != null}
+        title={t('devices.lianliCurve.mediaDeleteTitle')}
+        message={t('devices.lianliCurve.mediaDeleteMessage', { name: pendingDelete?.label ?? '' })}
+        confirmLabel={t('common.delete')}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const item = pendingDelete;
+          setPendingDelete(null);
+          if (!item) return;
+          void deleteLianLiScreen88Media(item.name).then(ok => {
+            if (aliveRef.current) setMediaError(ok ? null : 'delete');
+            return Promise.all([refreshMedia(), refreshSettings()]);
+          });
+        }}
+      />
+
+      <LConnectImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => { void refreshMedia(); }}
+      />
+
+      {cropTarget && (
+        <MediaCropper
+          src={cropTarget.src}
+          kind="video"
+          aspect={LIANLI_SCREEN88_SCREEN_ASPECT}
+          busy={uploading}
+          onConfirm={onCropConfirm}
+          onCancel={() => closeCropper(cropTarget)}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * L-Connect's own template videos, read from the user's L-Connect folder. The picked ones are
+ * copied into the library (L-Connect's files stay as they are); ones already there are shown
+ * ticked and locked.
+ */
+function LConnectImportModal({ open, onClose, onImported }: { open: boolean; onClose: () => void; onImported: () => void }) {
+  const { t } = useTranslation();
+  const { numberFormat } = useUnitPrefs();
+  const [list, setList] = useState<LConnectVideos | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
+  const [importing, setImporting] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const aliveRef = useRef(true);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => { aliveRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    setPicked(new Set());
+    setFailed(false);
+    setList(null);
+    setLoading(true);
+    void getLianLiScreen88LConnectVideos().catch(() => null).then(res => {
+      if (cancelled) return;
+      setList(res);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [open]);
+
+  const videos = list?.videos ?? [];
+  const choosable = videos.filter(v => !v.imported);
+  const allPicked = choosable.length > 0 && choosable.every(v => picked.has(v.file));
+  const empty = !loading && videos.length === 0;
+  const size = (bytes: number) => localizeNumbers((bytes / BYTES_PER_MB).toFixed(1), numberFormat);
+
+  const toggle = (file: string, on: boolean) => setPicked(prev => {
+    const next = new Set(prev);
+    if (on) next.add(file);
+    else next.delete(file);
+    return next;
+  });
+
+  const runImport = async () => {
+    if (picked.size === 0 || importing) return;
+    setImporting(true);
+    setFailed(false);
+    const names = await importLianLiScreen88LConnectVideos([...picked]).catch(() => null);
+    if (!aliveRef.current) return;
+    setImporting(false);
+    // Videos copied before a refusal are in the library either way.
+    onImported();
+    if (names === null) {
+      setFailed(true);
+      return;
+    }
+    onClose();
+  };
+
+  return (
+    <ConfirmModal
+      open={open}
+      size="wide"
+      title={t('devices.lianliScreen88.lconnectImport')}
+      message={empty
+        ? t('devices.lianliScreen88.lconnectImportEmpty', { folder: list?.folder ?? '' })
+        : t('devices.lianliScreen88.lconnectImportHint')}
+      note={failed ? t('devices.lianliScreen88.lconnectImportFailed') : undefined}
+      noteTone={IMPORT_FAILED_TONE}
+      destructive={false}
+      hideConfirm={empty}
+      confirmLabel={importing ? t('devices.lianliScreen88.lconnectImporting') : t('devices.lianliScreen88.lconnectImportConfirm')}
+      confirmDisabled={importing || picked.size === 0}
+      onCancel={onClose}
+      onConfirm={() => { void runImport(); }}
+    >
+      {loading && <Spinner size={22} />}
+      {!loading && videos.length > 0 && (
+        <div className={styles.importList}>
+          <Checkbox
+            checked={allPicked}
+            disabled={importing || choosable.length === 0}
+            onChange={on => setPicked(on ? new Set(choosable.map(v => v.file)) : new Set())}
+            label={t('devices.lianliScreen88.lconnectImportSelectAll')}
+          />
+          {videos.map(v => (
+            <Checkbox
+              key={v.file}
+              checked={v.imported || picked.has(v.file)}
+              disabled={importing || v.imported}
+              onChange={on => toggle(v.file, on)}
+              label={(
+                <span className={styles.importItem}>
+                  <span>{v.label}</span>
+                  <span className={styles.customNote}>
+                    {v.imported
+                      ? t('devices.lianliScreen88.lconnectImportInLibrary', { size: size(v.sizeBytes) })
+                      : t('devices.lianliScreen88.lconnectImportSize', { size: size(v.sizeBytes) })}
+                  </span>
+                </span>
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </ConfirmModal>
+  );
+}

@@ -19,6 +19,8 @@ import { typeForMarketplace } from '../../../widgets/marketplaceRegistry';
 import { LianLiTlDevicePage } from './LianLiTlDevicePage';
 import { LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
 import { LianLiHubPage } from './LianLiHubPage';
+import { LianLiScreen88AbsentPage } from './LianLiScreen88Settings';
+import { LIANLI_SCREEN88_ID, LIANLI_SCREEN88_NAME } from '../../../api/lianliScreen88';
 import { Galahad2DevicePage } from './Galahad2DevicePage';
 import { AsiahorseUmbraDevicePage } from './AsiahorseUmbraDevicePage';
 import { AsusGlacialLcdDevicePage } from './AsusGlacialLcdDevicePage';
@@ -153,7 +155,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
   }
 
   if (notConnected) {
-    return (
+    const notConnectedView = (
       <div className={styles.page}>
         <ViewHeader title={t('devices.page.title')} />
         {graceElapsed && (
@@ -163,6 +165,11 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
         )}
       </div>
     );
+    // The 8.8 in its own Windows display mode lists no panel, yet it is not unplugged.
+    if (deviceKey === `curated-${LIANLI_SCREEN88_ID}` || device?.curatedId === LIANLI_SCREEN88_ID) {
+      return <LianLiScreen88AbsentPage key={deviceKey} name={device?.shortName ?? LIANLI_SCREEN88_NAME} fallback={notConnectedView} />;
+    }
+    return notConnectedView;
   }
 
   // When the user turns Nexus Control off, the device's settings are
@@ -355,7 +362,12 @@ function DeviceBody({ device, unified, controlDevice, platform, onOpenFirmware, 
     );
   }
 
-  return <PanelNotConnected name={device.shortName} deviceKey={device.key} warning={device.warning} />;
+  const panelNotConnected = <PanelNotConnected name={device.shortName} deviceKey={device.key} warning={device.warning} />;
+  // The 8.8's glass in its own Windows display mode: no panel, but no "not connected" either.
+  if (device.curatedId === LIANLI_SCREEN88_ID) {
+    return <LianLiScreen88AbsentPage key={device.key} name={device.shortName} fallback={panelNotConnected} />;
+  }
+  return panelNotConnected;
 }
 
 /** A screen whose page is its panel (a cooler LCD, a Q-series), before that panel connects. */

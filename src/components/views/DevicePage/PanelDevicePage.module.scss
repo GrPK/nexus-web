@@ -523,3 +523,16 @@
   object-fit: contain;
   border-radius: var(--radius);
 }
+
+// The same for the Universal Screen 8.8 mounted landscape, whose previews are 4:1.
+.screen88VideoPreview {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 1920 / 480;
+  object-fit: contain;
+  border-radius: var(--radius);
+}

@@ -8,7 +8,9 @@ import { ExperimentalEnableModal } from '../../common/ExperimentalEnableModal/Ex
 import { NexusControlConflictModal } from '../../common/NexusControlConflictModal/NexusControlConflictModal';
 import { LIANLI_FLEX_CHANNEL_PREFIX } from '../../../api/lianli-flex';
 import { HYDROSHIFT2_CURVE_LIGHTING_API } from '../../../api/hydroshift2Curve';
-import { LIANLI_SCREEN88_LIGHTING_API } from '../../../api/lianliScreen88';
+import {
+  LIANLI_SCREEN88_ID, LIANLI_SCREEN88_LED_ID, LIANLI_SCREEN88_LIGHTING_API, LIANLI_SCREEN88_NAME,
+} from '../../../api/lianliScreen88';
 import { useConflictGuardedEnable } from '../../../hooks/useConflictGuardedEnable';
 import type { UnifiedDevice } from '../../../hooks/useUnifiedDevices';
 import type { DashboardSectionNavigate } from '../../../panel/engine/panelLayoutHelpers';
@@ -19,9 +21,11 @@ import { CoolingPageShortcut, LightingPageShortcut } from './CoolingPageLink';
 import { HydroShift2CurveHeadSettings } from './HydroShift2CurveHeadSettings';
 import { HydroShift2CurvePumpSettings, HydroShift2CurveSettings } from './HydroShift2CurveSettings';
 import { HydroShift2RingSettings } from './HydroShift2RingSettings';
+import { LianLiScreen88Settings } from './LianLiScreen88Settings';
 import { LianLiSyncAllBar } from './LianLiSyncAllBar';
 import { LianLiUnitTabBody, useLianLiUnit } from './LianLiWirelessDevicePage';
 import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
+import { isScreen88InWindowsDisplay, useLianLiScreen88Screen } from './useLianLiScreen88Screen';
 // The page's own styles first: the docked-tabs check reads the first styles module as the page's.
 import styles from './LianLiWirelessDevicePage.module.scss';
 import devicesStyles from '../../../panel/widgets/devices/DevicesPage.module.scss';
@@ -30,8 +34,8 @@ const WIRELESS_ID = 'lianli-wireless';
 const FLEX_ID = 'lianli-flex';
 const RING_ID = 'lianli-hydroshift2';
 const CURVE_ID = 'lianli-hydroshift2-curve';
-// The 8.8" Universal Screen, whose bezel LEDs the service drives itself.
-const SCREEN88_ID = 'lianli-screen88';
+// The 8.8" Universal Screen: its screen and bezel LEDs are the service's own, set on this page.
+const SCREEN88_IDS = new Set([LIANLI_SCREEN88_ID, LIANLI_SCREEN88_LED_ID]);
 // The units whose lighting, screens and cooling live on this page; their own page keeps only
 // the connection and the wireless devices (LianLiWirelessDevicePage devicesOnly).
 const UNIT_IDS = new Set([WIRELESS_ID, FLEX_ID]);
@@ -71,12 +75,23 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   const panels = sorted.filter(m => m.kind === 'panel');
   const ring = panels.find(m => m.curatedId === RING_ID);
   const curve = panels.find(m => m.curatedId === CURVE_ID);
-  const screen88 = sorted.find(m => m.curatedId === SCREEN88_ID);
+  const screen88 = sorted.find(m => m.curatedId === LIANLI_SCREEN88_ID);
+  const screen88Panel = screen88?.kind === 'panel';
+  // Listed on its own switch: present even while the glass is a Windows display, not a panel.
+  const screen88Led = sorted.find(m => m.curatedId === LIANLI_SCREEN88_LED_ID);
   // The Uni hubs, Uni Fan TL, Galahad II and Strimer: their controls stay on their own pages.
-  const ownPage = sorted.filter(m => m.kind !== 'panel' && !UNIT_IDS.has(m.curatedId ?? ''));
+  const ownPage = sorted.filter(m => m.kind !== 'panel' && m.navigable
+    && !UNIT_IDS.has(m.curatedId ?? '') && !SCREEN88_IDS.has(m.curatedId ?? ''));
 
-  const hasLighting = wireless || flex || !!ring || !!curve || !!screen88 || ownPage.length > 0;
-  const hasScreens = wireless || flex || panels.length > 0;
+  // A panel's screen is read on the Screens tab; without one the 8.8 may sit in its Windows
+  // display mode, which only the service can tell, so it is read throughout.
+  const screen88Screen = useLianLiScreen88Screen(screen88Panel ? activeTab === 'screens' : !!(screen88 || screen88Led));
+  const screen88Windows = isScreen88InWindowsDisplay(screen88Screen.settings);
+  // With only the LED board listed (the glass is a Windows display), the product name.
+  const screen88Title = screen88?.shortName ?? LIANLI_SCREEN88_NAME;
+
+  const hasLighting = wireless || flex || !!ring || !!curve || !!screen88 || !!screen88Led || ownPage.length > 0;
+  const hasScreens = wireless || flex || panels.length > 0 || screen88Windows;
   // The Curve's pump and head are cooling, not screen, settings.
   const hasCooling = wireless || flex || !!curve;
   const tabs = [
@@ -169,7 +184,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
               ))}
               {ring && <HydroShift2RingSettings title={ring.shortName} onSectionNavigate={onSectionNavigate} />}
               {curve && <HydroShift2RingSettings title={curve.shortName} api={HYDROSHIFT2_CURVE_LIGHTING_API} onSectionNavigate={onSectionNavigate} />}
-              {screen88 && <HydroShift2RingSettings title={screen88.shortName} api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={onSectionNavigate} />}
+              {(screen88 || screen88Led) && <HydroShift2RingSettings title={screen88Title} api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={onSectionNavigate} />}
               {ownPage.map(d => openRow(d, t('devices.lightingPage.setHint'), t('lighting.devices.menuOpenDevicePage')))}
             </>
           )}
@@ -180,6 +195,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
                 <LianLiUnitTabBody key={unit.flex ? FLEX_ID : WIRELESS_ID} unit={unit} tab="screen" onSectionNavigate={onSectionNavigate} embedded />
               ))}
               {curve && <HydroShift2CurveSettings screen={curveScreen} hidePump />}
+              {(screen88Panel || screen88Windows) && <LianLiScreen88Settings screen={screen88Screen} title={screen88Title} />}
               {panels.map(p => openRow(p, p.name, t('devices.lianli-wireless.openPanel')))}
             </>
           )}
