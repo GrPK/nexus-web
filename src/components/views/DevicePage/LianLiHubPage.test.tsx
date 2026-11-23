@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LianLiHubPage } from './LianLiHubPage';
 import type { UnifiedDevice } from '../../../hooks/useUnifiedDevices';
@@ -19,28 +19,27 @@ vi.mock('../../../lib/i18n', () => ({
 vi.mock('../../../panel/widgets/devices/DevicesPage', () => ({
   DeviceCard: ({ device, onClick, onToggleControl }: any) => (
     <div data-testid="device-card">
-      <button onClick={onClick}>{device.shortName}</button>
+      {device.navigable
+        ? <button data-testid="card-name" onClick={onClick}>{device.shortName}</button>
+        : <span data-testid="card-name">{device.shortName}</span>}
       {onToggleControl && <button onClick={() => onToggleControl(!device.nexusControlEnabled)}>{`toggle ${device.shortName}`}</button>}
     </div>
   ),
 }));
-vi.mock('./LianLiWirelessLightingTab', () => ({
-  LianLiWirelessLightingTab: ({ api }: any) => <div data-testid={api ? 'flex-lighting' : 'wireless-lighting'} />,
+const { unitCalls, lightCards } = vi.hoisted(() => ({
+  unitCalls: [] as { flex: boolean; enabled?: boolean; lightingActive: boolean }[],
+  lightCards: [] as { title?: string; api?: unknown }[],
 }));
-vi.mock('./LianLiWirelessScreenTab', () => ({
-  LianLiWirelessScreenTab: ({ api }: any) => <div data-testid={api ? 'flex-screens' : 'wireless-screens'} />,
-}));
-vi.mock('./LianLiWirelessCoolingTab', () => ({
-  LianLiWirelessCoolingTab: ({ channelPrefix }: any) => <div data-testid="cooling">{channelPrefix}</div>,
-}));
-vi.mock('./LianLiFlexLcdThemesSection', () => ({ LianLiFlexLcdThemesSection: () => <div data-testid="lcd-themes" /> }));
-vi.mock('./LianLiFlexSyncSection', () => ({
-  LianLiFlexSyncSection: () => null,
-  isSyncOn: () => false,
-  useLianLiFlexSync: () => ({ data: null, refresh: vi.fn(), reorder: vi.fn() }),
+vi.mock('./LianLiWirelessDevicePage', () => ({
+  useLianLiUnit: (opts: any) => {
+    unitCalls.push(opts);
+    return { flex: opts.flex, boundMacs: [], hasScreen: true };
+  },
+  LianLiUnitTabBody: ({ unit, tab, embedded }: any) => (
+    <div data-testid={`${unit.flex ? 'flex' : 'wireless'}-${tab}`} data-embedded={String(embedded)} />
+  ),
 }));
 vi.mock('./LianLiSyncAllBar', () => ({ LianLiSyncAllBar: () => <div data-testid="sync-all" /> }));
-const { lightCards } = vi.hoisted(() => ({ lightCards: [] as { title?: string; api?: unknown }[] }));
 vi.mock('./HydroShift2RingSettings', () => ({
   HydroShift2RingSettings: ({ title, api }: any) => {
     lightCards.push({ title, api });
@@ -49,17 +48,6 @@ vi.mock('./HydroShift2RingSettings', () => ({
 }));
 vi.mock('./HydroShift2CurveSettings', () => ({ HydroShift2CurveSettings: () => <div data-testid="curve-screen" /> }));
 vi.mock('./useHydroShift2CurveScreen', () => ({ useHydroShift2CurveScreen: () => ({ settings: null, write: vi.fn() }) }));
-vi.mock('./LianLiWirelessFansTab', () => ({ isHydroShiftDevice: () => false }));
-vi.mock('./lianliWirelessCoolingUtils', () => ({ WIRELESS_CHANNEL_PREFIX: 'wireless:' }));
-vi.mock('../../../hooks/useUnifiedDevices', () => ({ panelDeviceKey: (id: string) => `panel-${id}` }));
-vi.mock('../../../hooks/usePanelDevices', () => ({ streamedPanelId: (id: string) => `streamed-${id}` }));
-vi.mock('../../../api/lianli-wireless', () => ({ getLianLiWirelessState: () => Promise.resolve(null) }));
-vi.mock('../../../api/lianli-flex', () => ({
-  LIANLI_FLEX_CHANNEL_PREFIX: 'flex:',
-  getLianLiFlexState: () => Promise.resolve(null),
-  lianLiFlexLightingApi: { get: vi.fn(), set: vi.fn() },
-  lianLiFlexScreenApi: {},
-}));
 const mockRequestEnable = vi.fn();
 vi.mock('../../../hooks/useConflictGuardedEnable', () => ({
   useConflictGuardedEnable: () => ({
@@ -80,6 +68,7 @@ function device(key: string, curatedId: string, extra: Partial<UnifiedDevice> = 
 }
 
 const wireless = device('L-Wireless', 'lianli-wireless');
+const flexHub = device('LCD Flex', 'lianli-flex');
 const tl = device('Uni Fan TL', 'lianli-tl');
 const curve = device('HydroShift II Curved', 'lianli-hydroshift2-curve', { kind: 'panel', supportsNexusControl: false });
 const screen88 = device('Universal Screen 8.8', 'lianli-screen88', { kind: 'panel', supportsNexusControl: false });
@@ -101,6 +90,7 @@ async function openTab(label: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  unitCalls.length = 0;
   lightCards.length = 0;
   controlDevice.mockResolvedValue(undefined);
 });
@@ -109,12 +99,38 @@ beforeEach(() => {
 const apiOfCard = (title: string) => lightCards.filter(c => c.title === title).slice(-1)[0]?.api;
 
 describe('LianLiHubPage', () => {
-  it('lists every Lian Li device by name and opens its own page from its card', async () => {
+  it('lists every Lian Li device by name; one whose controls live elsewhere opens its own page', async () => {
     await renderHub([wireless, curve, tl, screen88]);
-    const cards = screen.getAllByTestId('device-card').map(c => within(c).getAllByRole('button')[0].textContent);
-    expect(cards).toEqual(['HydroShift II Curved', 'L-Wireless', 'Uni Fan TL', 'Universal Screen 8.8']);
+    expect(screen.getAllByTestId('card-name').map(c => c.textContent)).toEqual([
+      'HydroShift II Curved', 'L-Wireless', 'Uni Fan TL', 'Universal Screen 8.8',
+    ]);
     fireEvent.click(screen.getByRole('button', { name: 'Uni Fan TL' }));
     expect(nav).toHaveBeenCalledWith('device', { deviceKey: 'Uni Fan TL' });
+    fireEvent.click(screen.getByRole('button', { name: 'Universal Screen 8.8' }));
+    expect(nav).toHaveBeenCalledWith('device', { deviceKey: 'Universal Screen 8.8' });
+  });
+
+  it('the L-Wireless controller and the Flex hub live on this page: their cards open nothing but keep Nexus Control', async () => {
+    await renderHub([wireless, flexHub, tl]);
+    expect(screen.queryByRole('button', { name: 'L-Wireless' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'LCD Flex' })).not.toBeInTheDocument();
+    expect(screen.getByText('L-Wireless')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'toggle L-Wireless' }));
+    expect(controlDevice).toHaveBeenCalledWith('lianli-wireless', false);
+    expect(nav).not.toHaveBeenCalled();
+  });
+
+  it('Devices holds both units\' fan chains and binding, without links to their own pages', async () => {
+    await renderHub([wireless, flexHub]);
+    expect(screen.getByTestId('wireless-fans')).toHaveAttribute('data-embedded', 'true');
+    expect(screen.getByTestId('flex-fans')).toHaveAttribute('data-embedded', 'true');
+  });
+
+  it('reads only the units that are present', async () => {
+    await renderHub([wireless, curve]);
+    expect(unitCalls.filter(c => !c.flex).every(c => c.enabled === true)).toBe(true);
+    expect(unitCalls.filter(c => c.flex).every(c => c.enabled === false)).toBe(true);
+    expect(screen.queryByTestId('flex-fans')).not.toBeInTheDocument();
   });
 
   it('a card switches Nexus Control: off at once, on through the conflict check', async () => {
@@ -126,7 +142,7 @@ describe('LianLiHubPage', () => {
     expect(mockRequestEnable).toHaveBeenCalledWith(expect.objectContaining({ key: 'tl-off' }), expect.any(Function));
   });
 
-  it('shows all four tabs with the L-Wireless controller, and no Cooling with screens alone', async () => {
+  it('shows all four tabs with the L-Wireless controller', async () => {
     await renderHub([wireless, curve]);
     expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual([
       'devices.lianli-wireless.tab.devices', 'lighting.title', 'devices.lianli-wireless.tab.screen', 'cooling.title',
@@ -140,7 +156,7 @@ describe('LianLiHubPage', () => {
     ]);
   });
 
-  it('Lighting holds Sync all and every light: wireless chains, the Curve edge and the 8.8 bezel on their own endpoints, a page link for the rest', async () => {
+  it('Lighting holds Sync all and every light: the units\' chains, the Curve edge and the 8.8 bezel on their own endpoints, a page link for the rest', async () => {
     await renderHub([wireless, curve, tl, screen88]);
     await openTab('lighting.title');
     expect(screen.getByTestId('sync-all')).toBeInTheDocument();
@@ -149,8 +165,7 @@ describe('LianLiHubPage', () => {
     expect(screen.getAllByTestId('light-card').map(c => c.textContent)).toEqual(['HydroShift II Curved', 'Universal Screen 8.8']);
     expect(apiOfCard('HydroShift II Curved')).toBe(HYDROSHIFT2_CURVE_LIGHTING_API);
     expect(apiOfCard('Universal Screen 8.8')).toBe(LIANLI_SCREEN88_LIGHTING_API);
-    // Nothing sends the bezel to the Lighting page as an OpenRGB device any more.
-    expect(screen.queryByRole('button', { name: 'smartLights.colorOnLightingPage' })).not.toBeInTheDocument();
+    expect(unitCalls.slice(-2).every(c => c.lightingActive)).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'lighting.devices.menuOpenDevicePage' }));
     expect(nav).toHaveBeenCalledWith('device', { deviceKey: 'Uni Fan TL' });
   });
@@ -162,10 +177,10 @@ describe('LianLiHubPage', () => {
     expect(apiOfCard('HydroShift II')).toBeUndefined();
   });
 
-  it('Screens holds the fan LCDs, the Curve screen and a panel link for every Lian Li screen', async () => {
+  it('Screens holds the units\' LCDs, the Curve screen and a panel link for every Lian Li screen', async () => {
     await renderHub([wireless, curve, screen88]);
     await openTab('devices.lianli-wireless.tab.screen');
-    expect(screen.getByTestId('wireless-screens')).toBeInTheDocument();
+    expect(screen.getByTestId('wireless-screen')).toBeInTheDocument();
     expect(screen.getByTestId('curve-screen')).toBeInTheDocument();
     const opens = screen.getAllByRole('button', { name: 'devices.lianli-wireless.openPanel' });
     expect(opens).toHaveLength(2);
@@ -174,8 +189,9 @@ describe('LianLiHubPage', () => {
   });
 
   it('Cooling holds the fans and pump of the controller and the Flex hub', async () => {
-    await renderHub([wireless, device('LCD Flex', 'lianli-flex')]);
+    await renderHub([wireless, flexHub]);
     await openTab('cooling.title');
-    expect(screen.getAllByTestId('cooling').map(c => c.textContent)).toEqual(['wireless:', 'flex:']);
+    expect(screen.getByTestId('wireless-cooling')).toBeInTheDocument();
+    expect(screen.getByTestId('flex-cooling')).toBeInTheDocument();
   });
 });

@@ -428,9 +428,12 @@ function DeviceRow({
         </Button>
       ) : null) : wiredOwned ? (
         <>
-          <Button size="sm" tone="neutral" onClick={onOpenWiredPage}>
-            {t('devices.lianli-flex.openWiredPage')}
-          </Button>
+          {/* Absent where the wired fans are on the same page (the Lian Li page). */}
+          {onOpenWiredPage && (
+            <Button size="sm" tone="neutral" onClick={onOpenWiredPage}>
+              {t('devices.lianli-flex.openWiredPage')}
+            </Button>
+          )}
           {/* The service allows only a release here: Unbind hands the fan to USB. */}
           {fan.boundToUs && lockGuard(<Button size="sm" tone="danger" disabled={busy || pairingLocked} aria-describedby={pairingLocked ? lockedNoteId : undefined} onClick={() => onUnbindRequest(fan.mac)}>
             {unbindLabel}
