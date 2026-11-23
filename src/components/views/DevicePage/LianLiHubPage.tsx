@@ -194,7 +194,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
               {units.filter(u => u.hasScreen).map(unit => (
                 <LianLiUnitTabBody key={unit.flex ? FLEX_ID : WIRELESS_ID} unit={unit} tab="screen" onSectionNavigate={onSectionNavigate} embedded />
               ))}
-              {curve && <HydroShift2CurveSettings screen={curveScreen} hidePump />}
+              {curve && <HydroShift2CurveSettings screen={curveScreen} />}
               {(screen88Panel || screen88Windows) && <LianLiScreen88Settings screen={screen88Screen} title={screen88Title} />}
               {panels.map(p => openRow(p, p.name, t('devices.lianli-wireless.openPanel')))}
             </>

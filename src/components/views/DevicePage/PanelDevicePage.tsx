@@ -130,7 +130,7 @@ import { AsusGlacialLcdControls } from './AsusGlacialLcdDevicePage';
 import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
 import { LianLiScreen88Settings } from './LianLiScreen88Settings';
 import { useLianLiScreen88Screen } from './useLianLiScreen88Screen';
-import { HYDROSHIFT2_CURVE_LIGHTING_API, hydroShift2CurveMediaPreviewUrl } from '../../../api/hydroshift2Curve';
+import { hydroShift2CurveMediaPreviewUrl } from '../../../api/hydroshift2Curve';
 import { lianLiScreen88MediaPreviewUrl } from '../../../api/lianliScreen88';
 import { useFirmwareStatus } from '../../../hooks/useFirmwareStatus';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
@@ -2199,11 +2199,11 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                       <HydroShift2RingSettings onSectionNavigate={onSectionNavigate} />
                     </div>
                   )}
+                  {/* The Curve's edge LEDs are on the Lian Li page's Lighting tab, its pump option on Cooling. */}
                   {activeTab === 'settings' && isHydroShift2CurvePanel && (
                     <div className={styles.settingsContent}>
                       <HydroShift2CurveHeadSettings />
                       <HydroShift2CurveSettings screen={curveScreen} />
-                      <HydroShift2RingSettings api={HYDROSHIFT2_CURVE_LIGHTING_API} onSectionNavigate={onSectionNavigate} />
                     </div>
                   )}
                   {/* The 8.8's bezel LEDs are set on the Lian Li page's Lighting tab, like every other Lian Li light. */}

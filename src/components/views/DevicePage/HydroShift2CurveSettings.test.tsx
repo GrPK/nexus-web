@@ -38,9 +38,15 @@ vi.mock('../../../api/hydroshift2Curve', async importOriginal => ({
 
 function Harness({ part = 'all' }: { part?: 'all' | 'screen' | 'pump' }) {
   const screen = useHydroShift2CurveScreen(true);
-  return part === 'pump'
-    ? <HydroShift2CurvePumpSettings screen={screen} />
-    : <HydroShift2CurveSettings screen={screen} hidePump={part === 'screen'} />;
+  if (part === 'pump') return <HydroShift2CurvePumpSettings screen={screen} />;
+  if (part === 'screen') return <HydroShift2CurveSettings screen={screen} />;
+  // Both on one read, as the Lian Li page shares it between Screens and Cooling.
+  return (
+    <>
+      <HydroShift2CurveSettings screen={screen} />
+      <HydroShift2CurvePumpSettings screen={screen} />
+    </>
+  );
 }
 
 const settings: Settings = {
@@ -76,13 +82,7 @@ afterEach(() => {
 });
 
 describe('HydroShift2CurveSettings split for the Lian Li page', () => {
-  it('the device page shows the pump option with the screen', async () => {
-    await renderSettings();
-    expect(screen.getByRole('switch', { name: 'devices.lianliCurve.pumpFollowsMotherboard' })).toBeInTheDocument();
-    expect(screen.getByText('devices.lianliCurve.screenSection')).toBeInTheDocument();
-  });
-
-  it('hidePump leaves only the screen options', async () => {
+  it('the screen section has no pump option: that lives with the cooling', async () => {
     mockGetSettings.mockResolvedValue(settings);
     mockGetMedia.mockResolvedValue([]);
     await act(async () => {

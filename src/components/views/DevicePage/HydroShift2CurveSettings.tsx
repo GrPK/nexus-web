@@ -29,7 +29,7 @@ interface CropTarget {
   file: File;
 }
 
-/** The pump option: the pump follows the motherboard's pump header. Shown with the cooling where the screen and cooling are apart (the Lian Li page). */
+/** The pump option: the pump follows the motherboard's pump header. It lives with the cooling only (the Lian Li page's Cooling tab). */
 export function HydroShift2CurvePumpSettings({ screen }: { screen: HydroShift2CurveScreen }) {
   const { settings, write } = screen;
   const { t } = useTranslation();
@@ -47,10 +47,10 @@ export function HydroShift2CurvePumpSettings({ screen }: { screen: HydroShift2Cu
 }
 
 /**
- * The HydroShift II Curved screen (Nexus panel or an uploaded video), screen saver, clock and pump options.
- * `hidePump` leaves the pump option out, for a page that shows it with the cooling.
+ * The HydroShift II Curved screen (Nexus panel or an uploaded video), screen saver and clock options.
+ * The pump option is HydroShift2CurvePumpSettings, shown with the cooling.
  */
-export function HydroShift2CurveSettings({ screen, hidePump = false }: { screen: HydroShift2CurveScreen; hidePump?: boolean }) {
+export function HydroShift2CurveSettings({ screen }: { screen: HydroShift2CurveScreen }) {
   const { settings, write, previewBrightness, commitBrightness, refresh: refreshSettings } = screen;
   const { t } = useTranslation();
   const { numberFormat } = useUnitPrefs();
@@ -258,8 +258,6 @@ export function HydroShift2CurveSettings({ screen, hidePump = false }: { screen:
           onCommit={commitBrightness}
         />
       </SettingsSection>
-
-      {!hidePump && <HydroShift2CurvePumpSettings screen={screen} />}
 
       <ConfirmModal
         open={pendingDelete != null}

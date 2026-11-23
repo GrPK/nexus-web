@@ -47,7 +47,7 @@ vi.mock('./HydroShift2RingSettings', () => ({
   },
 }));
 vi.mock('./HydroShift2CurveSettings', () => ({
-  HydroShift2CurveSettings: ({ hidePump }: any) => <div data-testid="curve-screen" data-hide-pump={String(!!hidePump)} />,
+  HydroShift2CurveSettings: () => <div data-testid="curve-screen" />,
   HydroShift2CurvePumpSettings: () => <div data-testid="curve-pump" />,
 }));
 vi.mock('./HydroShift2CurveHeadSettings', () => ({ HydroShift2CurveHeadSettings: () => <div data-testid="curve-head" /> }));
@@ -182,7 +182,7 @@ describe('LianLiHubPage', () => {
     await renderHub([curve, screen88]);
     expect(screen.getAllByRole('tab').map(t => t.textContent)).toContain('cooling.title');
     await openTab('devices.lianli-wireless.tab.screen');
-    expect(screen.getByTestId('curve-screen')).toHaveAttribute('data-hide-pump', 'true');
+    expect(screen.getByTestId('curve-screen')).toBeInTheDocument();
     expect(screen.queryByTestId('curve-pump')).not.toBeInTheDocument();
     expect(screen.queryByTestId('curve-head')).not.toBeInTheDocument();
     await openTab('cooling.title');
