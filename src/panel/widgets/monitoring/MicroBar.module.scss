@@ -210,10 +210,3 @@
     font-size: var(--type-tiny);
   }
 }
-
-.columnCaption {
-  @include text-caption;
-
-  color: var(--text-dim);
-  text-transform: uppercase;
-}
