@@ -85,7 +85,8 @@ describe('LianLiSyncAllBar', () => {
       'devices.lianliEffect.rainbow', 'devices.lianliEffect.meteor', 'devices.lianliEffect.static',
     ]);
     expect(screen.getByText('Lian Li Wireless TL')).toBeInTheDocument();
-    expect(screen.getByText('devices.lianli.fanCount3')).toBeInTheDocument();
+    // The names count the fans; no line under the rows.
+    expect(screen.queryByText(/devices\.lianli\.fanCount/)).not.toBeInTheDocument();
     expect(screen.getByText('HydroShift II OLED Curved')).toBeInTheDocument();
     expect(screen.getByText('Universal Screen 8.8')).toBeInTheDocument();
   });

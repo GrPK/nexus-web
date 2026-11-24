@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "Dentri",
   "devices.lianli-flex.zoneOuter": "Difûr",
   "devices.lianli-flex.zoneUp": "Disore",
+  "devices.lianli-hub.chainFans": "{name} ({count} ventiladôrs)",
+  "devices.lianli-hub.chainOneFan": "{name} (1 ventiladôr)",
   "devices.lianli-hub.chainOneScreen": "{name} (1 schermi)",
   "devices.lianli-hub.chainScreens": "{name} ({count} schermis)",
   "devices.lianli-hub.fanScreen": "{name}: schermi dal ventiladôr",

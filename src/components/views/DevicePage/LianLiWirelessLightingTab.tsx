@@ -46,12 +46,21 @@ function chainTitle(t: Translate, chain: LianLiWirelessChainLighting): string {
     : t(`devices.lianli-wireless.${fanTypeKey(chain.fanType)}` as Parameters<Translate>[0]);
 }
 
-/** A fan chain's name with its screens counted; a chain without screens keeps its name. */
-function withScreenCount(t: Translate, name: string, screens: number): string {
-  if (screens <= 0) return name;
-  return screens === 1
-    ? t('devices.lianli-hub.chainOneScreen', { name })
-    : t('devices.lianli-hub.chainScreens', { name, count: screens });
+/**
+ * A chain's name with what it holds counted: its screens, or a fan chain without screens its fans.
+ * A Strimer keeps its name, and so does every chain when nothing counts the screens.
+ */
+function withCount(t: Translate, name: string, chain: LianLiWirelessChainLighting, screens: number | undefined): string {
+  if (screens === undefined) return name;
+  if (screens > 0) {
+    return screens === 1
+      ? t('devices.lianli-hub.chainOneScreen', { name })
+      : t('devices.lianli-hub.chainScreens', { name, count: screens });
+  }
+  if (chain.kind !== 'fans' || chain.fanCount <= 0) return name;
+  return chain.fanCount === 1
+    ? t('devices.lianli-hub.chainOneFan', { name })
+    : t('devices.lianli-hub.chainFans', { name, count: chain.fanCount });
 }
 
 /** The P28 V2 receiver: always driven by the Lighting page, with no stored effects, merge or motherboard ARGB. */
@@ -111,7 +120,10 @@ interface LianLiWirelessLightingTabProps {
    */
   chainFilter?: (chain: LianLiWirelessChainLighting) => boolean;
   chainOrder?: (a: LianLiWirelessChainLighting, b: LianLiWirelessChainLighting) => number;
-  /** The screens on a chain, counted after its name ("TL LCD Wireless Fans (3 screens)"); none by default. */
+  /**
+   * The screens on a chain. Given, every chain's name counts what it holds: "TL LCD Wireless Fans (3 screens)",
+   * or for a fan chain without screens its fans, "TL Wireless Fans (3 fans)". Without it the names count nothing.
+   */
   screensOf?: (chain: LianLiWirelessChainLighting) => number;
   /** Runs with each chain's name on this page (by MAC) when the names change, for views that name the chains alike. */
   onNames?: (names: ReadonlyMap<string, string>) => void;
@@ -248,7 +260,7 @@ export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LI
   const all = data ? sortBySequence(data.chains) : [];
   // Units of one model read the same, so repeated titles are numbered in sequence order.
   const numbered = numberDuplicateTitles(all.map(c => chainTitle(t, c)));
-  const names = new Map(all.map((c, i) => [c.mac, withScreenCount(t, unitNames?.get(c.mac) ?? numbered[i], screensOf?.(c) ?? 0)]));
+  const names = new Map(all.map((c, i) => [c.mac, withCount(t, unitNames?.get(c.mac) ?? numbered[i], c, screensOf?.(c))]));
   const namesKey = JSON.stringify([...names]);
   const namesRef = useRef(names);
   namesRef.current = names;

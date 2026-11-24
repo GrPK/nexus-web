@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "內圈",
   "devices.lianli-flex.zoneOuter": "外圈",
   "devices.lianli-flex.zoneUp": "上",
+  "devices.lianli-hub.chainFans": "{name}（{count} 個風扇）",
+  "devices.lianli-hub.chainOneFan": "{name}（1 個風扇）",
   "devices.lianli-hub.chainOneScreen": "{name}（1 個螢幕）",
   "devices.lianli-hub.chainScreens": "{name}（{count} 個螢幕）",
   "devices.lianli-hub.fanScreen": "{name} 風扇螢幕",

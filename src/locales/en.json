@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "Inner",
   "devices.lianli-flex.zoneOuter": "Outer",
   "devices.lianli-flex.zoneUp": "Up",
+  "devices.lianli-hub.chainFans": "{name} ({count} fans)",
+  "devices.lianli-hub.chainOneFan": "{name} (1 fan)",
   "devices.lianli-hub.chainOneScreen": "{name} (1 screen)",
   "devices.lianli-hub.chainScreens": "{name} ({count} screens)",
   "devices.lianli-hub.fanScreen": "{name} Fan Screen",

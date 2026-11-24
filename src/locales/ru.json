@@ -1188,6 +1188,8 @@
   "devices.lianli-flex.zoneInner": "Внутренняя",
   "devices.lianli-flex.zoneOuter": "Внешняя",
   "devices.lianli-flex.zoneUp": "Верх",
+  "devices.lianli-hub.chainFans": "{name} (вентиляторов: {count})",
+  "devices.lianli-hub.chainOneFan": "{name} (1 вентилятор)",
   "devices.lianli-hub.chainOneScreen": "{name} (1 экран)",
   "devices.lianli-hub.chainScreens": "{name} (экранов: {count})",
   "devices.lianli-hub.fanScreen": "{name}: экран вентилятора",

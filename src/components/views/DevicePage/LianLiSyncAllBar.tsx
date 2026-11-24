@@ -11,9 +11,6 @@ import { LianLiChainEffectControls, effectLabel, type LianLiEffectValue } from '
 import { useTranslation } from '../../../lib/i18n';
 import styles from './LianLiDevicePage.module.scss';
 
-// The "N fans" strings the Lian Li pages already have.
-const MAX_FAN_COUNT_LABEL = 6;
-
 interface LianLiSyncAllBarProps {
   /** The sync endpoints; the service's by default. */
   api?: LianLiSyncAllApi;
@@ -145,9 +142,6 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
   // The controls name the effect `mode`; the route names it `effect`.
   const toPatch = ({ mode, ...look }: Partial<LianLiEffectValue>): LianLiSyncAllPatch =>
     (mode === undefined ? look : { ...look, effect: mode });
-  const fanCountLabel = (n: number | undefined) => (n !== undefined && n >= 0 && n <= MAX_FAN_COUNT_LABEL
-    ? t(`devices.lianli.fanCount${n}` as Parameters<typeof t>[0])
-    : undefined);
   // A TL chain reads as the Lighting tab names it; the MAC's case may differ between the routes.
   const namesByMac = new Map<string, string>();
   for (const [mac, name] of chainNames ?? []) namesByMac.set(mac.toUpperCase(), name);
@@ -186,7 +180,7 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
         <>
           <p className={styles.zoneHeading} data-settings-aside="true">{t('devices.lianli-wireless.tab.devices')}</p>
           {data.devices.map((d, i) => (
-            <SettingRow key={`${d.kind}:${d.id}`} label={deviceName(d)} description={fanCountLabel(d.fanCount)}>
+            <SettingRow key={`${d.kind}:${d.id}`} label={deviceName(d)}>
               {data.devices.length > 1 && (<>
                 <Button size="sm" tone="neutral" disabled={i === 0} onClick={() => move(i, -1)}>
                   {t('devices.lianli-wireless.orderMoveUp')}

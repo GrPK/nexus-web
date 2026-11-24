@@ -89,28 +89,39 @@ describe('LianLiWirelessLightingTab', () => {
     expect(screen.getByText('devices.lianli-wireless.fanTypeSlv3Lcd')).toBeInTheDocument();
   });
 
-  it('counts a fan chain\'s screens after its name and reports the names', async () => {
+  it('counts a chain\'s screens, or a fan chain\'s fans, after its name and reports the names', async () => {
     const one = { ...fanChain, mac: 'ONE', fanCount: 1 };
-    const bare = { ...fanChain, mac: 'BARE', fanType: 28 };
+    const bare = { ...fanChain, mac: 'BARE', fanType: 28, fanCount: 1 };
+    const fans = { ...fanChain, mac: 'FANS', fanType: 28, fanCount: 3 };
     const screens: Record<string, number> = { [fanChain.mac]: 3, ONE: 1 };
     const onNames = vi.fn();
-    mockGetStrimers.mockResolvedValue({ ...catalog, chains: [strimer, fanChain, one, bare] });
+    mockGetStrimers.mockResolvedValue({ ...catalog, chains: [strimer, fanChain, one, bare, fans] });
     await act(async () => {
       render(<LianLiWirelessLightingTab screensOf={c => screens[c.mac] ?? 0} onNames={onNames} />);
     });
     const three = 'devices.lianli-hub.chainScreens:{"name":"devices.lianli-wireless.fanTypeSlv3Lcd","count":3}';
     const single = 'devices.lianli-hub.chainOneScreen:{"name":"devices.lianli-wireless.fanTypeSlv3Lcd 2"}';
+    const oneFan = 'devices.lianli-hub.chainOneFan:{"name":"devices.lianli-wireless.fanTypeTlv2"}';
+    const threeFans = 'devices.lianli-hub.chainFans:{"name":"devices.lianli-wireless.fanTypeTlv2 2","count":3}';
     expect(screen.getByText('Strimer 24-Pin')).toBeInTheDocument();
     expect(screen.getByText(three)).toBeInTheDocument();
     expect(screen.getByText(single)).toBeInTheDocument();
-    expect(screen.getByText('devices.lianli-wireless.fanTypeTlv2')).toBeInTheDocument();
+    expect(screen.getByText(oneFan)).toBeInTheDocument();
+    expect(screen.getByText(threeFans)).toBeInTheDocument();
     expect(onNames).toHaveBeenCalledTimes(1);
     expect([...onNames.mock.calls[0][0]]).toEqual([
       [strimer.mac, 'Strimer 24-Pin'],
       [fanChain.mac, three],
-      ['BARE', 'devices.lianli-wireless.fanTypeTlv2'],
+      ['BARE', oneFan],
+      ['FANS', threeFans],
       ['ONE', single],
     ]);
+  });
+
+  it('counts nothing in the names when no screens are counted', async () => {
+    await renderTab({ ...catalog, chains: [strimer, fanChain] });
+    expect(screen.getByText('devices.lianli-wireless.fanTypeSlv3Lcd')).toBeInTheDocument();
+    expect(screen.queryByText(/chainFans|chainScreens/)).not.toBeInTheDocument();
   });
 
   it('offers a fan chain its own catalog and no per-lane mode', async () => {
