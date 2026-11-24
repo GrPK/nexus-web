@@ -173,3 +173,47 @@ describe('PanelApp generic display without touch', () => {
     expect(closeImmersive()).toBeNull();
   });
 });
+
+describe('PanelApp generic display long-press on empty space', () => {
+  const tray = () => document.querySelector<HTMLElement>('aside[aria-label="panel.actions.label"]');
+  const emptySpace = () => renderedPages()[0]!;
+
+  async function longPressEmptySpace() {
+    fireEvent.pointerDown(emptySpace(), { pointerId: 2, pointerType: 'touch', button: 0, isPrimary: true });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+  }
+
+  it('opens the actions tray on a touch display with a solid background', async () => {
+    await mount(true, 'theme');
+
+    await longPressEmptySpace();
+
+    expect(tray()?.dataset.state).toBe('open');
+  });
+
+  it('stays inert on a touch display over the desktop, where clicks pass through', async () => {
+    await mount(true);
+
+    await longPressEmptySpace();
+
+    expect(tray()?.dataset.state).not.toBe('open');
+  });
+
+  it('stays inert on a display without touch', async () => {
+    await mount(false, 'theme');
+
+    await longPressEmptySpace();
+
+    expect(tray()?.dataset.state).not.toBe('open');
+  });
+
+  it('keeps the widget menu entry for the panel actions on a touch display', async () => {
+    await mount(true, 'theme');
+
+    fireEvent.contextMenu(widget('w0')!);
+
+    expect(await screen.findByRole('button', { name: 'panel.actions.label', hidden: true })).not.toBeNull();
+  });
+});
