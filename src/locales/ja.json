@@ -1526,6 +1526,7 @@
   "devices.lianliScreen88.lconnectImporting": "読み込み中...",
   "devices.lianliScreen88.mediaEmptyHint": "動画をアップロードするか L-Connect から読み込むと、画面で再生できます。",
   "devices.lianliScreen88.restartScreen": "画面を再起動",
+  "devices.lianliScreen88.restarting": "画面を再起動しています...",
   "devices.lianliScreen88.saverHint": "設定した間隔ごとに動画を一度再生し、その後パネル表示に戻ります。",
   "devices.lianliScreen88.windowsDisplay": "Windows ディスプレイ",
   "devices.lianliScreen88.windowsDisplayActive": "画面は Windows ディスプレイです",

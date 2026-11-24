@@ -1535,6 +1535,7 @@
   "devices.lianliScreen88.lconnectImporting": "Импорт...",
   "devices.lianliScreen88.mediaEmptyHint": "Загрузите видео или импортируйте его из L-Connect, чтобы воспроизводить на экране.",
   "devices.lianliScreen88.restartScreen": "Перезапустить экран",
+  "devices.lianliScreen88.restarting": "Перезапуск экрана...",
   "devices.lianliScreen88.saverHint": "Раз в заданный интервал воспроизводит видео один раз, затем возвращается к панели.",
   "devices.lianliScreen88.windowsDisplay": "Монитор Windows",
   "devices.lianliScreen88.windowsDisplayActive": "Экран работает как монитор Windows",

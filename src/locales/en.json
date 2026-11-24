@@ -1526,6 +1526,7 @@
   "devices.lianliScreen88.lconnectImporting": "Importing...",
   "devices.lianliScreen88.mediaEmptyHint": "Upload a video, or import one from L-Connect, to play it on the screen.",
   "devices.lianliScreen88.restartScreen": "Restart screen",
+  "devices.lianliScreen88.restarting": "Restarting the screen...",
   "devices.lianliScreen88.saverHint": "Plays the video once every interval, then returns to the panel.",
   "devices.lianliScreen88.windowsDisplay": "Windows display",
   "devices.lianliScreen88.windowsDisplayActive": "The screen is a Windows display",

@@ -25,7 +25,7 @@ import {
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import { localizeNumbers } from '../../../lib/units';
-import { isScreen88InWindowsDisplay, useLianLiScreen88Screen, type LianLiScreen88Screen } from './useLianLiScreen88Screen';
+import { useLianLiScreen88Screen, type LianLiScreen88Screen } from './useLianLiScreen88Screen';
 import styles from './LianLiDevicePage.module.scss';
 import pageStyles from './DevicePage.module.scss';
 
@@ -56,24 +56,26 @@ interface SectionProps {
  * OLED Curved's: the same decoder features under the same names.
  */
 export function LianLiScreen88Settings({ screen, title }: SectionProps) {
-  const { settings } = screen;
-  if (isScreen88InWindowsDisplay(settings)) return <LianLiScreen88WindowsDisplay screen={screen} title={title} />;
-  if (!settings?.connected) return null;
-  return <LianLiScreen88PanelSettings screen={screen} title={title} />;
+  switch (screen.view) {
+    case 'windows': return <LianLiScreen88WindowsDisplay screen={screen} title={title} />;
+    case 'restarting': return <LianLiScreen88Restarting screen={screen} title={title} />;
+    case 'panel': return <LianLiScreen88PanelSettings screen={screen} title={title} />;
+    default: return null;
+  }
 }
 
 /**
  * Every view of the 8.8's own page (its panel page, its row without a panel, a page whose row has
- * gone) goes through this. The settings route, read again every few seconds, decides: while the
- * glass is a Windows display (inWindowsDisplay, not attached as a panel) the page says so and offers
- * the switch back, whatever the device list still shows; otherwise `fallback` (the panel page, or
- * the usual not-connected page) shows. A round trip panel, Windows display, panel follows it.
+ * gone) goes through this, so a press on the Windows display switch changes the page at once and
+ * the service's pushes settle it, whatever the device list still shows: the Windows display view
+ * (heading, notice, the switch), the switch alone while the glass restarts as a panel, or
+ * `fallback` (the panel page, or the usual not-connected page).
  */
 export function LianLiScreen88PageGate({ name, fallback }: { name: string; fallback: ReactNode }) {
   const screen = useLianLiScreen88Screen(true);
   // The first read decides, so neither view flashes before the right one.
-  if (!screen.loaded) return null;
-  if (!isScreen88InWindowsDisplay(screen.settings)) return <>{fallback}</>;
+  if (!screen.loaded && !screen.pendingMode) return null;
+  if (screen.view !== 'windows' && screen.view !== 'restarting') return <>{fallback}</>;
   return (
     <div className={pageStyles.page}>
       <ViewHeader title={name} />
@@ -87,38 +89,56 @@ export function LianLiScreen88PageGate({ name, fallback }: { name: string; fallb
 
 function LianLiScreen88WindowsDisplay({ screen, title }: SectionProps) {
   const { t } = useTranslation();
-  // The notice stands above the card, on the page; the card holds only the switch.
+  // Heading, then the notice, then the card holding only the switch.
   return (
-    <>
-      <Notice tone="info" role="status" className={styles.windowsDisplayNotice}>
-        <span>{t('devices.lianliScreen88.windowsDisplayActive')}</span>
-        <NoticeSecondary>{t('devices.lianliScreen88.windowsDisplayActiveHint')}</NoticeSecondary>
-      </Notice>
-      <SettingsSection title={title ?? t('devices.lianliCurve.screenSection')}>
-        <WindowsDisplaySwitch screen={screen} />
-      </SettingsSection>
-    </>
+    <SettingsSection
+      title={title ?? t('devices.lianliCurve.screenSection')}
+      description={(
+        <Notice tone="info" role="status">
+          <span>{t('devices.lianliScreen88.windowsDisplayActive')}</span>
+          <NoticeSecondary>{t('devices.lianliScreen88.windowsDisplayActiveHint')}</NoticeSecondary>
+        </Notice>
+      )}
+    >
+      <WindowsDisplaySwitch screen={screen} />
+    </SettingsSection>
+  );
+}
+
+/** On the way back to a panel: only the switch, restarting, until the glass is a panel again. */
+function LianLiScreen88Restarting({ screen, title }: SectionProps) {
+  const { t } = useTranslation();
+  return (
+    <SettingsSection title={title ?? t('devices.lianliCurve.screenSection')}>
+      <WindowsDisplaySwitch screen={screen} />
+    </SettingsSection>
   );
 }
 
 /**
- * The glass as an ordinary Windows monitor (L-Connect's secondary screen) or a Nexus screen.
- * Either way restarts the glass, so both ask first. Only the user flips it: Nexus never does.
+ * The glass as a Windows monitor (L-Connect's secondary screen) or a Nexus screen. Either way
+ * restarts the glass, so both ask first; the page shows the new mode as soon as the user confirms,
+ * and the row says the screen is restarting until the service shows it there. Only the user flips
+ * it: Nexus never does.
  */
 function WindowsDisplaySwitch({ screen }: { screen: LianLiScreen88Screen }) {
-  const { settings, write } = screen;
+  const { settings, view, pendingMode, write, switchWindowsDisplay } = screen;
   const { t } = useTranslation();
   const [confirm, setConfirm] = useState<'on' | 'off' | null>(null);
-  if (!settings) return null;
-  const asWindows = isScreen88InWindowsDisplay(settings);
-  // The asked-for mode while the restart is still pending, else the one the glass is in.
-  const pending = asWindows ? settings.windowsDisplay === false : settings.windowsDisplay === true;
-  const checked = asWindows !== pending;
-  const description = asWindows
-    ? t(pending ? 'devices.lianliScreen88.windowsDisplayReturning' : 'devices.lianliScreen88.windowsDisplayBackHint')
-    : t(pending ? 'devices.lianliScreen88.windowsDisplaySwitching' : 'devices.lianliScreen88.windowsDisplayHint');
+  if (!settings && !pendingMode) return null;
+  const asWindows = view === 'windows';
+  const restarting = pendingMode !== null;
+  // Not pressed here: the service may still be on an earlier request (L-Connect open, Nexus Control off).
+  const serviceWaiting = !restarting && !!settings
+    && (asWindows ? settings.windowsDisplay === false : settings.windowsDisplay === true);
+  const checked = restarting ? pendingMode === 'windows' : asWindows !== serviceWaiting;
+  const description = restarting
+    ? t('devices.lianliScreen88.restarting')
+    : asWindows
+      ? t(serviceWaiting ? 'devices.lianliScreen88.windowsDisplayReturning' : 'devices.lianliScreen88.windowsDisplayBackHint')
+      : t(serviceWaiting ? 'devices.lianliScreen88.windowsDisplaySwitching' : 'devices.lianliScreen88.windowsDisplayHint');
   const onChange = (on: boolean) => {
-    // Back to the mode the glass is in only drops the pending switch: nothing restarts.
+    // Back to the mode the glass is in only drops the service's waiting request: nothing restarts.
     if (on === asWindows) {
       void write({ windowsDisplay: on });
       return;
@@ -131,6 +151,7 @@ function WindowsDisplaySwitch({ screen }: { screen: LianLiScreen88Screen }) {
         label={t('devices.lianliScreen88.windowsDisplay')}
         description={description}
         checked={checked}
+        disabled={restarting}
         onChange={onChange}
       />
       <ConfirmModal
@@ -143,7 +164,7 @@ function WindowsDisplaySwitch({ screen }: { screen: LianLiScreen88Screen }) {
         onConfirm={() => {
           const on = confirm === 'on';
           setConfirm(null);
-          void write({ windowsDisplay: on });
+          void switchWindowsDisplay(on);
         }}
       />
     </>

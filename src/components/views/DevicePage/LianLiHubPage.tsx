@@ -23,7 +23,7 @@ import { HydroShift2RingSettings } from './HydroShift2RingSettings';
 import { LianLiSyncAllBar } from './LianLiSyncAllBar';
 import { LianLiUnitTabBody, openLianLiUnitOnScreens, useLianLiUnit } from './LianLiWirelessDevicePage';
 import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
-import { isScreen88InWindowsDisplay, useLianLiScreen88Screen } from './useLianLiScreen88Screen';
+import { useLianLiScreen88Screen } from './useLianLiScreen88Screen';
 // The page's own styles first: the docked-tabs check reads the first styles module as the page's.
 import styles from './LianLiWirelessDevicePage.module.scss';
 import devicesStyles from '../../../panel/widgets/devices/DevicesPage.module.scss';
@@ -80,7 +80,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   // The 8.8's row without a panel (listed while the glass is a Windows display or only its LED board is
   // there) is a screen only as a Windows display, which only the service can tell.
   const screen88Screen = useLianLiScreen88Screen(!!screen88 && !screen88Panel);
-  const screen88Windows = isScreen88InWindowsDisplay(screen88Screen.settings);
+  const screen88Windows = screen88Screen.view === 'windows' || screen88Screen.view === 'restarting';
   const screen88Title = screen88?.shortName ?? LIANLI_SCREEN88_NAME;
 
   // The L-Wireless controller and the Flex hub, read the way their own pages read them.

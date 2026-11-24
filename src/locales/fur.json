@@ -1526,6 +1526,7 @@
   "devices.lianliScreen88.lconnectImporting": "Impuartazion...",
   "devices.lianliScreen88.mediaEmptyHint": "Cjame un video, o impuartint un di L-Connect, par riprodusilu sul schermi.",
   "devices.lianliScreen88.restartScreen": "Torne invie il schermi",
+  "devices.lianliScreen88.restarting": "Il schermi si torne a inviâ...",
   "devices.lianliScreen88.saverHint": "Al riprodûs il video une volte a ogni interval, po al torne al panel.",
   "devices.lianliScreen88.windowsDisplay": "Monitor di Windows",
   "devices.lianliScreen88.windowsDisplayActive": "Il schermi al è un monitor di Windows",

@@ -1526,6 +1526,7 @@
   "devices.lianliScreen88.lconnectImporting": "Importeren...",
   "devices.lianliScreen88.mediaEmptyHint": "Upload een video of importeer er een uit L-Connect om die op het scherm af te spelen.",
   "devices.lianliScreen88.restartScreen": "Scherm opnieuw opstarten",
+  "devices.lianliScreen88.restarting": "Scherm wordt opnieuw opgestart...",
   "devices.lianliScreen88.saverHint": "Speelt de video elk interval één keer af en keert daarna terug naar het paneel.",
   "devices.lianliScreen88.windowsDisplay": "Windows-beeldscherm",
   "devices.lianliScreen88.windowsDisplayActive": "Het scherm is een Windows-beeldscherm",

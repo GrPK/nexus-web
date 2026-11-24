@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { isScreen88InWindowsDisplay, useLianLiScreen88Screen } from './useLianLiScreen88Screen';
+import { isScreen88InWindowsDisplay, screen88View, useLianLiScreen88Screen } from './useLianLiScreen88Screen';
 
 const mockGet = vi.fn();
 
@@ -51,7 +51,20 @@ describe('useLianLiScreen88Screen', () => {
     expect(isScreen88InWindowsDisplay(s.settings)).toBe(false);
   });
 
-  it('does not poll while disabled', async () => {
+  it('a pressed switch shows its target at once; otherwise the route decides', () => {
+    const panel = { ...base, connected: true } as never;
+    const windows = { ...base, connected: false, inWindowsDisplay: true } as never;
+    const neither = { ...base, connected: false } as never;
+    expect(screen88View(panel, 'windows')).toBe('windows');
+    expect(screen88View(windows, 'panel')).toBe('restarting');
+    expect(screen88View(panel, 'panel')).toBe('panel');
+    expect(screen88View(windows, null)).toBe('windows');
+    expect(screen88View(panel, null)).toBe('panel');
+    expect(screen88View(neither, null)).toBe('none');
+    expect(screen88View(null, null)).toBe('none');
+  });
+
+  it('does not read while disabled', async () => {
     const s = await read({ screenMode: 'video', video: 'a.mp4' }, false);
     expect(s.playingClip).toBeNull();
     expect(s.loaded).toBe(false);

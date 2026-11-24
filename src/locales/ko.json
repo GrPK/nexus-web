@@ -1526,6 +1526,7 @@
   "devices.lianliScreen88.lconnectImporting": "가져오는 중...",
   "devices.lianliScreen88.mediaEmptyHint": "동영상을 업로드하거나 L-Connect에서 가져오면 화면에서 재생할 수 있습니다.",
   "devices.lianliScreen88.restartScreen": "화면 다시 시작",
+  "devices.lianliScreen88.restarting": "화면을 다시 시작하는 중...",
   "devices.lianliScreen88.saverHint": "설정한 간격마다 동영상을 한 번 재생한 뒤 패널 화면으로 돌아갑니다.",
   "devices.lianliScreen88.windowsDisplay": "Windows 디스플레이",
   "devices.lianliScreen88.windowsDisplayActive": "화면이 Windows 디스플레이입니다",

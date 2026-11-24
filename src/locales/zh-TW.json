@@ -1526,6 +1526,7 @@
   "devices.lianliScreen88.lconnectImporting": "正在匯入...",
   "devices.lianliScreen88.mediaEmptyHint": "上傳影片或從 L-Connect 匯入影片，即可在螢幕上播放。",
   "devices.lianliScreen88.restartScreen": "重新啟動螢幕",
+  "devices.lianliScreen88.restarting": "正在重新啟動螢幕...",
   "devices.lianliScreen88.saverHint": "每隔設定時間播放一次影片，然後返回面板。",
   "devices.lianliScreen88.windowsDisplay": "Windows 顯示器",
   "devices.lianliScreen88.windowsDisplayActive": "螢幕目前是 Windows 顯示器",

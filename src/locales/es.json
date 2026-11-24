@@ -1526,6 +1526,7 @@
   "devices.lianliScreen88.lconnectImporting": "Importando...",
   "devices.lianliScreen88.mediaEmptyHint": "Sube un vídeo o importa uno de L-Connect para reproducirlo en la pantalla.",
   "devices.lianliScreen88.restartScreen": "Reiniciar pantalla",
+  "devices.lianliScreen88.restarting": "Reiniciando la pantalla...",
   "devices.lianliScreen88.saverHint": "Reproduce el vídeo una vez en cada intervalo y luego vuelve al panel.",
   "devices.lianliScreen88.windowsDisplay": "Monitor de Windows",
   "devices.lianliScreen88.windowsDisplayActive": "La pantalla es un monitor de Windows",

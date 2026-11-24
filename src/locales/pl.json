@@ -1535,6 +1535,7 @@
   "devices.lianliScreen88.lconnectImporting": "Importowanie...",
   "devices.lianliScreen88.mediaEmptyHint": "Prześlij film lub zaimportuj go z L-Connect, aby odtwarzać go na ekranie.",
   "devices.lianliScreen88.restartScreen": "Uruchom ekran ponownie",
+  "devices.lianliScreen88.restarting": "Ponowne uruchamianie ekranu...",
   "devices.lianliScreen88.saverHint": "Odtwarza film raz w każdym interwale, a następnie wraca do panelu.",
   "devices.lianliScreen88.windowsDisplay": "Monitor Windows",
   "devices.lianliScreen88.windowsDisplayActive": "Ekran jest monitorem Windows",

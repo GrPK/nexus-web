@@ -1526,6 +1526,7 @@
   "devices.lianliScreen88.lconnectImporting": "Importation...",
   "devices.lianliScreen88.mediaEmptyHint": "Ajoutez une vidéo ou importez-en une depuis L-Connect pour la lire sur l'écran.",
   "devices.lianliScreen88.restartScreen": "Redémarrer l'écran",
+  "devices.lianliScreen88.restarting": "Redémarrage de l'écran...",
   "devices.lianliScreen88.saverHint": "Lit la vidéo une fois à chaque intervalle, puis revient au panneau.",
   "devices.lianliScreen88.windowsDisplay": "Affichage Windows",
   "devices.lianliScreen88.windowsDisplayActive": "L'écran est en affichage Windows",

@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LianLiScreen88PageGate, LianLiScreen88Settings } from './LianLiScreen88Settings';
-import { useLianLiScreen88Screen } from './useLianLiScreen88Screen';
+import { resetScreen88PendingMode, useLianLiScreen88Screen } from './useLianLiScreen88Screen';
 import type { LConnectVideos, LianLiScreen88MediaItem, LianLiScreen88Settings as Settings } from '../../../api/lianliScreen88';
+import { MultiplexContext } from '../../../hooks/useMultiplexSocket';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -45,6 +46,23 @@ function Harness({ title }: { title?: string }) {
   return <LianLiScreen88Settings screen={screen88} title={title} />;
 }
 
+// The service's push channel: the page reads the settings again on these frames, never on a timer.
+const topicListeners = new Map<string, Set<(data: unknown) => void>>();
+const mux = {
+  subscribe: (topic: string, listener: (data: unknown) => void) => {
+    if (!topicListeners.has(topic)) topicListeners.set(topic, new Set());
+    topicListeners.get(topic)!.add(listener);
+  },
+  unsubscribe: (topic: string, listener: (data: unknown) => void) => { topicListeners.get(topic)?.delete(listener); },
+  connected: true,
+} as any;
+const Mux = ({ children }: { children: React.ReactNode }) => (
+  <MultiplexContext.Provider value={mux}>{children}</MultiplexContext.Provider>
+);
+async function push(topic = 'devices') {
+  await act(async () => { topicListeners.get(topic)?.forEach(listener => listener({})); });
+}
+
 const settings: Settings = {
   connected: true,
   inWindowsDisplay: false,
@@ -71,7 +89,7 @@ async function renderSettings(s: Partial<Settings> = {}, media: LianLiScreen88Me
   mockGetSettings.mockResolvedValue({ ...settings, ...s });
   mockGetMedia.mockResolvedValue(media);
   await act(async () => {
-    render(<Harness title={title} />);
+    render(<Harness title={title} />, { wrapper: Mux });
   });
 }
 
@@ -79,6 +97,7 @@ const windowsSwitch = () => screen.getByRole('switch', { name: 'devices.lianliSc
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetScreen88PendingMode();
   mockSetSettings.mockResolvedValue(true);
   mockUpload.mockResolvedValue({ name: 'new.mp4' });
   mockDelete.mockResolvedValue(true);
@@ -146,11 +165,10 @@ describe('LianLiScreen88Settings', () => {
   });
 
   it('reads the library again when the mount turns a quarter, for its new thumbnails', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     await renderSettings({ screenMode: 'video' }, [clip('a.mp4')]);
     const before = mockGetMedia.mock.calls.length;
     mockGetSettings.mockResolvedValue({ ...settings, screenMode: 'video', videoPortrait: true, videoWidth: 480, videoHeight: 1920 });
-    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    await push('panel/device');
     expect(mockGetMedia.mock.calls.length).toBeGreaterThan(before);
   });
 
@@ -212,15 +230,20 @@ describe('LianLiScreen88Settings', () => {
 });
 
 describe('LianLiScreen88Settings Windows display', () => {
-  it('never writes the mode on its own, however long it polls', async () => {
+  it('reads nothing on a timer, only on the service\'s pushes, and never writes the mode on its own', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     await renderSettings(asWindows);
-    await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
-    expect(mockGetSettings.mock.calls.length).toBeGreaterThan(1);
+    const reads = mockGetSettings.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    expect(mockGetSettings.mock.calls.length).toBe(reads);
+    await push('devices');
+    await push('panel/device');
+    await push('lianli-screen88');
+    expect(mockGetSettings.mock.calls.length).toBe(reads + 3);
     expect(mockSetSettings).not.toHaveBeenCalled();
   });
 
-  it('as a Nexus screen, the switch is off and turning it on asks before restarting the glass', async () => {
+  it('as a Nexus screen, the switch is off; turning it on asks, then shows the Windows display at once', async () => {
     await renderSettings();
     expect(windowsSwitch()).not.toBeChecked();
     expect(screen.getByText('devices.lianliScreen88.windowsDisplayHint')).toBeInTheDocument();
@@ -228,7 +251,19 @@ describe('LianLiScreen88Settings Windows display', () => {
     expect(mockSetSettings).not.toHaveBeenCalled();
     expect(await screen.findByText('devices.lianliScreen88.windowsDisplayOnMessage')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'devices.lianliScreen88.restartScreen' }));
+    // On the press: the Windows display view, the switch on and locked while the glass restarts.
+    expect(screen.getByText('devices.lianliScreen88.windowsDisplayActive')).toBeInTheDocument();
+    expect(screen.queryByLabelText('devices.lianliCurve.screenContent')).not.toBeInTheDocument();
+    expect(windowsSwitch()).toBeChecked();
+    expect(windowsSwitch()).toBeDisabled();
+    expect(screen.getByText('devices.lianliScreen88.restarting')).toBeInTheDocument();
     await waitFor(() => expect(mockSetSettings).toHaveBeenCalledWith({ windowsDisplay: true }));
+    // The service's push settles it: the glass is a Windows display.
+    mockGetSettings.mockResolvedValue({ ...settings, ...asWindows, windowsDisplay: true });
+    await push('devices');
+    expect(screen.queryByText('devices.lianliScreen88.restarting')).not.toBeInTheDocument();
+    expect(windowsSwitch()).toBeChecked();
+    expect(windowsSwitch()).not.toBeDisabled();
   });
 
   it('cancelling the question writes nothing', async () => {
@@ -253,21 +288,55 @@ describe('LianLiScreen88Settings Windows display', () => {
     expect(screen.queryByLabelText('devices.lianliCurve.screenContent')).not.toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'devices.lianliCurve.offlineMode' })).not.toBeInTheDocument();
     expect(mockGetMedia).not.toHaveBeenCalled();
-    // The notice stands on the page above the card; the card holds only the switch.
-    expect(screen.getByText('devices.lianliScreen88.windowsDisplayActive').closest('section')).toBeNull();
-    expect(windowsSwitch().closest('section')).not.toBeNull();
+    // Heading, then the notice, then the card holding only the switch.
+    const notice = screen.getByText('devices.lianliScreen88.windowsDisplayActive');
+    const card = windowsSwitch().closest('[class*="_box_"]');
+    expect(card).not.toBeNull();
+    expect(card!.contains(notice)).toBe(false);
+    expect(notice.closest('section')).toBe(windowsSwitch().closest('section'));
   });
 
-  it('turning it off asks first, then asks the service to bring the glass back as a panel', async () => {
+  it('turning it off asks first, then shows the restart at once and the panel once the service says so', async () => {
     await renderSettings(asWindows);
     fireEvent.click(windowsSwitch());
     expect(mockSetSettings).not.toHaveBeenCalled();
     expect(await screen.findByText('devices.lianliScreen88.windowsDisplayOffMessage')).toBeInTheDocument();
-    mockGetSettings.mockResolvedValue({ ...settings, ...asWindows, windowsDisplay: false });
     fireEvent.click(screen.getByRole('button', { name: 'devices.lianliScreen88.restartScreen' }));
+    // On the press: no notice, the switch off and locked while the glass restarts as a panel.
+    expect(screen.queryByText('devices.lianliScreen88.windowsDisplayActive')).not.toBeInTheDocument();
+    expect(windowsSwitch()).not.toBeChecked();
+    expect(windowsSwitch()).toBeDisabled();
+    expect(screen.getByText('devices.lianliScreen88.restarting')).toBeInTheDocument();
     await waitFor(() => expect(mockSetSettings).toHaveBeenCalledWith({ windowsDisplay: false }));
-    await waitFor(() => expect(windowsSwitch()).not.toBeChecked());
-    expect(screen.getByText('devices.lianliScreen88.windowsDisplayReturning')).toBeInTheDocument();
+    mockGetSettings.mockResolvedValue({ ...settings, windowsDisplay: false });
+    await push('panel/device');
+    expect(screen.getByLabelText('devices.lianliCurve.screenContent')).toBeInTheDocument();
+    expect(screen.queryByText('devices.lianliScreen88.restarting')).not.toBeInTheDocument();
+  });
+
+  it('the page follows a press made in its own section at once (the shared switch state)', async () => {
+    mockGetSettings.mockResolvedValue(settings);
+    mockGetMedia.mockResolvedValue([]);
+    await act(async () => {
+      render(<LianLiScreen88PageGate name="Lian Li Universal Screen 8.8" fallback={<Harness />} />, { wrapper: Mux });
+    });
+    expect(screen.getByLabelText('devices.lianliCurve.screenContent')).toBeInTheDocument();
+    fireEvent.click(windowsSwitch());
+    fireEvent.click(await screen.findByRole('button', { name: 'devices.lianliScreen88.restartScreen' }));
+    // The page itself, not just the section, is the Windows display view now.
+    expect(screen.getByText('Lian Li Universal Screen 8.8')).toBeInTheDocument();
+    expect(screen.getByText('devices.lianliScreen88.windowsDisplayActive')).toBeInTheDocument();
+    expect(screen.queryByLabelText('devices.lianliCurve.screenContent')).not.toBeInTheDocument();
+  });
+
+  it('a switch the glass never makes stops showing as restarting after a minute', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    await renderSettings();
+    fireEvent.click(windowsSwitch());
+    fireEvent.click(screen.getByRole('button', { name: 'devices.lianliScreen88.restartScreen' }));
+    expect(screen.getByText('devices.lianliScreen88.restarting')).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(screen.queryByText('devices.lianliScreen88.restarting')).not.toBeInTheDocument();
   });
 
   it('turning it back on while the return is pending only drops the request', async () => {

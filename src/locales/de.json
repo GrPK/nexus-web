@@ -1526,6 +1526,7 @@
   "devices.lianliScreen88.lconnectImporting": "Wird importiert...",
   "devices.lianliScreen88.mediaEmptyHint": "Laden Sie ein Video hoch oder importieren Sie eines aus L-Connect, um es auf dem Bildschirm abzuspielen.",
   "devices.lianliScreen88.restartScreen": "Bildschirm neu starten",
+  "devices.lianliScreen88.restarting": "Bildschirm wird neu gestartet...",
   "devices.lianliScreen88.saverHint": "Spielt das Video im festgelegten Abstand einmal ab und kehrt dann zum Panel zurück.",
   "devices.lianliScreen88.windowsDisplay": "Windows-Anzeige",
   "devices.lianliScreen88.windowsDisplayActive": "Der Bildschirm ist eine Windows-Anzeige",

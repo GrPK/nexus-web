@@ -61,9 +61,10 @@ const { screen88Route } = vi.hoisted(() => ({
 vi.mock('./useLianLiScreen88Screen', () => ({
   useLianLiScreen88Screen: (enabled: boolean) => {
     screen88Route.reads.push(enabled);
-    return { settings: enabled ? screen88Route.settings : null, loaded: enabled, write: vi.fn() };
+    const s = enabled ? screen88Route.settings : null;
+    const view = !s ? 'none' : !s.connected && s.inWindowsDisplay ? 'windows' : s.connected ? 'panel' : 'none';
+    return { settings: s, loaded: enabled, view, pendingMode: null, write: vi.fn() };
   },
-  isScreen88InWindowsDisplay: (s: { connected: boolean; inWindowsDisplay: boolean } | null) => !!s && !s.connected && s.inWindowsDisplay,
 }));
 vi.mock('./LianLiScreen88Settings', () => ({
   LianLiScreen88Settings: ({ title }: any) => <div data-testid="screen88-screen">{title}</div>,

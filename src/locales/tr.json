@@ -1526,6 +1526,7 @@
   "devices.lianliScreen88.lconnectImporting": "İçe aktarılıyor...",
   "devices.lianliScreen88.mediaEmptyHint": "Ekranda oynatmak için bir video yükleyin veya L-Connect'ten içe aktarın.",
   "devices.lianliScreen88.restartScreen": "Ekranı yeniden başlat",
+  "devices.lianliScreen88.restarting": "Ekran yeniden başlatılıyor...",
   "devices.lianliScreen88.saverHint": "Her aralıkta videoyu bir kez oynatır, sonra panele döner.",
   "devices.lianliScreen88.windowsDisplay": "Windows monitörü",
   "devices.lianliScreen88.windowsDisplayActive": "Ekran bir Windows monitörü",

@@ -1535,6 +1535,7 @@
   "devices.lianliScreen88.lconnectImporting": "Importování...",
   "devices.lianliScreen88.mediaEmptyHint": "Nahrajte video nebo ho importujte z L-Connect, aby se přehrálo na obrazovce.",
   "devices.lianliScreen88.restartScreen": "Restartovat obrazovku",
+  "devices.lianliScreen88.restarting": "Restartování obrazovky...",
   "devices.lianliScreen88.saverHint": "V každém intervalu jednou přehraje video a pak se vrátí na panel.",
   "devices.lianliScreen88.windowsDisplay": "Monitor Windows",
   "devices.lianliScreen88.windowsDisplayActive": "Obrazovka je monitor Windows",
