@@ -294,9 +294,26 @@ describe('LianLiSyncAllBar', () => {
     expect(set).toHaveBeenLastCalledWith({ colors: ['#00ffaa'] });
   });
 
-  it('every effect key the service can send has an English label', () => {
+  it('every effect key the service can send has an English label, the merged ones saying so in plain words', () => {
     const labels = en as Record<string, string>;
     expect(SERVICE_EFFECT_KEYS.filter(k => !labels[`devices.lianliEffect.${k}`])).toEqual([]);
+    expect(labels['devices.lianliEffect.mergeRainbow']).toBe('Rainbow (merged)');
+    expect(labels['devices.lianli-hub.syncMerged']).toBe('Merged across devices');
+    expect(Object.entries(labels).filter(([, v]) => v.includes('W*'))).toEqual([]);
+  });
+
+  it('says how a merged effect runs, under the picker, only while one is on', async () => {
+    await renderBar(merged);
+    const picker = screen.getByLabelText('devices.lianli.lightingMode');
+    const hint = screen.getByText('devices.lianli-hub.syncMergedHint');
+    expect(picker.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(hint.compareDocumentPosition(screen.getByText('devices.lianli-hub.mergeOrder')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    cleanup();
+    await renderBar({ ...merged, effect: 'rainbow' });
+    expect(screen.queryByText('devices.lianli-hub.syncMergedHint')).not.toBeInTheDocument();
+    cleanup();
+    await renderBar({ ...merged, enabled: false });
+    expect(screen.queryByText('devices.lianli-hub.syncMergedHint')).not.toBeInTheDocument();
   });
 
   it('lists L-Connect\'s merged effects under their own heading, after the ones each device plays', async () => {

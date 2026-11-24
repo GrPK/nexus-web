@@ -9,7 +9,7 @@ import { fetchService, putService } from './service';
 export interface LianLiSyncEffect {
   key: string;
   /**
-   * One of L-Connect's merged ("wireless", W*) Quick Sync effects: drawn once across every
+   * One of L-Connect's merged ("wireless", "(W*)" there) Quick Sync effects: drawn once across every
    * device in `devices` order. False or absent for the ones each device plays on its own.
    */
   merge?: boolean;

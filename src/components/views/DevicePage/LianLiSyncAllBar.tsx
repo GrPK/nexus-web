@@ -38,8 +38,8 @@ type Translate = ReturnType<typeof useTranslation>['t'];
 
 /**
  * The effect picker's options in the service's order. When both kinds are listed, a heading
- * goes before the ones each device plays on its own and before L-Connect's merged ones, which
- * L-Connect marks "(W*)" as their labels here do.
+ * goes before the ones each device plays on its own and before L-Connect's merged ones (its
+ * "(W*)" effects), whose labels say "(merged)" so a closed picker tells the two Rainbows apart.
  */
 export function syncEffectOptions(t: Translate, effects: readonly LianLiSyncEffect[]): SelectOption[] {
   const grouped = effects.some(e => e.merge) && effects.some(e => !e.merge);
@@ -172,6 +172,8 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
   const onLightingPage = blocked('lightingPage');
   const onMotherboard = blocked('motherboardArgb');
   const cannotTurnOn = !data.enabled && onLightingPage.length + onMotherboard.length > 0;
+  // The order matters only to a merged effect, which runs through the devices in it.
+  const mergedOn = data.enabled && current.merge === true && data.devices.length > 0;
 
   // The whole order is sent, so the service stores exactly what the list shows.
   const move = (index: number, delta: number) => {
@@ -210,9 +212,10 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
         onModeChange={next => { void commit({ effect: next }); }}
         onPreview={patch => preview(toPatch(patch))}
         onCommit={patch => { void commit(toPatch(patch)); }}
-      />
-      {/* The order matters only to a merged effect, which runs through the devices in it. */}
-      {data.enabled && current.merge === true && data.devices.length > 0 && (
+      >
+        {mergedOn && <p className={styles.customNote} data-settings-aside="true">{t('devices.lianli-hub.syncMergedHint')}</p>}
+      </LianLiChainEffectControls>
+      {mergedOn && (
         <>
           <p className={styles.zoneHeading} data-settings-aside="true">{t('devices.lianli-hub.mergeOrder')}</p>
           <p className={styles.customNote} data-settings-aside="true">{t('devices.lianli-hub.mergeOrderHint')}</p>
