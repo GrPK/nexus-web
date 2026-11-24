@@ -121,7 +121,7 @@ export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING
       <LightingPageSwitch
         on={followsLightingPage}
         disabled={!loaded || (syncedAll && !followsLightingPage)}
-        followsSyncAll={syncedAll}
+        controlledBySyncAll={syncedAll}
         onChange={on => {
           if (!lighting) return;
           const mode = on ? LIGHTING_PAGE_MODE : effectKey;

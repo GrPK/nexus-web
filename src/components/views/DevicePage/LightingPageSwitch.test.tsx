@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LightingPageSwitch } from './LightingPageSwitch';
+import { Notice } from '../../common/Notice/Notice';
 
 vi.mock('../../../lib/i18n', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -35,23 +36,34 @@ describe('LightingPageSwitch', () => {
     expect(screen.queryByText('smartLights.colorOnLightingPage')).not.toBeInTheDocument();
   });
 
-  it('shows Follows Sync all as a pill in its own row, centred between the label and the switch', () => {
-    render(<LightingPageSwitch on={false} onChange={vi.fn()} disabled followsSyncAll />);
-    const pill = screen.getByText('devices.lianli-hub.followsSyncAll');
+  it('puts Controlled by Sync all right after the label text, led by the warning icon', () => {
+    render(<LightingPageSwitch on={false} onChange={vi.fn()} disabled controlledBySyncAll onSectionNavigate={vi.fn()} />);
+    const pill = screen.getByText('devices.lianli-hub.controlledBySyncAll');
     expect(pill.className).toContain('syncPill');
-    expect(pill.parentElement?.className).toContain('centerBadge');
-    const row = rowOf(pill);
-    expect(row).toContainElement(screen.getByText('devices.lightingPage.use'));
-    // The pill sits between the label block and the switch.
-    expect(screen.getByText('devices.lightingPage.use').compareDocumentPosition(pill) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(pill.compareDocumentPosition(screen.getByRole('switch')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // A disabled row dims its label and switch, not the pill.
-    expect(row?.className).toContain('hasCenterBadge');
-    expect(row?.className).toContain('disabled');
+    // On the label's line, inside the label, ahead of the (hidden) Lighting page link.
+    const label = screen.getByText('devices.lightingPage.use');
+    expect(label).toContainElement(pill);
+    expect(pill.compareDocumentPosition(screen.getByText('smartLights.colorOnLightingPage')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The warning notice's triangle, first, sized to the text.
+    const icon = pill.firstElementChild;
+    expect(icon?.tagName.toLowerCase()).toBe('svg');
+    expect(icon).toHaveAttribute('width', '1em');
+    const { container: notice } = render(<Notice tone="warning">x</Notice>);
+    expect(icon?.innerHTML).toBe(notice.querySelector('svg')?.innerHTML);
+    // The hint stays below the label.
+    expect(label.parentElement).toHaveTextContent('devices.lightingPage.useHint');
   });
 
-  it('has no pill unless Sync all drives the light', () => {
-    render(<LightingPageSwitch on={false} onChange={vi.fn()} />);
-    expect(screen.queryByText('devices.lianli-hub.followsSyncAll')).not.toBeInTheDocument();
+  it('under Sync all locks only the switch, so the row with its pill stays readable', () => {
+    render(<LightingPageSwitch on={false} onChange={vi.fn()} disabled controlledBySyncAll />);
+    expect(screen.getByRole('switch')).toBeDisabled();
+    expect(rowOf(screen.getByText('devices.lianli-hub.controlledBySyncAll'))?.className).not.toContain('disabled');
+  });
+
+  it('dims a disabled row as before, with no pill, unless Sync all drives the light', () => {
+    render(<LightingPageSwitch on={false} onChange={vi.fn()} disabled />);
+    expect(screen.queryByText('devices.lianli-hub.controlledBySyncAll')).not.toBeInTheDocument();
+    expect(screen.getByRole('switch')).toBeDisabled();
+    expect(rowOf(screen.getByText('devices.lightingPage.use'))?.className).toContain('disabled');
   });
 });

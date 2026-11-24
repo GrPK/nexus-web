@@ -279,7 +279,7 @@ describe('Sync all on the Lian Li page', () => {
       render(<LianLiWirelessLightingTab syncAllMacs={new Set(['7880AE72AB3C'])} />);
     });
     // A pill in the Lighting page row, not a row of its own.
-    expect(rowOf(screen.getByText('devices.lianli-hub.followsSyncAll'))).toContainElement(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
+    expect(rowOf(screen.getByText('devices.lianli-hub.controlledBySyncAll'))).toContainElement(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
     expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
     expect(screen.getByRole('switch', { name: 'devices.motherboardArgb.label' })).toBeDisabled();
     expect(screen.getByRole('switch', { name: 'devices.lianli-wireless.separateHalves' })).toBeDisabled();
@@ -313,7 +313,7 @@ describe('Sync all on the Lian Li page', () => {
     await act(async () => {
       render(<LianLiWirelessLightingTab syncAllMacs={new Set(['OTHER'])} />);
     });
-    expect(screen.queryByText('devices.lianli-hub.followsSyncAll')).not.toBeInTheDocument();
+    expect(screen.queryByText('devices.lianli-hub.controlledBySyncAll')).not.toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).not.toBeDisabled();
   });
 
@@ -353,7 +353,7 @@ describe('Sync all on the Lian Li page', () => {
     await act(async () => {
       render(<LianLiWirelessLightingTab syncAllMacs={new Set(['64F271E566E1'])} />);
     });
-    expect(rowOf(screen.getByText('devices.lianli-hub.followsSyncAll'))).toContainElement(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
+    expect(rowOf(screen.getByText('devices.lianli-hub.controlledBySyncAll'))).toContainElement(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
     expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
     expect(screen.getByRole('switch', { name: 'devices.motherboardArgb.label' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'devices.lianli.lightingMode' })).toBeDisabled();

@@ -21,7 +21,8 @@ export interface NoticeProps {
   dismissLabel?: string;
 }
 
-const ICONS = { info: Info, warning: TriangleAlert, critical: OctagonAlert } as const;
+/** Each tone's icon, for a badge elsewhere that should read as the same level. */
+export const NOTICE_ICONS = { info: Info, warning: TriangleAlert, critical: OctagonAlert } as const;
 
 /**
  * The one inline notice block: a soft fill, border and icon in the level's colour, with
@@ -30,7 +31,7 @@ const ICONS = { info: Info, warning: TriangleAlert, critical: OctagonAlert } as 
  * than building their own bordered banner.
  */
 export function Notice({ tone, role, children, actions, className, onDismiss, dismissLabel }: NoticeProps) {
-  const Icon = ICONS[tone];
+  const Icon = NOTICE_ICONS[tone];
   return (
     <div className={`${styles.notice} ${styles[tone]} ${className ?? ''}`} role={role} data-tone={tone}>
       <div className={styles.row}>

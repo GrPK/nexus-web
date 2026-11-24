@@ -429,7 +429,7 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
       {!p28 && <LightingPageSwitch
         on={lightingPage}
         disabled={argbOn || (synced && !(syncAll && lightingPage))}
-        followsSyncAll={syncAll}
+        controlledBySyncAll={syncAll}
         onChange={on => onCommit(on ? { mode: MODE_CUSTOM } : { mode: effectKey, effectMode: effectKey })}
         onSectionNavigate={onSectionNavigate}
       />}
