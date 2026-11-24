@@ -38,6 +38,7 @@ import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import { localizeNumbers } from '../../../lib/units';
 import { LianLiAioScreenSection } from './LianLiAioScreenSection';
+import { FrameRateSetting } from './FrameRateSetting';
 import styles from './LianLiWirelessDevicePage.module.scss';
 
 const WIRELESS_SCREEN_API: LianLiScreenApi = {
@@ -83,6 +84,8 @@ const CONTENT_TYPES: { value: ContentChoice; labelKey: string }[] = [
 ];
 
 const ROTATIONS = [0, 1, 2, 3];
+/** Clip rates the fan screens offer beyond the lighting presets. */
+const FAN_LCD_EXTRA_CAPS_HZ = [60] as const;
 
 const SELECTION_MODES: { key: 'single' | 'multiple'; labelKey: string }[] = [
   { key: 'single', labelKey: 'devices.lianli-wireless.selectionModeSingle' },
@@ -284,6 +287,10 @@ export function LianLiWirelessScreenTab({
   const brightness = sharedValue(targetScreens, s => s.brightness);
   const rotation = sharedValue(targetScreens, s => s.rotation);
   const sleep = sharedValue(targetScreens, s => s.sleepWhenLocked ?? true);
+  // The rate only paces a GIF or video clip, and only on a screen that is not a Nexus panel; an older service sends no cap.
+  const showFrameRate = representative !== null && representative.fpsCap !== undefined
+    && (representative.contentType === 'gif' || representative.contentType === 'video')
+    && representative.nexusPanel !== true;
   const mixedLabel = t('common.mixed');
   const nexusPanel = sharedValue(targetScreens, s => s.nexusPanel === true);
   // When several fans with different content types are selected the content
@@ -329,6 +336,17 @@ export function LianLiWirelessScreenTab({
       serial => { void api.setSettings(serial, { rotation }); },
     );
   }, [applyToTargets, api]);
+
+  const handleFpsCapSave = useCallback(async (fpsCap: number) => {
+    const serials = targetScreens.map(s => s.serial);
+    const results = await Promise.all(serials.map(serial => api.setSettings(serial, { fpsCap })));
+    const ok = results.every(Boolean);
+    if (ok) {
+      lastEditRef.current = performance.now();
+      setScreens(prev => prev ? prev.map(s => (serials.includes(s.serial) ? { ...s, fpsCap } : s)) : prev);
+    }
+    return ok;
+  }, [targetScreens, api]);
 
   const handleSleepWhenLockedChange = useCallback((sleepWhenLocked: boolean) => {
     const previous = new Map(targetScreens.map(s => [s.serial, s.sleepWhenLocked]));
@@ -589,6 +607,13 @@ export function LianLiWirelessScreenTab({
             }))}
           />
         </SettingRow>
+        {showFrameRate && representative && (
+          <FrameRateSetting
+            cap={representative.fpsCap && representative.fpsCap >= 1 ? representative.fpsCap : null}
+            onSave={handleFpsCapSave}
+            extraCapsHz={FAN_LCD_EXTRA_CAPS_HZ}
+          />
+        )}
         {lcdRestart && (
           <SettingRow
             label={t('devices.lianli-flex.restartLcd')}

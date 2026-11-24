@@ -332,6 +332,8 @@ export interface LianLiWirelessScreen {
   colorB?: string;
   /** Display unit for a temperature sensor source. */
   tempUnit?: LianLiWirelessTempUnit;
+  /** Clip frame rate cap in fps the screen plays under; 0 = Off. Absent on an older service. */
+  fpsCap?: number;
   /** Absent/null = on. */
   sleepWhenLocked?: boolean | null;
   /**
@@ -391,6 +393,8 @@ export interface LianLiScreenSettingsPatch {
   rotation?: number;
   sleepWhenLocked?: boolean;
   nexusPanel?: boolean;
+  /** Clip frame rate cap in fps; 0 = Off, the clip plays at its own rate. */
+  fpsCap?: number;
 }
 
 /** The screen endpoints of one Lian Li fan LCD family; the Screens tab is written against this. */
