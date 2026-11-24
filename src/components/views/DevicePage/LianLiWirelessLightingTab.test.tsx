@@ -293,7 +293,7 @@ describe('wireless TL up and down', () => {
     fireEvent.click(screen.getByLabelText('devices.lianli.lightingMode'));
     const options = (await screen.findAllByRole('option')).map(o => o.textContent);
     expect(options).toEqual(['devices.lianliEffect.rainbow', 'devices.lianliEffect.static', 'devices.lianliEffect.meteor']);
-    expect(screen.queryByText('devices.lianli-wireless.halfUp')).not.toBeInTheDocument();
+    expect(screen.queryByText('devices.lianli-wireless.halfRight')).not.toBeInTheDocument();
   });
 
   it('Separate halves on gives the up half its own look and shows only the two halves', async () => {
@@ -303,8 +303,9 @@ describe('wireless TL up and down', () => {
     });
     expect(mockSetStrimer).toHaveBeenCalledWith('7880AE72AB3C', { scope: 'up', effectMode: undefined });
     expect(screen.getByRole('switch', { name: 'devices.lianli-wireless.separateHalves' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('devices.lianli-wireless.halfUp')).toBeInTheDocument();
-    expect(screen.getByText('devices.lianli-wireless.halfDown')).toBeInTheDocument();
+    // Left half ("down") first, then right half ("up").
+    const left = screen.getByText('devices.lianli-wireless.halfLeft');
+    expect(left.compareDocumentPosition(screen.getByText('devices.lianli-wireless.halfRight')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The whole fan's picker is gone: one picker per half.
     expect(screen.getAllByRole('button', { name: 'devices.lianli.lightingMode' })).toHaveLength(2);
   });
@@ -315,7 +316,7 @@ describe('wireless TL up and down', () => {
       fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-wireless.separateHalves' }));
     });
     expect(mockSetStrimer).toHaveBeenCalledWith('7880AE72AB3C', { mode: 'meteor', effectMode: undefined });
-    expect(screen.queryByText('devices.lianli-wireless.halfUp')).not.toBeInTheDocument();
+    expect(screen.queryByText('devices.lianli-wireless.halfRight')).not.toBeInTheDocument();
     const [chainMode] = screen.getAllByRole('button', { name: 'devices.lianli.lightingMode' });
     expect(screen.getAllByRole('button', { name: 'devices.lianli.lightingMode' })).toHaveLength(1);
     expect(chainMode).toHaveTextContent('devices.lianliEffect.meteor');
@@ -324,13 +325,13 @@ describe('wireless TL up and down', () => {
   it('shows each half with its own look and saves a change to that half only', async () => {
     await renderTl(ownHalves);
     expect(screen.getByRole('switch', { name: 'devices.lianli-wireless.separateHalves' })).toHaveAttribute('aria-checked', 'true');
-    const [upMode, downMode] = screen.getAllByRole('button', { name: 'devices.lianli.lightingMode' });
+    const [downMode, upMode] = screen.getAllByRole('button', { name: 'devices.lianli.lightingMode' });
     expect(upMode).toHaveTextContent('devices.lianliEffect.static');
     expect(downMode).toHaveTextContent('devices.lianliEffect.meteor');
-    // Up's one colour, then Down's four.
+    // The left half's ("down") four colours, then the right half's ("up") one.
     const inputs = screen.getAllByLabelText('common.hexColor') as HTMLInputElement[];
-    expect(inputs.map(i => i.value)).toEqual(['#222222', '#333333', '#444444', '#555555', '#666666']);
-    fireEvent.change(inputs[2], { target: { value: '#abcdef' } });
+    expect(inputs.map(i => i.value)).toEqual(['#333333', '#444444', '#555555', '#666666', '#222222']);
+    fireEvent.change(inputs[1], { target: { value: '#abcdef' } });
     expect(mockSetStrimer).toHaveBeenLastCalledWith('7880AE72AB3C', {
       scope: 'down',
       colors: ['#333333', '#abcdef', '#555555', '#666666'],
@@ -340,14 +341,15 @@ describe('wireless TL up and down', () => {
 
   it('a half without a look of its own shows the whole fan look', async () => {
     await renderTl({ up: ownHalves.up, lastScope: 'up' });
-    const [upMode, downMode] = screen.getAllByRole('button', { name: 'devices.lianli.lightingMode' });
+    const [downMode, upMode] = screen.getAllByRole('button', { name: 'devices.lianli.lightingMode' });
     expect(upMode).toHaveTextContent('devices.lianliEffect.static');
     expect(downMode).toHaveTextContent('devices.lianliEffect.meteor');
   });
 
   it('picking an effect for one half starts it from its own colours', async () => {
     await renderTl(ownHalves);
-    fireEvent.click(screen.getAllByLabelText('devices.lianli.lightingMode')[0]);
+    // The right half ("up") is the second picker.
+    fireEvent.click(screen.getAllByLabelText('devices.lianli.lightingMode')[1]);
     await act(async () => {
       fireEvent.click(await screen.findByRole('option', { name: 'devices.lianliEffect.meteor' }));
     });
@@ -361,7 +363,7 @@ describe('wireless TL up and down', () => {
       fireEvent.click(await screen.findByRole('option', { name: 'devices.lianliEffect.static' }));
     });
     expect(mockSetStrimer).toHaveBeenCalledWith('7880AE72AB3C', { mode: 'static', colors: [], effectMode: undefined });
-    expect(screen.queryByText('devices.lianli-wireless.halfUp')).not.toBeInTheDocument();
+    expect(screen.queryByText('devices.lianli-wireless.halfRight')).not.toBeInTheDocument();
     // The cleared palette shows the effect's own colour.
     expect((screen.getByLabelText('common.hexColor') as HTMLInputElement).value.toLowerCase()).toBe('#ff0000');
   });
@@ -376,10 +378,11 @@ describe('wireless TL up and down', () => {
     expect(screen.getByRole('switch', { name: 'devices.lianli-wireless.merge' })).toBeInTheDocument();
   });
 
-  it('shows the up and down swap and saves it', async () => {
+  it('shows the left and right swap and saves it', async () => {
     await renderTl();
+    expect(screen.queryByRole('switch', { name: 'devices.lianli-flex.upDownSwap' })).not.toBeInTheDocument();
     await act(async () => {
-      fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-flex.upDownSwap' }));
+      fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' }));
     });
     expect(mockSetStrimer).toHaveBeenCalledWith('7880AE72AB3C', { upDownSwap: true, effectMode: undefined });
   });
@@ -389,7 +392,7 @@ describe('wireless TL up and down', () => {
     fireEvent.click(screen.getByLabelText('devices.lianli.lightingMode'));
     expect((await screen.findAllByRole('option')).map(o => o.textContent)).not.toContain('devices.lianli-flex.modePerZone');
     expect(screen.queryByRole('switch', { name: 'devices.lianli-wireless.separateHalves' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('switch', { name: 'devices.lianli-flex.upDownSwap' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' })).not.toBeInTheDocument();
   });
 
   it('Separate halves follows the motherboard and Lighting page locks', async () => {

@@ -73,11 +73,20 @@ const ZONE_LABEL_KEYS: Record<LianLiFlexZone['id'], string> = {
   inner: 'devices.lianli-flex.zoneInner',
   outer: 'devices.lianli-flex.zoneOuter',
 };
-// A wireless TL fan's halves (L-Connect's Up / Down scope).
-const HALF_LABEL_KEYS: Partial<Record<LianLiFlexZone['id'], string>> = {
-  up: 'devices.lianli-wireless.halfUp',
-  down: 'devices.lianli-wireless.halfDown',
+// A TL fan seen upright, as its screen shows the boot logo: L-Connect's "up" half (LEDs 0..12) is
+// the right half and "down" (LEDs 13..25) the left one. The ids and the patches keep up and down.
+const TL_HALF_LABEL_KEYS: Partial<Record<LianLiFlexZone['id'], string>> = {
+  up: 'devices.lianli-wireless.halfRight',
+  down: 'devices.lianli-wireless.halfLeft',
 };
+const TL_FAN_TYPES: ReadonlySet<string> = new Set(['fanTypeTlv2', 'fanTypeTlLcd', 'fanTypeTlFlex']);
+
+/** A TL fan chain, wireless or on a wired Flex hub: its two halves are its left and right. */
+export function isTlChain(chain: LianLiWirelessChainLighting): boolean {
+  if (chain.kind !== 'fans') return false;
+  if (chain.family) return chain.family === 'tlFlex';
+  return chain.supportsScope === true || TL_FAN_TYPES.has(fanTypeKey(chain.fanType));
+}
 
 interface LianLiWirelessLightingTabProps {
   onSectionNavigate?: (section: string) => void;
@@ -329,11 +338,14 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
   // a wired Flex fan picks Per zone in its mode list.
   const scoped = chain.supportsScope === true && !p28;
   const ownHalves = scoped && hasOwnHalves(chain);
+  const tl = isTlChain(chain);
   const perZone = (chain.supportsZones === true && !p28 && effectKey === MODE_PER_ZONE) || ownHalves;
   // A half without a look of its own plays the whole fan's.
-  const zones: Pick<LianLiFlexZone, 'id' | 'mode' | 'speed' | 'direction' | 'brightness' | 'colors'>[] = ownHalves
+  const shownZones: Pick<LianLiFlexZone, 'id' | 'mode' | 'speed' | 'direction' | 'brightness' | 'colors'>[] = ownHalves
     ? (['up', 'down'] as const).map(id => ({ id, ...(chain[id] ?? chainLookOf(chain)) }))
     : chain.zones ?? [];
+  // A TL fan reads in reading order: its left half ("down"), then its right half ("up").
+  const zones = tl ? [...shownZones].sort((a, b) => Number(a.id === 'up') - Number(b.id === 'up')) : shownZones;
   const zonePatch = (id: LianLiFlexZone['id'], patch: Partial<LianLiEffectValue>): LianLiWirelessChainPatch =>
     ownHalves && (id === 'up' || id === 'down') ? { scope: id, ...patch } : { zones: [{ id, ...patch }] };
   // L-Connect starts a picked effect from its own colours, so a TL pick clears the stored ones.
@@ -416,7 +428,7 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
         {perZone && zones.map(zone => (
           <Fragment key={zone.id}>
             <p className={styles.zoneHeading} data-settings-aside="true">
-              {t(((ownHalves ? HALF_LABEL_KEYS[zone.id] : undefined) ?? ZONE_LABEL_KEYS[zone.id]) as Parameters<Translate>[0])}
+              {t(((tl ? TL_HALF_LABEL_KEYS[zone.id] : undefined) ?? ZONE_LABEL_KEYS[zone.id]) as Parameters<Translate>[0])}
             </p>
             <LianLiChainEffectControls
               modes={chain.modes}
@@ -448,8 +460,8 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
 
       {chain.upDownSwap != null && (
         <SettingToggle
-          label={t('devices.lianli-flex.upDownSwap')}
-          description={t('devices.lianli-flex.upDownSwapHint')}
+          label={t(tl ? 'devices.lianli-wireless.leftRightSwap' : 'devices.lianli-flex.upDownSwap')}
+          description={t(tl ? 'devices.lianli-wireless.leftRightSwapHint' : 'devices.lianli-flex.upDownSwapHint')}
           checked={chain.upDownSwap}
           onChange={on => onCommit({ upDownSwap: on })}
           disabled={argbOn}

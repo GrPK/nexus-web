@@ -60,6 +60,15 @@ describe('LianLiFlexLcdThemesSection', () => {
     expect(mockSet).toHaveBeenCalledWith('6D1007F517E1', { enabled: true });
   });
 
+  it('names a TL chain\'s swap left and right, and saves it', async () => {
+    mockGet.mockResolvedValue({ sourceCount: 25, themes, chains: [chain({ upDownSwap: false })] });
+    await renderSection();
+    expect(screen.getByText('devices.lianli-wireless.leftRightSwapHint')).toBeInTheDocument();
+    expect(screen.queryByText('devices.lianli-flex.upDownSwap')).not.toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' })); });
+    expect(mockSet).toHaveBeenCalledWith('6D1007F517E1', { upDownSwap: true });
+  });
+
   it('offers a theme per index, the readings the service fills, and one picker per editable color', async () => {
     mockGet.mockResolvedValue({ sourceCount: 25, themes, chains: [chain({ enabled: true })] });
     await renderSection();

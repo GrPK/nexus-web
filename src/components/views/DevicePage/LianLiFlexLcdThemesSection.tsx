@@ -95,8 +95,8 @@ export function LianLiFlexLcdThemesSection({ reloadKey = '' }: {
             boxClassName={styles.sectionBox}
           >
             <SettingToggle
-              label={t('devices.lianli-flex.upDownSwap')}
-              description={t('devices.lianli-flex.upDownSwapHint')}
+              label={t(chain.family === 'tlFlex' ? 'devices.lianli-wireless.leftRightSwap' : 'devices.lianli-flex.upDownSwap')}
+              description={t(chain.family === 'tlFlex' ? 'devices.lianli-wireless.leftRightSwapHint' : 'devices.lianli-flex.upDownSwapHint')}
               checked={chain.upDownSwap}
               onChange={on => { void commit(chain.mac, { upDownSwap: on }, c => ({ ...c, upDownSwap: on })); }}
             />
