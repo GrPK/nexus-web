@@ -63,13 +63,15 @@ export function LianLiScreen88Settings({ screen, title }: SectionProps) {
 }
 
 /**
- * The 8.8's own page while no panel is attached. In its Windows display mode the glass is an
- * ordinary monitor, so the page says so and offers the switch back; otherwise `fallback`
- * (the usual not-connected page) shows.
+ * Every view of the 8.8's own page (its panel page, its row without a panel, a page whose row has
+ * gone) goes through this. The settings route, read again every few seconds, decides: while the
+ * glass is a Windows display (inWindowsDisplay, not attached as a panel) the page says so and offers
+ * the switch back, whatever the device list still shows; otherwise `fallback` (the panel page, or
+ * the usual not-connected page) shows. A round trip panel, Windows display, panel follows it.
  */
-export function LianLiScreen88AbsentPage({ name, fallback }: { name: string; fallback: ReactNode }) {
+export function LianLiScreen88PageGate({ name, fallback }: { name: string; fallback: ReactNode }) {
   const screen = useLianLiScreen88Screen(true);
-  // The first read decides, so "not connected" never flashes before the Windows display view.
+  // The first read decides, so neither view flashes before the right one.
   if (!screen.loaded) return null;
   if (!isScreen88InWindowsDisplay(screen.settings)) return <>{fallback}</>;
   return (
@@ -85,14 +87,17 @@ export function LianLiScreen88AbsentPage({ name, fallback }: { name: string; fal
 
 function LianLiScreen88WindowsDisplay({ screen, title }: SectionProps) {
   const { t } = useTranslation();
+  // The notice stands above the card, on the page; the card holds only the switch.
   return (
-    <SettingsSection title={title ?? t('devices.lianliCurve.screenSection')}>
-      <Notice tone="info" role="status">
+    <>
+      <Notice tone="info" role="status" className={styles.windowsDisplayNotice}>
         <span>{t('devices.lianliScreen88.windowsDisplayActive')}</span>
         <NoticeSecondary>{t('devices.lianliScreen88.windowsDisplayActiveHint')}</NoticeSecondary>
       </Notice>
-      <WindowsDisplaySwitch screen={screen} />
-    </SettingsSection>
+      <SettingsSection title={title ?? t('devices.lianliCurve.screenSection')}>
+        <WindowsDisplaySwitch screen={screen} />
+      </SettingsSection>
+    </>
   );
 }
 

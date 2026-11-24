@@ -19,7 +19,7 @@ import { typeForMarketplace } from '../../../widgets/marketplaceRegistry';
 import { LianLiTlDevicePage } from './LianLiTlDevicePage';
 import { LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
 import { LianLiHubPage } from './LianLiHubPage';
-import { LianLiScreen88AbsentPage } from './LianLiScreen88Settings';
+import { LianLiScreen88PageGate } from './LianLiScreen88Settings';
 import { LIANLI_SCREEN88_ID, LIANLI_SCREEN88_NAME } from '../../../api/lianliScreen88';
 import { Galahad2DevicePage } from './Galahad2DevicePage';
 import { AsiahorseUmbraDevicePage } from './AsiahorseUmbraDevicePage';
@@ -101,6 +101,12 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
     [unified, deviceKey],
   );
   const title = device?.shortName;
+  // The 8.8's page stays its page when its panel row leaves the list (the glass turned into a
+  // Windows display), so the settings route, not the list, decides what it shows.
+  const screen88KeyRef = useRef<string | null>(null);
+  if (device?.curatedId === LIANLI_SCREEN88_ID) screen88KeyRef.current = deviceKey;
+  const isScreen88Page = deviceKey === `curated-${LIANLI_SCREEN88_ID}` || device?.curatedId === LIANLI_SCREEN88_ID
+    || screen88KeyRef.current === deviceKey;
   useEffect(() => { onTitleChange?.(deviceKey, title); }, [onTitleChange, deviceKey, title]);
 
   // The device appearing in `unified` re-renders and dispatches immediately,
@@ -165,9 +171,9 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
         )}
       </div>
     );
-    // The 8.8 in its own Windows display mode lists no panel, yet it is not unplugged.
-    if (deviceKey === `curated-${LIANLI_SCREEN88_ID}` || device?.curatedId === LIANLI_SCREEN88_ID) {
-      return <LianLiScreen88AbsentPage key={deviceKey} name={device?.shortName ?? LIANLI_SCREEN88_NAME} fallback={notConnectedView} />;
+    // The 8.8 in its own Windows display mode may list no panel, yet it is not unplugged.
+    if (isScreen88Page) {
+      return <LianLiScreen88PageGate key={deviceKey} name={device?.shortName ?? LIANLI_SCREEN88_NAME} fallback={notConnectedView} />;
     }
     return notConnectedView;
   }
@@ -252,6 +258,18 @@ function DeviceBody({ device, unified, controlDevice, platform, onOpenFirmware, 
 
   if (device.kind === 'panel' && device.panelDevice && device.curatedId === 'asus-glacial-lcd') {
     return <GlacialPanelRoute key={device.key} device={device.panelDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />;
+  }
+
+  // The 8.8's panel page gives way to its Windows display view as soon as the settings route says so,
+  // even while the list still shows the panel.
+  if (device.kind === 'panel' && device.panelDevice && device.curatedId === LIANLI_SCREEN88_ID) {
+    return (
+      <LianLiScreen88PageGate
+        key={device.key}
+        name={device.shortName}
+        fallback={<PanelDevicePage device={device.panelDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />}
+      />
+    );
   }
 
   if (device.kind === 'panel' && device.panelDevice) {
@@ -365,7 +383,7 @@ function DeviceBody({ device, unified, controlDevice, platform, onOpenFirmware, 
   const panelNotConnected = <PanelNotConnected name={device.shortName} deviceKey={device.key} warning={device.warning} />;
   // The 8.8's glass in its own Windows display mode: no panel, but no "not connected" either.
   if (device.curatedId === LIANLI_SCREEN88_ID) {
-    return <LianLiScreen88AbsentPage key={device.key} name={device.shortName} fallback={panelNotConnected} />;
+    return <LianLiScreen88PageGate key={device.key} name={device.shortName} fallback={panelNotConnected} />;
   }
   return panelNotConnected;
 }

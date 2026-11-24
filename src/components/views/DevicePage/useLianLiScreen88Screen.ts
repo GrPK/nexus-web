@@ -7,6 +7,8 @@ import {
 } from '../../../api/lianliScreen88';
 
 const SETTINGS_POLL_MS = 5000;
+// While a Windows display switch is on its way the glass restarts; the page follows it sooner.
+const SWITCH_POLL_MS = 1500;
 
 export interface LianLiScreen88Screen {
   settings: LianLiScreen88Settings | null;
@@ -52,12 +54,15 @@ export function useLianLiScreen88Screen(enabled: boolean): LianLiScreen88Screen 
     if (!enabled) return undefined;
     aliveRef.current = true;
     void refresh();
-    const id = window.setInterval(() => { if (!document.hidden) void refresh(); }, SETTINGS_POLL_MS);
-    return () => {
-      aliveRef.current = false;
-      window.clearInterval(id);
-    };
+    return () => { aliveRef.current = false; };
   }, [enabled, refresh]);
+
+  const switching = isScreen88Switching(settings);
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const id = window.setInterval(() => { if (!document.hidden) void refresh(); }, switching ? SWITCH_POLL_MS : SETTINGS_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [enabled, switching, refresh]);
 
   const write = useCallback(async (patch: LianLiScreen88SettingsPatch) => {
     setSettings(prev => (prev ? { ...prev, ...patch } : prev));
@@ -92,7 +97,14 @@ export function useLianLiScreen88Screen(enabled: boolean): LianLiScreen88Screen 
   return { settings, loaded, write, previewBrightness, commitBrightness, refresh, playingClip };
 }
 
-/** The glass sits in its own Windows display mode: an ordinary monitor, not a Nexus panel. */
+/** The glass sits in its own Windows display mode: a Windows monitor, not a Nexus panel. */
 export function isScreen88InWindowsDisplay(settings: LianLiScreen88Settings | null): boolean {
   return !!settings && !settings.connected && settings.inWindowsDisplay;
+}
+
+/** The user asked for the other mode and the glass is not there yet. */
+export function isScreen88Switching(settings: LianLiScreen88Settings | null): boolean {
+  if (!settings) return false;
+  const asWindows = isScreen88InWindowsDisplay(settings);
+  return asWindows ? settings.windowsDisplay === false : settings.windowsDisplay === true;
 }

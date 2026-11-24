@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LianLiScreen88AbsentPage, LianLiScreen88Settings } from './LianLiScreen88Settings';
+import { LianLiScreen88PageGate, LianLiScreen88Settings } from './LianLiScreen88Settings';
 import { useLianLiScreen88Screen } from './useLianLiScreen88Screen';
 import type { LConnectVideos, LianLiScreen88MediaItem, LianLiScreen88Settings as Settings } from '../../../api/lianliScreen88';
 
@@ -253,6 +253,9 @@ describe('LianLiScreen88Settings Windows display', () => {
     expect(screen.queryByLabelText('devices.lianliCurve.screenContent')).not.toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'devices.lianliCurve.offlineMode' })).not.toBeInTheDocument();
     expect(mockGetMedia).not.toHaveBeenCalled();
+    // The notice stands on the page above the card; the card holds only the switch.
+    expect(screen.getByText('devices.lianliScreen88.windowsDisplayActive').closest('section')).toBeNull();
+    expect(windowsSwitch().closest('section')).not.toBeNull();
   });
 
   it('turning it off asks first, then asks the service to bring the glass back as a panel', async () => {
@@ -335,11 +338,11 @@ describe('LianLiScreen88Settings L-Connect import', () => {
   });
 });
 
-describe('LianLiScreen88AbsentPage', () => {
+describe('LianLiScreen88PageGate', () => {
   it('shows the Windows display view, not the fallback, while the glass is a Windows display', async () => {
     mockGetSettings.mockResolvedValue({ ...settings, ...asWindows });
     await act(async () => {
-      render(<LianLiScreen88AbsentPage name="Lian Li Universal Screen 8.8" fallback={<p>not connected</p>} />);
+      render(<LianLiScreen88PageGate name="Lian Li Universal Screen 8.8" fallback={<p>not connected</p>} />);
     });
     expect(screen.getByText('Lian Li Universal Screen 8.8')).toBeInTheDocument();
     expect(screen.getByText('devices.lianliScreen88.windowsDisplayActive')).toBeInTheDocument();
@@ -348,11 +351,11 @@ describe('LianLiScreen88AbsentPage', () => {
 
   it('shows the fallback when the glass is simply absent or the service has no answer', async () => {
     mockGetSettings.mockResolvedValue({ ...settings, connected: false, inWindowsDisplay: false });
-    const view = render(<LianLiScreen88AbsentPage name="8.8" fallback={<p>not connected</p>} />);
+    const view = render(<LianLiScreen88PageGate name="8.8" fallback={<p>not connected</p>} />);
     expect(await screen.findByText('not connected')).toBeInTheDocument();
     view.unmount();
     mockGetSettings.mockResolvedValue(null);
-    render(<LianLiScreen88AbsentPage name="8.8" fallback={<p>not connected</p>} />);
+    render(<LianLiScreen88PageGate name="8.8" fallback={<p>not connected</p>} />);
     expect(await screen.findByText('not connected')).toBeInTheDocument();
   });
 });
