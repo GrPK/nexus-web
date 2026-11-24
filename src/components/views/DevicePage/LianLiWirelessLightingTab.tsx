@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { SettingRow, SettingSelect, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { HsvPicker } from '../../common/HsvPicker/HsvPicker';
 import { Lightbulb } from 'lucide-react';
@@ -72,6 +72,11 @@ const ZONE_LABEL_KEYS: Record<LianLiFlexZone['id'], string> = {
   center: 'devices.lianli-flex.zoneCenter',
   inner: 'devices.lianli-flex.zoneInner',
   outer: 'devices.lianli-flex.zoneOuter',
+};
+// A wireless TL fan's halves (L-Connect's Up / Down scope).
+const HALF_LABEL_KEYS: Partial<Record<LianLiFlexZone['id'], string>> = {
+  up: 'devices.lianli-wireless.halfUp',
+  down: 'devices.lianli-wireless.halfDown',
 };
 
 interface LianLiWirelessLightingTabProps {
@@ -299,6 +304,11 @@ interface ChainSectionProps {
   onSectionNavigate?: (section: string) => void;
 }
 
+/** The effect controls when `show`, otherwise only the rows they hold (the halves, Merge). */
+function MaybeEffectControls({ show, children, ...props }: { show: boolean } & ComponentProps<typeof LianLiChainEffectControls>) {
+  return show ? <LianLiChainEffectControls {...props}>{children}</LianLiChainEffectControls> : <>{children}</>;
+}
+
 function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, followsTitle, onMove, first, last, flex, synced, onSectionNavigate }: ChainSectionProps) {
   const { t } = useTranslation();
   const [confirmReset, setConfirmReset] = useState(false);
@@ -315,11 +325,11 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
   const follower = !synced && chain.merge === true && canMerge(chain) && followsTitle !== undefined;
   const lookLocked = locked || follower || synced;
   const perLane = chain.supportsPerLane && effectKey === MODE_PER_LANE;
-  // A wireless TL chain sets each half of a fan apart (L-Connect's Up / Down scope); it reads like a wired fan's zones.
+  // A wireless TL chain sets each half of a fan apart (L-Connect's Up / Down scope) with its own switch;
+  // a wired Flex fan picks Per zone in its mode list.
   const scoped = chain.supportsScope === true && !p28;
   const ownHalves = scoped && hasOwnHalves(chain);
   const perZone = (chain.supportsZones === true && !p28 && effectKey === MODE_PER_ZONE) || ownHalves;
-  const shownMode = ownHalves ? MODE_PER_ZONE : effectKey;
   // A half without a look of its own plays the whole fan's.
   const zones: Pick<LianLiFlexZone, 'id' | 'mode' | 'speed' | 'direction' | 'brightness' | 'colors'>[] = ownHalves
     ? (['up', 'down'] as const).map(id => ({ id, ...(chain[id] ?? chainLookOf(chain)) }))
@@ -328,14 +338,15 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
     ownHalves && (id === 'up' || id === 'down') ? { scope: id, ...patch } : { zones: [{ id, ...patch }] };
   // L-Connect starts a picked effect from its own colours, so a TL pick clears the stored ones.
   const pickedLook = (mode: string): Partial<LianLiEffectValue> => (scoped ? { mode, colors: [] } : { mode });
-  // Per zone on a TL chain gives the up half a look of its own, the one the fan plays now.
-  const pickMode = (v: string): LianLiWirelessChainPatch =>
-    scoped && v === MODE_PER_ZONE ? { scope: 'up' } : { ...pickedLook(v), effectMode: v };
+  const pickMode = (v: string): LianLiWirelessChainPatch => ({ ...pickedLook(v), effectMode: v });
+  // On gives the up half a look of its own, the one the fan plays now; off plays the whole fan's look
+  // again, and a whole-fan look drops both halves.
+  const setHalves = (on: boolean): LianLiWirelessChainPatch => (on ? { scope: 'up' } : { mode: chainLookOf(chain).mode });
 
   const effectOptions = chain.modes.map(e => ({ value: e.key, label: effectLabel(t, e.key) }));
   // The choices that are not effects come first, set apart from the effect list.
   const modeOptions = [
-    ...((chain.supportsZones || scoped) && !p28 ? [{ value: MODE_PER_ZONE, label: t('devices.lianli-flex.modePerZone') }, { value: '', label: '', divider: true }] : []),
+    ...(chain.supportsZones && !p28 ? [{ value: MODE_PER_ZONE, label: t('devices.lianli-flex.modePerZone') }, { value: '', label: '', divider: true }] : []),
     ...effectOptions,
     ...(chain.supportsPerLane ? [{ value: MODE_PER_LANE, label: t('devices.lianli-wireless.strimerModePerLane') }] : []),
   ];
@@ -375,11 +386,22 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
           </Button>
         </SettingRow>
       ) : (<>
-      <LianLiChainEffectControls
+      {scoped && (
+        <SettingToggle
+          label={t('devices.lianli-wireless.separateHalves')}
+          description={t('devices.lianli-wireless.separateHalvesHint')}
+          checked={ownHalves}
+          onChange={on => onCommit(setHalves(on))}
+          disabled={lookLocked}
+        />
+      )}
+      {/* With the halves apart the whole fan's own picker does nothing, so only the halves show. */}
+      <MaybeEffectControls
+        show={!ownHalves}
         modes={chain.modes}
-        value={{ mode: shownMode, speed: chain.speed, direction: chain.direction, brightness: chain.brightness, colors: chain.colors }}
+        value={{ mode: effectKey, speed: chain.speed, direction: chain.direction, brightness: chain.brightness, colors: chain.colors }}
         modeOptions={modeOptions}
-        modeValue={shownMode}
+        modeValue={effectKey}
         disabled={lookLocked}
         paletteDimmed={lightingPage || follower || synced}
         trimPalette={chain.supportsZones === true}
@@ -394,7 +416,7 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
         {perZone && zones.map(zone => (
           <Fragment key={zone.id}>
             <p className={styles.zoneHeading} data-settings-aside="true">
-              {t(ZONE_LABEL_KEYS[zone.id] as Parameters<Translate>[0])}
+              {t(((ownHalves ? HALF_LABEL_KEYS[zone.id] : undefined) ?? ZONE_LABEL_KEYS[zone.id]) as Parameters<Translate>[0])}
             </p>
             <LianLiChainEffectControls
               modes={chain.modes}
@@ -421,7 +443,7 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
             disabled={locked || synced || (chain.supportsZones === true && !canMerge(chain))}
           />
         )}
-      </LianLiChainEffectControls>
+      </MaybeEffectControls>
       </>)}
 
       {chain.upDownSwap != null && (
