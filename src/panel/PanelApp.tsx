@@ -1642,7 +1642,7 @@ export function PanelContent({
   const clickThrough = seeThrough && (genericDisplay || recordState.record?.clickThrough === true);
   // Empty space never opens panel UI where it is meant to pass clicks; the widget menu reaches it instead.
   // A touch generic display on a solid background keeps long-press, as any touch panel does.
-  const emptySpaceInert = genericSinglePage(genericDisplay, surface, deviceTouch) || clickThrough;
+  const emptySpaceInert = genericOnePage || clickThrough;
   // Long-press on the empty background opens the actions tray (mirrors the
   // widget long-press-to-menu). Kiosk surfaces only, not while in a sheet /
   // immersive / drag state, and only when the press misses widgets and

@@ -34,6 +34,7 @@ vi.mock('./engine/panelSync', () => ({
 
 import PanelApp from './PanelApp';
 import { UiSettingsProvider } from '../hooks/useUiSettings';
+import { PANEL_CONTEXT_MENU_TRIGGER_MS } from './engine/usePanelTouchMode';
 
 const clock = (id: string) => ({ id, type: 'clock', size: '2x2', col: 0, row: 0, config: {} });
 const layout: PanelLayout = {
@@ -181,7 +182,7 @@ describe('PanelApp generic display long-press on empty space', () => {
   async function longPressEmptySpace() {
     fireEvent.pointerDown(emptySpace(), { pointerId: 2, pointerType: 'touch', button: 0, isPrimary: true });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(PANEL_CONTEXT_MENU_TRIGGER_MS + 100);
     });
   }
 
