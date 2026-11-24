@@ -2397,12 +2397,12 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                   aria-hidden="true"
                 />
               )}
-              {/* The 8.8's previews are landscape; a portrait mount keeps the panel preview. */}
-              {isScreen88Panel && previewLandscape && screen88Screen.playingClip && (
+              {/* The 8.8's preview follows its mount: 4:1, or 1:4 turned a quarter. */}
+              {isScreen88Panel && screen88Screen.playingClip && (
                 <video
-                  key={screen88Screen.playingClip}
-                  className={styles.screen88VideoPreview}
-                  src={lianLiScreen88MediaPreviewUrl(screen88Screen.playingClip)}
+                  key={`${screen88Screen.playingClip}:${screen88Screen.settings?.videoPortrait === true}`}
+                  className={screen88Screen.settings?.videoPortrait ? styles.screen88VideoPreviewPortrait : styles.screen88VideoPreview}
+                  src={lianLiScreen88MediaPreviewUrl(screen88Screen.playingClip, screen88Screen.settings?.videoPortrait === true)}
                   autoPlay
                   loop
                   muted

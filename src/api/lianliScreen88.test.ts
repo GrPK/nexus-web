@@ -76,6 +76,19 @@ describe('Universal Screen 8.8 media library', () => {
     postForm.mockResolvedValue({ error: true, msg: 'bad' });
     expect(await uploadLianLiScreen88Media(file, { x: 0, y: 0, w: 1, h: 1 })).toBeNull();
   });
+
+  it("sends a portrait mount's crop as portraitCrop", async () => {
+    postForm.mockResolvedValue({ error: false, name: 'p' });
+    await uploadLianLiScreen88Media(new File(['x'], 'tall.mp4'), { x: 0.2, y: 0, w: 0.25, h: 1 }, true);
+    const [, form] = postForm.mock.calls[0] as [string, FormData];
+    expect(form.get('portraitCrop')).toBe('0.200000,0.000000,0.250000,1.000000');
+    expect(form.get('crop')).toBeNull();
+  });
+
+  it('the preview can ask for one orientation', () => {
+    expect(lianLiScreen88MediaPreviewUrl('a.mp4', true)).toContain('/devices/lianli-screen88/media/a.mp4/preview?portrait=true');
+    expect(lianLiScreen88MediaPreviewUrl('a.mp4')).not.toContain('portrait=');
+  });
 });
 
 describe('L-Connect videos', () => {

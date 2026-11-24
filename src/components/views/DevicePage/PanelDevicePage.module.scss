@@ -536,3 +536,16 @@
   object-fit: contain;
   border-radius: var(--radius);
 }
+
+// The 8.8 mounted portrait: a 1:4 preview, as tall as the stage.
+.screen88VideoPreviewPortrait {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: 480 / 1920;
+  object-fit: contain;
+  border-radius: var(--radius);
+}

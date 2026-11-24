@@ -4,10 +4,12 @@ import { fetchService, postService, postServiceForm, putService, resolveHttp } f
 import type { HydroShift2Lighting, HydroShift2LightingApi, HydroShift2LightingPatch } from './hydroshift2';
 import type { HydroShift2CurveMediaItem } from './hydroshift2Curve';
 
-/** The glass's handler (its panel's source id) and the bezel LED board's, which has its own switch. */
+/**
+ * The 8.8's one device row (its panel's source id too). It is connected while the glass is a panel,
+ * a Windows display or only its bezel LED board is there, and its Nexus Control drives glass and ring.
+ */
 export const LIANLI_SCREEN88_ID = 'lianli-screen88';
-export const LIANLI_SCREEN88_LED_ID = 'lianli-screen88-led';
-/** The product name, for where no device row names it (the glass in its Windows display mode lists no panel). */
+/** The product name, for where no device row names it. */
 export const LIANLI_SCREEN88_NAME = 'Lian Li Universal Screen 8.8';
 
 const BASE = '/devices/lianli-screen88';
@@ -31,7 +33,7 @@ export const LIANLI_SCREEN88_LIGHTING_API: HydroShift2LightingApi = {
   set: patch => setLianLiScreen88Lighting(patch),
 };
 
-/** The glass mounted landscape (1920x480), as the service's previews and thumbnails are; the upload cropper uses the same aspect. */
+/** A library video's picture with the glass mounted landscape (1920x480); a service that does not say otherwise. */
 export const LIANLI_SCREEN88_SCREEN_ASPECT = 1920 / 480;
 
 export type LianLiScreen88ScreenMode = 'nexus' | 'video';
@@ -56,6 +58,18 @@ export interface LianLiScreen88Settings {
   screenSaverMinutes: number;
   screenSaverVideo?: string | null;
   screenSaverBrightness: number;
+  /** The panel record turns the glass a quarter (rotation 90 or 270): videos play portrait, cropped 1:4. */
+  videoPortrait?: boolean;
+  /** A library video's picture at the current mount: 1920x480, or 480x1920 portrait. */
+  videoWidth?: number;
+  videoHeight?: number;
+}
+
+/** The video picture's aspect at the current mount (the cropper's, the thumbnails' and the preview's). */
+export function lianLiScreen88VideoAspect(settings: Pick<LianLiScreen88Settings, 'videoWidth' | 'videoHeight'> | null): number {
+  const w = settings?.videoWidth ?? 0;
+  const h = settings?.videoHeight ?? 0;
+  return w > 0 && h > 0 ? w / h : LIANLI_SCREEN88_SCREEN_ASPECT;
 }
 
 /** PUT body: only the fields sent change. An empty `video` or `screenSaverVideo` clears it. */
@@ -107,11 +121,15 @@ export async function getLianLiScreen88Media(): Promise<LianLiScreen88MediaItem[
   return res?.media ?? null;
 }
 
-/** The stored clip's name, or null when the upload failed. */
-export async function uploadLianLiScreen88Media(file: File, crop: NormalizedCrop): Promise<{ name: string | null } | null> {
+/**
+ * The stored clip's name, or null when the upload failed. The crop is the current mount's: 4:1 sent as
+ * `crop`, or 1:4 sent as `portraitCrop` when the glass is mounted portrait. The other mount then shows
+ * the centre of the whole clip at its own aspect.
+ */
+export async function uploadLianLiScreen88Media(file: File, crop: NormalizedCrop, portrait = false): Promise<{ name: string | null } | null> {
   const form = new FormData();
   form.append('file', file, file.name);
-  form.append('crop', serializeCrop(crop));
+  form.append(portrait ? 'portraitCrop' : 'crop', serializeCrop(crop));
   const res = await postServiceForm<OkResponse>(`${BASE}/media`, form);
   return res && !res.error ? { name: res.name ?? null } : null;
 }
@@ -121,11 +139,18 @@ export async function deleteLianLiScreen88Media(name: string): Promise<boolean> 
   return !!res && !res.error;
 }
 
-/** Browser-playable preview of a clip; a media element cannot send a Bearer header, so the token rides the query. */
-export function lianLiScreen88MediaPreviewUrl(name: string): string {
-  const base = resolveHttp(`${BASE}/media/${encodeURIComponent(name)}/preview`);
+/**
+ * Browser-playable preview of a clip: 960x240, or 240x960 when `portrait`; left out, the service
+ * follows the current mount. A media element cannot send a Bearer header, so the token rides the query.
+ */
+export function lianLiScreen88MediaPreviewUrl(name: string, portrait?: boolean): string {
+  const params = new URLSearchParams();
+  if (portrait !== undefined) params.set('portrait', String(portrait));
   const tok = getTokenSync();
-  return tok ? `${base}?token=${encodeURIComponent(tok)}` : base;
+  if (tok) params.set('token', tok);
+  const query = params.toString();
+  const base = resolveHttp(`${BASE}/media/${encodeURIComponent(name)}/preview`);
+  return query ? `${base}?${query}` : base;
 }
 
 /** L-Connect's template videos found on this PC; nothing of them ships with Nexus. */

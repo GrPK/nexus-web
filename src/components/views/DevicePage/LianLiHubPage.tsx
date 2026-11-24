@@ -9,7 +9,7 @@ import { NexusControlConflictModal } from '../../common/NexusControlConflictModa
 import { LIANLI_FLEX_CHANNEL_PREFIX } from '../../../api/lianli-flex';
 import { HYDROSHIFT2_CURVE_LIGHTING_API } from '../../../api/hydroshift2Curve';
 import {
-  LIANLI_SCREEN88_ID, LIANLI_SCREEN88_LED_ID, LIANLI_SCREEN88_LIGHTING_API, LIANLI_SCREEN88_NAME,
+  LIANLI_SCREEN88_ID, LIANLI_SCREEN88_LIGHTING_API, LIANLI_SCREEN88_NAME,
 } from '../../../api/lianliScreen88';
 import { useConflictGuardedEnable } from '../../../hooks/useConflictGuardedEnable';
 import type { UnifiedDevice } from '../../../hooks/useUnifiedDevices';
@@ -33,8 +33,6 @@ const WIRELESS_ID = 'lianli-wireless';
 const FLEX_ID = 'lianli-flex';
 const RING_ID = 'lianli-hydroshift2';
 const CURVE_ID = 'lianli-hydroshift2-curve';
-// The 8.8" Universal Screen: its screen and bezel LEDs are the service's own, set on this page.
-const SCREEN88_IDS = new Set([LIANLI_SCREEN88_ID, LIANLI_SCREEN88_LED_ID]);
 // The units whose lighting, screens and cooling live on this page; their own page keeps only
 // the connection and the wireless devices (LianLiWirelessDevicePage devicesOnly).
 const UNIT_IDS = new Set([WIRELESS_ID, FLEX_ID]);
@@ -76,20 +74,18 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   const curve = panels.find(m => m.curatedId === CURVE_ID);
   const screen88 = sorted.find(m => m.curatedId === LIANLI_SCREEN88_ID);
   const screen88Panel = screen88?.kind === 'panel';
-  // Listed on its own switch: present even while the glass is a Windows display, not a panel.
-  const screen88Led = sorted.find(m => m.curatedId === LIANLI_SCREEN88_LED_ID);
   // The Uni hubs, Uni Fan TL, Galahad II and Strimer: their controls stay on their own pages.
   const ownPage = sorted.filter(m => m.kind !== 'panel' && m.navigable
-    && !UNIT_IDS.has(m.curatedId ?? '') && !SCREEN88_IDS.has(m.curatedId ?? ''));
+    && !UNIT_IDS.has(m.curatedId ?? '') && m.curatedId !== LIANLI_SCREEN88_ID);
 
-  // A panel's screen is read on the Screens tab; without one the 8.8 may sit in its Windows
-  // display mode, which only the service can tell, so it is read throughout.
-  const screen88Screen = useLianLiScreen88Screen(screen88Panel ? activeTab === 'screens' : !!(screen88 || screen88Led));
+  // A panel's screen is read on the Screens tab. The 8.8's row without a panel (it stays listed while the
+  // glass is a Windows display or only its LED board is there) may be a Windows display, which only the
+  // service can tell, so it is read throughout.
+  const screen88Screen = useLianLiScreen88Screen(screen88Panel ? activeTab === 'screens' : !!screen88);
   const screen88Windows = isScreen88InWindowsDisplay(screen88Screen.settings);
-  // With only the LED board listed (the glass is a Windows display), the product name.
   const screen88Title = screen88?.shortName ?? LIANLI_SCREEN88_NAME;
 
-  const hasLighting = wireless || flex || !!ring || !!curve || !!screen88 || !!screen88Led || ownPage.length > 0;
+  const hasLighting = wireless || flex || !!ring || !!curve || !!screen88 || ownPage.length > 0;
   const hasScreens = wireless || flex || panels.length > 0 || screen88Windows;
   // The Curve's pump option is a cooling setting; its head position is on its own panel page only.
   const hasCooling = wireless || flex || !!curve;
@@ -183,7 +179,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
               ))}
               {ring && <HydroShift2RingSettings title={ring.shortName} onSectionNavigate={onSectionNavigate} />}
               {curve && <HydroShift2RingSettings title={curve.shortName} api={HYDROSHIFT2_CURVE_LIGHTING_API} onSectionNavigate={onSectionNavigate} />}
-              {(screen88 || screen88Led) && <HydroShift2RingSettings title={screen88Title} api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={onSectionNavigate} />}
+              {screen88 && <HydroShift2RingSettings title={screen88Title} api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={onSectionNavigate} />}
               {ownPage.map(d => openRow(d, t('devices.lightingPage.setHint'), t('lighting.devices.menuOpenDevicePage')))}
             </>
           )}

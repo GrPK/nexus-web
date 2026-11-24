@@ -13,7 +13,7 @@ import { Spinner } from '../../common/Spinner/Spinner';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import {
   LIANLI_SCREEN88_SAVER_MINUTES,
-  LIANLI_SCREEN88_SCREEN_ASPECT,
+  lianLiScreen88VideoAspect,
   deleteLianLiScreen88Media,
   getLianLiScreen88LConnectVideos,
   getLianLiScreen88Media,
@@ -37,6 +37,9 @@ const IMPORT_FAILED_TONE = 'critical' as const;
 interface CropTarget {
   src: string;
   file: File;
+  /** The mount the crop is made for, fixed when the file is picked: its aspect and which crop field it fills. */
+  aspect: number;
+  portrait: boolean;
 }
 
 interface SectionProps {
@@ -177,12 +180,22 @@ function LianLiScreen88PanelSettings({ screen, title }: SectionProps) {
     return () => window.clearInterval(id);
   }, [processing, refreshMedia]);
 
+  // The thumbnails follow the mount, so a quarter turn reads them again.
+  const portrait = settings?.videoPortrait === true;
+  const videoAspect = lianLiScreen88VideoAspect(settings);
+  const shownPortraitRef = useRef(portrait);
+  useEffect(() => {
+    if (shownPortraitRef.current === portrait) return;
+    shownPortraitRef.current = portrait;
+    void refreshMedia();
+  }, [portrait, refreshMedia]);
+
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
     setMediaError(null);
-    const target = { src: URL.createObjectURL(file), file };
+    const target = { src: URL.createObjectURL(file), file, aspect: videoAspect, portrait };
     cropTargetRef.current = target;
     setCropTarget(target);
   };
@@ -197,7 +210,7 @@ function LianLiScreen88PanelSettings({ screen, title }: SectionProps) {
     if (!cropTarget) return;
     setUploading(true);
     try {
-      const uploaded = await uploadLianLiScreen88Media(cropTarget.file, crop);
+      const uploaded = await uploadLianLiScreen88Media(cropTarget.file, crop, cropTarget.portrait);
       if (aliveRef.current) setMediaError(uploaded ? null : 'upload');
       if (uploaded?.name) void write({ screenMode: 'video', video: uploaded.name });
       await refreshMedia();
@@ -264,7 +277,7 @@ function LianLiScreen88PanelSettings({ screen, title }: SectionProps) {
             )}
 
             {media.length > 0 ? (
-              <div className={styles.mediaGrid}>
+              <div className={portrait ? `${styles.mediaGrid} ${styles.mediaGridPortrait}` : styles.mediaGrid}>
                 {media.map(item => (
                   item.ready ? (
                     <EffectCard
@@ -273,7 +286,7 @@ function LianLiScreen88PanelSettings({ screen, title }: SectionProps) {
                       label={item.label}
                       thumbUrl={item.thumb ?? null}
                       thumbStatic
-                      thumbAspect={LIANLI_SCREEN88_SCREEN_ASPECT}
+                      thumbAspect={videoAspect}
                       active={item.name === settings.video}
                       onClick={() => { void write({ screenMode: 'video', video: item.name }); }}
                       onDelete={() => setPendingDelete(item)}
@@ -288,7 +301,7 @@ function LianLiScreen88PanelSettings({ screen, title }: SectionProps) {
                       meta={t('devices.lianliCurve.mediaProcessing')}
                       thumbUrl={item.thumb ?? null}
                       thumbStatic
-                      thumbAspect={LIANLI_SCREEN88_SCREEN_ASPECT}
+                      thumbAspect={videoAspect}
                       active={false}
                       thumbOverlay={<span className={styles.mediaOverlay} role="status" aria-label={t('devices.lianliCurve.mediaProcessing')}><Spinner size={26} /></span>}
                     />
@@ -383,7 +396,7 @@ function LianLiScreen88PanelSettings({ screen, title }: SectionProps) {
         <MediaCropper
           src={cropTarget.src}
           kind="video"
-          aspect={LIANLI_SCREEN88_SCREEN_ASPECT}
+          aspect={cropTarget.aspect}
           busy={uploading}
           onConfirm={onCropConfirm}
           onCancel={() => closeCropper(cropTarget)}

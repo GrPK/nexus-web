@@ -90,8 +90,8 @@ const flexHub = device('LCD Flex', 'lianli-flex');
 const tl = device('Uni Fan TL', 'lianli-tl');
 const curve = device('HydroShift II Curved', 'lianli-hydroshift2-curve', { kind: 'panel', supportsNexusControl: false });
 const screen88 = device('Universal Screen 8.8', 'lianli-screen88', { kind: 'panel', supportsNexusControl: false });
-// The bezel LED board, listed on its own switch with no page of its own.
-const screen88Led = device('Universal Screen 8.8 LEDs', 'lianli-screen88-led', { navigable: false });
+// The 8.8's one row without a panel: listed while the glass is a Windows display or only its LED board is there.
+const screen88Row = device('Lian Li Universal Screen 8.8', 'lianli-screen88');
 
 const nav = vi.fn();
 const controlDevice = vi.fn();
@@ -234,9 +234,9 @@ describe('LianLiHubPage', () => {
     expect(screen.getAllByRole('button', { name: 'devices.lianli-wireless.openPanel' })).toHaveLength(1);
   });
 
-  it('with the glass a Windows display, its LED board alone brings the 8.8 to Screens and Lighting', async () => {
+  it("with the glass a Windows display, the 8.8's row without a panel brings it to Screens and Lighting", async () => {
     screen88Route.settings = { connected: false, inWindowsDisplay: true };
-    await renderHub([tl, screen88Led]);
+    await renderHub([tl, screen88Row]);
     expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual([
       'devices.lianli-wireless.tab.devices', 'lighting.title', 'devices.lianli-wireless.tab.screen',
     ]);
@@ -244,13 +244,13 @@ describe('LianLiHubPage', () => {
     expect(screen.getByTestId('screen88-screen')).toHaveTextContent('Lian Li Universal Screen 8.8');
     await openTab('lighting.title');
     expect(apiOfCard('Lian Li Universal Screen 8.8')).toBe(LIANLI_SCREEN88_LIGHTING_API);
-    // The LED board has no page: only the TL gets an "Open device page" row.
+    // The 8.8's lights are on this card: only the TL gets an "Open device page" row.
     expect(screen.getAllByRole('button', { name: 'lighting.devices.menuOpenDevicePage' })).toHaveLength(1);
   });
 
-  it('the LED board without a Windows display adds no Screens tab', async () => {
+  it("the 8.8's row without a panel or a Windows display adds no Screens tab", async () => {
     screen88Route.settings = { connected: false, inWindowsDisplay: false };
-    await renderHub([tl, screen88Led]);
+    await renderHub([tl, screen88Row]);
     expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual([
       'devices.lianli-wireless.tab.devices', 'lighting.title',
     ]);

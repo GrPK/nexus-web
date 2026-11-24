@@ -131,9 +131,27 @@ describe('LianLiScreen88Settings', () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
     fireEvent.click(await screen.findByText(`cropper:${(1920 / 480).toFixed(3)}`));
-    await waitFor(() => expect(mockUpload).toHaveBeenCalledWith(file, { x: 0.1, y: 0.2, w: 0.5, h: 0.4 }));
+    await waitFor(() => expect(mockUpload).toHaveBeenCalledWith(file, { x: 0.1, y: 0.2, w: 0.5, h: 0.4 }, false));
     await waitFor(() =>
       expect(mockSetSettings).toHaveBeenCalledWith({ screenMode: 'video', video: 'new.mp4' }));
+  });
+
+  it('a portrait-mounted glass crops at 1:4 and sends that as the portrait crop', async () => {
+    await renderSettings({ screenMode: 'video', videoPortrait: true, videoWidth: 480, videoHeight: 1920 });
+    const file = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.click(await screen.findByText(`cropper:${(480 / 1920).toFixed(3)}`));
+    await waitFor(() => expect(mockUpload).toHaveBeenCalledWith(file, { x: 0.1, y: 0.2, w: 0.5, h: 0.4 }, true));
+  });
+
+  it('reads the library again when the mount turns a quarter, for its new thumbnails', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    await renderSettings({ screenMode: 'video' }, [clip('a.mp4')]);
+    const before = mockGetMedia.mock.calls.length;
+    mockGetSettings.mockResolvedValue({ ...settings, screenMode: 'video', videoPortrait: true, videoWidth: 480, videoHeight: 1920 });
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(mockGetMedia.mock.calls.length).toBeGreaterThan(before);
   });
 
   it('shows the failure and selects nothing when an upload fails', async () => {
