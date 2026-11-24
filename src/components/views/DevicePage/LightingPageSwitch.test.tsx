@@ -36,7 +36,7 @@ describe('LightingPageSwitch', () => {
     expect(screen.queryByText('smartLights.colorOnLightingPage')).not.toBeInTheDocument();
   });
 
-  it('puts Sync is active right after the label text, led by the warning icon', () => {
+  it('puts Sync mode on right after the label text, led by the warning icon', () => {
     render(<LightingPageSwitch on={false} onChange={vi.fn()} disabled controlledBySyncAll onSectionNavigate={vi.fn()} />);
     const pill = screen.getByText('devices.lianli-hub.syncActive');
     expect(pill.className).toContain('syncPill');

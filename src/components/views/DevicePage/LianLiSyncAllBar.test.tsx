@@ -122,7 +122,7 @@ describe('LianLiSyncAllBar', () => {
   it('shows the merge order while a merged effect plays, under the picker hint, the devices by name only', async () => {
     await renderBar(merged);
     const heading = screen.getByText('devices.lianli-hub.mergeOrder');
-    // The hint under the picker says what the order does; the list adds no hint of its own.
+    // The hint under the picker says what a merged effect does; the list below shows the order, with no hint of its own.
     expect(screen.getByText('devices.lianli-hub.syncMergedHint').compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText('devices.lianli-hub.mergeOrderHint')).not.toBeInTheDocument();
     expect(screen.getByText('Lian Li Wireless TL')).toBeInTheDocument();
@@ -406,8 +406,8 @@ describe('LianLiSyncAllBar', () => {
     expect(SERVICE_EFFECT_KEYS.filter(k => !labels[`devices.lianliEffect.${k}`])).toEqual([]);
     expect(labels['devices.lianliEffect.mergeRainbow']).toBe('Rainbow (merged)');
     expect(labels['devices.lianli-hub.syncMerged']).toBe('Merged across devices');
-    expect(labels['devices.lianli-hub.syncMergedHint']).toBe('One animation flows from device to device, in the order below');
-    expect(labels['devices.lianli-hub.syncActive']).toBe('Sync is active');
+    expect(labels['devices.lianli-hub.syncMergedHint']).toBe('One continuous animation across every device');
+    expect(labels['devices.lianli-hub.syncActive']).toBe('Sync mode on');
     expect(Object.entries(labels).filter(([, v]) => v.includes('W*'))).toEqual([]);
   });
 
