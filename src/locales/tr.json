@@ -2140,6 +2140,7 @@
   "diagnostics.reason.smart.uncorrectable": "Düzeltilemeyen sektörler",
   "diagnostics.reason.smart.vendorHealth": "Üretici sağlık göstergesi",
   "diagnostics.reason.storage.noSmartSource": "SMART verileri kullanılamıyor",
+  "diagnostics.reason.storage.notResponding": "Sürücü yanıt vermiyor",
   "diagnostics.reason.system.bugchecks": "Sistem çökmeleri",
   "diagnostics.reason.system.dirtyShutdowns": "Beklenmedik kapanmalar",
   "diagnostics.reason.system.failedUnits": "Başarısız olan sistem hizmetleri",

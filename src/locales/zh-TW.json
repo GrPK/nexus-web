@@ -2140,6 +2140,7 @@
   "diagnostics.reason.smart.uncorrectable": "無法修正的磁區",
   "diagnostics.reason.smart.vendorHealth": "製造商健康指標",
   "diagnostics.reason.storage.noSmartSource": "無法取得 SMART 資料",
+  "diagnostics.reason.storage.notResponding": "磁碟機無回應",
   "diagnostics.reason.system.bugchecks": "系統當機",
   "diagnostics.reason.system.dirtyShutdowns": "非預期關機",
   "diagnostics.reason.system.failedUnits": "失敗的系統服務",

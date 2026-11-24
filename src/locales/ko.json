@@ -2140,6 +2140,7 @@
   "diagnostics.reason.smart.uncorrectable": "복구 불가 섹터",
   "diagnostics.reason.smart.vendorHealth": "제조사 상태 지표",
   "diagnostics.reason.storage.noSmartSource": "SMART 데이터 사용 불가",
+  "diagnostics.reason.storage.notResponding": "드라이브가 응답하지 않음",
   "diagnostics.reason.system.bugchecks": "시스템 충돌",
   "diagnostics.reason.system.dirtyShutdowns": "예기치 않은 종료",
   "diagnostics.reason.system.failedUnits": "실패한 시스템 서비스",

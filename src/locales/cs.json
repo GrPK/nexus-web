@@ -2150,6 +2150,7 @@
   "diagnostics.reason.smart.uncorrectable": "Neopravitelné sektory",
   "diagnostics.reason.smart.vendorHealth": "Ukazatel stavu od výrobce",
   "diagnostics.reason.storage.noSmartSource": "Data SMART nejsou k dispozici",
+  "diagnostics.reason.storage.notResponding": "Disk neodpovídá",
   "diagnostics.reason.system.bugchecks": "Pády systému",
   "diagnostics.reason.system.dirtyShutdowns": "Neočekávaná vypnutí",
   "diagnostics.reason.system.failedUnits": "Selhané systémové služby",

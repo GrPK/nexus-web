@@ -2150,6 +2150,7 @@
   "diagnostics.reason.smart.uncorrectable": "Sektory niemożliwe do naprawienia",
   "diagnostics.reason.smart.vendorHealth": "Wskaźnik kondycji producenta",
   "diagnostics.reason.storage.noSmartSource": "Dane SMART niedostępne",
+  "diagnostics.reason.storage.notResponding": "Dysk nie odpowiada",
   "diagnostics.reason.system.bugchecks": "Awarie systemu",
   "diagnostics.reason.system.dirtyShutdowns": "Nieoczekiwane wyłączenia",
   "diagnostics.reason.system.failedUnits": "Usługi systemowe zakończone błędem",

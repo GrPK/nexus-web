@@ -2150,6 +2150,7 @@
   "diagnostics.reason.smart.uncorrectable": "Неисправимые секторы",
   "diagnostics.reason.smart.vendorHealth": "Показатель состояния от производителя",
   "diagnostics.reason.storage.noSmartSource": "Данные SMART недоступны",
+  "diagnostics.reason.storage.notResponding": "Диск не отвечает",
   "diagnostics.reason.system.bugchecks": "Сбои системы",
   "diagnostics.reason.system.dirtyShutdowns": "Неожиданные выключения",
   "diagnostics.reason.system.failedUnits": "Системные службы с ошибкой",

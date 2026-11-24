@@ -2140,6 +2140,7 @@
   "diagnostics.reason.smart.uncorrectable": "Oncorrigeerbare sectoren",
   "diagnostics.reason.smart.vendorHealth": "Gezondheidsindicator van fabrikant",
   "diagnostics.reason.storage.noSmartSource": "SMART-gegevens niet beschikbaar",
+  "diagnostics.reason.storage.notResponding": "Schijf reageert niet",
   "diagnostics.reason.system.bugchecks": "Systeemcrashes",
   "diagnostics.reason.system.dirtyShutdowns": "Onverwachte afsluitingen",
   "diagnostics.reason.system.failedUnits": "Mislukte systeemservices",

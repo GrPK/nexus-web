@@ -2140,6 +2140,7 @@
   "diagnostics.reason.smart.uncorrectable": "不可纠正扇区",
   "diagnostics.reason.smart.vendorHealth": "制造商健康指标",
   "diagnostics.reason.storage.noSmartSource": "无法获取 SMART 数据",
+  "diagnostics.reason.storage.notResponding": "驱动器无响应",
   "diagnostics.reason.system.bugchecks": "系统崩溃",
   "diagnostics.reason.system.dirtyShutdowns": "意外关机",
   "diagnostics.reason.system.failedUnits": "失败的系统服务",
