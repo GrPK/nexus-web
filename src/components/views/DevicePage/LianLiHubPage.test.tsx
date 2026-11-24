@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LianLiHubPage } from './LianLiHubPage';
+import { LianLiHubPage, resetLianLiHubTab } from './LianLiHubPage';
 import type { UnifiedDevice } from '../../../hooks/useUnifiedDevices';
 import { HYDROSHIFT2_CURVE_LIGHTING_API } from '../../../api/hydroshift2Curve';
 import { LIANLI_SCREEN88_LIGHTING_API } from '../../../api/lianliScreen88';
@@ -115,6 +115,7 @@ async function openTab(label: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetLianLiHubTab();
   unitCalls.length = 0;
   lightCards.length = 0;
   screen88Route.settings = null;
@@ -272,6 +273,18 @@ describe('LianLiHubPage', () => {
     expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual([
       'devices.lianli-wireless.tab.devices', 'lighting.title',
     ]);
+  });
+
+  it('comes back on the tab it was left on, so Back from a page it opened returns there', async () => {
+    let view!: ReturnType<typeof render>;
+    await act(async () => {
+      view = render(<LianLiHubPage members={[wireless, curve]} controlDevice={controlDevice} onSectionNavigate={nav} />);
+    });
+    await openTab('devices.lianli-wireless.tab.screen');
+    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-hub.screenTitle:{"name":"HydroShift II Curved"}' }));
+    view.unmount();
+    await renderHub([wireless, curve]);
+    expect(screen.getByRole('tab', { name: 'devices.lianli-wireless.tab.screen' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('Cooling holds the fans and pump of the controller and the Flex hub', async () => {

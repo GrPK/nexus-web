@@ -42,6 +42,14 @@ const UNIT_IDS = new Set([WIRELESS_ID, FLEX_ID]);
 
 type LianLiHubTab = 'devices' | 'lighting' | 'screens' | 'cooling';
 
+// The tab the Lian Li page was left on: Back from a page one of its tabs opened returns to that tab.
+let rememberedTab: LianLiHubTab = 'devices';
+
+/** Forgets the remembered tab, so the page opens on Devices (tests). */
+export function resetLianLiHubTab(): void {
+  rememberedTab = 'devices';
+}
+
 interface LianLiHubPageProps {
   /** The connected Lian Li devices the page stands for (see groupLianLiDevices). */
   members: readonly UnifiedDevice[];
@@ -59,7 +67,11 @@ interface LianLiHubPageProps {
  */
 export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: LianLiHubPageProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<LianLiHubTab>('devices');
+  const [activeTab, setActiveTabState] = useState<LianLiHubTab>(() => rememberedTab);
+  const setActiveTab = (key: LianLiHubTab) => {
+    rememberedTab = key;
+    setActiveTabState(key);
+  };
   // A sync write changes each device's own look, so the lighting sections re-read after it.
   const [lightingRev, setLightingRev] = useState(0);
   const onSyncWritten = useCallback(() => setLightingRev(r => r + 1), []);
