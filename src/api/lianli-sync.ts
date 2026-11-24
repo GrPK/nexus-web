@@ -43,6 +43,19 @@ export interface LianLiSyncDevice {
   direction?: number;
 }
 
+/**
+ * What keeps a Sync all member from following it: the Lighting page drives it, or (a TL chain) it plays its
+ * motherboard ARGB input. Sync all cannot be turned on while a member has one.
+ */
+export type LianLiSyncLock = 'lightingPage' | 'motherboardArgb';
+
+/** The Sync all member ids of the single USB devices (a TL chain's is its MAC). */
+export const LIANLI_SYNC_CURVE_ID = 'hydroShift2Curve';
+export const LIANLI_SYNC_SCREEN88_ID = 'universalScreen88';
+
+/** Member ids compare without case (a MAC's case differs between routes). */
+export const lianLiSyncKey = (id: string): string => id.toUpperCase();
+
 /** One device of a new merge order; a direction left out keeps the stored one. */
 export interface LianLiSyncDeviceOrder {
   id: string;

@@ -263,6 +263,66 @@ describe('motherboard ARGB', () => {
   });
 });
 
+describe('Sync all on the Lian Li page', () => {
+  const tl: LianLiWirelessChainLighting = { ...fanChain, mac: '7880ae72ab3c', fanType: 28, supportsScope: true, argbCableConnected: true };
+
+  it('locks a chain Sync all drives and says it follows Sync all', async () => {
+    mockGetStrimers.mockResolvedValue({ ...catalog, chains: [tl] });
+    await act(async () => {
+      render(<LianLiWirelessLightingTab syncAllMacs={new Set(['7880AE72AB3C'])} />);
+    });
+    expect(screen.getByText('devices.lianli-hub.followsSyncAll')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'devices.motherboardArgb.label' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'devices.lianli-wireless.separateHalves' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'devices.lianli.lightingMode' })).toBeDisabled();
+  });
+
+  it('lets a synced chain leave the Lighting page', async () => {
+    mockGetStrimers.mockResolvedValue({ ...catalog, chains: [{ ...tl, mode: 'custom', effectMode: 'rainbow' }] });
+    await act(async () => {
+      render(<LianLiWirelessLightingTab syncAllMacs={new Set(['7880AE72AB3C'])} />);
+    });
+    const lightingPage = screen.getByRole('switch', { name: 'devices.lightingPage.use' });
+    expect(lightingPage).not.toBeDisabled();
+    await act(async () => {
+      fireEvent.click(lightingPage);
+    });
+    expect(mockSetStrimer).toHaveBeenCalledWith('7880ae72ab3c', { mode: 'rainbow', effectMode: undefined });
+  });
+
+  it('leaves a chain Sync all does not drive as it is', async () => {
+    mockGetStrimers.mockResolvedValue({ ...catalog, chains: [tl] });
+    await act(async () => {
+      render(<LianLiWirelessLightingTab syncAllMacs={new Set(['OTHER'])} />);
+    });
+    expect(screen.queryByText('devices.lianli-hub.followsSyncAll')).not.toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).not.toBeDisabled();
+  });
+
+  it('reports the chains the Lighting page or their motherboard input drive', async () => {
+    const onLocks = vi.fn();
+    mockGetStrimers.mockResolvedValue({
+      ...catalog,
+      chains: [
+        { ...tl, mode: 'custom', effectMode: 'rainbow' },
+        { ...tl, mac: 'aa', motherboardArgb: true },
+        { ...tl, mac: 'bb', motherboardArgb: null, playingMotherboardArgb: true },
+        { ...tl, mac: 'cc' },
+      ],
+    });
+    await act(async () => {
+      render(<LianLiWirelessLightingTab onLocks={onLocks} />);
+    });
+    expect(onLocks).toHaveBeenCalledTimes(1);
+    expect(Object.fromEntries(onLocks.mock.calls[0][0])).toEqual({
+      '7880AE72AB3C': 'lightingPage',
+      AA: 'motherboardArgb',
+      BB: 'motherboardArgb',
+    });
+  });
+});
+
 describe('wireless TL up and down', () => {
   const tlEffects = [
     { key: 'rainbow', hasSpeed: true, hasDirection: true, colorsMin: 0, colorsMax: 0, mergeable: true },

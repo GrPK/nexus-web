@@ -14,6 +14,7 @@ import {
 import { useConflictGuardedEnable } from '../../../hooks/useConflictGuardedEnable';
 import type { UnifiedDevice } from '../../../hooks/useUnifiedDevices';
 import type { LianLiWirelessChainLighting } from '../../../api/lianli-wireless';
+import { LIANLI_SYNC_CURVE_ID, LIANLI_SYNC_SCREEN88_ID, lianLiSyncKey, type LianLiSyncLock } from '../../../api/lianli-sync';
 import type { DashboardSectionNavigate } from '../../../panel/engine/panelLayoutHelpers';
 import { DeviceCard } from '../../../panel/widgets/devices/DevicesPage';
 import { lianLiFlexCoolingAnchors, lianLiFlexLightingAnchors, lianLiWirelessCoolingAnchors, lianLiWirelessLightingAnchors } from '../../../lib/pageAnchors';
@@ -120,6 +121,29 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
     if ([...names].every(([mac, name]) => prev.get(mac) === name)) return prev;
     return new Map([...prev, ...names]);
   }), []);
+  // Sync all and its members lock each other: the members Sync all drives lock their own looks, and a member
+  // the Lighting page or its motherboard input drives keeps Sync all from turning on.
+  const [syncedIds, setSyncedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const onSynced = useCallback((ids: ReadonlySet<string>) => setSyncedIds(prev =>
+    (prev.size === ids.size && [...ids].every(id => prev.has(id)) ? prev : ids)), []);
+  // By source (each unit's chains, the Curve edge, the 8.8 bezel), as each last reported.
+  const [lockSources, setLockSources] = useState<Readonly<Record<string, ReadonlyMap<string, LianLiSyncLock>>>>({});
+  const lockReporters = useMemo(() => {
+    const report = (source: string) => (locks: ReadonlyMap<string, LianLiSyncLock>) => setLockSources(prev =>
+      (JSON.stringify([...(prev[source] ?? [])]) === JSON.stringify([...locks]) ? prev : { ...prev, [source]: locks }));
+    const light = (source: string, id: string) => (on: boolean) =>
+      report(source)(new Map<string, LianLiSyncLock>(on ? [[lianLiSyncKey(id), 'lightingPage']] : []));
+    return {
+      wireless: report('wireless'),
+      flex: report('flex'),
+      curve: light('curve', LIANLI_SYNC_CURVE_ID),
+      screen88: light('screen88', LIANLI_SYNC_SCREEN88_ID),
+    };
+  }, []);
+  const memberLocks = useMemo(
+    () => new Map(Object.values(lockSources).flatMap(m => [...m])),
+    [lockSources],
+  );
 
   const sorted = useMemo(
     () => [...members].sort((a, b) =>
@@ -245,7 +269,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
 
           {tab === 'lighting' && (
             <>
-              <LianLiSyncAllBar onWritten={onSyncWritten} chainNames={chainNames} />
+              <LianLiSyncAllBar onWritten={onSyncWritten} chainNames={chainNames} memberLocks={memberLocks} onSynced={onSynced} />
               {/* Strimers, then fans without screens, then fans with screens (most screens first), then
                   the single-screen devices; each group keeps the order it had. */}
               {CHAIN_GROUPS.map(group => (
@@ -263,6 +287,8 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
                       chainOrder={group === 'screens' ? (a, b) => chainScreens(unit, b) - chainScreens(unit, a) : undefined}
                       screensOf={chain => chainScreens(unit, chain)}
                       onChainNames={onChainNames}
+                      syncAllMacs={syncedIds}
+                      onChainLocks={unit.flex ? lockReporters.flex : lockReporters.wireless}
                       // The Flex sync controls stand with the Flex fans: with its screens when it has them.
                       hideHeader={group !== (unit.hasScreen ? 'screens' : 'fans')}
                     />
@@ -274,8 +300,24 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
                 </Fragment>
               ))}
               {ring && <HydroShift2RingSettings title={ring.shortName} onSectionNavigate={nav} />}
-              {curve && <HydroShift2RingSettings title={curve.shortName} api={HYDROSHIFT2_CURVE_LIGHTING_API} onSectionNavigate={nav} />}
-              {screen88 && <HydroShift2RingSettings title={screen88Title} api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={nav} />}
+              {curve && (
+                <HydroShift2RingSettings
+                  title={curve.shortName}
+                  api={HYDROSHIFT2_CURVE_LIGHTING_API}
+                  onSectionNavigate={nav}
+                  syncedAll={syncedIds.has(lianLiSyncKey(LIANLI_SYNC_CURVE_ID))}
+                  onLightingPage={lockReporters.curve}
+                />
+              )}
+              {screen88 && (
+                <HydroShift2RingSettings
+                  title={screen88Title}
+                  api={LIANLI_SCREEN88_LIGHTING_API}
+                  onSectionNavigate={nav}
+                  syncedAll={syncedIds.has(lianLiSyncKey(LIANLI_SYNC_SCREEN88_ID))}
+                  onLightingPage={lockReporters.screen88}
+                />
+              )}
             </>
           )}
 

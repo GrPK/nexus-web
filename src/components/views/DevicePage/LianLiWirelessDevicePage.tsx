@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Fan, CircleEqual, Lightbulb, RadioReceiver, Unplug } from 'lucide-react';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
+import type { LianLiSyncLock } from '../../../api/lianli-sync';
 import {
   getLianLiWirelessState,
   type LianLiWirelessChainLighting,
@@ -265,12 +266,16 @@ interface LianLiUnitTabBodyProps {
   screensOf?: (chain: LianLiWirelessChainLighting) => number;
   /** Lighting: runs with the chains' names when they change. */
   onChainNames?: (names: ReadonlyMap<string, string>) => void;
+  /** Lighting: the chains Sync all drives. */
+  syncAllMacs?: ReadonlySet<string>;
+  /** Lighting: runs with the chains the Lighting page or their motherboard input drive. */
+  onChainLocks?: (locks: ReadonlyMap<string, LianLiSyncLock>) => void;
 }
 
 /** One tab of a unit's page: its fans and binding, lighting, cooling or screens. */
 export function LianLiUnitTabBody({
   unit, tab, onSectionNavigate, embedded = false, reloadSignal = 0, chainFilter, chainOrder, hideHeader = false, onLightingSettled,
-  screensOf, onChainNames,
+  screensOf, onChainNames, syncAllMacs, onChainLocks,
 }: LianLiUnitTabBodyProps) {
   const { flex, state, refresh, flexSync, lightingRev, panelOpener, lcdRestart } = unit;
   const flexRefresh = flexSync.refresh;
@@ -308,6 +313,8 @@ export function LianLiUnitTabBody({
           chainOrder={chainOrder}
           screensOf={screensOf}
           onNames={onChainNames}
+          syncAllMacs={syncAllMacs}
+          onLocks={onChainLocks}
         />
       )}
       {tab === 'cooling' && (

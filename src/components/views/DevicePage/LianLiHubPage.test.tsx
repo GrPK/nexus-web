@@ -26,27 +26,35 @@ vi.mock('../../../panel/widgets/devices/DevicesPage', () => ({
     </div>
   ),
 }));
-const { unitCalls, lightCards } = vi.hoisted(() => ({
+const { unitCalls, lightCards, unitBodies, syncBars } = vi.hoisted(() => ({
   unitCalls: [] as { flex: boolean; enabled?: boolean; lightingActive: boolean }[],
-  lightCards: [] as { title?: string; api?: unknown }[],
+  lightCards: [] as { title?: string; api?: unknown; syncedAll?: boolean; onLightingPage?: (on: boolean) => void }[],
+  unitBodies: [] as any[],
+  syncBars: [] as any[],
 }));
 vi.mock('./LianLiWirelessDevicePage', () => ({
   useLianLiUnit: (opts: any) => {
     unitCalls.push(opts);
     return { flex: opts.flex, boundMacs: [], hasScreen: true };
   },
-  LianLiUnitTabBody: ({ unit, tab, embedded }: any) => (
-    <div data-testid={`${unit.flex ? 'flex' : 'wireless'}-${tab}`} data-embedded={String(embedded)} />
-  ),
+  LianLiUnitTabBody: (props: any) => {
+    unitBodies.push(props);
+    return <div data-testid={`${props.unit.flex ? 'flex' : 'wireless'}-${props.tab}`} data-embedded={String(props.embedded)} />;
+  },
 }));
 vi.mock('./lianliFanScreens', async importOriginal => ({
   ...(await importOriginal<typeof import('./lianliFanScreens')>()),
   useLianLiFanScreenCount: () => null,
 }));
-vi.mock('./LianLiSyncAllBar', () => ({ LianLiSyncAllBar: () => <div data-testid="sync-all" /> }));
+vi.mock('./LianLiSyncAllBar', () => ({
+  LianLiSyncAllBar: (props: any) => {
+    syncBars.push(props);
+    return <div data-testid="sync-all" />;
+  },
+}));
 vi.mock('./HydroShift2RingSettings', () => ({
-  HydroShift2RingSettings: ({ title, api }: any) => {
-    lightCards.push({ title, api });
+  HydroShift2RingSettings: ({ title, api, syncedAll, onLightingPage }: any) => {
+    lightCards.push({ title, api, syncedAll, onLightingPage });
     return <div data-testid="light-card">{title}</div>;
   },
 }));
@@ -120,6 +128,8 @@ beforeEach(() => {
   window.history.replaceState(null, '');
   unitCalls.length = 0;
   lightCards.length = 0;
+  unitBodies.length = 0;
+  syncBars.length = 0;
   screen88Route.settings = null;
   screen88Route.reads.length = 0;
   controlDevice.mockResolvedValue(undefined);
@@ -212,6 +222,27 @@ describe('LianLiHubPage', () => {
     expect(unitCalls.slice(-2).every(c => c.lightingActive)).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'lighting.devices.menuOpenDevicePage' }));
     expect(nav).toHaveBeenCalledWith('device', { deviceKey: 'Uni Fan TL' });
+  });
+
+  it('ties Sync all and its members both ways: what it drives locks, what holds a member back keeps it off', async () => {
+    await renderHub([wireless, curve, screen88]);
+    await openTab('lighting.title');
+    const bar = () => syncBars[syncBars.length - 1];
+    const card = (title: string) => lightCards.filter(c => c.title === title).slice(-1)[0];
+    const lightingBody = () => unitBodies.filter(b => b.tab === 'lighting').slice(-1)[0];
+    await act(async () => { bar().onSynced(new Set(['7880AE72AB3C', 'HYDROSHIFT2CURVE'])); });
+    expect(card('HydroShift II Curved').syncedAll).toBe(true);
+    expect(card('Universal Screen 8.8').syncedAll).toBe(false);
+    expect([...lightingBody().syncAllMacs]).toEqual(['7880AE72AB3C', 'HYDROSHIFT2CURVE']);
+    await act(async () => {
+      card('HydroShift II Curved').onLightingPage?.(true);
+      card('Universal Screen 8.8').onLightingPage?.(false);
+      lightingBody().onChainLocks(new Map([['7880AE72AB3C', 'motherboardArgb']]));
+    });
+    expect(Object.fromEntries(bar().memberLocks)).toEqual({ HYDROSHIFT2CURVE: 'lightingPage', '7880AE72AB3C': 'motherboardArgb' });
+    // A light that leaves the Lighting page no longer holds Sync all back.
+    await act(async () => { card('HydroShift II Curved').onLightingPage?.(false); });
+    expect(Object.fromEntries(bar().memberLocks)).toEqual({ '7880AE72AB3C': 'motherboardArgb' });
   });
 
   it('the HydroShift II pump ring keeps its default endpoints', async () => {

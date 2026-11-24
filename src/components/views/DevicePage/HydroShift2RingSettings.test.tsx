@@ -81,6 +81,38 @@ describe('HydroShift2RingSettings', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
     expect(mockSet).toHaveBeenLastCalledWith({ mode: 'rainbow' });
   });
+
+  it('reports whether the Lighting page drives it, once read and on a change', async () => {
+    const onLightingPage = vi.fn();
+    mockGet.mockResolvedValue(lighting);
+    await act(async () => {
+      render(<HydroShift2RingSettings onLightingPage={onLightingPage} />);
+    });
+    expect(onLightingPage).toHaveBeenLastCalledWith(false);
+    fireEvent.click(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
+    expect(onLightingPage).toHaveBeenLastCalledWith(true);
+  });
+
+  it('under Sync all locks its look and the Lighting page switch, and says it follows Sync all', async () => {
+    mockGet.mockResolvedValue(lighting);
+    await act(async () => {
+      render(<HydroShift2RingSettings syncedAll />);
+    });
+    expect(screen.getByText('devices.lianli-hub.followsSyncAll')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'devices.lianli.lightingMode' })).toBeDisabled();
+  });
+
+  it('under Sync all still lets the Lighting page switch go off', async () => {
+    mockGet.mockResolvedValue({ ...lighting, mode: 'canvas', effectMode: 'rainbow' });
+    await act(async () => {
+      render(<HydroShift2RingSettings syncedAll />);
+    });
+    const lightingPage = screen.getByRole('switch', { name: 'devices.lightingPage.use' });
+    expect(lightingPage).not.toBeDisabled();
+    fireEvent.click(lightingPage);
+    expect(mockSet).toHaveBeenLastCalledWith({ mode: 'rainbow' });
+  });
 });
 
 describe('HydroShift2RingSettings on the OLED Curved edge', () => {

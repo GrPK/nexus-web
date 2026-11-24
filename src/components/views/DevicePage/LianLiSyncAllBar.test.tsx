@@ -173,6 +173,70 @@ describe('LianLiSyncAllBar', () => {
     expect(tl.compareDocumentPosition(screen.getByText('HydroShift II OLED Curved')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('cannot turn on while a member is on the Lighting page or its motherboard input, and names them', async () => {
+    get.mockResolvedValue(sync);
+    const memberLocks = new Map([
+      ['7880AE72AB3C', 'lightingPage' as const],
+      ['HYDROSHIFT2CURVE', 'lightingPage' as const],
+      ['UNIVERSALSCREEN88', 'motherboardArgb' as const],
+      // Not a member (a Strimer): it holds nothing back.
+      ['64F271E566E1', 'lightingPage' as const],
+    ]);
+    const chainNames = new Map([['7880AE72AB3C', 'TL Wireless (3 fans)']]);
+    await act(async () => {
+      render(<LianLiSyncAllBar api={api} chainNames={chainNames} memberLocks={memberLocks} />);
+    });
+    expect(screen.getByRole('switch', { name: 'devices.lianli-hub.syncAll' })).toBeDisabled();
+    const notice = screen.getByRole('status');
+    expect(notice).toHaveAttribute('data-tone', 'info');
+    expect(notice).toHaveTextContent('devices.lianli-hub.syncBlockedLightingPage:{"devices":"TL Wireless (3 fans), HydroShift II OLED Curved"}');
+    expect(notice).toHaveTextContent('devices.lianli-hub.syncBlockedArgb:{"devices":"Universal Screen 8.8"}');
+  });
+
+  it('turns on with no member held back, and shows no notice', async () => {
+    get.mockResolvedValue(sync);
+    await act(async () => {
+      render(<LianLiSyncAllBar api={api} memberLocks={new Map([['64F271E566E1', 'lightingPage' as const]])} />);
+    });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-hub.syncAll' }));
+    });
+    expect(set).toHaveBeenCalledWith({ enabled: true });
+  });
+
+  it('can always be turned off, even with a member on the Lighting page', async () => {
+    get.mockResolvedValue({ ...sync, enabled: true });
+    await act(async () => {
+      render(<LianLiSyncAllBar api={api} memberLocks={new Map([['HYDROSHIFT2CURVE', 'lightingPage' as const]])} />);
+    });
+    const toggle = screen.getByRole('switch', { name: 'devices.lianli-hub.syncAll' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(toggle).not.toBeDisabled();
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+    expect(set).toHaveBeenCalledWith({ enabled: false });
+  });
+
+  it('reports the members it drives while on, none while off, at once on a press', async () => {
+    const onSynced = vi.fn();
+    let state = sync;
+    get.mockImplementation(() => Promise.resolve(state));
+    set.mockImplementation((patch: { enabled?: boolean }) => {
+      state = { ...state, enabled: patch.enabled ?? state.enabled };
+      return Promise.resolve(true);
+    });
+    await act(async () => {
+      render(<LianLiSyncAllBar api={api} onSynced={onSynced} />);
+    });
+    expect([...onSynced.mock.lastCall![0]]).toEqual([]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-hub.syncAll' }));
+    });
+    expect([...onSynced.mock.lastCall![0]]).toEqual(['7880AE72AB3C', 'HYDROSHIFT2CURVE', 'UNIVERSALSCREEN88']);
+  });
+
   it('keeps the effect locked while sync is off', async () => {
     await renderBar();
     expect(screen.getByRole('switch', { name: 'devices.lianli-hub.syncAll' })).toHaveAttribute('aria-checked', 'false');

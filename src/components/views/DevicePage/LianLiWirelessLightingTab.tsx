@@ -6,6 +6,7 @@ import { Button } from '../../common/Button/Button';
 import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { LightingPageSwitch } from './LightingPageSwitch';
+import { lianLiSyncKey, type LianLiSyncLock } from '../../../api/lianli-sync';
 import {
   getLianLiWirelessLighting,
   setLianLiWirelessChainLighting,
@@ -127,10 +128,14 @@ interface LianLiWirelessLightingTabProps {
   screensOf?: (chain: LianLiWirelessChainLighting) => number;
   /** Runs with each chain's name on this page (by MAC) when the names change, for views that name the chains alike. */
   onNames?: (names: ReadonlyMap<string, string>) => void;
+  /** The chains Sync all drives (MACs, lianLiSyncKey): their own look and Lighting page switch lock. */
+  syncAllMacs?: ReadonlySet<string>;
+  /** Runs with the chains the Lighting page or their motherboard input drive (by MAC, lianLiSyncKey) when that changes. */
+  onLocks?: (locks: ReadonlyMap<string, LianLiSyncLock>) => void;
 }
 
 /** Per-chain animation picker for the Strimer cables and fan chains bound to the controller. */
-export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LIGHTING_API, header, syncOn = false, onSettled, reloadSignal, onSequence, unitNames, chainFilter, chainOrder, screensOf, onNames }: LianLiWirelessLightingTabProps) {
+export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LIGHTING_API, header, syncOn = false, onSettled, reloadSignal, onSequence, unitNames, chainFilter, chainOrder, screensOf, onNames, syncAllMacs, onLocks }: LianLiWirelessLightingTabProps) {
   const { t } = useTranslation();
   const [data, setData] = useState<LianLiWirelessLighting | null>(null);
   const aliveRef = useRef(true);
@@ -268,6 +273,21 @@ export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LI
     if (namesRef.current.size > 0) onNames?.(namesRef.current);
   }, [namesKey, onNames]);
 
+  // What drives each chain instead of its own look, for Sync all to wait on.
+  const flexApi = api !== WIRELESS_LIGHTING_API;
+  const locks = new Map<string, LianLiSyncLock>();
+  for (const c of all) {
+    if (isP28Chain(c, flexApi)) continue;
+    if (c.motherboardArgb ?? c.playingMotherboardArgb === true) locks.set(lianLiSyncKey(c.mac), 'motherboardArgb');
+    else if (c.mode === MODE_CUSTOM) locks.set(lianLiSyncKey(c.mac), 'lightingPage');
+  }
+  const locksKey = data ? JSON.stringify([...locks]) : '';
+  const locksRef = useRef(locks);
+  locksRef.current = locks;
+  useEffect(() => {
+    if (locksKey) onLocks?.(locksRef.current);
+  }, [locksKey, onLocks]);
+
   if (!data) return null;
   // The service names the leader when it can; otherwise the same rule applies here.
   const leaderMac = data.mergeLeaderMac !== undefined ? data.mergeLeaderMac : mergeLeaderMac(all);
@@ -294,7 +314,8 @@ export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LI
             : undefined}
           first={i === 0}
           flex={flex}
-          synced={syncOn && chain.supportsZones === true && !isP28Chain(chain, flex)}
+          synced={(syncOn && chain.supportsZones === true && !isP28Chain(chain, flex)) || (syncAllMacs?.has(lianLiSyncKey(chain.mac)) ?? false)}
+          syncAll={syncAllMacs?.has(lianLiSyncKey(chain.mac)) ?? false}
           last={i === chains.length - 1}
           onSectionNavigate={onSectionNavigate}
         />
@@ -320,8 +341,10 @@ interface ChainSectionProps {
   last: boolean;
   /** The chain is a wired Flex unit, not an RF wireless one. */
   flex: boolean;
-  /** The group sync drives this fan's look. */
+  /** The group sync, or Sync all, drives this fan's look. */
   synced: boolean;
+  /** It is Sync all on the Lian Li page: the Lighting page and motherboard switches can still go off. */
+  syncAll?: boolean;
   onSectionNavigate?: (section: string) => void;
 }
 
@@ -330,7 +353,7 @@ function MaybeEffectControls({ show, children, ...props }: { show: boolean } & C
   return show ? <LianLiChainEffectControls {...props}>{children}</LianLiChainEffectControls> : <>{children}</>;
 }
 
-function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, followsTitle, onMove, first, last, flex, synced, onSectionNavigate }: ChainSectionProps) {
+function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, followsTitle, onMove, first, last, flex, synced, syncAll = false, onSectionNavigate }: ChainSectionProps) {
   const { t } = useTranslation();
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetFailed, setResetFailed] = useState(false);
@@ -394,11 +417,12 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
           description={t('devices.motherboardArgb.hint')}
           checked={argbOn}
           onChange={on => onCommit({ motherboardArgb: on })}
+          disabled={syncAll && !argbOn}
         />
       )}
       {!p28 && <LightingPageSwitch
         on={lightingPage}
-        disabled={argbOn || synced}
+        disabled={argbOn || (synced && !(syncAll && lightingPage))}
         onChange={on => onCommit(on ? { mode: MODE_CUSTOM } : { mode: effectKey, effectMode: effectKey })}
         onSectionNavigate={onSectionNavigate}
       />}
@@ -435,7 +459,7 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
         onPreview={onPreview}
         onCommit={onCommit}
       >
-        {synced && <SettingRow label={t('devices.lianli-flex.followsSync')} />}
+        {synced && <SettingRow label={t(syncAll ? 'devices.lianli-hub.followsSyncAll' : 'devices.lianli-flex.followsSync')} />}
         {follower && <SettingRow label={t('devices.lianli-flex.followsLeader', { leader: followsTitle })} />}
         {perZone && zones.map(zone => (
           <Fragment key={zone.id}>

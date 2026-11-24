@@ -3,8 +3,10 @@ import { SettingRow, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { Button } from '../../common/Button/Button';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import type { SelectOption } from '../../common/Select/Select';
+import { Notice } from '../../common/Notice/Notice';
 import {
-  LIANLI_SYNC_ALL_API, type LianLiSyncAll, type LianLiSyncAllApi, type LianLiSyncAllPatch, type LianLiSyncEffect,
+  LIANLI_SYNC_ALL_API, lianLiSyncKey, type LianLiSyncAll, type LianLiSyncAllApi, type LianLiSyncAllPatch, type LianLiSyncEffect,
+  type LianLiSyncLock,
 } from '../../../api/lianli-sync';
 import type { LianLiWirelessLightingEffect } from '../../../api/lianli-wireless';
 import { LianLiChainEffectControls, effectLabel, type LianLiEffectValue } from './LianLiChainEffectControls';
@@ -18,6 +20,16 @@ interface LianLiSyncAllBarProps {
   onWritten?: () => void;
   /** Each TL chain's name on the Lighting tab, by MAC; a chain without one keeps the service's name. */
   chainNames?: ReadonlyMap<string, string>;
+  /** What keeps a member from following Sync all, by member id (lianLiSyncKey); such a member keeps it from turning on. */
+  memberLocks?: ReadonlyMap<string, LianLiSyncLock>;
+  /** Runs with the ids of the devices Sync all drives (lianLiSyncKey), none while it is off, so their own controls lock. */
+  onSynced?: (ids: ReadonlySet<string>) => void;
+}
+
+/** "A, B, C" in the page's language; a plain comma join where Intl.ListFormat is missing. */
+function joinNames(names: readonly string[], language: string | undefined): string {
+  if (typeof Intl === 'undefined' || typeof Intl.ListFormat !== 'function') return names.join(', ');
+  return new Intl.ListFormat(language, { style: 'short', type: 'unit' }).format(names);
 }
 
 const TL_CHAIN = 'tlChain';
@@ -90,8 +102,8 @@ function patchEffect(data: LianLiSyncAll, patch: LianLiSyncAllPatch): LianLiSync
  * Sync all on the Lian Li page: one effect across every light the service lists
  * (L-Connect's Merge), each effect keeping its own look, or each device plays its own.
  */
-export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNames }: LianLiSyncAllBarProps) {
-  const { t } = useTranslation();
+export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNames, memberLocks, onSynced }: LianLiSyncAllBarProps) {
+  const { t, language } = useTranslation();
   const [data, setData] = useState<LianLiSyncAll | null>(null);
   const aliveRef = useRef(true);
 
@@ -128,6 +140,12 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
     await refresh();
   }, [api, preview, refresh, onWritten]);
 
+  // The devices Sync all drives, reported when they change (a press shows at once, a refusal undoes it).
+  const syncedKey = data?.enabled ? data.devices.map(d => lianLiSyncKey(d.id)).join('|') : '';
+  useEffect(() => {
+    onSynced?.(new Set(syncedKey ? syncedKey.split('|') : []));
+  }, [syncedKey, onSynced]);
+
   // A service without the sync route has nothing to show.
   if (!data || data.effects.length === 0) return null;
 
@@ -147,6 +165,14 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
   for (const [mac, name] of chainNames ?? []) namesByMac.set(mac.toUpperCase(), name);
   const deviceName = (d: LianLiSyncAll['devices'][number]) =>
     (d.kind === TL_CHAIN ? namesByMac.get(d.id.toUpperCase()) : undefined) ?? d.name;
+  // A member the Lighting page or its motherboard input drives would be taken over silently, so Sync all
+  // waits until the user turns that off. Turning Sync all off is always allowed.
+  const blocked = (lock: LianLiSyncLock) =>
+    data.devices.filter(d => memberLocks?.get(lianLiSyncKey(d.id)) === lock).map(deviceName);
+  const onLightingPage = blocked('lightingPage');
+  const onMotherboard = blocked('motherboardArgb');
+  const cannotTurnOn = !data.enabled && onLightingPage.length + onMotherboard.length > 0;
+
   // The whole order is sent, so the service stores exactly what the list shows.
   const move = (index: number, delta: number) => {
     const order = data.devices.map(d => d.id);
@@ -163,7 +189,16 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
         description={t('devices.lianli-hub.syncAllHint')}
         checked={data.enabled}
         onChange={on => { void commit({ enabled: on }); }}
+        disabled={cannotTurnOn}
       />
+      {cannotTurnOn && (
+        <div data-settings-aside="true">
+          <Notice tone="info" role="status">
+            {onLightingPage.length > 0 && <div>{t('devices.lianli-hub.syncBlockedLightingPage', { devices: joinNames(onLightingPage, language) })}</div>}
+            {onMotherboard.length > 0 && <div>{t('devices.lianli-hub.syncBlockedArgb', { devices: joinNames(onMotherboard, language) })}</div>}
+          </Notice>
+        </div>
+      )}
       <LianLiChainEffectControls
         modes={asModes(data.effects)}
         value={value}

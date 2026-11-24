@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
+import { SettingRow, SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
 import { HsvPicker } from '../../common/HsvPicker/HsvPicker';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { LightingPageSwitch } from './LightingPageSwitch';
@@ -47,10 +47,14 @@ interface HydroShift2RingSettingsProps {
   api?: HydroShift2LightingApi;
   /** The section title; "Lighting" by default, the device's name where several lights share a page. */
   title?: string;
+  /** Sync all drives this light: its own look and the Lighting page switch lock (the switch can still go off). */
+  syncedAll?: boolean;
+  /** Runs with whether the Lighting page drives this light, once read and on every change. */
+  onLightingPage?: (on: boolean) => void;
 }
 
 /** A HydroShift II light (the pump ring, the OLED Curved's edge): follow the Lighting page, or loop one of its own effects. */
-export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING_API, title }: HydroShift2RingSettingsProps) {
+export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING_API, title, syncedAll = false, onLightingPage }: HydroShift2RingSettingsProps) {
   const { t } = useTranslation();
   const { numberFormat } = useUnitPrefs();
   const [lighting, setLighting] = useState<HydroShift2Lighting | null>(null);
@@ -76,7 +80,11 @@ export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING
   const effectKey = lighting ? (followsLightingPage ? lighting.effectMode : lighting.mode) : '';
   const selected = lighting?.modes.find(m => m.key === effectKey) ?? null;
   const palette = fullPalette(lighting?.colors ?? [], selected);
-  const disabled = !loaded || followsLightingPage;
+  const disabled = !loaded || followsLightingPage || syncedAll;
+
+  useEffect(() => {
+    if (loaded) onLightingPage?.(followsLightingPage);
+  }, [loaded, followsLightingPage, onLightingPage]);
   const percentPerLevel = 100 / (lighting?.maxLevel || DEFAULT_MAX_LEVEL);
 
   const levelSlider = (
@@ -110,7 +118,7 @@ export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING
     <SettingsSection title={title ?? t('devices.lianli.lightingSection')}>
       <LightingPageSwitch
         on={followsLightingPage}
-        disabled={!loaded}
+        disabled={!loaded || (syncedAll && !followsLightingPage)}
         onChange={on => {
           if (!lighting) return;
           const mode = on ? LIGHTING_PAGE_MODE : effectKey;
@@ -131,6 +139,7 @@ export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING
         options={(lighting?.modes ?? []).map(m => ({ value: m.key, label: effectLabel(t, m.key) }))}
         disabled={disabled}
       />
+      {syncedAll && <SettingRow label={t('devices.lianli-hub.followsSyncAll')} />}
 
       {selected?.hasBrightness && levelSlider(
         t('devices.lianli.lightingBrightness'),
@@ -165,7 +174,7 @@ export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING
       )}
 
       {selected && selected.colors > 0 && loaded && (
-        <div className={`${styles.colorBlock} ${followsLightingPage ? styles.rowDisabled : ''}`} data-settings-aside="true">
+        <div className={`${styles.colorBlock} ${followsLightingPage || syncedAll ? styles.rowDisabled : ''}`} data-settings-aside="true">
           <div className={styles.colorPairRow}>
             {palette.slice(0, selected.colors).map((color, i) => (
               <div key={i} className={styles.colorEntry}>
