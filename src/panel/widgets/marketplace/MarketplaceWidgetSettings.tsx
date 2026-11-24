@@ -74,7 +74,7 @@ export function MarketplaceWidgetSettings({ widget }: WidgetSettingsProps) {
   const [values, setValues] = useState<Record<string, unknown>>({});
   // Bridge is keyed by placement id (per-instance) so two placements of the
   // same marketplace widget keep separate settings.
-  const bridge = useMemo(() => (widget.id ? new WidgetSettingsBridge(widget.id) : null), [widget.id]);
+  const bridge = useMemo(() => (widget.id ? WidgetSettingsBridge.for(widget.id) : null), [widget.id]);
 
   // Sync the listing with the dynamic registry (covers the case where the
   // settings drawer opens before the catalog refresh has landed).

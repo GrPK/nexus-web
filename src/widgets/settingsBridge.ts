@@ -17,6 +17,24 @@ export interface WidgetSettingsPatch {
 
 export type WidgetSettingsListener = (values: Record<string, unknown>) => void;
 
+/** Structural equality for JSON-shaped settings values (key order ignored). */
+export function settingsEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  const ob = b as Record<string, unknown>;
+  return ka.every((k) => k in ob && settingsEqual((a as Record<string, unknown>)[k], ob[k]));
+}
+
+/** Multiplex topic the service broadcasts a full settings document on after every write. */
+export function appSettingsTopic(instanceId: string): string {
+  return `app-settings/${instanceId}`;
+}
+
+const shared = new Map<string, WidgetSettingsBridge>();
+
 /**
  * Lazy-loaded, cached settings document with a subscriber list. One instance
  * per widget surfaced by the dashboard. The Tier 2 worker host (read via
@@ -32,6 +50,24 @@ export class WidgetSettingsBridge {
 
   constructor(instanceId: string) { this.instanceId = instanceId; }
 
+  /** One bridge per placement id, so the settings panel and the running tile see each other's writes. */
+  static for(instanceId: string): WidgetSettingsBridge {
+    let b = shared.get(instanceId);
+    if (!b) { b = new WidgetSettingsBridge(instanceId); shared.set(instanceId, b); }
+    return b;
+  }
+
+  /** Test hook: drops every shared instance. */
+  static _resetSharedForTests(): void { shared.clear(); }
+
+  /** Adopts a full settings document from elsewhere (a broadcast). No-op when equal to the cache. */
+  apply(values: Record<string, unknown>): void {
+    if (this.loaded && settingsEqual(this.values, values)) return;
+    this.values = values;
+    this.loaded = true;
+    this.fire();
+  }
+
   /** Returns the cached values. Triggers a load on first call. */
   get(): Record<string, unknown> {
     if (!this.loaded) {
@@ -46,11 +82,7 @@ export class WidgetSettingsBridge {
     const doc = await fetchService<WidgetSettingsDocument>(
       `/apps-api/instance/${encodeURIComponent(this.instanceId)}/settings`,
     );
-    if (doc?.values) {
-      this.values = doc.values;
-      this.loaded = true;
-      this.fire();
-    }
+    if (doc?.values) this.apply(doc.values);
     return this.values;
   }
 
@@ -72,9 +104,7 @@ export class WidgetSettingsBridge {
     }
     if (!res.ok) return this.values;
     const doc = (await res.json()) as WidgetSettingsDocument;
-    this.values = doc.values ?? {};
-    this.loaded = true;
-    this.fire();
+    this.apply(doc.values ?? {});
     return this.values;
   }
 
