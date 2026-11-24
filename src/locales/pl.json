@@ -1188,6 +1188,7 @@
   "devices.lianli-flex.zoneInner": "Wewnętrzna",
   "devices.lianli-flex.zoneOuter": "Zewnętrzna",
   "devices.lianli-flex.zoneUp": "Góra",
+  "devices.lianli-hub.fanScreens": "{name}: ekrany wentylatorów",
   "devices.lianli-hub.syncAll": "Synchronizuj wszystkie światła Lian Li",
   "devices.lianli-hub.syncAllHint": "Wszystkie światła Lian Li odtwarzają razem jeden efekt.",
   "devices.lianli-hub.syncEachDevice": "Na każdym urządzeniu",

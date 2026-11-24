@@ -1179,6 +1179,7 @@
   "devices.lianli-flex.zoneInner": "İç",
   "devices.lianli-flex.zoneOuter": "Dış",
   "devices.lianli-flex.zoneUp": "Üst",
+  "devices.lianli-hub.fanScreens": "{name} fan ekranları",
   "devices.lianli-hub.syncAll": "Tüm Lian Li ışıklarını eşitle",
   "devices.lianli-hub.syncAllHint": "Tüm Lian Li ışıkları tek bir efekti birlikte oynatır.",
   "devices.lianli-hub.syncEachDevice": "Her cihazda",

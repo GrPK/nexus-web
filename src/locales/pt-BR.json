@@ -1179,6 +1179,7 @@
   "devices.lianli-flex.zoneInner": "Interior",
   "devices.lianli-flex.zoneOuter": "Exterior",
   "devices.lianli-flex.zoneUp": "Cima",
+  "devices.lianli-hub.fanScreens": "{name}: telas das ventoinhas",
   "devices.lianli-hub.syncAll": "Sincronizar todas as luzes Lian Li",
   "devices.lianli-hub.syncAllHint": "Todas as luzes Lian Li reproduzem um único efeito juntas.",
   "devices.lianli-hub.syncEachDevice": "Em cada dispositivo",

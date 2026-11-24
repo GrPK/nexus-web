@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
+import { LianLiWirelessDevicePage, openLianLiUnitOnScreens } from './LianLiWirelessDevicePage';
 import { fanTypeKey, deviceTypeKey, isFanDevice } from './LianLiWirelessFansTab';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -182,16 +182,31 @@ describe('LianLiWirelessDevicePage', () => {
     expect(screen.getByRole('tab', { name: /cooling\.title/ })).toBeInTheDocument();
   });
 
-  it('opened from the Lian Li page it shows only the connection and the wireless devices, no tabs', async () => {
+  it('grouped on the Lian Li page it keeps its devices and fan screens; lighting and cooling are on the Lian Li page', async () => {
     await act(async () => {
-      render(<LianLiWirelessDevicePage devicesOnly />);
+      render(<LianLiWirelessDevicePage grouped />);
     });
     expect(screen.getByText('devices.lianli-wireless.connectionSection')).toBeInTheDocument();
     expect(screen.getByText('devices.lianli-wireless.fanTypeSlv3Lcd')).toBeInTheDocument();
-    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    expect(screen.getByRole('tab', { name: /devices\.lianli-wireless\.tab\.screen/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /devices\.lianli-wireless\.tab\.devices/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByRole('button', { name: /lighting\.title|cooling\.title/ })).not.toBeInTheDocument();
   });
 
+  it('the Lian Li page\'s fan screens card opens it on the Screen tab, once', async () => {
+    openLianLiUnitOnScreens(false);
+    let view!: ReturnType<typeof render>;
+    await act(async () => {
+      view = render(<LianLiWirelessDevicePage grouped />);
+    });
+    expect(screen.getByRole('tab', { name: /devices\.lianli-wireless\.tab\.screen/ })).toHaveAttribute('aria-selected', 'true');
+    view.unmount();
+    await act(async () => {
+      render(<LianLiWirelessDevicePage grouped />);
+    });
+    expect(screen.getByRole('tab', { name: /devices\.lianli-wireless\.tab\.devices/ })).toHaveAttribute('aria-selected', 'true');
+  });
   it('drops a state read that was sent earlier but resolved after a newer one', async () => {
     await act(async () => {
       render(<LianLiWirelessDevicePage />);

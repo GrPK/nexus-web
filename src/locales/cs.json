@@ -1188,6 +1188,7 @@
   "devices.lianli-flex.zoneInner": "Vnitřní",
   "devices.lianli-flex.zoneOuter": "Vnější",
   "devices.lianli-flex.zoneUp": "Horní",
+  "devices.lianli-hub.fanScreens": "{name}: obrazovky ventilátorů",
   "devices.lianli-hub.syncAll": "Synchronizovat všechna světla Lian Li",
   "devices.lianli-hub.syncAllHint": "Všechna světla Lian Li přehrávají společně jeden efekt.",
   "devices.lianli-hub.syncEachDevice": "Na každém zařízení",

@@ -1179,6 +1179,7 @@
   "devices.lianli-flex.zoneInner": "Inner",
   "devices.lianli-flex.zoneOuter": "Outer",
   "devices.lianli-flex.zoneUp": "Up",
+  "devices.lianli-hub.fanScreens": "{name} fan screens",
   "devices.lianli-hub.syncAll": "Sync all Lian Li lights",
   "devices.lianli-hub.syncAllHint": "Every Lian Li light plays one effect together.",
   "devices.lianli-hub.syncEachDevice": "On each device",

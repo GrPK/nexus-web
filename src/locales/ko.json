@@ -1179,6 +1179,7 @@
   "devices.lianli-flex.zoneInner": "안쪽",
   "devices.lianli-flex.zoneOuter": "바깥쪽",
   "devices.lianli-flex.zoneUp": "위",
+  "devices.lianli-hub.fanScreens": "{name} 팬 화면",
   "devices.lianli-hub.syncAll": "모든 Lian Li 조명 동기화",
   "devices.lianli-hub.syncAllHint": "모든 Lian Li 조명이 하나의 효과를 함께 재생합니다.",
   "devices.lianli-hub.syncEachDevice": "각 장치에서",

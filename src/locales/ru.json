@@ -1188,6 +1188,7 @@
   "devices.lianli-flex.zoneInner": "Внутренняя",
   "devices.lianli-flex.zoneOuter": "Внешняя",
   "devices.lianli-flex.zoneUp": "Верх",
+  "devices.lianli-hub.fanScreens": "{name}: экраны вентиляторов",
   "devices.lianli-hub.syncAll": "Синхронизировать всю подсветку Lian Li",
   "devices.lianli-hub.syncAllHint": "Вся подсветка Lian Li воспроизводит один эффект одновременно.",
   "devices.lianli-hub.syncEachDevice": "На каждом устройстве",

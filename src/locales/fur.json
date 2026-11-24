@@ -1179,6 +1179,7 @@
   "devices.lianli-flex.zoneInner": "Dentri",
   "devices.lianli-flex.zoneOuter": "Difûr",
   "devices.lianli-flex.zoneUp": "Disore",
+  "devices.lianli-hub.fanScreens": "{name}: schermis dai ventiladôrs",
   "devices.lianli-hub.syncAll": "Sincronize dutis lis lûs Lian Li",
   "devices.lianli-hub.syncAllHint": "Dutis lis lûs Lian Li a riprodusin un sôl efiet adun.",
   "devices.lianli-hub.syncEachDevice": "Su ogni dispositîf",

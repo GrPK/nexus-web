@@ -1179,6 +1179,7 @@
   "devices.lianli-flex.zoneInner": "内圈",
   "devices.lianli-flex.zoneOuter": "外圈",
   "devices.lianli-flex.zoneUp": "上",
+  "devices.lianli-hub.fanScreens": "{name} 风扇屏幕",
   "devices.lianli-hub.syncAll": "同步所有 Lian Li 灯光",
   "devices.lianli-hub.syncAllHint": "所有 Lian Li 灯光一起播放同一个效果。",
   "devices.lianli-hub.syncEachDevice": "每个设备各自",
