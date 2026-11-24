@@ -90,6 +90,63 @@ describe('LianLiSyncAllBar', () => {
     expect(screen.getByText('Universal Screen 8.8')).toBeInTheDocument();
   });
 
+  it('names a TL chain as the Lighting tab does; the Curve and the 8.8 keep their names', async () => {
+    get.mockResolvedValue(sync);
+    const chainNames = new Map([['7880ae72ab3c', 'TL LCD Wireless Fans (3 screens)'], ['hydroShift2Curve', 'Other']]);
+    await act(async () => {
+      render(<LianLiSyncAllBar api={api} chainNames={chainNames} />);
+    });
+    expect(screen.getByText('TL LCD Wireless Fans (3 screens)')).toBeInTheDocument();
+    expect(screen.queryByText('Lian Li Wireless TL')).not.toBeInTheDocument();
+    expect(screen.getByText('HydroShift II OLED Curved')).toBeInTheDocument();
+    expect(screen.getByText('Universal Screen 8.8')).toBeInTheDocument();
+  });
+
+  it('moves a device in the merge order at once, sends the whole order and reads it back', async () => {
+    let state = sync;
+    set.mockImplementation((patch: { devices?: { id: string }[] }) => {
+      state = { ...state, devices: patch.devices!.map(o => state.devices.find(d => d.id === o.id)!) };
+      return Promise.resolve(true);
+    });
+    get.mockImplementation(() => Promise.resolve(state));
+    const onWritten = vi.fn();
+    await act(async () => {
+      render(<LianLiSyncAllBar api={api} onWritten={onWritten} />);
+    });
+    const ups = screen.getAllByRole('button', { name: 'devices.lianli-wireless.orderMoveUp' });
+    const downs = screen.getAllByRole('button', { name: 'devices.lianli-wireless.orderMoveDown' });
+    expect(ups.map(b => (b as HTMLButtonElement).disabled)).toEqual([true, false, false]);
+    expect(downs.map(b => (b as HTMLButtonElement).disabled)).toEqual([false, false, true]);
+    await act(async () => {
+      fireEvent.click(ups[2]);
+    });
+    expect(set).toHaveBeenCalledWith({
+      devices: [{ id: '7880AE72AB3C' }, { id: 'universalScreen88' }, { id: 'hydroShift2Curve' }],
+    });
+    expect(get).toHaveBeenCalledTimes(2);
+    // The order changes no device's own look.
+    expect(onWritten).not.toHaveBeenCalled();
+    const labels = ['Lian Li Wireless TL', 'Universal Screen 8.8', 'HydroShift II OLED Curved'].map(name => screen.getByText(name));
+    expect(labels[0].compareDocumentPosition(labels[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(labels[1].compareDocumentPosition(labels[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows the new order before the service answers and the stored one after a refusal', async () => {
+    let answer!: (ok: boolean) => void;
+    set.mockImplementation(() => new Promise<boolean>(resolve => { answer = resolve; }));
+    await renderBar();
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'devices.lianli-wireless.orderMoveDown' })[0]);
+    });
+    const curve = screen.getByText('HydroShift II OLED Curved');
+    expect(curve.compareDocumentPosition(screen.getByText('Lian Li Wireless TL')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await act(async () => {
+      answer(false);
+    });
+    const tl = screen.getByText('Lian Li Wireless TL');
+    expect(tl.compareDocumentPosition(screen.getByText('HydroShift II OLED Curved')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('keeps the effect locked while sync is off', async () => {
     await renderBar();
     expect(screen.getByRole('switch', { name: 'devices.lianli-hub.syncAll' })).toHaveAttribute('aria-checked', 'false');

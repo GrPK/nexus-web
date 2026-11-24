@@ -114,6 +114,12 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   // A unit's chains show in several groups; a write settled in one has the others read again.
   const [groupRev, setGroupRev] = useState(0);
   const onGroupSettled = useCallback(() => setGroupRev(r => r + 1), []);
+  // Each chain's name on the Lighting tab, by MAC, so Sync all names the TL chains the same way.
+  const [chainNames, setChainNames] = useState<ReadonlyMap<string, string>>(() => new Map());
+  const onChainNames = useCallback((names: ReadonlyMap<string, string>) => setChainNames(prev => {
+    if ([...names].every(([mac, name]) => prev.get(mac) === name)) return prev;
+    return new Map([...prev, ...names]);
+  }), []);
 
   const sorted = useMemo(
     () => [...members].sort((a, b) =>
@@ -239,7 +245,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
 
           {tab === 'lighting' && (
             <>
-              <LianLiSyncAllBar onWritten={onSyncWritten} />
+              <LianLiSyncAllBar onWritten={onSyncWritten} chainNames={chainNames} />
               {/* Strimers, then fans without screens, then fans with screens (most screens first), then
                   the single-screen devices; each group keeps the order it had. */}
               {CHAIN_GROUPS.map(group => (
@@ -256,6 +262,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
                       chainFilter={chain => chainGroup(unit, chain) === group}
                       chainOrder={group === 'screens' ? (a, b) => chainScreens(unit, b) - chainScreens(unit, a) : undefined}
                       screensOf={chain => chainScreens(unit, chain)}
+                      onChainNames={onChainNames}
                       // The Flex sync controls stand with the Flex fans: with its screens when it has them.
                       hideHeader={group !== (unit.hasScreen ? 'screens' : 'fans')}
                     />

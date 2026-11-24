@@ -27,14 +27,26 @@ export interface LianLiSyncEffect {
   colors: string[];
 }
 
-/** A light the sync drives while it is on. */
+/** A light the sync drives while it is on, in the merge order: a merged effect is drawn across them in this order. */
 export interface LianLiSyncDevice {
+  /** "tlChain", "hydroShift2Curve" or "universalScreen88". */
   kind: string;
+  /** The chain's MAC for a TL chain; the kind for the single USB devices. */
   id: string;
   name: string;
   /** TL chains only. */
   fanCount?: number;
   mode?: string;
+  /** Its stretch of a merged effect's line: 13 per TL fan, 14 for the OLED Curved, 31 for the 8.8 bezel. */
+  dots?: number;
+  /** The direction it reads its stretch of a merged effect in: 0 as drawn, 1 reversed. */
+  direction?: number;
+}
+
+/** One device of a new merge order; a direction left out keeps the stored one. */
+export interface LianLiSyncDeviceOrder {
+  id: string;
+  direction?: number;
 }
 
 export interface LianLiSyncAll {
@@ -59,6 +71,8 @@ export interface LianLiSyncAllPatch {
   brightness?: number;
   direction?: number;
   colors?: string[];
+  /** A new merge order: these devices first, in this order, then the others in their stored order. */
+  devices?: LianLiSyncDeviceOrder[];
 }
 
 export interface LianLiSyncAllApi {
@@ -78,7 +92,10 @@ export function getLianLiSyncAll(): Promise<LianLiSyncAll | null> {
   return fetchService<LianLiSyncAll>(SYNC);
 }
 
-/** False when the service refuses the patch ("unknown effect", "<effect> takes N colors", "invalid color") or does not answer. */
+/**
+ * False when the service refuses the patch ("unknown effect", "<effect> takes N colors", "invalid color",
+ * "each device once", "unknown device <id>") or does not answer.
+ */
 export async function setLianLiSyncAll(patch: LianLiSyncAllPatch): Promise<boolean> {
   const res = await putService<OkResponse>(SYNC, patch);
   return !!res && res.error !== true;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SettingRow, SettingToggle } from '../../common/SettingRow/SettingRow';
+import { Button } from '../../common/Button/Button';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import type { SelectOption } from '../../common/Select/Select';
 import {
@@ -18,7 +19,11 @@ interface LianLiSyncAllBarProps {
   api?: LianLiSyncAllApi;
   /** Runs after a write the service accepted, so the per-device looks below are read again. */
   onWritten?: () => void;
+  /** Each TL chain's name on the Lighting tab, by MAC; a chain without one keeps the service's name. */
+  chainNames?: ReadonlyMap<string, string>;
 }
+
+const TL_CHAIN = 'tlChain';
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
@@ -56,13 +61,22 @@ const asModes = (effects: readonly LianLiSyncEffect[]): LianLiWirelessLightingEf
   defaultColors: e.defaultColors,
 }));
 
-/** The effect's look after a patch, as the service stores it. */
+/** The devices in a new merge order, as the service stores it: the listed ones first, then the rest as they were. */
+function reorderDevices(devices: LianLiSyncAll['devices'], order: NonNullable<LianLiSyncAllPatch['devices']>): LianLiSyncAll['devices'] {
+  const key = (id: string) => id.toUpperCase();
+  const listed = order.map(o => devices.find(d => key(d.id) === key(o.id))).filter(d => d !== undefined);
+  const seen = new Set(listed.map(d => key(d.id)));
+  return [...listed, ...devices.filter(d => !seen.has(key(d.id)))];
+}
+
+/** The effect's look and the merge order after a patch, as the service stores them. */
 function patchEffect(data: LianLiSyncAll, patch: LianLiSyncAllPatch): LianLiSyncAll {
-  const { enabled, effect, speed, brightness, direction, colors } = patch;
+  const { enabled, effect, speed, brightness, direction, colors, devices } = patch;
   const target = effect ?? data.effect;
   const lookChanged = speed !== undefined || brightness !== undefined || direction !== undefined || colors !== undefined;
   return {
     ...data,
+    devices: devices ? reorderDevices(data.devices, devices) : data.devices,
     enabled: enabled ?? data.enabled,
     effect: target,
     effects: !lookChanged ? data.effects : data.effects.map(e => (e.key !== target ? e : {
@@ -79,7 +93,7 @@ function patchEffect(data: LianLiSyncAll, patch: LianLiSyncAllPatch): LianLiSync
  * Sync all on the Lian Li page: one effect across every light the service lists
  * (L-Connect's Merge), each effect keeping its own look, or each device plays its own.
  */
-export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten }: LianLiSyncAllBarProps) {
+export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNames }: LianLiSyncAllBarProps) {
   const { t } = useTranslation();
   const [data, setData] = useState<LianLiSyncAll | null>(null);
   const aliveRef = useRef(true);
@@ -112,7 +126,8 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten }: LianL
     } catch {
       // The read below shows what the service kept.
     }
-    if (ok) onWritten?.();
+    // A new merge order changes no device's own look.
+    if (ok && Object.keys(patch).some(k => k !== 'devices')) onWritten?.();
     await refresh();
   }, [api, preview, refresh, onWritten]);
 
@@ -133,6 +148,19 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten }: LianL
   const fanCountLabel = (n: number | undefined) => (n !== undefined && n >= 0 && n <= MAX_FAN_COUNT_LABEL
     ? t(`devices.lianli.fanCount${n}` as Parameters<typeof t>[0])
     : undefined);
+  // A TL chain reads as the Lighting tab names it; the MAC's case may differ between the routes.
+  const namesByMac = new Map<string, string>();
+  for (const [mac, name] of chainNames ?? []) namesByMac.set(mac.toUpperCase(), name);
+  const deviceName = (d: LianLiSyncAll['devices'][number]) =>
+    (d.kind === TL_CHAIN ? namesByMac.get(d.id.toUpperCase()) : undefined) ?? d.name;
+  // The whole order is sent, so the service stores exactly what the list shows.
+  const move = (index: number, delta: number) => {
+    const order = data.devices.map(d => d.id);
+    const other = index + delta;
+    if (other < 0 || other >= order.length) return;
+    [order[index], order[other]] = [order[other], order[index]];
+    void commit({ devices: order.map(id => ({ id })) });
+  };
 
   return (
     <SettingsSection title={t('devices.lianli-flex.syncSection')} boxClassName={styles.sectionBox}>
@@ -157,8 +185,17 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten }: LianL
       {data.devices.length > 0 && (
         <>
           <p className={styles.zoneHeading} data-settings-aside="true">{t('devices.lianli-wireless.tab.devices')}</p>
-          {data.devices.map(d => (
-            <SettingRow key={`${d.kind}:${d.id}`} label={d.name} description={fanCountLabel(d.fanCount)} />
+          {data.devices.map((d, i) => (
+            <SettingRow key={`${d.kind}:${d.id}`} label={deviceName(d)} description={fanCountLabel(d.fanCount)}>
+              {data.devices.length > 1 && (<>
+                <Button size="sm" tone="neutral" disabled={i === 0} onClick={() => move(i, -1)}>
+                  {t('devices.lianli-wireless.orderMoveUp')}
+                </Button>
+                <Button size="sm" tone="neutral" disabled={i === data.devices.length - 1} onClick={() => move(i, 1)}>
+                  {t('devices.lianli-wireless.orderMoveDown')}
+                </Button>
+              </>)}
+            </SettingRow>
           ))}
         </>
       )}

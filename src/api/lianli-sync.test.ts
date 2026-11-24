@@ -19,6 +19,14 @@ describe('Lian Li sync route', () => {
     expect(putService).toHaveBeenCalledWith('/devices/lianli/sync', { enabled: true, effect: 'meteor' });
   });
 
+  it('sends a new merge order as `devices`', async () => {
+    vi.mocked(putService).mockResolvedValue({ error: false });
+    await expect(setLianLiSyncAll({ devices: [{ id: 'universalScreen88' }, { id: '7880AE72AB3C', direction: 1 }] })).resolves.toBe(true);
+    expect(putService).toHaveBeenCalledWith('/devices/lianli/sync', {
+      devices: [{ id: 'universalScreen88' }, { id: '7880AE72AB3C', direction: 1 }],
+    });
+  });
+
   it('reports a refused patch or no answer as not saved', async () => {
     vi.mocked(putService).mockResolvedValue({ error: true, msg: 'meteor takes 4 colors' });
     await expect(setLianLiSyncAll({ colors: ['#ffffff'] })).resolves.toBe(false);
