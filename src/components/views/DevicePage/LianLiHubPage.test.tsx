@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LianLiHubPage, chainGroup, chainScreens, resetLianLiHubTab } from './LianLiHubPage';
+import { LianLiHubPage, chainGroup, chainScreens } from './LianLiHubPage';
 import type { UnifiedDevice } from '../../../hooks/useUnifiedDevices';
 import { HYDROSHIFT2_CURVE_LIGHTING_API } from '../../../api/hydroshift2Curve';
 import { LIANLI_SCREEN88_LIGHTING_API } from '../../../api/lianliScreen88';
@@ -102,9 +102,11 @@ const nav = vi.fn();
 const controlDevice = vi.fn();
 
 async function renderHub(members: UnifiedDevice[]) {
+  let view!: ReturnType<typeof render>;
   await act(async () => {
-    render(<LianLiHubPage members={members} controlDevice={controlDevice} onSectionNavigate={nav} />);
+    view = render(<LianLiHubPage members={members} controlDevice={controlDevice} onSectionNavigate={nav} />);
   });
+  return view;
 }
 
 async function openTab(label: string) {
@@ -115,7 +117,7 @@ async function openTab(label: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetLianLiHubTab();
+  window.history.replaceState(null, '');
   unitCalls.length = 0;
   lightCards.length = 0;
   screen88Route.settings = null;
@@ -276,7 +278,29 @@ describe('LianLiHubPage', () => {
     ]);
   });
 
-  it('comes back on the tab it was left on, so Back from a page it opened returns there', async () => {
+  it('Back from a page it opened returns to the tab it was left on, once', async () => {
+    window.history.replaceState({ idx: 3 }, '');
+    let view!: ReturnType<typeof render>;
+    await act(async () => {
+      view = render(<LianLiHubPage members={[wireless, curve]} controlDevice={controlDevice} onSectionNavigate={nav} />);
+    });
+    await openTab('devices.lianli-wireless.tab.screen');
+    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-hub.screenTitle:{"name":"HydroShift II Curved"}' }));
+    // The tab is kept on the hub's own history entry, next to the router's index.
+    expect(window.history.state).toEqual({ idx: 3, lianliHubTab: 'screens' });
+    view.unmount();
+    // Back: the same entry, so the page opens on the tab it was left on.
+    view = await renderHub([wireless, curve]);
+    expect(screen.getByRole('tab', { name: 'devices.lianli-wireless.tab.screen' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.history.state).toEqual({ idx: 3 });
+    view.unmount();
+    // Used once: the same entry again opens on Devices.
+    await renderHub([wireless, curve]);
+    expect(screen.getByRole('tab', { name: 'devices.lianli-wireless.tab.devices' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('opens on Devices on a fresh visit, whatever tab another visit left', async () => {
+    window.history.replaceState({ idx: 3 }, '');
     let view!: ReturnType<typeof render>;
     await act(async () => {
       view = render(<LianLiHubPage members={[wireless, curve]} controlDevice={controlDevice} onSectionNavigate={nav} />);
@@ -284,8 +308,10 @@ describe('LianLiHubPage', () => {
     await openTab('devices.lianli-wireless.tab.screen');
     fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-hub.screenTitle:{"name":"HydroShift II Curved"}' }));
     view.unmount();
+    // The sidebar pushes a new entry, which carries only the router's index.
+    window.history.pushState({ idx: 5 }, '');
     await renderHub([wireless, curve]);
-    expect(screen.getByRole('tab', { name: 'devices.lianli-wireless.tab.screen' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'devices.lianli-wireless.tab.devices' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('groups the Lighting chains: Strimers, fans without screens, fans with screens (most screens first)', () => {

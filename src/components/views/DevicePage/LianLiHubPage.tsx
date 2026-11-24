@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CircleEqual, Fan, Lightbulb, RadioReceiver } from 'lucide-react';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { SettingRow } from '../../common/SettingRow/SettingRow';
@@ -63,12 +63,15 @@ export function chainGroup(unit: Pick<LianLiUnit, 'state'>, chain: LianLiWireles
   return chainScreens(unit, chain) > 0 ? 'screens' : 'fans';
 }
 
-// The tab the Lian Li page was left on: Back from a page one of its tabs opened returns to that tab.
-let rememberedTab: LianLiHubTab = 'devices';
+const HUB_TABS: readonly LianLiHubTab[] = ['devices', 'lighting', 'screens', 'cooling'];
+// Set on this page's own history entry when one of its tabs opens another page, so Back lands on
+// that tab. A fresh visit (the sidebar, a link) is a new entry without it and starts on Devices.
+const RETURN_TAB_KEY = 'lianliHubTab';
 
-/** Forgets the remembered tab, so the page opens on Devices (tests). */
-export function resetLianLiHubTab(): void {
-  rememberedTab = 'devices';
+/** The tab a page this one opened left on the current history entry, if any. */
+function returnTabOf(state: unknown): LianLiHubTab | null {
+  const tab = state && typeof state === 'object' ? (state as Record<string, unknown>)[RETURN_TAB_KEY] : undefined;
+  return typeof tab === 'string' && (HUB_TABS as readonly string[]).includes(tab) ? tab as LianLiHubTab : null;
 }
 
 interface LianLiHubPageProps {
@@ -88,11 +91,23 @@ interface LianLiHubPageProps {
  */
 export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: LianLiHubPageProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTabState] = useState<LianLiHubTab>(() => rememberedTab);
-  const setActiveTab = (key: LianLiHubTab) => {
-    rememberedTab = key;
-    setActiveTabState(key);
-  };
+  const [activeTab, setActiveTab] = useState<LianLiHubTab>(() => returnTabOf(window.history.state) ?? 'devices');
+  // The return tab is used once: read, then taken off the entry.
+  useEffect(() => {
+    const state: unknown = window.history.state;
+    if (!returnTabOf(state)) return;
+    const rest = { ...(state as Record<string, unknown>) };
+    delete rest[RETURN_TAB_KEY];
+    window.history.replaceState(rest, '');
+  }, []);
+  // Every page this one opens (cards, rows, shortcuts) leaves the current tab to come back to.
+  const tabRef = useRef<LianLiHubTab>('devices');
+  const leaveTo = useCallback<DashboardSectionNavigate>((section, payload) => {
+    const state: unknown = window.history.state;
+    window.history.replaceState({ ...(state && typeof state === 'object' ? state : {}), [RETURN_TAB_KEY]: tabRef.current }, '');
+    onSectionNavigate?.(section, payload);
+  }, [onSectionNavigate]);
+  const nav = onSectionNavigate ? leaveTo : undefined;
   // A sync write changes each device's own look, so the lighting sections re-read after it.
   const [lightingRev, setLightingRev] = useState(0);
   const onSyncWritten = useCallback(() => setLightingRev(r => r + 1), []);
@@ -124,14 +139,14 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   const screen88Title = screen88?.shortName ?? LIANLI_SCREEN88_NAME;
 
   // The L-Wireless controller and the Flex hub, read the way their own pages read them.
-  const wirelessUnit = useLianLiUnit({ flex: false, enabled: wireless, lightingActive: activeTab === 'lighting', onSectionNavigate });
-  const flexUnit = useLianLiUnit({ flex: true, enabled: flex, lightingActive: activeTab === 'lighting', onSectionNavigate });
+  const wirelessUnit = useLianLiUnit({ flex: false, enabled: wireless, lightingActive: activeTab === 'lighting', onSectionNavigate: nav });
+  const flexUnit = useLianLiUnit({ flex: true, enabled: flex, lightingActive: activeTab === 'lighting', onSectionNavigate: nav });
   const units = [...(wireless ? [wirelessUnit] : []), ...(flex ? [flexUnit] : [])];
   // The fan screens cards read "Screen" or "Screens" by how many each unit has.
   const wirelessScreenCount = useLianLiFanScreenCount(false, wireless);
   const flexScreenCount = useLianLiFanScreenCount(true, flex);
 
-  const open = (deviceKey: string) => onSectionNavigate?.('device', { deviceKey });
+  const open = (deviceKey: string) => nav?.('device', { deviceKey });
   // One card per screen, each opening that screen's own page: the units' fan screens (a page of
   // their own), every Lian Li panel, and the 8.8 while its glass is a Windows display.
   const screenCards: { device: UnifiedDevice; onOpen: () => void }[] = [
@@ -159,6 +174,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
     ...(hasCooling ? [{ key: 'cooling', label: t('cooling.title'), icon: <Fan size={14} /> }] : []),
   ];
   const tab: LianLiHubTab = tabs.some(x => x.key === activeTab) ? activeTab : 'devices';
+  tabRef.current = tab;
   // Only Cooling reads the Curve's settings, for its pump option.
   const curveScreen = useHydroShift2CurveScreen(!!curve && tab === 'cooling');
   const controlGuard = useConflictGuardedEnable();
@@ -200,15 +216,15 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
         tabs={tabs}
         activeTab={tab}
         onTabChange={key => setActiveTab(key as LianLiHubTab)}
-        tabActions={!onSectionNavigate ? undefined
+        tabActions={!nav ? undefined
           : tab === 'cooling' ? (
             <CoolingPageShortcut
-              onSectionNavigate={onSectionNavigate}
+              onSectionNavigate={nav}
               anchors={coolingAnchors}
               fanId={!wireless && flex && flexFirstFan ? `${LIANLI_FLEX_CHANNEL_PREFIX}${flexFirstFan}:port0` : undefined}
             />
           )
-          : tab === 'lighting' ? <LightingPageShortcut onSectionNavigate={onSectionNavigate} anchors={lightingAnchors} />
+          : tab === 'lighting' ? <LightingPageShortcut onSectionNavigate={nav} anchors={lightingAnchors} />
           : undefined}
       />
       <div className={`${styles.pageBody} pageBody`}>
@@ -233,7 +249,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
                       key={`${unit.flex ? FLEX_ID : WIRELESS_ID}-${group}`}
                       unit={unit}
                       tab="lighting"
-                      onSectionNavigate={onSectionNavigate}
+                      onSectionNavigate={nav}
                       embedded
                       reloadSignal={lightingRev + groupRev}
                       onLightingSettled={onGroupSettled}
@@ -249,9 +265,9 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
                     .map(d => openRow(d, t('devices.lightingPage.setHint'), t('lighting.devices.menuOpenDevicePage')))}
                 </Fragment>
               ))}
-              {ring && <HydroShift2RingSettings title={ring.shortName} onSectionNavigate={onSectionNavigate} />}
-              {curve && <HydroShift2RingSettings title={curve.shortName} api={HYDROSHIFT2_CURVE_LIGHTING_API} onSectionNavigate={onSectionNavigate} />}
-              {screen88 && <HydroShift2RingSettings title={screen88Title} api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={onSectionNavigate} />}
+              {ring && <HydroShift2RingSettings title={ring.shortName} onSectionNavigate={nav} />}
+              {curve && <HydroShift2RingSettings title={curve.shortName} api={HYDROSHIFT2_CURVE_LIGHTING_API} onSectionNavigate={nav} />}
+              {screen88 && <HydroShift2RingSettings title={screen88Title} api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={nav} />}
             </>
           )}
 
@@ -264,7 +280,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
           {tab === 'cooling' && (
             <>
               {units.map(unit => (
-                <LianLiUnitTabBody key={unit.flex ? FLEX_ID : WIRELESS_ID} unit={unit} tab="cooling" onSectionNavigate={onSectionNavigate} embedded />
+                <LianLiUnitTabBody key={unit.flex ? FLEX_ID : WIRELESS_ID} unit={unit} tab="cooling" onSectionNavigate={nav} embedded />
               ))}
               {curve && <HydroShift2CurvePumpSettings screen={curveScreen} />}
             </>
