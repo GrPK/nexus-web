@@ -26,17 +26,15 @@ vi.mock('../../../panel/widgets/devices/DevicesPage', () => ({
     </div>
   ),
 }));
-const { unitCalls, lightCards, screenTabOpens } = vi.hoisted(() => ({
+const { unitCalls, lightCards } = vi.hoisted(() => ({
   unitCalls: [] as { flex: boolean; enabled?: boolean; lightingActive: boolean }[],
   lightCards: [] as { title?: string; api?: unknown }[],
-  screenTabOpens: [] as boolean[],
 }));
 vi.mock('./LianLiWirelessDevicePage', () => ({
   useLianLiUnit: (opts: any) => {
     unitCalls.push(opts);
     return { flex: opts.flex, boundMacs: [], hasScreen: true };
   },
-  openLianLiUnitOnScreens: (flex: boolean) => { screenTabOpens.push(flex); },
   LianLiUnitTabBody: ({ unit, tab, embedded }: any) => (
     <div data-testid={`${unit.flex ? 'flex' : 'wireless'}-${tab}`} data-embedded={String(embedded)} />
   ),
@@ -115,7 +113,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   unitCalls.length = 0;
   lightCards.length = 0;
-  screenTabOpens.length = 0;
   screen88Route.settings = null;
   screen88Route.reads.length = 0;
   controlDevice.mockResolvedValue(undefined);
@@ -136,7 +133,7 @@ describe('LianLiHubPage', () => {
     expect(nav).toHaveBeenCalledWith('device', { deviceKey: 'Universal Screen 8.8' });
   });
 
-  it('the L-Wireless and Flex cards open their own page (which then holds their devices and fan screens)', async () => {
+  it('the L-Wireless and Flex cards open their own page (which then keeps only the connection and wireless devices)', async () => {
     await renderHub([wireless, flexHub, tl]);
     fireEvent.click(screen.getByRole('button', { name: 'L-Wireless' }));
     expect(nav).toHaveBeenCalledWith('device', { deviceKey: 'L-Wireless' });
@@ -228,20 +225,17 @@ describe('LianLiHubPage', () => {
     expect(screen.queryByRole('button', { name: 'devices.lianli-wireless.openPanel' })).not.toBeInTheDocument();
   });
 
-  it('a screen card opens that screen\'s own page; the fan screens card opens the unit\'s page on its Screen tab', async () => {
+  it('a screen card opens that screen\'s own page; a fan screens card opens the unit\'s fan screens page, not the unit\'s', async () => {
     await renderHub([wireless, flexHub, curve, screen88]);
     await openTab('devices.lianli-wireless.tab.screen');
     fireEvent.click(screen.getByRole('button', { name: 'Universal Screen 8.8' }));
     expect(nav).toHaveBeenLastCalledWith('device', { deviceKey: 'Universal Screen 8.8' });
     fireEvent.click(screen.getByRole('button', { name: 'HydroShift II Curved' }));
     expect(nav).toHaveBeenLastCalledWith('device', { deviceKey: 'HydroShift II Curved' });
-    expect(screenTabOpens).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-hub.fanScreens:{"name":"LCD Flex"}' }));
-    expect(screenTabOpens).toEqual([true]);
-    expect(nav).toHaveBeenLastCalledWith('device', { deviceKey: 'LCD Flex' });
+    expect(nav).toHaveBeenLastCalledWith('device', { deviceKey: 'lianli-fan-screens:flex' });
     fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-hub.fanScreens:{"name":"L-Wireless"}' }));
-    expect(screenTabOpens).toEqual([true, false]);
-    expect(nav).toHaveBeenLastCalledWith('device', { deviceKey: 'L-Wireless' });
+    expect(nav).toHaveBeenLastCalledWith('device', { deviceKey: 'lianli-fan-screens:wireless' });
   });
 
   it('the 8.8 as a panel needs no settings read: its card is there, the route is not polled', async () => {

@@ -21,7 +21,8 @@ import { CoolingPageShortcut, LightingPageShortcut } from './CoolingPageLink';
 import { HydroShift2CurvePumpSettings } from './HydroShift2CurveSettings';
 import { HydroShift2RingSettings } from './HydroShift2RingSettings';
 import { LianLiSyncAllBar } from './LianLiSyncAllBar';
-import { LianLiUnitTabBody, openLianLiUnitOnScreens, useLianLiUnit } from './LianLiWirelessDevicePage';
+import { LianLiUnitTabBody, useLianLiUnit } from './LianLiWirelessDevicePage';
+import { lianLiFanScreensKey } from './lianliFanScreens';
 import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
 import { useLianLiScreen88Screen } from './useLianLiScreen88Screen';
 // The page's own styles first: the docked-tabs check reads the first styles module as the page's.
@@ -32,8 +33,9 @@ const WIRELESS_ID = 'lianli-wireless';
 const FLEX_ID = 'lianli-flex';
 const RING_ID = 'lianli-hydroshift2';
 const CURVE_ID = 'lianli-hydroshift2-curve';
-// The units whose lighting and cooling live on this page; their own page keeps the connection,
-// the wireless devices and their fan screens (LianLiWirelessDevicePage grouped).
+// The units whose lighting, screens and cooling live on this page; their own page keeps only
+// the connection and the wireless devices (LianLiWirelessDevicePage devicesOnly), and their
+// fan screens have a page of their own (LianLiFanScreensPage).
 const UNIT_IDS = new Set([WIRELESS_ID, FLEX_ID]);
 
 type LianLiHubTab = 'devices' | 'lighting' | 'screens' | 'cooling';
@@ -89,17 +91,14 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   const units = [...(wireless ? [wirelessUnit] : []), ...(flex ? [flexUnit] : [])];
 
   const open = (deviceKey: string) => onSectionNavigate?.('device', { deviceKey });
-  // One card per screen, each opening that screen's own page: the units' fan screens (their page opens
-  // on its Screen tab), every Lian Li panel, and the 8.8 while its glass is a Windows display.
+  // One card per screen, each opening that screen's own page: the units' fan screens (a page of
+  // their own), every Lian Li panel, and the 8.8 while its glass is a Windows display.
   const screenCards: { device: UnifiedDevice; onOpen: () => void }[] = [
     ...units.filter(u => u.hasScreen).flatMap(u => {
       const member = sorted.find(m => m.curatedId === (u.flex ? FLEX_ID : WIRELESS_ID));
       return member ? [{
         device: { ...member, shortName: t('devices.lianli-hub.fanScreens', { name: member.shortName }) },
-        onOpen: () => {
-          openLianLiUnitOnScreens(u.flex);
-          open(member.key);
-        },
+        onOpen: () => open(lianLiFanScreensKey(u.flex)),
       }] : [];
     }),
     ...panels.map(p => ({ device: p, onOpen: () => open(p.key) })),

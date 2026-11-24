@@ -17,7 +17,8 @@ import { CnvsDevicePage } from './CnvsDevicePage';
 import { SdkMarketplacePage } from '../../../panel/widgets/marketplace/SdkMarketplacePage';
 import { typeForMarketplace } from '../../../widgets/marketplaceRegistry';
 import { LianLiTlDevicePage } from './LianLiTlDevicePage';
-import { LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
+import { LianLiFanScreensPage, LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
+import { lianLiFanScreensOf } from './lianliFanScreens';
 import { LianLiHubPage } from './LianLiHubPage';
 import { LianLiScreen88PageGate } from './LianLiScreen88Settings';
 import { LIANLI_SCREEN88_ID, LIANLI_SCREEN88_NAME } from '../../../api/lianliScreen88';
@@ -96,11 +97,17 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
   const { unified, controlDevice, turnedOffMonitorKeys } = useUnifiedDevices(serviceOnline);
   // A connected cooler LCD's panel row replaces its curated row, so a page
   // opened on the curated key shows the panel in place.
+  // A unit's fan screens page (from the Lian Li page's Screens tab) stands on the unit's own row.
+  const fanScreens = lianLiFanScreensOf(deviceKey);
   const device = useMemo<UnifiedDevice | undefined>(
-    () => unified.find(d => d.key === deviceKey) ?? unified.find(d => claimsKey(d, deviceKey)),
-    [unified, deviceKey],
+    () => (fanScreens !== null
+      ? unified.find(d => d.curatedId === (fanScreens ? 'lianli-flex' : 'lianli-wireless'))
+      : unified.find(d => d.key === deviceKey) ?? unified.find(d => claimsKey(d, deviceKey))),
+    [unified, deviceKey, fanScreens],
   );
-  const title = device?.shortName;
+  const title = fanScreens !== null && device
+    ? t('devices.lianli-hub.fanScreens', { name: device.shortName })
+    : device?.shortName;
   // The 8.8's page stays its page when its panel row leaves the list (the glass turned into a
   // Windows display), so the settings route, not the list, decides what it shows.
   const screen88KeyRef = useRef<string | null>(null);
@@ -234,7 +241,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
       )}
       <div className={holdBody ? styles.bodyHeld : styles.bodyShown}>
         <DeviceDetectingContext.Provider value={reportWaiting}>
-          <DeviceBody device={device} unified={unified} controlDevice={controlDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />
+          <DeviceBody device={device} fanScreens={fanScreens} unified={unified} controlDevice={controlDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />
         </DeviceDetectingContext.Provider>
       </div>
     </>
@@ -243,6 +250,8 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
 
 interface DeviceBodyProps {
   device: UnifiedDevice;
+  /** The unit's fan screens page rather than the unit's own (true for the Flex hub's), or null. */
+  fanScreens?: boolean | null;
   /** Every listed device, for a group entry's page. */
   unified: readonly UnifiedDevice[];
   controlDevice: (id: string, nextEnabled: boolean) => Promise<unknown>;
@@ -251,7 +260,11 @@ interface DeviceBodyProps {
   onSectionNavigate?: DashboardSectionNavigate;
 }
 
-function DeviceBody({ device, unified, controlDevice, platform, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
+function DeviceBody({ device, fanScreens = null, unified, controlDevice, platform, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
+  if (fanScreens !== null) {
+    return <LianLiFanScreensPage key={`fan-screens-${device.key}`} flex={fanScreens} onSectionNavigate={onSectionNavigate} />;
+  }
+
   if (device.key === LIANLI_HUB_KEY) {
     return <LianLiHubPage key={device.key} members={groupMembers(unified, LIANLI_GROUP)} controlDevice={controlDevice} onSectionNavigate={onSectionNavigate} />;
   }
@@ -343,14 +356,14 @@ function DeviceBody({ device, unified, controlDevice, platform, onOpenFirmware, 
     return <KrakenDevicePage key={device.key} onSectionNavigate={onSectionNavigate} />;
   }
 
-  // Grouped on the Lian Li page, which holds their lighting and cooling, the L-Wireless and
-  // Flex pages show their connection and wireless devices, and their fan screens.
+  // Opened from the Lian Li page, which holds their lighting, screens and cooling,
+  // the L-Wireless and Flex pages show only their connection and wireless devices.
   if (device.curatedId === 'lianli-wireless') {
-    return <LianLiWirelessDevicePage key={device.key} onSectionNavigate={onSectionNavigate} grouped={device.groupKey === LIANLI_GROUP} />;
+    return <LianLiWirelessDevicePage key={device.key} onSectionNavigate={onSectionNavigate} devicesOnly={device.groupKey === LIANLI_GROUP} />;
   }
 
   if (device.curatedId === 'lianli-flex') {
-    return <LianLiWirelessDevicePage key={device.key} flex onSectionNavigate={onSectionNavigate} grouped={device.groupKey === LIANLI_GROUP} />;
+    return <LianLiWirelessDevicePage key={device.key} flex onSectionNavigate={onSectionNavigate} devicesOnly={device.groupKey === LIANLI_GROUP} />;
   }
 
   if (device.curatedId === 'strimer') {
