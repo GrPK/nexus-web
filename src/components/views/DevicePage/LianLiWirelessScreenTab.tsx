@@ -288,9 +288,10 @@ export function LianLiWirelessScreenTab({
   const rotation = sharedValue(targetScreens, s => s.rotation);
   const sleep = sharedValue(targetScreens, s => s.sleepWhenLocked ?? true);
   // The rate only paces a GIF or video clip, and only on a screen that is not a Nexus panel; an older service sends no cap.
-  const showFrameRate = representative !== null && representative.fpsCap !== undefined
-    && (representative.contentType === 'gif' || representative.contentType === 'video')
-    && representative.nexusPanel !== true;
+  const showFrameRate = targetScreens.length > 0 && targetScreens.every(s => s.fpsCap !== undefined
+    && (s.contentType === 'gif' || s.contentType === 'video')
+    && s.nexusPanel !== true);
+  const fpsCap = sharedValue(targetScreens, s => s.fpsCap ?? 0);
   const mixedLabel = t('common.mixed');
   const nexusPanel = sharedValue(targetScreens, s => s.nexusPanel === true);
   // When several fans with different content types are selected the content
@@ -607,9 +608,10 @@ export function LianLiWirelessScreenTab({
             }))}
           />
         </SettingRow>
-        {showFrameRate && representative && (
+        {showFrameRate && (
           <FrameRateSetting
-            cap={representative.fpsCap && representative.fpsCap >= 1 ? representative.fpsCap : null}
+            cap={fpsCap.value !== undefined && fpsCap.value >= 1 ? fpsCap.value : null}
+            mixed={fpsCap.mixed}
             onSave={handleFpsCapSave}
             extraCapsHz={FAN_LCD_EXTRA_CAPS_HZ}
           />

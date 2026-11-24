@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LianLiWirelessScreenTab } from './LianLiWirelessScreenTab';
 
@@ -732,5 +732,49 @@ describe('LianLiWirelessScreenTab Restart LCD', () => {
   it('has no Restart LCD row for a family that cannot restart', async () => {
     await renderTab();
     expect(screen.queryByText('devices.lianli-flex.restartLcd')).not.toBeInTheDocument();
+  });
+
+  describe('frame rate', () => {
+    const RATE = 'lighting.ledMap.rateCap';
+    const HZ = (hz: number) => `lighting.ledMap.rateCapHz:{"hz":${hz}}`;
+    const clip = (serial: string, fpsCap?: number, contentType = 'gif') => ({
+      serial, position: 0, width: 400, height: 400, brightness: 80, rotation: 0, contentType, mediaId: 'm2', fpsCap,
+    });
+
+    it('shows for a GIF or video screen that reports a cap, with the cap as the value', async () => {
+      mockGetScreens.mockResolvedValue([clip('S1', 30)]);
+      await renderTab();
+      expect(screen.getByRole('button', { name: RATE })).toHaveTextContent(HZ(30));
+    });
+
+    it('is hidden for a still image, for a screen without a cap (older service) and for a Nexus panel', async () => {
+      mockGetScreens.mockResolvedValue([clip('S1', 30, 'image')]);
+      await renderTab();
+      expect(screen.queryByRole('button', { name: RATE })).not.toBeInTheDocument();
+      cleanup();
+      mockGetScreens.mockResolvedValue([clip('S1', undefined)]);
+      await renderTab();
+      expect(screen.queryByRole('button', { name: RATE })).not.toBeInTheDocument();
+      cleanup();
+      mockGetScreens.mockResolvedValue([{ ...clip('S1', 30), nexusPanel: true }]);
+      await renderTab();
+      expect(screen.queryByRole('button', { name: RATE })).not.toBeInTheDocument();
+    });
+
+    it('reads Mixed when the selected screens differ and saves the pick to every one of them', async () => {
+      mockGetScreens.mockResolvedValue([clip('S1', 30), clip('S2', 0)]);
+      await renderTab();
+      fireEvent.click(screen.getByRole('radio', { name: 'devices.lianli-wireless.selectionModeMultiple' }));
+      fireEvent.click(fanTile(2));
+      expect(screen.getByRole('button', { name: RATE })).toHaveTextContent('common.mixed');
+
+      fireEvent.click(screen.getByRole('button', { name: RATE }));
+      fireEvent.click(screen.getByRole('option', { name: HZ(60) }));
+
+      await waitFor(() => {
+        expect(mockSetSettings).toHaveBeenCalledWith('S1', { fpsCap: 60 });
+        expect(mockSetSettings).toHaveBeenCalledWith('S2', { fpsCap: 60 });
+      });
+    });
   });
 });

@@ -5,6 +5,9 @@ import { useToastSafe } from '../../common/Toast/Toast';
 import { SettingSelect } from '../../common/SettingRow/SettingRow';
 import { frameRateCaps, frameRateFromValue, frameRateValue } from './frameRateOptions';
 
+/** Matches no option, so the select shows its placeholder. */
+const MIXED_VALUE = 'mixed';
+
 interface Props {
   /** The panel record the cap belongs to; null before it is known. Not needed with `onSave`. */
   recordId?: string | null;
@@ -12,6 +15,8 @@ interface Props {
   cap: number | null;
   /** Saves a cap in fps (0 = Off) somewhere other than a panel record; resolves true when it was stored. */
   onSave?: (fps: number) => Promise<boolean>;
+  /** The edited devices hold different caps; the select shows "Mixed" until a rate is picked. */
+  mixed?: boolean;
   /** Rates offered beyond the lighting presets. */
   extraCapsHz?: readonly number[];
 }
@@ -21,10 +26,11 @@ interface Props {
  * select back on the newest successful save. A value arriving from the parent while a save
  * is in flight (an older save's broadcast) never overwrites a newer pick.
  */
-export function FrameRateSetting({ recordId = null, cap, onSave, extraCapsHz }: Props) {
+export function FrameRateSetting({ recordId = null, cap, onSave, mixed = false, extraCapsHz }: Props) {
   const { t } = useTranslation();
   const { push } = useToastSafe();
   const [current, setCurrent] = useState<number | null>(cap);
+  const [picked, setPicked] = useState(false);
   const seq = useRef(0);
   const pending = useRef(0);
   const confirmed = useRef<number | null>(cap);
@@ -35,12 +41,14 @@ export function FrameRateSetting({ recordId = null, cap, onSave, extraCapsHz }: 
     if (pending.current > 0) return;
     confirmed.current = cap;
     setCurrent(cap);
-  }, [cap]);
+    setPicked(false);
+  }, [cap, mixed]);
 
   const handleChange = (value: string) => {
     if (!onSave && !recordId) return;
     const sent = frameRateFromValue(value);
     const next = sent > 0 ? sent : null;
+    setPicked(true);
     const mine = ++seq.current;
     pending.current += 1;
     setCurrent(next);
@@ -69,7 +77,8 @@ export function FrameRateSetting({ recordId = null, cap, onSave, extraCapsHz }: 
     <SettingSelect
       label={t('lighting.ledMap.rateCap')}
       description={t('devices.lcd.frameRateHint')}
-      value={frameRateValue(current)}
+      value={mixed && !picked ? MIXED_VALUE : frameRateValue(current)}
+      placeholder={mixed && !picked ? t('common.mixed') : undefined}
       options={frameRateCaps(current, extraCapsHz).map(hz => (hz === null
         ? { value: '', label: t('lighting.ledMap.rateCapOff') }
         : { value: String(hz), label: t('lighting.ledMap.rateCapHz', { hz }) }))}
