@@ -294,6 +294,8 @@ describe('LianLiScreen88Settings Windows display', () => {
     expect(card).not.toBeNull();
     expect(card!.contains(notice)).toBe(false);
     expect(notice.closest('section')).toBe(windowsSwitch().closest('section'));
+    // The warning tone the app uses for a screen Nexus cannot drive right now.
+    expect(notice.closest('[data-tone]')).toHaveAttribute('data-tone', 'warning');
   });
 
   it('turning it off asks first, then shows the restart at once and the panel once the service says so', async () => {

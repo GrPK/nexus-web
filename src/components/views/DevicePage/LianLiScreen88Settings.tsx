@@ -89,12 +89,13 @@ export function LianLiScreen88PageGate({ name, fallback }: { name: string; fallb
 
 function LianLiScreen88WindowsDisplay({ screen, title }: SectionProps) {
   const { t } = useTranslation();
-  // Heading, then the notice, then the card holding only the switch.
+  // Heading, then the notice, then the card holding only the switch. The warning tone, like the
+  // other notices for a screen Nexus cannot drive right now (a Y70 display unplugged, access denied).
   return (
     <SettingsSection
       title={title ?? t('devices.lianliCurve.screenSection')}
       description={(
-        <Notice tone="info" role="status">
+        <Notice tone="warning" role="status">
           <span>{t('devices.lianliScreen88.windowsDisplayActive')}</span>
           <NoticeSecondary>{t('devices.lianliScreen88.windowsDisplayActiveHint')}</NoticeSecondary>
         </Notice>
