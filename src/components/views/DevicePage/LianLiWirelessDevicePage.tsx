@@ -35,6 +35,7 @@ import { LianLiWirelessLightingTab } from './LianLiWirelessLightingTab';
 import { LianLiWirelessScreenTab } from './LianLiWirelessScreenTab';
 import styles from './LianLiWirelessDevicePage.module.scss';
 import { useReportDeviceWaiting } from './deviceDetecting';
+import { lianLiFanScreensTitle, useLianLiFanScreenCount } from './lianliFanScreens';
 
 // Polling interval matches the service RpmPollMs.
 const RPM_POLL_MS = 2000;
@@ -317,10 +318,6 @@ interface LianLiWirelessDevicePageProps {
   devicesOnly?: boolean;
 }
 
-// Brand and model names, the same as the units' own page titles.
-const WIRELESS_NAME = 'Lian Li L-Wireless Controller';
-const FLEX_NAME = 'Lian Li LCD Flex';
-const P28_NAME = 'Lian Li P28 V2';
 const SCREEN_TAB: LianLiWirelessTab = 'screen';
 
 /**
@@ -332,10 +329,10 @@ export function LianLiFanScreensPage({ onSectionNavigate, flex = false }: { onSe
   const unit = useLianLiUnit({ flex, lightingActive: false, onSectionNavigate });
   useReportDeviceWaiting(unit.connection !== 'connected');
   const { disconnected, hintKey, blockingApp } = unit;
-  const unitName = flex ? (unit.p28Only ? P28_NAME : FLEX_NAME) : WIRELESS_NAME;
+  const count = useLianLiFanScreenCount(flex, true);
   return (
     <div className={styles.page}>
-      <ViewHeader title={t('devices.lianli-hub.fanScreens', { name: unitName })} />
+      <ViewHeader title={lianLiFanScreensTitle(t, flex, unit.p28Only, count)} />
       <div className={`${styles.pageBody} pageBody`}>
         {disconnected && (
           <EmptyState

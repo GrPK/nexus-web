@@ -27,6 +27,11 @@ vi.mock('./LianLiWirelessDevicePage', () => ({
   useLianLiUnit: () => ({ flex: false, boundMacs: [], hasScreen: true }),
 }));
 
+vi.mock('./lianliFanScreens', async importOriginal => ({
+  ...(await importOriginal<typeof import('./lianliFanScreens')>()),
+  useLianLiFanScreenCount: () => null,
+}));
+
 let mockUnified: UnifiedDevice[] = [];
 vi.mock('../../../hooks/useUnifiedDevices', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../hooks/useUnifiedDevices')>()),
@@ -74,7 +79,7 @@ describe('DevicePage fan screens pages', () => {
     expect(screen.getByTestId('fan-screens-page')).toHaveAttribute('data-flex', 'false');
     expect(screen.queryByTestId('unit-page')).not.toBeInTheDocument();
     expect(onTitleChange).toHaveBeenLastCalledWith(
-      'lianli-fan-screens:wireless', 'devices.lianli-hub.fanScreens:{"name":"Lian Li L-Wireless Controller"}');
+      'lianli-fan-screens:wireless', 'devices.lianli-hub.fanScreens:{"name":"Lian Li Wireless"}');
   });
 
   it('opens the Flex hub\'s fan screens page', async () => {

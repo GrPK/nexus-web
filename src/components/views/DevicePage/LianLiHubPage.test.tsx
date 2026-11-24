@@ -39,6 +39,10 @@ vi.mock('./LianLiWirelessDevicePage', () => ({
     <div data-testid={`${unit.flex ? 'flex' : 'wireless'}-${tab}`} data-embedded={String(embedded)} />
   ),
 }));
+vi.mock('./lianliFanScreens', async importOriginal => ({
+  ...(await importOriginal<typeof import('./lianliFanScreens')>()),
+  useLianLiFanScreenCount: () => null,
+}));
 vi.mock('./LianLiSyncAllBar', () => ({ LianLiSyncAllBar: () => <div data-testid="sync-all" /> }));
 vi.mock('./HydroShift2RingSettings', () => ({
   HydroShift2RingSettings: ({ title, api }: any) => {
@@ -217,7 +221,7 @@ describe('LianLiHubPage', () => {
     await renderHub([wireless, curve, screen88]);
     await openTab('devices.lianli-wireless.tab.screen');
     expect(screen.getAllByTestId('card-name').map(c => c.textContent)).toEqual([
-      'devices.lianli-hub.fanScreens:{"name":"L-Wireless"}', 'HydroShift II Curved', 'Universal Screen 8.8',
+      'devices.lianli-hub.fanScreens:{"name":"Lian Li Wireless"}', 'devices.lianli-hub.screenTitle:{"name":"HydroShift II Curved"}', 'Universal Screen 8.8',
     ]);
     for (const id of ['wireless-screen', 'curve-screen', 'screen88-screen', 'curve-head']) {
       expect(screen.queryByTestId(id)).not.toBeInTheDocument();
@@ -230,11 +234,11 @@ describe('LianLiHubPage', () => {
     await openTab('devices.lianli-wireless.tab.screen');
     fireEvent.click(screen.getByRole('button', { name: 'Universal Screen 8.8' }));
     expect(nav).toHaveBeenLastCalledWith('device', { deviceKey: 'Universal Screen 8.8' });
-    fireEvent.click(screen.getByRole('button', { name: 'HydroShift II Curved' }));
+    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-hub.screenTitle:{"name":"HydroShift II Curved"}' }));
     expect(nav).toHaveBeenLastCalledWith('device', { deviceKey: 'HydroShift II Curved' });
-    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-hub.fanScreens:{"name":"LCD Flex"}' }));
+    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-hub.fanScreens:{"name":"Lian Li Flex"}' }));
     expect(nav).toHaveBeenLastCalledWith('device', { deviceKey: 'lianli-fan-screens:flex' });
-    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-hub.fanScreens:{"name":"L-Wireless"}' }));
+    fireEvent.click(screen.getByRole('button', { name: 'devices.lianli-hub.fanScreens:{"name":"Lian Li Wireless"}' }));
     expect(nav).toHaveBeenLastCalledWith('device', { deviceKey: 'lianli-fan-screens:wireless' });
   });
 

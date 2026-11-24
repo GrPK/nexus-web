@@ -22,7 +22,9 @@ import { HydroShift2CurvePumpSettings } from './HydroShift2CurveSettings';
 import { HydroShift2RingSettings } from './HydroShift2RingSettings';
 import { LianLiSyncAllBar } from './LianLiSyncAllBar';
 import { LianLiUnitTabBody, useLianLiUnit } from './LianLiWirelessDevicePage';
-import { lianLiFanScreensKey } from './lianliFanScreens';
+import {
+  lianLiFanScreensKey, lianLiFanScreensTitle, lianLiScreenTitle, useLianLiFanScreenCount,
+} from './lianliFanScreens';
 import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
 import { useLianLiScreen88Screen } from './useLianLiScreen88Screen';
 // The page's own styles first: the docked-tabs check reads the first styles module as the page's.
@@ -89,6 +91,9 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   const wirelessUnit = useLianLiUnit({ flex: false, enabled: wireless, lightingActive: activeTab === 'lighting', onSectionNavigate });
   const flexUnit = useLianLiUnit({ flex: true, enabled: flex, lightingActive: activeTab === 'lighting', onSectionNavigate });
   const units = [...(wireless ? [wirelessUnit] : []), ...(flex ? [flexUnit] : [])];
+  // The fan screens cards read "Screen" or "Screens" by how many each unit has.
+  const wirelessScreenCount = useLianLiFanScreenCount(false, wireless);
+  const flexScreenCount = useLianLiFanScreenCount(true, flex);
 
   const open = (deviceKey: string) => onSectionNavigate?.('device', { deviceKey });
   // One card per screen, each opening that screen's own page: the units' fan screens (a page of
@@ -97,12 +102,14 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
     ...units.filter(u => u.hasScreen).flatMap(u => {
       const member = sorted.find(m => m.curatedId === (u.flex ? FLEX_ID : WIRELESS_ID));
       return member ? [{
-        device: { ...member, shortName: t('devices.lianli-hub.fanScreens', { name: member.shortName }) },
+        device: { ...member, shortName: lianLiFanScreensTitle(t, u.flex, u.p28Only === true, u.flex ? flexScreenCount : wirelessScreenCount) },
         onOpen: () => open(lianLiFanScreensKey(u.flex)),
       }] : [];
     }),
-    ...panels.map(p => ({ device: p, onOpen: () => open(p.key) })),
-    ...(screen88 && !screen88Panel && screen88Windows ? [{ device: screen88, onOpen: () => open(screen88.key) }] : []),
+    ...panels.map(p => ({ device: { ...p, shortName: lianLiScreenTitle(t, p.shortName) }, onOpen: () => open(p.key) })),
+    ...(screen88 && !screen88Panel && screen88Windows
+      ? [{ device: { ...screen88, shortName: lianLiScreenTitle(t, screen88.shortName) }, onOpen: () => open(screen88.key) }]
+      : []),
   ];
 
   const hasLighting = wireless || flex || !!ring || !!curve || !!screen88 || ownPage.length > 0;

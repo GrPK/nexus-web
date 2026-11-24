@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, Unplug } from 'lucide-react';
 import {
-  useUnifiedDevices, controlGateIsPanel, claimsKey, groupMembers, LIANLI_GROUP, LIANLI_HUB_KEY, type UnifiedDevice,
+  useUnifiedDevices, controlGateIsPanel, claimsKey, groupMembers, isLianLiMemberId, LIANLI_GROUP, LIANLI_HUB_KEY, type UnifiedDevice,
 } from '../../../hooks/useUnifiedDevices';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
@@ -18,7 +18,7 @@ import { SdkMarketplacePage } from '../../../panel/widgets/marketplace/SdkMarket
 import { typeForMarketplace } from '../../../widgets/marketplaceRegistry';
 import { LianLiTlDevicePage } from './LianLiTlDevicePage';
 import { LianLiFanScreensPage, LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
-import { lianLiFanScreensOf } from './lianliFanScreens';
+import { lianLiFanScreensOf, lianLiFanScreensTitle, lianLiScreenTitle, useLianLiFanScreenCount } from './lianliFanScreens';
 import { LianLiHubPage } from './LianLiHubPage';
 import { LianLiScreen88PageGate } from './LianLiScreen88Settings';
 import { LIANLI_SCREEN88_ID, LIANLI_SCREEN88_NAME } from '../../../api/lianliScreen88';
@@ -105,9 +105,11 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
       : unified.find(d => d.key === deviceKey) ?? unified.find(d => claimsKey(d, deviceKey))),
     [unified, deviceKey, fanScreens],
   );
-  const title = fanScreens !== null && device
-    ? t('devices.lianli-hub.fanScreens', { name: device.shortName })
-    : device?.shortName;
+  // A Lian Li screen's page and a unit's fan screens page carry the title of the Lian Li page's card.
+  const fanScreenCount = useLianLiFanScreenCount(fanScreens === true, fanScreens !== null);
+  const title = fanScreens !== null
+    ? (device ? lianLiFanScreensTitle(t, fanScreens, device.shortName === 'Lian Li P28 V2', fanScreenCount) : undefined)
+    : device?.kind === 'panel' && isLianLiMemberId(device.curatedId) ? lianLiScreenTitle(t, device.shortName) : device?.shortName;
   // The 8.8's page stays its page when its panel row leaves the list (the glass turned into a
   // Windows display), so the settings route, not the list, decides what it shows.
   const screen88KeyRef = useRef<string | null>(null);
