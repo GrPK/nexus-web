@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { CircleEqual, Fan, Lightbulb, RadioReceiver } from 'lucide-react';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { SettingRow } from '../../common/SettingRow/SettingRow';
@@ -13,6 +13,7 @@ import {
 } from '../../../api/lianliScreen88';
 import { useConflictGuardedEnable } from '../../../hooks/useConflictGuardedEnable';
 import type { UnifiedDevice } from '../../../hooks/useUnifiedDevices';
+import type { LianLiWirelessChainLighting } from '../../../api/lianli-wireless';
 import type { DashboardSectionNavigate } from '../../../panel/engine/panelLayoutHelpers';
 import { DeviceCard } from '../../../panel/widgets/devices/DevicesPage';
 import { lianLiFlexCoolingAnchors, lianLiFlexLightingAnchors, lianLiWirelessCoolingAnchors, lianLiWirelessLightingAnchors } from '../../../lib/pageAnchors';
@@ -21,7 +22,8 @@ import { CoolingPageShortcut, LightingPageShortcut } from './CoolingPageLink';
 import { HydroShift2CurvePumpSettings } from './HydroShift2CurveSettings';
 import { HydroShift2RingSettings } from './HydroShift2RingSettings';
 import { LianLiSyncAllBar } from './LianLiSyncAllBar';
-import { LianLiUnitTabBody, useLianLiUnit } from './LianLiWirelessDevicePage';
+import { LianLiUnitTabBody, useLianLiUnit, type LianLiUnit } from './LianLiWirelessDevicePage';
+import { fanTypeKey } from './LianLiWirelessFansTab';
 import {
   lianLiFanScreensKey, lianLiFanScreensTitle, lianLiScreenTitle, useLianLiFanScreenCount,
 } from './lianliFanScreens';
@@ -41,6 +43,25 @@ const CURVE_ID = 'lianli-hydroshift2-curve';
 const UNIT_IDS = new Set([WIRELESS_ID, FLEX_ID]);
 
 type LianLiHubTab = 'devices' | 'lighting' | 'screens' | 'cooling';
+
+/** The Lighting tab's groups, in their order: Strimers, fans without screens, fans with screens. */
+type ChainGroup = 'strimers' | 'fans' | 'screens';
+const CHAIN_GROUPS: readonly ChainGroup[] = ['strimers', 'fans', 'screens'];
+// Wireless fans with a screen in every fan.
+const LCD_FAN_TYPES = new Set(['fanTypeSlv3Lcd', 'fanTypeTlLcd']);
+
+/** How many screens a chain carries: one per fan of an LCD fan model, one for a Flex unit with a paired screen. */
+export function chainScreens(unit: Pick<LianLiUnit, 'state'>, chain: LianLiWirelessChainLighting): number {
+  if (chain.kind !== 'fans') return 0;
+  if (LCD_FAN_TYPES.has(fanTypeKey(chain.fanType))) return Math.max(1, chain.fanCount);
+  return unit.state?.fans.some(f => f.mac === chain.mac && !!f.screenSerial) ? 1 : 0;
+}
+
+/** Which Lighting group a chain falls in. */
+export function chainGroup(unit: Pick<LianLiUnit, 'state'>, chain: LianLiWirelessChainLighting): ChainGroup {
+  if (chain.kind === 'strimer') return 'strimers';
+  return chainScreens(unit, chain) > 0 ? 'screens' : 'fans';
+}
 
 // The tab the Lian Li page was left on: Back from a page one of its tabs opened returns to that tab.
 let rememberedTab: LianLiHubTab = 'devices';
@@ -75,6 +96,9 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   // A sync write changes each device's own look, so the lighting sections re-read after it.
   const [lightingRev, setLightingRev] = useState(0);
   const onSyncWritten = useCallback(() => setLightingRev(r => r + 1), []);
+  // A unit's chains show in several groups; a write settled in one has the others read again.
+  const [groupRev, setGroupRev] = useState(0);
+  const onGroupSettled = useCallback(() => setGroupRev(r => r + 1), []);
 
   const sorted = useMemo(
     () => [...members].sort((a, b) =>
@@ -200,20 +224,34 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
           {tab === 'lighting' && (
             <>
               <LianLiSyncAllBar onWritten={onSyncWritten} />
-              {units.map(unit => (
-                <LianLiUnitTabBody
-                  key={unit.flex ? FLEX_ID : WIRELESS_ID}
-                  unit={unit}
-                  tab="lighting"
-                  onSectionNavigate={onSectionNavigate}
-                  embedded
-                  reloadSignal={lightingRev}
-                />
+              {/* Strimers, then fans without screens, then fans with screens (most screens first), then
+                  the single-screen devices; each group keeps the order it had. */}
+              {CHAIN_GROUPS.map(group => (
+                <Fragment key={group}>
+                  {units.map(unit => (
+                    <LianLiUnitTabBody
+                      key={`${unit.flex ? FLEX_ID : WIRELESS_ID}-${group}`}
+                      unit={unit}
+                      tab="lighting"
+                      onSectionNavigate={onSectionNavigate}
+                      embedded
+                      reloadSignal={lightingRev + groupRev}
+                      onLightingSettled={onGroupSettled}
+                      chainFilter={chain => chainGroup(unit, chain) === group}
+                      chainOrder={group === 'screens' ? (a, b) => chainScreens(unit, b) - chainScreens(unit, a) : undefined}
+                      // The Flex sync controls stand with the Flex fans: with its screens when it has them.
+                      hideHeader={group !== (unit.hasScreen ? 'screens' : 'fans')}
+                    />
+                  ))}
+                  {group === 'strimers' && ownPage.filter(d => d.curatedId === 'strimer')
+                    .map(d => openRow(d, t('devices.lightingPage.setHint'), t('lighting.devices.menuOpenDevicePage')))}
+                  {group === 'fans' && ownPage.filter(d => d.curatedId !== 'strimer')
+                    .map(d => openRow(d, t('devices.lightingPage.setHint'), t('lighting.devices.menuOpenDevicePage')))}
+                </Fragment>
               ))}
               {ring && <HydroShift2RingSettings title={ring.shortName} onSectionNavigate={onSectionNavigate} />}
               {curve && <HydroShift2RingSettings title={curve.shortName} api={HYDROSHIFT2_CURVE_LIGHTING_API} onSectionNavigate={onSectionNavigate} />}
               {screen88 && <HydroShift2RingSettings title={screen88Title} api={LIANLI_SCREEN88_LIGHTING_API} onSectionNavigate={onSectionNavigate} />}
-              {ownPage.map(d => openRow(d, t('devices.lightingPage.setHint'), t('lighting.devices.menuOpenDevicePage')))}
             </>
           )}
 

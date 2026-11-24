@@ -104,6 +104,28 @@ export function moveInSequence(
     .map(({ mac: m, sortIndex }) => ({ mac: m, sortIndex }));
 }
 
+/**
+ * Swaps two chains' places in the light sequence: a chain and the neighbour shown next to it
+ * where only some chains are shown (the Lian Li page groups them). The chains between them keep
+ * their places; every chain is renumbered by position, as moveInSequence does.
+ */
+export function swapInSequence(
+  chains: readonly LianLiWirelessChainLighting[],
+  mac: string,
+  otherMac: string,
+): { mac: string; sortIndex: number }[] {
+  const ordered = sortBySequence(chains);
+  const a = ordered.findIndex(c => c.mac === mac);
+  const b = ordered.findIndex(c => c.mac === otherMac);
+  if (a < 0 || b < 0 || a === b) return [];
+  const next = [...ordered];
+  [next[a], next[b]] = [next[b], next[a]];
+  return next
+    .map((c, sortIndex) => ({ mac: c.mac, sortIndex, changed: c.sortIndex !== sortIndex }))
+    .filter(x => x.changed)
+    .map(({ mac: m, sortIndex }) => ({ mac: m, sortIndex }));
+}
+
 /** A patch that can change which unit leads a merged group, so a leader named by an earlier read may be stale. */
 export function patchAffectsLeader(patch: LianLiWirelessChainPatch): boolean {
   return patch.merge !== undefined || patch.mode !== undefined || patch.sortIndex !== undefined;

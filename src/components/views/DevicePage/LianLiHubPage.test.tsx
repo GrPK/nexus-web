@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LianLiHubPage, resetLianLiHubTab } from './LianLiHubPage';
+import { LianLiHubPage, chainGroup, chainScreens, resetLianLiHubTab } from './LianLiHubPage';
 import type { UnifiedDevice } from '../../../hooks/useUnifiedDevices';
 import { HYDROSHIFT2_CURVE_LIGHTING_API } from '../../../api/hydroshift2Curve';
 import { LIANLI_SCREEN88_LIGHTING_API } from '../../../api/lianliScreen88';
@@ -201,7 +201,8 @@ describe('LianLiHubPage', () => {
     await renderHub([wireless, curve, tl, screen88]);
     await openTab('lighting.title');
     expect(screen.getByTestId('sync-all')).toBeInTheDocument();
-    expect(screen.getByTestId('wireless-lighting')).toBeInTheDocument();
+    // One body per group (Strimers, fans, fans with screens) for the controller, none for an absent Flex hub.
+    expect(screen.getAllByTestId('wireless-lighting')).toHaveLength(3);
     expect(screen.queryByTestId('flex-lighting')).not.toBeInTheDocument();
     expect(screen.getAllByTestId('light-card').map(c => c.textContent)).toEqual(['HydroShift II Curved', 'Universal Screen 8.8']);
     expect(apiOfCard('HydroShift II Curved')).toBe(HYDROSHIFT2_CURVE_LIGHTING_API);
@@ -285,6 +286,18 @@ describe('LianLiHubPage', () => {
     view.unmount();
     await renderHub([wireless, curve]);
     expect(screen.getByRole('tab', { name: 'devices.lianli-wireless.tab.screen' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('groups the Lighting chains: Strimers, fans without screens, fans with screens (most screens first)', () => {
+    const unit = { state: { fans: [{ mac: 'FLEX1', screenSerial: 'S1' }, { mac: 'FLEX2', screenSerial: '' }] } } as any;
+    const chain = (mac: string, kind: 'strimer' | 'fans', fanType = 0, fanCount = 1) => ({ mac, kind, fanType, fanCount }) as any;
+    expect(chainGroup(unit, chain('S', 'strimer'))).toBe('strimers');
+    expect(chainGroup(unit, chain('TL', 'fans', 28, 3))).toBe('fans');
+    expect(chainGroup(unit, chain('FLEX2', 'fans', 51))).toBe('fans');
+    expect(chainGroup(unit, chain('FLEX1', 'fans', 51))).toBe('screens');
+    expect(chainScreens(unit, chain('LCD3', 'fans', 24, 3))).toBe(3);
+    expect(chainScreens(unit, chain('TLLCD', 'fans', 27, 2))).toBe(2);
+    expect(chainScreens(unit, chain('FLEX1', 'fans', 51))).toBe(1);
   });
 
   it('Cooling holds the fans and pump of the controller and the Flex hub', async () => {

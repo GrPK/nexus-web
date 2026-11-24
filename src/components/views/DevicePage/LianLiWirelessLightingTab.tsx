@@ -19,7 +19,7 @@ import {
 import { fanTypeKey } from './LianLiWirelessFansTab';
 import { LIANLI_DEFAULT_COLORS as DEFAULT_COLORS, LianLiChainEffectControls, effectLabel, type LianLiEffectValue } from './LianLiChainEffectControls';
 import {
-  applyChainPatch, canMerge, chainLookOf, hasOwnHalves, mergeLeaderMac, moveInSequence, numberDuplicateTitles, patchAffectsLeader, sortBySequence,
+  applyChainPatch, canMerge, chainLookOf, hasOwnHalves, mergeLeaderMac, moveInSequence, numberDuplicateTitles, patchAffectsLeader, sortBySequence, swapInSequence,
 } from './lianliChainUtils';
 import { useTranslation } from '../../../lib/i18n';
 import styles from './LianLiDevicePage.module.scss';
@@ -82,10 +82,17 @@ interface LianLiWirelessLightingTabProps {
   onSequence?: (macs: string[]) => void;
   /** The service's name per unit MAC (Flex); a unit without one is numbered by sequence. */
   unitNames?: ReadonlyMap<string, string>;
+  /**
+   * Shows only these chains (the Lian Li page groups them: Strimers, fans, fans with screens),
+   * ordered by `chainOrder` and then by the light sequence. A move then swaps a chain with the
+   * neighbour shown next to it; the chains not shown keep their places in the sequence.
+   */
+  chainFilter?: (chain: LianLiWirelessChainLighting) => boolean;
+  chainOrder?: (a: LianLiWirelessChainLighting, b: LianLiWirelessChainLighting) => number;
 }
 
 /** Per-chain animation picker for the Strimer cables and fan chains bound to the controller. */
-export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LIGHTING_API, header, syncOn = false, onSettled, reloadSignal, onSequence, unitNames }: LianLiWirelessLightingTabProps) {
+export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LIGHTING_API, header, syncOn = false, onSettled, reloadSignal, onSequence, unitNames, chainFilter, chainOrder }: LianLiWirelessLightingTabProps) {
   const { t } = useTranslation();
   const [data, setData] = useState<LianLiWirelessLighting | null>(null);
   const aliveRef = useRef(true);
@@ -201,9 +208,10 @@ export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LI
     }
   }, [api, beginWrite]);
 
-  const move = useCallback((mac: string, delta: -1 | 1) => {
+  // With only some chains shown, a move swaps with the neighbour shown next to the chain.
+  const move = useCallback((mac: string, delta: -1 | 1, shownNeighbour?: string) => {
     if (!data) return;
-    const moves = moveInSequence(data.chains, mac, delta);
+    const moves = shownNeighbour ? swapInSequence(data.chains, mac, shownNeighbour) : moveInSequence(data.chains, mac, delta);
     if (moves.length > 0) {
       const next = data.chains.map(c => ({ ...c, sortIndex: moves.find(m => m.mac === c.mac)?.sortIndex ?? c.sortIndex }));
       onSequence?.(sortBySequence(next).map(c => c.mac));
@@ -212,30 +220,33 @@ export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LI
   }, [data, commit, onSequence]);
 
   if (!data) return null;
-  const chains = sortBySequence(data.chains);
+  const all = sortBySequence(data.chains);
   // The service names the leader when it can; otherwise the same rule applies here.
-  const leaderMac = data.mergeLeaderMac !== undefined ? data.mergeLeaderMac : mergeLeaderMac(chains);
+  const leaderMac = data.mergeLeaderMac !== undefined ? data.mergeLeaderMac : mergeLeaderMac(all);
   const flex = api !== WIRELESS_LIGHTING_API;
-  const leader = chains.find(c => c.mac === leaderMac);
+  const leader = all.find(c => c.mac === leaderMac);
   // Units of one model read the same, so repeated titles are numbered in sequence order.
-  const numbered = numberDuplicateTitles(chains.map(c => chainTitle(t, c)));
-  const titles = chains.map((c, i) => unitNames?.get(c.mac) ?? numbered[i]);
-  const names = new Map(chains.map((c, i) => [c.mac, titles[i]]));
-  const leaderTitle = leader && titles[chains.indexOf(leader)];
+  const numbered = numberDuplicateTitles(all.map(c => chainTitle(t, c)));
+  const names = new Map(all.map((c, i) => [c.mac, unitNames?.get(c.mac) ?? numbered[i]]));
+  const leaderTitle = leader && names.get(leader.mac);
+  // Array.sort is stable, so chains the order ranks alike keep their sequence order.
+  const chains = chainFilter ? all.filter(chainFilter).sort((a, b) => chainOrder?.(a, b) ?? 0) : all;
   return (
     <>
-      {header?.(chains, names)}
+      {header?.(all, names)}
       {chains.map((chain, i) => (
         <ChainSection
           key={chain.mac}
           chain={chain}
-          title={titles[i]}
+          title={names.get(chain.mac) ?? ''}
           laneModes={data.laneModes}
           onPreview={patch => preview(chain.mac, patch)}
           onCommit={patch => { void commit(chain.mac, patch); }}
           followsTitle={leader && leader.mac !== chain.mac ? leaderTitle : undefined}
           onReset={api.reset ? () => reset(chain.mac) : undefined}
-          onMove={chains.length > 1 && chain.sortIndex !== undefined ? delta => move(chain.mac, delta) : undefined}
+          onMove={chains.length > 1 && chain.sortIndex !== undefined
+            ? delta => move(chain.mac, delta, chainFilter ? chains[i + delta]?.mac : undefined)
+            : undefined}
           first={i === 0}
           flex={flex}
           synced={syncOn && chain.supportsZones === true && !isP28Chain(chain, flex)}

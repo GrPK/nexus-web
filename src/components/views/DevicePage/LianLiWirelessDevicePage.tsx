@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Fan, CircleEqual, Lightbulb, RadioReceiver, Unplug } from 'lucide-react';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import {
   getLianLiWirelessState,
+  type LianLiWirelessChainLighting,
   type LianLiWirelessLinkStatus,
 } from '../../../api/lianli-wireless';
 import {
@@ -253,11 +254,28 @@ interface LianLiUnitTabBodyProps {
   embedded?: boolean;
   /** Added to the unit's own reload count, for a sync written outside this body. */
   reloadSignal?: number;
+  /** Lighting: only these chains, in this order (the Lian Li page's groups); see LianLiWirelessLightingTab. */
+  chainFilter?: (chain: LianLiWirelessChainLighting) => boolean;
+  chainOrder?: (a: LianLiWirelessChainLighting, b: LianLiWirelessChainLighting) => number;
+  /** Lighting: leaves out the Flex sync controls, for a group of chains shown apart from them. */
+  hideHeader?: boolean;
+  /** Lighting: runs when this body's writes have settled, so other groups of the same unit read again. */
+  onLightingSettled?: () => void;
 }
 
 /** One tab of a unit's page: its fans and binding, lighting, cooling or screens. */
-export function LianLiUnitTabBody({ unit, tab, onSectionNavigate, embedded = false, reloadSignal = 0 }: LianLiUnitTabBodyProps) {
+export function LianLiUnitTabBody({
+  unit, tab, onSectionNavigate, embedded = false, reloadSignal = 0, chainFilter, chainOrder, hideHeader = false, onLightingSettled,
+}: LianLiUnitTabBodyProps) {
   const { flex, state, refresh, flexSync, lightingRev, panelOpener, lcdRestart } = unit;
+  const flexRefresh = flexSync.refresh;
+  // Kept the same between renders: the lighting tab reads again whenever this changes.
+  const onSettled = useMemo(() => (flex || onLightingSettled
+    ? () => {
+      if (flex) void flexRefresh();
+      onLightingSettled?.();
+    }
+    : undefined), [flex, flexRefresh, onLightingSettled]);
   return (
     <>
       {tab === 'fans' && (
@@ -276,11 +294,13 @@ export function LianLiUnitTabBody({ unit, tab, onSectionNavigate, embedded = fal
           onSectionNavigate={onSectionNavigate}
           api={flex ? lianLiFlexLightingApi : undefined}
           unitNames={unit.unitNames}
-          header={flex ? (chains, names) => <LianLiFlexSyncSection sync={flexSync} chains={chains} names={names} /> : undefined}
+          header={flex && !hideHeader ? (chains, names) => <LianLiFlexSyncSection sync={flexSync} chains={chains} names={names} /> : undefined}
           syncOn={flex && isSyncOn(flexSync)}
-          onSettled={flex ? flexSync.refresh : undefined}
+          onSettled={onSettled}
           onSequence={flex ? flexSync.reorder : undefined}
           reloadSignal={lightingRev + reloadSignal}
+          chainFilter={chainFilter}
+          chainOrder={chainOrder}
         />
       )}
       {tab === 'cooling' && (
