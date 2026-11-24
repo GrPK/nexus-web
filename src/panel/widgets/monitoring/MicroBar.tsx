@@ -11,6 +11,8 @@ import styles from './MicroBar.module.scss';
 
 interface MicroBarProps {
   label: string;
+  /** Vertical Bars only: short caption under the value; falls back to `label`. */
+  columnLabel?: string;
   formatted: string;
   fillPercent: number;
   // One of the Micro design keys (see MICRO_DESIGN_KEYS): 'bar' (fill track),
@@ -28,8 +30,9 @@ interface MicroBarProps {
   style?: CSSProperties;
 }
 
-function ColumnRow({ label, formatted, fillPercent, style }: { label: string; formatted: string; fillPercent: number; style?: CSSProperties }) {
+function ColumnRow({ label, caption, formatted, fillPercent, style }: { label: string; caption: string; formatted: string; fillPercent: number; style?: CSSProperties }) {
   const { boxRef, contentRef, scale } = useFitWidth(1, false);
+  const { boxRef: capBoxRef, contentRef: capContentRef, scale: capScale } = useFitWidth(1, false);
   const clamped = Math.max(0, Math.min(100, fillPercent));
   return (
     <div className={styles.rowColumn} style={style} role="group" aria-label={label || undefined}>
@@ -41,6 +44,11 @@ function ColumnRow({ label, formatted, fillPercent, style }: { label: string; fo
           <GaugeValue formatted={formatted} className={styles.columnValue} />
         </div>
       </div>
+      {caption && (
+        <div ref={capBoxRef} className={styles.columnValueBox}>
+          <div ref={capContentRef} className={`${styles.columnValueContent} ${styles.columnCaption}`} style={{ transform: `scale(${capScale})` }}>{caption}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -64,8 +72,8 @@ export function MicroBar(props: MicroBarProps) {
   return <GaugeValueStateContext.Provider value={state}><MicroBarRow {...props} /></GaugeValueStateContext.Provider>;
 }
 
-function MicroBarRow({ label, formatted, fillPercent, design = 'bar', align = 'left', history, historyDomain, gradient, style }: MicroBarProps) {
-  if (design === 'columns') return <ColumnRow label={label} formatted={formatted} fillPercent={fillPercent} style={style} />;
+function MicroBarRow({ label, columnLabel, formatted, fillPercent, design = 'bar', align = 'left', history, historyDomain, gradient, style }: MicroBarProps) {
+  if (design === 'columns') return <ColumnRow label={label} caption={columnLabel ?? label} formatted={formatted} fillPercent={fillPercent} style={style} />;
   if (design === 'simple') return <SimpleRow label={label} formatted={formatted} align={align} style={style} />;
 
   const head = (

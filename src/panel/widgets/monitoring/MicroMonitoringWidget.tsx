@@ -26,6 +26,7 @@ import { gpu2Components, igpuComponents, sensorCaptionName } from './sensorCateg
 import { chartDomainForScale, defaultFixedMax, DEFAULT_SCALE_MODE, fixedFillPercent, type ScaleMode } from './perfDomain';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
 import { MicroBar } from './MicroBar';
+import { shortColumnLabels } from './microColumnLabels';
 import { usePanelGaugeGradient, type PanelGaugeGradientValue } from '../common/PanelGaugeGradientContext';
 import { defaultValueColorReverse, gaugeAccentVars, hasValueColorReading, reverseGaugeGradient, sensorSupportsValueColor } from './valueColor';
 import { accentShadowAlpha } from '../../../lib/settings';
@@ -132,6 +133,15 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
   // Only the bar design sizes itself to its content; fill, backdrop and simple stretch.
   const growsRow = microDesign !== 'bar';
 
+  const columnLabels = verticalBars
+    ? shortColumnLabels(sensorNames.map((rawName, i) => microRowLabel(
+      sensors, fpsSensors, networkSensors, extras, rowDevices[i], multiDevice, rawName,
+      widget.config?.[`micro_sensor${i}_label`] as string | undefined,
+      widget.config?.[`micro_sensor${i}_labelMode`] as string | undefined,
+      tempPrefs, t,
+    )))
+    : [];
+
   const rowEls = sensorNames.map((rawName, i) => {
     const rowDevice = rowDevices[i];
     const key = `${i}-${rowDevice}-${rawName}`;
@@ -147,6 +157,7 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
         sensorName={rawName}
         labelOverride={widget.config?.[`micro_sensor${i}_label`] as string | undefined}
         labelMode={widget.config?.[`micro_sensor${i}_labelMode`] as string | undefined}
+        columnLabel={columnLabels[i]}
         design={microDesign}
         align={microAlign}
         scale={microScale}
@@ -218,6 +229,8 @@ interface MicroRowProps {
   sensorName: string;
   labelOverride?: string;
   labelMode?: string;
+  /** Vertical Bars only: the short caption shown under the value. */
+  columnLabel?: string;
   design: MicroDesignKey;
   align: MicroAlign;
   scale: ScaleMode;
@@ -233,18 +246,37 @@ interface MicroRowProps {
   monitoringWholeNumbers: boolean;
 }
 
-function MicroRow({ sensors, fpsSensors, networkSensors, extras, device, prefixed, sensorName, labelOverride, labelMode, design, align, scale, fixedMin, fixedMax, valueColor, valueColorReverse, gaugeGradient, tempPrefs, monitoringTempUnit, numberFormat, monitoringWholeNumbers }: MicroRowProps) {
-  const { t } = useTranslation();
+// The row's caption, shared by the row itself and the widget's short-label pass.
+function microRowLabel(
+  sensors: ReturnType<typeof useSensors>,
+  fpsSensors: ReturnType<typeof useFpsSensors>,
+  networkSensors: ReturnType<typeof buildNetworkSensors>,
+  extras: ReturnType<typeof useSensorExtras>,
+  device: DeviceKey,
+  prefixed: boolean,
+  sensorName: string,
+  labelOverride: string | undefined,
+  labelMode: string | undefined,
+  tempPrefs: { cpuId: string; gpuId: string } | undefined,
+  t: (key: string) => string,
+): string {
   const effectiveSensorName = device === 'network' && !sensorName ? NETWORK_SENSOR_TOTAL : sensorName;
   const sensor = resolveSensor(sensors, fpsSensors, networkSensors, device, effectiveSensorName, tempPrefs, extras);
-  const rawValue = sensor?.value ?? 0;
-  const formatted = sensor ? formatSensorValue(sensor.value, sensor.units, sensor.formatted, monitoringTempUnit, numberFormat, sensor.type, monitoringWholeNumbers) : '-';
   const sensorDisplayName = sensorCaptionName(device, sensors, sensor) ?? '';
   const sensorMissing = isSavedSensorMissing(device, effectiveSensorName, sensor, extras);
   const autoLabel = sensorMissing ? t('monitoring.sensorMissing') : prefixed
     ? labelForDevice(device, sensorDisplayName || effectiveSensorName)
     : bareSensorLabel(device, sensorDisplayName) || sensorDisplayName || effectiveSensorName;
-  const label = displayLabel(labelMode, labelOverride, autoLabel);
+  return displayLabel(labelMode, labelOverride, autoLabel);
+}
+
+function MicroRow({ sensors, fpsSensors, networkSensors, extras, device, prefixed, sensorName, labelOverride, labelMode, columnLabel, design, align, scale, fixedMin, fixedMax, valueColor, valueColorReverse, gaugeGradient, tempPrefs, monitoringTempUnit, numberFormat, monitoringWholeNumbers }: MicroRowProps) {
+  const { t } = useTranslation();
+  const effectiveSensorName = device === 'network' && !sensorName ? NETWORK_SENSOR_TOTAL : sensorName;
+  const sensor = resolveSensor(sensors, fpsSensors, networkSensors, device, effectiveSensorName, tempPrefs, extras);
+  const rawValue = sensor?.value ?? 0;
+  const formatted = sensor ? formatSensorValue(sensor.value, sensor.units, sensor.formatted, monitoringTempUnit, numberFormat, sensor.type, monitoringWholeNumbers) : '-';
+  const label = microRowLabel(sensors, fpsSensors, networkSensors, extras, device, prefixed, sensorName, labelOverride, labelMode, tempPrefs, t);
   const sensorKey = `${device}::${effectiveSensorName || 'default'}`;
   const history = useSharedSensorHistory(sensorKey, rawValue) as number[];
   const maxValue = device === 'network'
@@ -267,6 +299,7 @@ function MicroRow({ sensors, fpsSensors, networkSensors, extras, device, prefixe
   return (
     <MicroBar
       label={label}
+      columnLabel={columnLabel}
       formatted={formatted}
       fillPercent={fillPercent}
       design={design}

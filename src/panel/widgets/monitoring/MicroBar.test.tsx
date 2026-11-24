@@ -106,17 +106,29 @@ describe('MicroBar simple row fit', () => {
 });
 
 describe('MicroBar columns design', () => {
-  it('fills the vertical track to the clamped percent and shows the value, not the label', () => {
+  it('fills the vertical track to the clamped percent and shows the value and a caption', () => {
     const { container } = render(<MicroBar label="PIN 1 CURRENT" formatted="0.881 A" fillPercent={140} design="columns" />);
     const fill = container.querySelector('[class*="columnFill"]') as HTMLElement;
     expect(fill.style.height).toBe('100%');
     expect(hasGaugeReading(container, '0.881 A')).toBe(true);
-    expect(container.textContent).not.toContain('PIN 1');
     expect(container.querySelector('[class*="label"]')).toBeNull();
+    expect(container.querySelector('[class*="columnCaption"]')?.textContent).toBe('PIN 1 CURRENT');
   });
 
   it('maps a partial fill to the same height percent', () => {
     const { container } = render(<MicroBar label="" formatted="3" fillPercent={35} design="columns" />);
     expect((container.querySelector('[class*="columnFill"]') as HTMLElement).style.height).toBe('35%');
+  });
+});
+
+describe('MicroBar columns caption', () => {
+  it('shows the short column label under the value and keeps the full name as aria-label', () => {
+    const { container } = render(<MicroBar label="Pin 1 Current" columnLabel="Pin 1" formatted="0.881 A" fillPercent={50} design="columns" />);
+    expect(container.querySelector('[class*="columnCaption"]')?.textContent).toBe('Pin 1');
+    expect(container.firstElementChild?.getAttribute('aria-label')).toBe('Pin 1 Current');
+  });
+  it('omits the caption when the label is hidden', () => {
+    const { container } = render(<MicroBar label="" formatted="1" fillPercent={50} design="columns" />);
+    expect(container.querySelector('[class*="columnCaption"]')).toBeNull();
   });
 });
