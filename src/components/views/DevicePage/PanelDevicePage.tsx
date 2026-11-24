@@ -2127,19 +2127,36 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                               if (next === undefined) return;
                               const seq = ++rotationSeqRef.current;
                               const previous = confirmedRotationRef.current;
-                              if (rotationCrossesClass(previous, next)) holdMountingInView();
+                              const crosses = rotationCrossesClass(previous, next);
+                              if (crosses) holdMountingInView();
                               setRecordRotation(next);
+                              // The 8.8 turns on the press: its preview and its videos' aspect follow at once,
+                              // and the service's answer settles them.
+                              if (isScreen88Panel) {
+                                if (crosses) setLiveCanvas(c => (c ? { width: c.height, height: c.width } : c));
+                                const portrait = next === 90 || next === 270;
+                                screen88Screen.assume({ videoPortrait: portrait, videoWidth: portrait ? 480 : 1920, videoHeight: portrait ? 1920 : 480 });
+                              }
                               const id = device?.panelRecordId;
                               if (!id) return;
+                              const undo = () => {
+                                if (seq !== rotationSeqRef.current) return;
+                                setRecordRotation(confirmedRotationRef.current);
+                                if (isScreen88Panel) {
+                                  if (crosses) refetchDeviceRecord();
+                                  void screen88Screen.refresh();
+                                }
+                              };
                               void patchPanelDevice(id, { rotation: next })
                                 .then(r => {
                                   if (r) {
                                     confirmedRotationRef.current = next;
                                     // The service keeps a layout per orientation class, so crossing one reads the other slot and the new render size.
-                                    if (rotationCrossesClass(previous, next)) refetchDeviceRecord();
-                                  } else if (seq === rotationSeqRef.current) setRecordRotation(confirmedRotationRef.current);
+                                    if (crosses) refetchDeviceRecord();
+                                    if (isScreen88Panel) void screen88Screen.refresh();
+                                  } else undo();
                                 })
-                                .catch(() => { if (seq === rotationSeqRef.current) setRecordRotation(confirmedRotationRef.current); });
+                                .catch(undo);
                             }}
                             options={rotationOptions(recordSupportedRotations)}
                           />
