@@ -32,7 +32,8 @@ function joinNames(names: readonly string[], language: string | undefined): stri
   return new Intl.ListFormat(language, { style: 'short', type: 'unit' }).format(names);
 }
 
-const TL_CHAIN = 'tlChain';
+// The members the Lighting tab names (a TL chain with its count, a Strimer by its model).
+const CHAIN_KINDS: ReadonlySet<string> = new Set(['tlChain', 'strimer']);
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
@@ -117,11 +118,14 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
     if (aliveRef.current && next) setData(next);
   }, [api]);
 
+  // A member that leaves or reaches its motherboard input leaves or rejoins the list, so a change in what
+  // holds the members reads the list again.
+  const locksKey = JSON.stringify([...(memberLocks ?? [])]);
   useEffect(() => {
     aliveRef.current = true;
     void refresh();
     return () => { aliveRef.current = false; };
-  }, [refresh]);
+  }, [refresh, locksKey]);
 
   const preview = useCallback((patch: LianLiSyncAllPatch) => {
     setData(prev => prev && patchEffect(prev, patch));
@@ -160,17 +164,19 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
   // The controls name the effect `mode`; the route names it `effect`.
   const toPatch = ({ mode, ...look }: Partial<LianLiEffectValue>): LianLiSyncAllPatch =>
     (mode === undefined ? look : { ...look, effect: mode });
-  // A TL chain reads as the Lighting tab names it; the MAC's case may differ between the routes.
+  // A TL chain or Strimer reads as the Lighting tab names it; the MAC's case may differ between the routes.
   const namesByMac = new Map<string, string>();
-  for (const [mac, name] of chainNames ?? []) namesByMac.set(mac.toUpperCase(), name);
+  for (const [mac, name] of chainNames ?? []) namesByMac.set(lianLiSyncKey(mac), name);
   const deviceName = (d: LianLiSyncAll['devices'][number]) =>
-    (d.kind === TL_CHAIN ? namesByMac.get(d.id.toUpperCase()) : undefined) ?? d.name;
+    (CHAIN_KINDS.has(d.kind) ? namesByMac.get(lianLiSyncKey(d.id)) : undefined) ?? d.name;
   // A member the Lighting page or its motherboard input drives would be taken over silently, so Sync all
   // waits until the user turns that off. Turning Sync all off is always allowed.
-  const blocked = (lock: LianLiSyncLock) =>
-    data.devices.filter(d => memberLocks?.get(lianLiSyncKey(d.id)) === lock).map(deviceName);
-  const onLightingPage = blocked('lightingPage');
-  const onMotherboard = blocked('motherboardArgb');
+  const onLightingPage = data.devices.filter(d => memberLocks?.get(lianLiSyncKey(d.id)) === 'lightingPage').map(deviceName);
+  // The service leaves a chain on its motherboard input off the list, so those come from the chains themselves.
+  const onMotherboard = [...(memberLocks ?? [])].filter(([, lock]) => lock === 'motherboardArgb').map(([id]) => {
+    const listed = data.devices.find(d => lianLiSyncKey(d.id) === id);
+    return listed ? deviceName(listed) : namesByMac.get(id) ?? id;
+  });
   const cannotTurnOn = !data.enabled && onLightingPage.length + onMotherboard.length > 0;
   // The order matters only to a merged effect, which runs through the devices in it.
   const mergedOn = data.enabled && current.merge === true && data.devices.length > 0;

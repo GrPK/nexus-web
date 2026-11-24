@@ -54,6 +54,26 @@ const sync: LianLiSyncAll = {
   ],
 };
 
+// The user's lights as the route lists them with Strimers (one TL chain on its motherboard input is left out).
+const withStrimers: LianLiSyncAll = {
+  ...sync,
+  devices: [
+    { kind: 'strimer', id: '64F271E566E1', name: 'Strimer MB 24-Pin', fanCount: 0, dots: 22, direction: 0 },
+    { kind: 'strimer', id: '5A0B1C72AB01', name: 'Strimer CPU 2x8', fanCount: 0, dots: 29, direction: 0 },
+    { kind: 'tlChain', id: '7880AE72AB3C', name: 'Lian Li Wireless TL', fanCount: 3, dots: 39, direction: 0 },
+    { kind: 'tlChain', id: '9828EC72ABE1', name: 'Lian Li Wireless TL', fanCount: 1, dots: 13, direction: 0 },
+    { kind: 'hydroShift2Curve', id: 'hydroShift2Curve', name: 'HydroShift II OLED Curved', dots: 14, direction: 0 },
+  ],
+};
+// Each chain's name on the Lighting tab, as the hub hands them on.
+const lightingNames = new Map([
+  ['64F271E566E1', 'Strimer MB 24-Pin'],
+  ['5a0b1c72ab01', 'Strimer CPU 2x8'],
+  ['7880AE72AB3C', 'TL Wireless Fans (3 fans)'],
+  ['91D3EC72ABE1', 'TL LCD Wireless Fans (3 screens)'],
+  ['9828EC72ABE1', 'TL LCD Wireless Fans 2 (1 screen)'],
+]);
+
 // Sync all on with a merged effect picked: the merge order shows.
 const merged: LianLiSyncAll = {
   ...sync,
@@ -173,24 +193,77 @@ describe('LianLiSyncAllBar', () => {
     expect(tl.compareDocumentPosition(screen.getByText('HydroShift II OLED Curved')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('cannot turn on while a member is on the Lighting page or its motherboard input, and names them', async () => {
-    get.mockResolvedValue(sync);
+  it('cannot turn on while members are on the Lighting page, and names them as the Lighting tab does', async () => {
+    get.mockResolvedValue(withStrimers);
+    // The user's lights: both Strimers and the one-screen TL chain on the Lighting page.
     const memberLocks = new Map([
-      ['7880AE72AB3C', 'lightingPage' as const],
-      ['HYDROSHIFT2CURVE', 'lightingPage' as const],
-      ['UNIVERSALSCREEN88', 'motherboardArgb' as const],
-      // Not a member (a Strimer): it holds nothing back.
       ['64F271E566E1', 'lightingPage' as const],
+      ['5A0B1C72AB01', 'lightingPage' as const],
+      ['9828EC72ABE1', 'lightingPage' as const],
+      // Not in the list (not a member): it holds nothing back.
+      ['ABCDEF000000', 'lightingPage' as const],
     ]);
-    const chainNames = new Map([['7880AE72AB3C', 'TL Wireless (3 fans)']]);
     await act(async () => {
-      render(<LianLiSyncAllBar api={api} chainNames={chainNames} memberLocks={memberLocks} />);
+      render(<LianLiSyncAllBar api={api} chainNames={lightingNames} memberLocks={memberLocks} />);
     });
     expect(screen.getByRole('switch', { name: 'devices.lianli-hub.syncAll' })).toBeDisabled();
     const notice = screen.getByRole('status');
     expect(notice).toHaveAttribute('data-tone', 'info');
-    expect(notice).toHaveTextContent('devices.lianli-hub.syncBlockedLightingPage:{"devices":"TL Wireless (3 fans), HydroShift II OLED Curved"}');
-    expect(notice).toHaveTextContent('devices.lianli-hub.syncBlockedArgb:{"devices":"Universal Screen 8.8"}');
+    expect(notice).toHaveTextContent(
+      'devices.lianli-hub.syncBlockedLightingPage:{"devices":"Strimer MB 24-Pin, Strimer CPU 2x8, TL LCD Wireless Fans 2 (1 screen)"}',
+    );
+    expect(notice).not.toHaveTextContent('syncBlockedArgb');
+  });
+
+  it('counts a chain on its motherboard input although the route leaves it off the list', async () => {
+    get.mockResolvedValue(withStrimers);
+    const memberLocks = new Map([
+      ['91D3EC72ABE1', 'motherboardArgb' as const],
+      ['64F271E566E1', 'lightingPage' as const],
+      // A chain the page has no name for yet reads as its MAC.
+      ['0000AAAA0000', 'motherboardArgb' as const],
+    ]);
+    await act(async () => {
+      render(<LianLiSyncAllBar api={api} chainNames={lightingNames} memberLocks={memberLocks} />);
+    });
+    expect(screen.getByRole('switch', { name: 'devices.lianli-hub.syncAll' })).toBeDisabled();
+    const notice = screen.getByRole('status');
+    expect(notice).toHaveTextContent('devices.lianli-hub.syncBlockedLightingPage:{"devices":"Strimer MB 24-Pin"}');
+    expect(notice).toHaveTextContent('devices.lianli-hub.syncBlockedArgb:{"devices":"TL LCD Wireless Fans (3 screens), 0000AAAA0000"}');
+  });
+
+  it('lists the Strimers in the merge order by their Lighting tab names, without a count', async () => {
+    get.mockResolvedValue({ ...withStrimers, enabled: true, effect: 'mergeMeteor', effects: merged.effects });
+    await act(async () => {
+      render(<LianLiSyncAllBar api={api} chainNames={lightingNames} />);
+    });
+    const rows = ['Strimer MB 24-Pin', 'Strimer CPU 2x8', 'TL Wireless Fans (3 fans)', 'TL LCD Wireless Fans 2 (1 screen)', 'HydroShift II OLED Curved']
+      .map(name => screen.getByText(name));
+    rows.slice(1).forEach((row, i) => {
+      expect(rows[i].compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'devices.lianli-wireless.orderMoveDown' })[0]);
+    });
+    // A Strimer moves like a TL chain.
+    expect(set).toHaveBeenCalledWith({
+      devices: [{ id: '5A0B1C72AB01' }, { id: '64F271E566E1' }, { id: '7880AE72AB3C' }, { id: '9828EC72ABE1' }, { id: 'hydroShift2Curve' }],
+    });
+  });
+
+  it('reads the list again when what holds the members changes', async () => {
+    get.mockResolvedValue(withStrimers);
+    let view!: ReturnType<typeof render>;
+    await act(async () => {
+      view = render(<LianLiSyncAllBar api={api} memberLocks={new Map([['91D3EC72ABE1', 'motherboardArgb' as const]])} />);
+    });
+    expect(get).toHaveBeenCalledTimes(1);
+    // The chain left its motherboard input, so the route lists it again.
+    await act(async () => {
+      view.rerender(<LianLiSyncAllBar api={api} memberLocks={new Map()} />);
+    });
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('turns on with no member held back, and shows no notice', async () => {

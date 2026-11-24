@@ -130,7 +130,10 @@ interface LianLiWirelessLightingTabProps {
   onNames?: (names: ReadonlyMap<string, string>) => void;
   /** The chains Sync all drives (MACs, lianLiSyncKey): their own look and Lighting page switch lock. */
   syncAllMacs?: ReadonlySet<string>;
-  /** Runs with the chains the Lighting page or their motherboard input drive (by MAC, lianLiSyncKey) when that changes. */
+  /**
+   * Runs with the chains Sync all can drive (the wireless TL chains and Strimers) that the Lighting page or their
+   * motherboard input drive instead (by MAC, lianLiSyncKey), when that changes.
+   */
   onLocks?: (locks: ReadonlyMap<string, LianLiSyncLock>) => void;
 }
 
@@ -273,11 +276,13 @@ export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LI
     if (namesRef.current.size > 0) onNames?.(namesRef.current);
   }, [namesKey, onNames]);
 
-  // What drives each chain instead of its own look, for Sync all to wait on.
+  // What drives each chain Sync all can drive (the wireless TL chains and Strimers) instead of its own look,
+  // for Sync all to wait on. The motherboard input counts as the service counts it: the saved choice, or with
+  // none saved what the chain reports.
   const flexApi = api !== WIRELESS_LIGHTING_API;
   const locks = new Map<string, LianLiSyncLock>();
   for (const c of all) {
-    if (isP28Chain(c, flexApi)) continue;
+    if (flexApi || !(c.kind === 'strimer' || isTlChain(c))) continue;
     if (c.motherboardArgb ?? c.playingMotherboardArgb === true) locks.set(lianLiSyncKey(c.mac), 'motherboardArgb');
     else if (c.mode === MODE_CUSTOM) locks.set(lianLiSyncKey(c.mac), 'lightingPage');
   }
@@ -529,20 +534,21 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
       )}
 
       {perLane && lanes.map((lane, i) => (
-        <div key={i} className={`${styles.colorBlock} ${lightingPage ? styles.rowDisabled : ''}`} data-settings-aside="true">
+        // Under a sync the service plays the synced look in place of the lanes.
+        <div key={i} className={`${styles.colorBlock} ${lightingPage || synced ? styles.rowDisabled : ''}`} data-settings-aside="true">
           <SettingSelect
             label={t('devices.lianli-wireless.strimerLaneN', { n: i + 1 })}
             value={lane.mode}
             onChange={v => setLane(i, { mode: v }, true)}
             options={laneModes.map(key => ({ value: key, label: effectLabel(t, key) }))}
-            disabled={locked}
+            disabled={locked || synced}
           />
           <SettingSelect
             label={t('devices.lianli.lightingDirection')}
             value={String(lane.direction)}
             onChange={v => setLane(i, { direction: Number(v) }, true)}
             options={directionOptions}
-            disabled={locked}
+            disabled={locked || synced}
           />
           <HsvPicker
             value={lane.color}

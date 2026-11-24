@@ -27,17 +27,21 @@ export interface LianLiSyncEffect {
   colors: string[];
 }
 
-/** A light the sync drives while it is on, in the merge order: a merged effect is drawn across them in this order. */
+/**
+ * A light the sync drives while it is on, in the merge order: a merged effect is drawn across them in this order.
+ * A TL chain or Strimer on its motherboard ARGB input is left out while it is (it keeps its stored place).
+ */
 export interface LianLiSyncDevice {
-  /** "tlChain", "hydroShift2Curve" or "universalScreen88". */
+  /** "tlChain", "strimer", "hydroShift2Curve" or "universalScreen88". */
   kind: string;
-  /** The chain's MAC for a TL chain; the kind for the single USB devices. */
+  /** The MAC for a TL chain or a Strimer; the kind for the single USB devices. */
   id: string;
+  /** A Strimer's is its cable model ("Strimer MB 24-Pin"). */
   name: string;
   /** TL chains only. */
   fanCount?: number;
   mode?: string;
-  /** Its stretch of a merged effect's line: 13 per TL fan, 14 for the OLED Curved, 31 for the 8.8 bezel. */
+  /** Its stretch of a merged effect's line: 13 per TL fan, a Strimer's LEDs per lane, 14 for the OLED Curved, 31 for the 8.8 bezel. */
   dots?: number;
   /** The direction it reads its stretch of a merged effect in: 0 as drawn, 1 reversed. */
   direction?: number;

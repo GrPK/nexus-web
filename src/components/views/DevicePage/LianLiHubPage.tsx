@@ -126,7 +126,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   const [syncedIds, setSyncedIds] = useState<ReadonlySet<string>>(() => new Set());
   const onSynced = useCallback((ids: ReadonlySet<string>) => setSyncedIds(prev =>
     (prev.size === ids.size && [...ids].every(id => prev.has(id)) ? prev : ids)), []);
-  // By source (each unit's chains, the Curve edge, the 8.8 bezel), as each last reported.
+  // By source (the wireless chains, the Curve edge, the 8.8 bezel), as each last reported.
   const [lockSources, setLockSources] = useState<Readonly<Record<string, ReadonlyMap<string, LianLiSyncLock>>>>({});
   const lockReporters = useMemo(() => {
     const report = (source: string) => (locks: ReadonlyMap<string, LianLiSyncLock>) => setLockSources(prev =>
@@ -135,7 +135,6 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
       report(source)(new Map<string, LianLiSyncLock>(on ? [[lianLiSyncKey(id), 'lightingPage']] : []));
     return {
       wireless: report('wireless'),
-      flex: report('flex'),
       curve: light('curve', LIANLI_SYNC_CURVE_ID),
       screen88: light('screen88', LIANLI_SYNC_SCREEN88_ID),
     };
@@ -288,7 +287,8 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
                       screensOf={chain => chainScreens(unit, chain)}
                       onChainNames={onChainNames}
                       syncAllMacs={syncedIds}
-                      onChainLocks={unit.flex ? lockReporters.flex : lockReporters.wireless}
+                      // Sync all drives the wireless chains only.
+                      onChainLocks={unit.flex ? undefined : lockReporters.wireless}
                       // The Flex sync controls stand with the Flex fans: with its screens when it has them.
                       hideHeader={group !== (unit.hasScreen ? 'screens' : 'fans')}
                     />

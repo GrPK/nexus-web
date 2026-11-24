@@ -300,15 +300,22 @@ describe('Sync all on the Lian Li page', () => {
     expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).not.toBeDisabled();
   });
 
-  it('reports the chains the Lighting page or their motherboard input drive', async () => {
+  it('reports the TL chains and Strimers the Lighting page or their motherboard input drive', async () => {
     const onLocks = vi.fn();
     mockGetStrimers.mockResolvedValue({
       ...catalog,
       chains: [
         { ...tl, mode: 'custom', effectMode: 'rainbow' },
         { ...tl, mac: 'aa', motherboardArgb: true },
+        // No saved choice: what the chain reports counts, as in the service.
         { ...tl, mac: 'bb', motherboardArgb: null, playingMotherboardArgb: true },
         { ...tl, mac: 'cc' },
+        // A saved choice wins over what the chain still reports.
+        { ...tl, mac: 'dd', motherboardArgb: false, playingMotherboardArgb: true },
+        { ...strimer, mac: 'ee', mode: 'custom', effectMode: 'meteor' },
+        { ...strimer, mac: 'ff', playingMotherboardArgb: true },
+        // Not a TL chain: Sync all does not drive it.
+        { ...fanChain, mac: 'gg', mode: 'custom', effectMode: 'rainbow' },
       ],
     });
     await act(async () => {
@@ -319,7 +326,37 @@ describe('Sync all on the Lian Li page', () => {
       '7880AE72AB3C': 'lightingPage',
       AA: 'motherboardArgb',
       BB: 'motherboardArgb',
+      EE: 'lightingPage',
+      FF: 'motherboardArgb',
     });
+  });
+
+  it('locks a Strimer Sync all drives, its lanes too', async () => {
+    mockGetStrimers.mockResolvedValue({ ...catalog, chains: [{ ...strimer, mode: 'perLane', argbCableConnected: true }] });
+    await act(async () => {
+      render(<LianLiWirelessLightingTab syncAllMacs={new Set(['64F271E566E1'])} />);
+    });
+    expect(screen.getByText('devices.lianli-hub.followsSyncAll')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'devices.motherboardArgb.label' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'devices.lianli.lightingMode' })).toBeDisabled();
+    for (let n = 1; n <= 6; n++) {
+      expect(screen.getByRole('button', { name: `devices.lianli-wireless.strimerLaneN:{"n":${n}}` })).toBeDisabled();
+    }
+    expect(screen.getAllByRole('button', { name: 'devices.lianli.lightingDirection' }).every(b => (b as HTMLButtonElement).disabled)).toBe(true);
+  });
+
+  it('lets a synced Strimer leave the Lighting page, not join it', async () => {
+    mockGetStrimers.mockResolvedValue({ ...catalog, chains: [{ ...strimer, mode: 'custom', effectMode: 'meteor' }] });
+    await act(async () => {
+      render(<LianLiWirelessLightingTab syncAllMacs={new Set(['64F271E566E1'])} />);
+    });
+    const lightingPage = screen.getByRole('switch', { name: 'devices.lightingPage.use' });
+    expect(lightingPage).not.toBeDisabled();
+    await act(async () => {
+      fireEvent.click(lightingPage);
+    });
+    expect(mockSetStrimer).toHaveBeenCalledWith('64F271E566E1', { mode: 'meteor', effectMode: undefined });
   });
 });
 
