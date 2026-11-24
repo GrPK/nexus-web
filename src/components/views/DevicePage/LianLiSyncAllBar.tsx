@@ -176,9 +176,11 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
         onPreview={patch => preview(toPatch(patch))}
         onCommit={patch => { void commit(toPatch(patch)); }}
       />
-      {data.devices.length > 0 && (
+      {/* The order matters only to a merged effect, which runs through the devices in it. */}
+      {data.enabled && current.merge === true && data.devices.length > 0 && (
         <>
-          <p className={styles.zoneHeading} data-settings-aside="true">{t('devices.lianli-wireless.tab.devices')}</p>
+          <p className={styles.zoneHeading} data-settings-aside="true">{t('devices.lianli-hub.mergeOrder')}</p>
+          <p className={styles.customNote} data-settings-aside="true">{t('devices.lianli-hub.mergeOrderHint')}</p>
           {data.devices.map((d, i) => (
             <SettingRow key={`${d.kind}:${d.id}`} label={deviceName(d)}>
               {data.devices.length > 1 && (<>

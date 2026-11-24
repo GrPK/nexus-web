@@ -1185,6 +1185,8 @@
   "devices.lianli-hub.chainScreens": "{name}（{count} 個螢幕）",
   "devices.lianli-hub.fanScreen": "{name} 風扇螢幕",
   "devices.lianli-hub.fanScreens": "{name} 風扇螢幕",
+  "devices.lianli-hub.mergeOrder": "合併順序",
+  "devices.lianli-hub.mergeOrderHint": "合併效果依此順序依次經過各裝置",
   "devices.lianli-hub.screenTitle": "{name} 螢幕",
   "devices.lianli-hub.syncAll": "同步所有 Lian Li 燈光",
   "devices.lianli-hub.syncAllHint": "所有 Lian Li 燈光一起播放同一個效果。",

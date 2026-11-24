@@ -1194,6 +1194,8 @@
   "devices.lianli-hub.chainScreens": "{name} (ekrany: {count})",
   "devices.lianli-hub.fanScreen": "{name}: ekran wentylatora",
   "devices.lianli-hub.fanScreens": "{name}: ekrany wentylatorów",
+  "devices.lianli-hub.mergeOrder": "Kolejność scalania",
+  "devices.lianli-hub.mergeOrderHint": "Scalone efekty przechodzą przez urządzenia w tej kolejności",
   "devices.lianli-hub.screenTitle": "{name}: ekran",
   "devices.lianli-hub.syncAll": "Synchronizuj wszystkie światła Lian Li",
   "devices.lianli-hub.syncAllHint": "Wszystkie światła Lian Li odtwarzają razem jeden efekt.",

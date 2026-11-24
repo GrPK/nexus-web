@@ -1185,6 +1185,8 @@
   "devices.lianli-hub.chainScreens": "{name} ({count} Bildschirme)",
   "devices.lianli-hub.fanScreen": "{name}: Lüfterbildschirm",
   "devices.lianli-hub.fanScreens": "{name}: Lüfterbildschirme",
+  "devices.lianli-hub.mergeOrder": "Reihenfolge beim Zusammenführen",
+  "devices.lianli-hub.mergeOrderHint": "Zusammengeführte Effekte laufen in dieser Reihenfolge durch die Geräte",
   "devices.lianli-hub.screenTitle": "{name}: Bildschirm",
   "devices.lianli-hub.syncAll": "Alle Lian-Li-Lichter synchronisieren",
   "devices.lianli-hub.syncAllHint": "Alle Lian-Li-Lichter spielen gemeinsam einen Effekt.",

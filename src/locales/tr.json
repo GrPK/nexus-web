@@ -1185,6 +1185,8 @@
   "devices.lianli-hub.chainScreens": "{name} ({count} ekran)",
   "devices.lianli-hub.fanScreen": "{name} fan ekranı",
   "devices.lianli-hub.fanScreens": "{name} fan ekranları",
+  "devices.lianli-hub.mergeOrder": "Birleştirme sırası",
+  "devices.lianli-hub.mergeOrderHint": "Birleştirilmiş efektler cihazlardan bu sırayla geçer",
   "devices.lianli-hub.screenTitle": "{name} ekranı",
   "devices.lianli-hub.syncAll": "Tüm Lian Li ışıklarını eşitle",
   "devices.lianli-hub.syncAllHint": "Tüm Lian Li ışıkları tek bir efekti birlikte oynatır.",

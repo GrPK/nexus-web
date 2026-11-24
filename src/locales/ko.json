@@ -1185,6 +1185,8 @@
   "devices.lianli-hub.chainScreens": "{name} (화면 {count}개)",
   "devices.lianli-hub.fanScreen": "{name} 팬 화면",
   "devices.lianli-hub.fanScreens": "{name} 팬 화면",
+  "devices.lianli-hub.mergeOrder": "병합 순서",
+  "devices.lianli-hub.mergeOrderHint": "병합 효과는 이 순서대로 장치를 따라 흐릅니다",
   "devices.lianli-hub.screenTitle": "{name} 화면",
   "devices.lianli-hub.syncAll": "모든 Lian Li 조명 동기화",
   "devices.lianli-hub.syncAllHint": "모든 Lian Li 조명이 하나의 효과를 함께 재생합니다.",

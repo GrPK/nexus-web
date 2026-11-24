@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LianLiSyncAllBar, syncEffectOptions } from './LianLiSyncAllBar';
 import type { LianLiSyncAll, LianLiSyncEffect } from '../../../api/lianli-sync';
@@ -54,6 +54,14 @@ const sync: LianLiSyncAll = {
   ],
 };
 
+// Sync all on with a merged effect picked: the merge order shows.
+const merged: LianLiSyncAll = {
+  ...sync,
+  enabled: true,
+  effect: 'mergeMeteor',
+  effects: [...sync.effects, mergeEffect('mergeMeteor')],
+};
+
 const get = vi.fn();
 const set = vi.fn();
 const api = { get, set };
@@ -77,22 +85,39 @@ describe('LianLiSyncAllBar', () => {
     expect(screen.queryByRole('switch', { name: 'devices.lianli-hub.syncAll' })).not.toBeInTheDocument();
   });
 
-  it('lists the effects from the service, in its order, and the devices sync drives', async () => {
+  it('lists the effects from the service, in its order', async () => {
     await renderBar({ ...sync, enabled: true });
     fireEvent.click(screen.getByLabelText('devices.lianli.lightingMode'));
     const options = await screen.findAllByRole('option');
     expect(options.map(o => o.textContent)).toEqual([
       'devices.lianliEffect.rainbow', 'devices.lianliEffect.meteor', 'devices.lianliEffect.static',
     ]);
+  });
+
+  it('shows the merge order with its hint while a merged effect plays, the devices by name only', async () => {
+    await renderBar(merged);
+    const heading = screen.getByText('devices.lianli-hub.mergeOrder');
+    expect(heading.compareDocumentPosition(screen.getByText('devices.lianli-hub.mergeOrderHint')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText('Lian Li Wireless TL')).toBeInTheDocument();
-    // The names count the fans; no line under the rows.
-    expect(screen.queryByText(/devices\.lianli\.fanCount/)).not.toBeInTheDocument();
     expect(screen.getByText('HydroShift II OLED Curved')).toBeInTheDocument();
     expect(screen.getByText('Universal Screen 8.8')).toBeInTheDocument();
+    expect(screen.queryByText(/devices\.lianli\.fanCount/)).not.toBeInTheDocument();
+    expect(screen.queryByText('devices.lianli-wireless.tab.devices')).not.toBeInTheDocument();
+  });
+
+  it('hides the merge order with an effect each device plays, or with Sync all off', async () => {
+    await renderBar({ ...merged, effect: 'rainbow' });
+    expect(screen.queryByText('devices.lianli-hub.mergeOrder')).not.toBeInTheDocument();
+    expect(screen.queryByText('Lian Li Wireless TL')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'devices.lianli-wireless.orderMoveUp' })).not.toBeInTheDocument();
+    cleanup();
+    await renderBar({ ...merged, enabled: false });
+    expect(screen.queryByText('devices.lianli-hub.mergeOrder')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'devices.lianli-wireless.orderMoveDown' })).not.toBeInTheDocument();
   });
 
   it('names a TL chain as the Lighting tab does; the Curve and the 8.8 keep their names', async () => {
-    get.mockResolvedValue(sync);
+    get.mockResolvedValue(merged);
     const chainNames = new Map([['7880ae72ab3c', 'TL LCD Wireless Fans (3 screens)'], ['hydroShift2Curve', 'Other']]);
     await act(async () => {
       render(<LianLiSyncAllBar api={api} chainNames={chainNames} />);
@@ -104,7 +129,7 @@ describe('LianLiSyncAllBar', () => {
   });
 
   it('moves a device in the merge order at once, sends the whole order and reads it back', async () => {
-    let state = sync;
+    let state = merged;
     set.mockImplementation((patch: { devices?: { id: string }[] }) => {
       state = { ...state, devices: patch.devices!.map(o => state.devices.find(d => d.id === o.id)!) };
       return Promise.resolve(true);
@@ -135,7 +160,7 @@ describe('LianLiSyncAllBar', () => {
   it('shows the new order before the service answers and the stored one after a refusal', async () => {
     let answer!: (ok: boolean) => void;
     set.mockImplementation(() => new Promise<boolean>(resolve => { answer = resolve; }));
-    await renderBar();
+    await renderBar(merged);
     await act(async () => {
       fireEvent.click(screen.getAllByRole('button', { name: 'devices.lianli-wireless.orderMoveDown' })[0]);
     });

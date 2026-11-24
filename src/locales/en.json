@@ -1185,6 +1185,8 @@
   "devices.lianli-hub.chainScreens": "{name} ({count} screens)",
   "devices.lianli-hub.fanScreen": "{name} Fan Screen",
   "devices.lianli-hub.fanScreens": "{name} Fan Screens",
+  "devices.lianli-hub.mergeOrder": "Merge order",
+  "devices.lianli-hub.mergeOrderHint": "Merged effects run through the devices in this order",
   "devices.lianli-hub.screenTitle": "{name} Screen",
   "devices.lianli-hub.syncAll": "Sync all Lian Li lights",
   "devices.lianli-hub.syncAllHint": "Every Lian Li light plays one effect together.",

@@ -1185,6 +1185,8 @@
   "devices.lianli-hub.chainScreens": "{name} (画面 {count} 台)",
   "devices.lianli-hub.fanScreen": "{name} のファン画面",
   "devices.lianli-hub.fanScreens": "{name} のファン画面",
+  "devices.lianli-hub.mergeOrder": "統合の順序",
+  "devices.lianli-hub.mergeOrderHint": "統合エフェクトはこの順序でデバイスを流れます",
   "devices.lianli-hub.screenTitle": "{name} の画面",
   "devices.lianli-hub.syncAll": "すべての Lian Li ライトを同期",
   "devices.lianli-hub.syncAllHint": "すべての Lian Li ライトが 1 つのエフェクトを一緒に再生します。",

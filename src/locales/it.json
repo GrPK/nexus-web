@@ -1185,6 +1185,8 @@
   "devices.lianli-hub.chainScreens": "{name} ({count} schermi)",
   "devices.lianli-hub.fanScreen": "{name}: schermo della ventola",
   "devices.lianli-hub.fanScreens": "{name}: schermi delle ventole",
+  "devices.lianli-hub.mergeOrder": "Ordine di unione",
+  "devices.lianli-hub.mergeOrderHint": "Gli effetti uniti attraversano i dispositivi in questo ordine",
   "devices.lianli-hub.screenTitle": "{name}: schermo",
   "devices.lianli-hub.syncAll": "Sincronizza tutte le luci Lian Li",
   "devices.lianli-hub.syncAllHint": "Tutte le luci Lian Li riproducono insieme un unico effetto.",

@@ -1185,6 +1185,8 @@
   "devices.lianli-hub.chainScreens": "{name} ({count} telas)",
   "devices.lianli-hub.fanScreen": "{name}: tela da ventoinha",
   "devices.lianli-hub.fanScreens": "{name}: telas das ventoinhas",
+  "devices.lianli-hub.mergeOrder": "Ordem de mesclagem",
+  "devices.lianli-hub.mergeOrderHint": "Os efeitos mesclados percorrem os dispositivos nesta ordem",
   "devices.lianli-hub.screenTitle": "{name}: tela",
   "devices.lianli-hub.syncAll": "Sincronizar todas as luzes Lian Li",
   "devices.lianli-hub.syncAllHint": "Todas as luzes Lian Li reproduzem um único efeito juntas.",

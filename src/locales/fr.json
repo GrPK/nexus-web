@@ -1185,6 +1185,8 @@
   "devices.lianli-hub.chainScreens": "{name} ({count} écrans)",
   "devices.lianli-hub.fanScreen": "{name} : écran du ventilateur",
   "devices.lianli-hub.fanScreens": "{name} : écrans des ventilateurs",
+  "devices.lianli-hub.mergeOrder": "Ordre de fusion",
+  "devices.lianli-hub.mergeOrderHint": "Les effets fusionnés parcourent les appareils dans cet ordre",
   "devices.lianli-hub.screenTitle": "{name} : écran",
   "devices.lianli-hub.syncAll": "Synchroniser toutes les lumières Lian Li",
   "devices.lianli-hub.syncAllHint": "Toutes les lumières Lian Li jouent un même effet ensemble.",
