@@ -7,6 +7,7 @@ import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { LightingPageSwitch } from './LightingPageSwitch';
 import { lianLiSyncKey, type LianLiSyncLock } from '../../../api/lianli-sync';
+import { lianLiSyncMemberAnchor } from '../../../lib/pageAnchors';
 import {
   getLianLiWirelessLighting,
   setLianLiWirelessChainLighting,
@@ -415,7 +416,7 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
 
   return (
     <>
-    <SettingsSection title={title} boxClassName={styles.sectionBox}>
+    <SettingsSection title={title} boxClassName={styles.sectionBox} searchAnchor={lianLiSyncMemberAnchor(chain.mac)}>
       {!p28 && (chain.argbCableConnected || argbOn) && (
         <SettingToggle
           label={t('devices.motherboardArgb.label')}

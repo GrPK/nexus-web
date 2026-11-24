@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { SettingRow, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { Button } from '../../common/Button/Button';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import type { SelectOption } from '../../common/Select/Select';
 import { Notice } from '../../common/Notice/Notice';
+import { requestSearchScroll } from '../../../search/scroll';
+import { lianLiSyncMemberAnchor } from '../../../lib/pageAnchors';
 import {
   LIANLI_SYNC_ALL_API, lianLiSyncKey, type LianLiSyncAll, type LianLiSyncAllApi, type LianLiSyncAllPatch, type LianLiSyncEffect,
   type LianLiSyncLock,
@@ -24,12 +26,36 @@ interface LianLiSyncAllBarProps {
   memberLocks?: ReadonlyMap<string, LianLiSyncLock>;
   /** Runs with the ids of the devices Sync all drives (lianLiSyncKey), none while it is off, so their own controls lock. */
   onSynced?: (ids: ReadonlySet<string>) => void;
+  /** The members (lianLiSyncKey) whose section is on this page: their names in the notice scroll to it. */
+  sectionIds?: ReadonlySet<string>;
 }
 
-/** "A, B, C" in the page's language; a plain comma join where Intl.ListFormat is missing. */
-function joinNames(names: readonly string[], language: string | undefined): string {
-  if (typeof Intl === 'undefined' || typeof Intl.ListFormat !== 'function') return names.join(', ');
-  return new Intl.ListFormat(language, { style: 'short', type: 'unit' }).format(names);
+type ListPart = { type: 'element'; index: number } | { type: 'literal'; value: string };
+
+/** "A, B, C" in the page's language as parts, so each name can be its own node; a plain comma join where Intl.ListFormat is missing. */
+function listParts(count: number, language: string | undefined): ListPart[] {
+  const parts: ListPart[] = [];
+  if (typeof Intl === 'undefined' || typeof Intl.ListFormat !== 'function') {
+    for (let i = 0; i < count; i++) {
+      if (i > 0) parts.push({ type: 'literal', value: ', ' });
+      parts.push({ type: 'element', index: i });
+    }
+    return parts;
+  }
+  let index = 0;
+  const placeholders = Array.from({ length: count }, (_, i) => String(i));
+  for (const p of new Intl.ListFormat(language, { style: 'short', type: 'unit' }).formatToParts(placeholders)) {
+    parts.push(p.type === 'element' ? { type: 'element', index: index++ } : { type: 'literal', value: p.value });
+  }
+  return parts;
+}
+
+// Stands for the device list in a translated line, so the names can go in as their own nodes.
+const DEVICES_SLOT = '%%devices%%';
+
+interface HeldDevice {
+  id: string;
+  name: string;
 }
 
 // The members the Lighting tab names (a TL chain with its count, a Strimer by its model).
@@ -103,7 +129,7 @@ function patchEffect(data: LianLiSyncAll, patch: LianLiSyncAllPatch): LianLiSync
  * Sync all on the Lian Li page: one effect across every light the service lists
  * (L-Connect's Merge), each effect keeping its own look, or each device plays its own.
  */
-export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNames, memberLocks, onSynced }: LianLiSyncAllBarProps) {
+export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNames, memberLocks, onSynced, sectionIds }: LianLiSyncAllBarProps) {
   const { t, language } = useTranslation();
   const [data, setData] = useState<LianLiSyncAll | null>(null);
   const aliveRef = useRef(true);
@@ -171,12 +197,38 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
     (CHAIN_KINDS.has(d.kind) ? namesByMac.get(lianLiSyncKey(d.id)) : undefined) ?? d.name;
   // A member the Lighting page or its motherboard input drives would be taken over silently, so Sync all
   // waits until the user turns that off. Turning Sync all off is always allowed.
-  const onLightingPage = data.devices.filter(d => memberLocks?.get(lianLiSyncKey(d.id)) === 'lightingPage').map(deviceName);
+  const onLightingPage: HeldDevice[] = data.devices
+    .filter(d => memberLocks?.get(lianLiSyncKey(d.id)) === 'lightingPage')
+    .map(d => ({ id: lianLiSyncKey(d.id), name: deviceName(d) }));
   // The service leaves a chain on its motherboard input off the list, so those come from the chains themselves.
-  const onMotherboard = [...(memberLocks ?? [])].filter(([, lock]) => lock === 'motherboardArgb').map(([id]) => {
+  const onMotherboard: HeldDevice[] = [...(memberLocks ?? [])].filter(([, lock]) => lock === 'motherboardArgb').map(([id]) => {
     const listed = data.devices.find(d => lianLiSyncKey(d.id) === id);
-    return listed ? deviceName(listed) : namesByMac.get(id) ?? id;
+    return { id, name: listed ? deviceName(listed) : namesByMac.get(id) ?? id };
   });
+  // The line with each name that has a section on this page as a link that scrolls to it and shines it.
+  const heldLine = (key: string, held: readonly HeldDevice[]) => {
+    const text = t(key, { devices: DEVICES_SLOT });
+    const at = text.indexOf(DEVICES_SLOT);
+    const parts = listParts(held.length, language);
+    if (at < 0) {
+      return t(key, { devices: parts.map(p => (p.type === 'element' ? held[p.index].name : p.value)).join('') });
+    }
+    return (<>
+      {text.slice(0, at)}
+      {parts.map((p, i) => {
+        if (p.type === 'literal') return <Fragment key={i}>{p.value}</Fragment>;
+        const device = held[p.index];
+        return sectionIds?.has(device.id)
+          ? (
+            <button key={i} type="button" className={styles.noticeLink} onClick={() => requestSearchScroll(lianLiSyncMemberAnchor(device.id))}>
+              {device.name}
+            </button>
+          )
+          : <Fragment key={i}>{device.name}</Fragment>;
+      })}
+      {text.slice(at + DEVICES_SLOT.length)}
+    </>);
+  };
   const cannotTurnOn = !data.enabled && onLightingPage.length + onMotherboard.length > 0;
   // The order matters only to a merged effect, which runs through the devices in it.
   const mergedOn = data.enabled && current.merge === true && data.devices.length > 0;
@@ -202,8 +254,8 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
       {cannotTurnOn && (
         <div data-settings-aside="true">
           <Notice tone="info" role="status">
-            {onLightingPage.length > 0 && <div>{t('devices.lianli-hub.syncBlockedLightingPage', { devices: joinNames(onLightingPage, language) })}</div>}
-            {onMotherboard.length > 0 && <div>{t('devices.lianli-hub.syncBlockedArgb', { devices: joinNames(onMotherboard, language) })}</div>}
+            {onLightingPage.length > 0 && <div>{heldLine('devices.lianli-hub.syncBlockedLightingPage', onLightingPage)}</div>}
+            {onMotherboard.length > 0 && <div>{heldLine('devices.lianli-hub.syncBlockedArgb', onMotherboard)}</div>}
           </Notice>
         </div>
       )}

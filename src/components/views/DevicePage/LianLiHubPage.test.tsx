@@ -28,7 +28,7 @@ vi.mock('../../../panel/widgets/devices/DevicesPage', () => ({
 }));
 const { unitCalls, lightCards, unitBodies, syncBars } = vi.hoisted(() => ({
   unitCalls: [] as { flex: boolean; enabled?: boolean; lightingActive: boolean }[],
-  lightCards: [] as { title?: string; api?: unknown; syncedAll?: boolean; onLightingPage?: (on: boolean) => void }[],
+  lightCards: [] as { title?: string; api?: unknown; syncedAll?: boolean; onLightingPage?: (on: boolean) => void; searchAnchor?: string }[],
   unitBodies: [] as any[],
   syncBars: [] as any[],
 }));
@@ -53,8 +53,8 @@ vi.mock('./LianLiSyncAllBar', () => ({
   },
 }));
 vi.mock('./HydroShift2RingSettings', () => ({
-  HydroShift2RingSettings: ({ title, api, syncedAll, onLightingPage }: any) => {
-    lightCards.push({ title, api, syncedAll, onLightingPage });
+  HydroShift2RingSettings: ({ title, api, syncedAll, onLightingPage, searchAnchor }: any) => {
+    lightCards.push({ title, api, syncedAll, onLightingPage, searchAnchor });
     return <div data-testid="light-card">{title}</div>;
   },
 }));
@@ -243,6 +243,18 @@ describe('LianLiHubPage', () => {
     // A light that leaves the Lighting page no longer holds Sync all back.
     await act(async () => { card('HydroShift II Curved').onLightingPage?.(false); });
     expect(Object.fromEntries(bar().memberLocks)).toEqual({ '7880AE72AB3C': 'motherboardArgb' });
+  });
+
+  it('hands Sync all the members with a section on the tab, each section anchored for its link', async () => {
+    await renderHub([wireless, curve, screen88]);
+    await openTab('lighting.title');
+    const bar = () => syncBars[syncBars.length - 1];
+    const lightingBody = () => unitBodies.filter(b => b.tab === 'lighting').slice(-1)[0];
+    await act(async () => { lightingBody().onChainNames(new Map([['64f271e566e1', 'Strimer MB 24-Pin']])); });
+    expect([...bar().sectionIds].sort()).toEqual(['64F271E566E1', 'HYDROSHIFT2CURVE', 'UNIVERSALSCREEN88']);
+    const anchorOf = (title: string) => lightCards.filter(c => c.title === title).slice(-1)[0]?.searchAnchor;
+    expect(anchorOf('HydroShift II Curved')).toBe('lianli-sync-member:HYDROSHIFT2CURVE');
+    expect(anchorOf('Universal Screen 8.8')).toBe('lianli-sync-member:UNIVERSALSCREEN88');
   });
 
   it('the HydroShift II pump ring keeps its default endpoints', async () => {

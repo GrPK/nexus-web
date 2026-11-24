@@ -29,6 +29,7 @@ export function SettingsSection({
   boxClassName,
   ariaLabel,
   pillarOff,
+  searchAnchor,
 }: {
   // Omit for a titleless box (e.g. the welcome screen's preferences group).
   title?: ReactNode;
@@ -54,10 +55,16 @@ export function SettingsSection({
   ariaLabel?: string;
   // The group's feature pillar is off: its rows give way to one notice naming where to turn it on.
   pillarOff?: { message: string; anchors: readonly string[] };
+  // Sets `data-search-anchor` on the section: a target requestSearchScroll reveals and shines (search/scroll.ts).
+  searchAnchor?: string;
 }) {
   const hasHeader = title !== undefined || description !== undefined || action !== undefined;
   return (
-    <section className={[styles.section, fill ? styles.fill : '', flush ? styles.flush : '', className ?? ''].filter(Boolean).join(' ')} aria-label={ariaLabel}>
+    <section
+      className={[styles.section, fill ? styles.fill : '', flush ? styles.flush : '', className ?? ''].filter(Boolean).join(' ')}
+      aria-label={ariaLabel}
+      data-search-anchor={searchAnchor}
+    >
       {hasHeader && (
         <div className={styles.header}>
           <div className={styles.titleRow}>

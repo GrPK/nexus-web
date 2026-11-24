@@ -65,3 +65,15 @@ describe('SettingsSection gap', () => {
     expect(container.firstElementChild?.className).toBe(styles.block);
   });
 });
+
+describe('SettingsSection searchAnchor', () => {
+  it('stamps the section as a scroll-and-shine target', () => {
+    render(<SettingsSection title="T" searchAnchor="here"><button type="button">go</button></SettingsSection>);
+    expect(screen.getByRole('button', { name: 'go' }).closest('section')).toHaveAttribute('data-search-anchor', 'here');
+  });
+
+  it('stamps nothing without one', () => {
+    render(<SettingsSection title="T"><button type="button">go</button></SettingsSection>);
+    expect(screen.getByRole('button', { name: 'go' }).closest('section')).not.toHaveAttribute('data-search-anchor');
+  });
+});

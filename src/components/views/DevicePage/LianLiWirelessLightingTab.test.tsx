@@ -291,6 +291,15 @@ describe('Sync all on the Lian Li page', () => {
     expect(mockSetStrimer).toHaveBeenCalledWith('7880ae72ab3c', { mode: 'rainbow', effectMode: undefined });
   });
 
+  it('anchors each chain\'s section, for the Sync all notice to scroll to', async () => {
+    mockGetStrimers.mockResolvedValue({ ...catalog, chains: [tl, strimer] });
+    await act(async () => {
+      render(<LianLiWirelessLightingTab />);
+    });
+    expect(document.querySelector('section[data-search-anchor="lianli-sync-member:7880AE72AB3C"]')).toHaveTextContent('devices.lianli-wireless.fanTypeTlv2');
+    expect(document.querySelector('section[data-search-anchor="lianli-sync-member:64F271E566E1"]')).toHaveTextContent('Strimer 24-Pin');
+  });
+
   it('leaves a chain Sync all does not drive as it is', async () => {
     mockGetStrimers.mockResolvedValue({ ...catalog, chains: [tl] });
     await act(async () => {

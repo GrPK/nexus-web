@@ -17,7 +17,7 @@ import type { LianLiWirelessChainLighting } from '../../../api/lianli-wireless';
 import { LIANLI_SYNC_CURVE_ID, LIANLI_SYNC_SCREEN88_ID, lianLiSyncKey, type LianLiSyncLock } from '../../../api/lianli-sync';
 import type { DashboardSectionNavigate } from '../../../panel/engine/panelLayoutHelpers';
 import { DeviceCard } from '../../../panel/widgets/devices/DevicesPage';
-import { lianLiFlexCoolingAnchors, lianLiFlexLightingAnchors, lianLiWirelessCoolingAnchors, lianLiWirelessLightingAnchors } from '../../../lib/pageAnchors';
+import { lianLiFlexCoolingAnchors, lianLiFlexLightingAnchors, lianLiSyncMemberAnchor, lianLiWirelessCoolingAnchors, lianLiWirelessLightingAnchors } from '../../../lib/pageAnchors';
 import { useTranslation } from '../../../lib/i18n';
 import { CoolingPageShortcut, LightingPageShortcut } from './CoolingPageLink';
 import { HydroShift2CurvePumpSettings } from './HydroShift2CurveSettings';
@@ -166,6 +166,14 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
   const screen88Screen = useLianLiScreen88Screen(!!screen88 && !screen88Panel);
   const screen88Windows = screen88Screen.view === 'windows' || screen88Screen.view === 'restarting';
   const screen88Title = screen88?.shortName ?? LIANLI_SCREEN88_NAME;
+  // The Sync all members with a section on the Lighting tab, for the held notice's links.
+  const hasCurve = !!curve;
+  const hasScreen88 = !!screen88;
+  const syncSections = useMemo(() => new Set([
+    ...[...chainNames.keys()].map(lianLiSyncKey),
+    ...(hasCurve ? [lianLiSyncKey(LIANLI_SYNC_CURVE_ID)] : []),
+    ...(hasScreen88 ? [lianLiSyncKey(LIANLI_SYNC_SCREEN88_ID)] : []),
+  ]), [chainNames, hasCurve, hasScreen88]);
 
   // The L-Wireless controller and the Flex hub, read the way their own pages read them.
   const wirelessUnit = useLianLiUnit({ flex: false, enabled: wireless, lightingActive: activeTab === 'lighting', onSectionNavigate: nav });
@@ -268,7 +276,13 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
 
           {tab === 'lighting' && (
             <>
-              <LianLiSyncAllBar onWritten={onSyncWritten} chainNames={chainNames} memberLocks={memberLocks} onSynced={onSynced} />
+              <LianLiSyncAllBar
+                onWritten={onSyncWritten}
+                chainNames={chainNames}
+                memberLocks={memberLocks}
+                onSynced={onSynced}
+                sectionIds={syncSections}
+              />
               {/* Strimers, then fans without screens, then fans with screens (most screens first), then
                   the single-screen devices; each group keeps the order it had. */}
               {CHAIN_GROUPS.map(group => (
@@ -307,6 +321,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
                   onSectionNavigate={nav}
                   syncedAll={syncedIds.has(lianLiSyncKey(LIANLI_SYNC_CURVE_ID))}
                   onLightingPage={lockReporters.curve}
+                  searchAnchor={lianLiSyncMemberAnchor(LIANLI_SYNC_CURVE_ID)}
                 />
               )}
               {screen88 && (
@@ -316,6 +331,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
                   onSectionNavigate={nav}
                   syncedAll={syncedIds.has(lianLiSyncKey(LIANLI_SYNC_SCREEN88_ID))}
                   onLightingPage={lockReporters.screen88}
+                  searchAnchor={lianLiSyncMemberAnchor(LIANLI_SYNC_SCREEN88_ID)}
                 />
               )}
             </>

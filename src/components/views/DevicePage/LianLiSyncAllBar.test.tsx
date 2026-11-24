@@ -20,6 +20,11 @@ const mergeEffect = (key: string): LianLiSyncEffect => ({
   speed: 3, brightness: 4, direction: 0, colors: [],
 });
 
+const mockScroll = vi.fn();
+vi.mock('../../../search/scroll', () => ({
+  requestSearchScroll: (...args: unknown[]) => mockScroll(...args),
+}));
+
 vi.mock('../../../lib/i18n', () => ({
   useTranslation: () => ({
     t: (key: string, vars?: Record<string, unknown>) =>
@@ -213,6 +218,33 @@ describe('LianLiSyncAllBar', () => {
       'devices.lianli-hub.syncBlockedLightingPage:{"devices":"Strimer MB 24-Pin, Strimer CPU 2x8, TL LCD Wireless Fans 2 (1 screen)"}',
     );
     expect(notice).not.toHaveTextContent('syncBlockedArgb');
+  });
+
+  it('makes each held name with a section on the page a button that scrolls to it; the rest stay text', async () => {
+    get.mockResolvedValue(withStrimers);
+    const memberLocks = new Map([
+      ['64F271E566E1', 'lightingPage' as const],
+      ['9828EC72ABE1', 'lightingPage' as const],
+      ['91D3EC72ABE1', 'motherboardArgb' as const],
+    ]);
+    // The one-screen TL chain has no section here.
+    const sectionIds = new Set(['64F271E566E1', '91D3EC72ABE1', 'HYDROSHIFT2CURVE']);
+    await act(async () => {
+      render(<LianLiSyncAllBar api={api} chainNames={lightingNames} memberLocks={memberLocks} sectionIds={sectionIds} />);
+    });
+    const notice = screen.getByRole('status');
+    // The wording is unchanged; only the names became buttons.
+    expect(notice).toHaveTextContent(
+      'devices.lianli-hub.syncBlockedLightingPage:{"devices":"Strimer MB 24-Pin, TL LCD Wireless Fans 2 (1 screen)"}',
+    );
+    expect(notice).toHaveTextContent('devices.lianli-hub.syncBlockedArgb:{"devices":"TL LCD Wireless Fans (3 screens)"}');
+    expect(screen.queryByRole('button', { name: 'TL LCD Wireless Fans 2 (1 screen)' })).not.toBeInTheDocument();
+    const strimer = screen.getByRole('button', { name: 'Strimer MB 24-Pin' });
+    expect(strimer).toHaveAttribute('type', 'button');
+    fireEvent.click(strimer);
+    expect(mockScroll).toHaveBeenLastCalledWith('lianli-sync-member:64F271E566E1');
+    fireEvent.click(screen.getByRole('button', { name: 'TL LCD Wireless Fans (3 screens)' }));
+    expect(mockScroll).toHaveBeenLastCalledWith('lianli-sync-member:91D3EC72ABE1');
   });
 
   it('counts a chain on its motherboard input although the route leaves it off the list', async () => {

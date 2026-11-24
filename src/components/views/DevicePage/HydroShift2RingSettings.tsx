@@ -51,10 +51,12 @@ interface HydroShift2RingSettingsProps {
   syncedAll?: boolean;
   /** Runs with whether the Lighting page drives this light, once read and on every change. */
   onLightingPage?: (on: boolean) => void;
+  /** A search anchor on the section, for a link elsewhere on the page to scroll to it. */
+  searchAnchor?: string;
 }
 
 /** A HydroShift II light (the pump ring, the OLED Curved's edge): follow the Lighting page, or loop one of its own effects. */
-export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING_API, title, syncedAll = false, onLightingPage }: HydroShift2RingSettingsProps) {
+export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING_API, title, syncedAll = false, onLightingPage, searchAnchor }: HydroShift2RingSettingsProps) {
   const { t } = useTranslation();
   const { numberFormat } = useUnitPrefs();
   const [lighting, setLighting] = useState<HydroShift2Lighting | null>(null);
@@ -115,7 +117,7 @@ export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING
   );
 
   return (
-    <SettingsSection title={title ?? t('devices.lianli.lightingSection')}>
+    <SettingsSection title={title ?? t('devices.lianli.lightingSection')} searchAnchor={searchAnchor}>
       <LightingPageSwitch
         on={followsLightingPage}
         disabled={!loaded || (syncedAll && !followsLightingPage)}

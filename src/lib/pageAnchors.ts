@@ -6,6 +6,8 @@
 export const lightingGroupAnchor = (groupKey: string) => `lighting-group:${groupKey}`;
 export const lightingDeviceAnchor = (deviceId: string) => `lighting-device:${deviceId}`;
 export const coolingGroupAnchor = (blockId: string) => `cooling-group:${blockId}`;
+/** A Sync all member's section on the Lian Li page's Lighting tab: a TL chain or Strimer by MAC, the Curve edge, the 8.8 bezel. */
+export const lianLiSyncMemberAnchor = (memberId: string) => `lianli-sync-member:${memberId.toUpperCase()}`;
 
 const WIRED_HUB_ID = 'lianli';
 const WIRELESS_HUB_ID = 'lianli-wireless';
