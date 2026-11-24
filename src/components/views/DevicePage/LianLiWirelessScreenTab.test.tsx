@@ -23,6 +23,9 @@ const mockGetAioScreen = vi.fn(() => Promise.resolve({
   showCpuTemp: true, showCpuLoad: true, showGpuTemp: true, showGpuLoad: true, showFanSpeed: false, nexusWidgets: true,
 }));
 
+const toast = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock('../../common/Toast/Toast', () => ({ useToastSafe: () => toast }));
+
 const mockSearchKlipy = vi.fn();
 const mockStageKlipy = vi.fn();
 const mockFetchStaged = vi.fn();
@@ -474,6 +477,36 @@ describe('LianLiWirelessScreenTab', () => {
     await waitFor(() => expect(mockImportMedia).toHaveBeenCalledTimes(1));
     expect(mockImportMedia).toHaveBeenCalledWith(file, { x: 0, y: 0, w: 1, h: 1, rotate: 0, mirror: false });
     await waitFor(() => expect(mockGetMedia).toHaveBeenCalledTimes(2));
+  });
+
+  async function importOneFile() {
+    await renderTab();
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [new File(['data'], 'clip.mp4', { type: 'video/mp4' })] } });
+    });
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'cropper.title' })).getByRole('button', { name: 'cropper.confirm' }));
+    await waitFor(() => expect(mockImportMedia).toHaveBeenCalledTimes(1));
+  }
+
+  it('shows the service message in a toast when an import is refused', async () => {
+    mockImportMedia.mockResolvedValue({ error: true, msg: 'ffmpeg exit 1: bad' });
+    await importOneFile();
+    await waitFor(() => expect(toast.push).toHaveBeenCalledWith({ title: 'lighting.controls.importFailed', body: 'ffmpeg exit 1: bad' }));
+  });
+
+  it('says the service could not be reached when an import gets no answer', async () => {
+    mockImportMedia.mockResolvedValue(null);
+    await importOneFile();
+    await waitFor(() => expect(toast.push).toHaveBeenCalledWith({
+      title: 'lighting.controls.importFailed', body: 'lighting.controls.importNetworkError',
+    }));
+  });
+
+  it('shows no failure toast when an import succeeds', async () => {
+    await importOneFile();
+    await waitFor(() => expect(mockGetMedia).toHaveBeenCalledTimes(2));
+    expect(toast.push).not.toHaveBeenCalled();
   });
 
   const panelScreen = (over: Record<string, unknown> = {}) => ({

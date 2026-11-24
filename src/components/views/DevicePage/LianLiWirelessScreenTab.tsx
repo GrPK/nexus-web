@@ -39,6 +39,7 @@ import { useTranslation } from '../../../lib/i18n';
 import { localizeNumbers } from '../../../lib/units';
 import { LianLiAioScreenSection } from './LianLiAioScreenSection';
 import { FrameRateSetting } from './FrameRateSetting';
+import { useToastSafe } from '../../common/Toast/Toast';
 import styles from './LianLiWirelessDevicePage.module.scss';
 
 const WIRELESS_SCREEN_API: LianLiScreenApi = {
@@ -159,6 +160,7 @@ export function LianLiWirelessScreenTab({
   defaultOrder?: readonly string[];
 }) {
   const { t } = useTranslation();
+  const { push } = useToastSafe();
   const { numberFormat } = useUnitPrefs();
   const [screens, setScreens] = useState<LianLiWirelessScreen[] | null>(null);
   const [media, setMedia] = useState<LianLiWirelessMediaItem[]>([]);
@@ -432,9 +434,15 @@ export function LianLiWirelessScreenTab({
     try {
       const upload = file ?? (rawUrl ? await fetchStagedFile(rawUrl, name) : null);
       if (upload) {
-        const item = await importLianLiWirelessMedia(upload, crop);
+        const result = await importLianLiWirelessMedia(upload, crop);
         await refreshMedia();
-        if (item && aliveRef.current) handleMediaSelect(item);
+        if (!result) {
+          push({ title: t('lighting.controls.importFailed'), body: t('lighting.controls.importNetworkError') });
+        } else if ('error' in result) {
+          push({ title: t('lighting.controls.importFailed'), body: result.msg || undefined });
+        } else if (aliveRef.current) {
+          handleMediaSelect(result);
+        }
       }
     } finally {
       if (file) URL.revokeObjectURL(src);
@@ -444,7 +452,7 @@ export function LianLiWirelessScreenTab({
         setCropState(null);
       }
     }
-  }, [cropState, refreshMedia, handleMediaSelect]);
+  }, [cropState, refreshMedia, handleMediaSelect, push, t]);
 
   const handleCropCancel = useCallback(() => {
     if (cropState?.file) URL.revokeObjectURL(cropState.src);
