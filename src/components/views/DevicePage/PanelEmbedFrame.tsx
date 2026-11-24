@@ -16,7 +16,7 @@ import {
   type SimulatorParentToChild,
   type SimulatorTheme,
 } from '../../../panel/embed/simulatorProtocol';
-import type { PanelLayout, PanelSurface, PanelWidget } from '../../../panel/types';
+import type { ChromeGrid, PanelLayout, PanelSurface, PanelWidget } from '../../../panel/types';
 import { simulatedPanelCssViewport } from '../../../panel/embed/simulatedPanelViewport';
 import { playlistTypeOfWidgetId, playlistWidget } from '../../../panel/engine/widgetPlaylist';
 import { useTranslation } from '../../../lib/i18n';
@@ -28,6 +28,8 @@ export interface PanelEmbedFrameHandle {
 }
 
 interface PanelEmbedFrameProps {
+  /** SVG filter id applied to the frame, for 1-bit glass. */
+  monoFilterId?: string;
   surface: PanelSurface;
   captureRef?: Ref<PanelEmbedFrameHandle>;
   layout: PanelLayout;
@@ -40,6 +42,9 @@ interface PanelEmbedFrameProps {
   onLayoutChange: (layout: PanelLayout) => void;
   onWidgetClicked: (widget: PanelWidget) => void;
   onBackgroundClicked: () => void;
+  // A click on free background; the point is in the host window's client pixels.
+  onBackgroundMenu?: (point: { x: number; y: number }) => void;
+  onBackgroundCovered?: (covered: boolean) => void;
   // The widget type the preview's playlist rotation shows (null when none).
   onPlaylistShown?: (type: string | null) => void;
   /** Panel device record id. Forwarded to the simulator iframe so it can render media backgrounds. */
@@ -51,6 +56,8 @@ interface PanelEmbedFrameProps {
   // desktop see-through gate needs it or a 'monitor' preview renders the theme
   // background where the device shows the wallpaper.
   displayBound?: boolean;
+  // Precomputed by the editor from the record family, forwarded so the preview classifies like the kiosk.
+  genericDisplay?: boolean;
   canvasSize?: { width: number; height: number };
   // Device DPI. Converts native canvas dimensions into the CSS-pixel
   // viewport the device exposes to its WebView, so the iframe reproduces
@@ -78,7 +85,10 @@ interface PanelEmbedFrameProps {
   gridDpi?: number;
   // Short-axis slot count Widget size forces on the grid, forwarded with the density.
   shortSideSlots?: number;
-  brightness: number;
+  // The single-widget tile has its axes swapped (a quarter-turn render).
+  transposedTile?: boolean;
+  // The Large-size grid that sizes floating chrome in the preview.
+  chromeGrid?: ChromeGrid;
   screenOn: boolean;
   showPanel: boolean;
 }
@@ -181,11 +191,11 @@ function composeFrostForCapture(doc: Document): () => void {
 
 // html-to-image rasterizes a <video> by drawing it into a canvas sized to its
 // padding box (clientWidth), not its content box, so the wake-lock side
-// padding on the media background (.backgroundMediaVideo) would rasterize a
+// padding on panel videos (marked data-wakelock-pad) would rasterize a
 // horizontally stretched frame. Returns an undo.
 function unpadVideosForCapture(doc: Document): () => void {
   const undo: Array<() => void> = [];
-  doc.querySelectorAll<HTMLVideoElement>('[data-panel-bg-layer] video').forEach(video => {
+  doc.querySelectorAll<HTMLVideoElement>('video[data-wakelock-pad]').forEach(video => {
     const prevPadding = video.style.padding;
     const prevMarginLeft = video.style.marginLeft;
     video.style.padding = '0';
@@ -217,18 +227,23 @@ export function PanelEmbedFrame({
   onLayoutChange,
   onWidgetClicked,
   onBackgroundClicked,
+  onBackgroundMenu,
+  onBackgroundCovered,
   onPlaylistShown,
   canvasSize,
+  monoFilterId,
   canvasDpi,
   canvasIsCssPixels,
   gridDpi,
   shortSideSlots,
-  brightness,
+  transposedTile = false,
+  chromeGrid,
   screenOn,
   showPanel,
   deviceId,
   deviceTouch,
   displayBound,
+  genericDisplay,
 }: PanelEmbedFrameProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -328,12 +343,26 @@ export function PanelEmbedFrame({
           // A playlist stand-in is not in the layout; its type is enough for the editor.
           const playlistType = playlistTypeOfWidgetId(data.widgetId);
           const widget = findWidget(layout, data.widgetId)
-            ?? (playlistType ? playlistWidget(layout, playlistType, surface) : undefined);
+            ?? (playlistType ? playlistWidget(layout, playlistType, surface, '', transposedTile) : undefined);
           if (widget) onWidgetClicked(widget);
           break;
         }
         case 'simulator/background-clicked': {
           onBackgroundClicked();
+          break;
+        }
+        case 'simulator/background-menu': {
+          // The iframe is transform-scaled, so its client pixels map through the box ratio.
+          const frame = iframeRef.current;
+          if (!frame) break;
+          const rect = frame.getBoundingClientRect();
+          const sx = frame.offsetWidth > 0 ? rect.width / frame.offsetWidth : 1;
+          const sy = frame.offsetHeight > 0 ? rect.height / frame.offsetHeight : 1;
+          onBackgroundMenu?.({ x: rect.left + data.x * sx, y: rect.top + data.y * sy });
+          break;
+        }
+        case 'simulator/background-covered': {
+          onBackgroundCovered?.(data.covered);
           break;
         }
         case 'simulator/playlist-shown': {
@@ -346,7 +375,7 @@ export function PanelEmbedFrame({
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [layout, onBackgroundClicked, onLayoutChange, onPlaylistShown, onWidgetClicked, surface]);
+  }, [layout, onBackgroundClicked, onBackgroundCovered, onBackgroundMenu, onLayoutChange, onPlaylistShown, onWidgetClicked, surface, transposedTile]);
 
   // Init handshake: send the full state once the child says it's ready.
   useEffect(() => {
@@ -356,13 +385,15 @@ export function PanelEmbedFrame({
       surface,
       deviceTouch,
       displayBound,
+      genericDisplay,
       dpi: effectiveGridDpi,
       shortSideSlots,
+      transposedTile,
+      chromeGrid,
       layout,
       theme,
       themeMode,
       selectedWidgetId,
-      brightness,
       screenOn,
       showPanel,
       deviceId,
@@ -404,8 +435,8 @@ export function PanelEmbedFrame({
   // fetch races the iframe boot), so mirror it like the other props.
   useEffect(() => {
     if (!childReady) return;
-    post({ type: 'simulator/set-grid', dpi: effectiveGridDpi, shortSideSlots });
-  }, [childReady, effectiveGridDpi, shortSideSlots, post]);
+    post({ type: 'simulator/set-grid', dpi: effectiveGridDpi, shortSideSlots, transposedTile, chromeGrid });
+  }, [childReady, effectiveGridDpi, shortSideSlots, transposedTile, chromeGrid, post]);
 
   // Touch capability can resolve after init the same way (record fetch),
   // so mirror it too - the preview's drag sensor gates on it.
@@ -418,8 +449,8 @@ export function PanelEmbedFrame({
   // gate in the iframe needs it.
   useEffect(() => {
     if (!childReady) return;
-    post({ type: 'simulator/set-display-bound', displayBound });
-  }, [childReady, displayBound, post]);
+    post({ type: 'simulator/set-display-bound', displayBound, genericDisplay });
+  }, [childReady, displayBound, genericDisplay, post]);
 
   useEffect(() => {
     if (!childReady) return;
@@ -437,8 +468,8 @@ export function PanelEmbedFrame({
 
   useEffect(() => {
     if (!childReady) return;
-    post({ type: 'simulator/set-display', brightness, screenOn, showPanel });
-  }, [childReady, brightness, screenOn, showPanel, post]);
+    post({ type: 'simulator/set-display', screenOn, showPanel });
+  }, [childReady, screenOn, showPanel, post]);
 
   // Same-origin iframe, so its document rasterizes directly. The SVG
   // foreignObject render is vector, so drawing at the native output size
@@ -526,6 +557,7 @@ export function PanelEmbedFrame({
           width: canvasW,
           height: canvasH,
           transform: `scale(${measured.scale})`,
+          ...(monoFilterId ? { filter: `url(#${monoFilterId})`, imageRendering: 'pixelated' as const } : {}),
         }}
       />
     </div>

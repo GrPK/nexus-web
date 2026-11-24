@@ -21,6 +21,19 @@ export function pickerHexAt(x: number, y: number): string {
   return hsvToHex(clamp01(x) * 360, s * 100, v * 100);
 }
 
+/** A contact this recently down or dragging still owns the pick. */
+export const PICKER_ACTIVE_MS = 250;
+
+/**
+ * Whether a contact landing while another owns the pick may take it over.
+ * A palm often rests on the field before the fingertip arrives, so a contact
+ * that has gone quiet gives way. A fresh tap or a drag in progress keeps the
+ * pick, so a palm grazing the field behind a fingertip cannot steal it.
+ */
+export function canTakePick(msSinceOwnerActive: number): boolean {
+  return msSinceOwnerActive >= PICKER_ACTIVE_MS;
+}
+
 export interface PickerPoint {
   x: number;
   y: number;
@@ -41,23 +54,26 @@ export function pickerPointFor(hex: string): PickerPoint {
 }
 
 /**
- * The segmented view samples the same field on a coarse grid - twelve hues, one
- * every 30 degrees. The rows are lightness stops, not an even split of the axis:
- * the centre stop is the pure hue (full saturation and value), three tints run
- * above it and three shades below, and the ends pull in from white and black,
- * which an LED renders as blown out and as off.
+ * The segmented view samples the same field on a coarse grid. Hues sit on
+ * column starts, evenly spaced from pure red, so the primaries are all on it.
+ * The rows are lightness stops, not an even split of the axis: the centre stop
+ * is the pure hue (full saturation and value), tints run above it and shades
+ * below, and the ends pull in from white and black, which an LED renders as
+ * blown out and as off.
  */
 export const PICKER_SEGMENT_COLS = 12;
 const SEGMENT_ROW_L = [0.84, 0.727, 0.613, 0.5, 0.393, 0.287, 0.18];
 export const PICKER_SEGMENT_ROWS = SEGMENT_ROW_L.length;
 
 /**
- * The cell a point falls in. Rows resolve by nearest lightness stop, not by an
- * even split of the axis: the stops are uneven, so an even split cannot reach
- * the row whose stop sits outside its own band.
+ * The cell whose swatch is nearest a point. Swatches sit on column starts, so
+ * the column is the nearest hue, wrapping around to column 0 past the last one.
+ * Rows resolve by nearest lightness stop, not by an even split of the axis: the
+ * stops are uneven, so an even split cannot reach the row whose stop sits
+ * outside its own band.
  */
 export function segmentCellFor(x: number, y: number): { col: number; row: number } {
-  const col = Math.min(PICKER_SEGMENT_COLS - 1, Math.floor(clamp01(x) * PICKER_SEGMENT_COLS));
+  const col = Math.round(clamp01(x) * PICKER_SEGMENT_COLS) % PICKER_SEGMENT_COLS;
   const l = 1 - clamp01(y);
   let row = 0;
   let best = Infinity;
@@ -71,17 +87,34 @@ export function segmentCellFor(x: number, y: number): { col: number; row: number
   return { col, row };
 }
 
+/**
+ * The cell a press lands in. The grid is painted as even rows and columns, so a
+ * press resolves by the drawn geometry, never by lightness stop.
+ */
+export function segmentCellAt(x: number, y: number): { col: number; row: number } {
+  return {
+    col: Math.min(PICKER_SEGMENT_COLS - 1, Math.floor(clamp01(x) * PICKER_SEGMENT_COLS)),
+    row: Math.min(PICKER_SEGMENT_ROWS - 1, Math.floor(clamp01(y) * PICKER_SEGMENT_ROWS)),
+  };
+}
+
 /** Snaps a point to its cell's swatch, so a segmented press lands on one. */
 export function snapToSegment(x: number, y: number): { x: number; y: number } {
   const { col, row } = segmentCellFor(x, y);
-  return { x: (col + 0.5) / PICKER_SEGMENT_COLS, y: 1 - SEGMENT_ROW_L[row] };
+  return { x: col / PICKER_SEGMENT_COLS, y: 1 - SEGMENT_ROW_L[row] };
+}
+
+/** The swatch drawn under a press at this point of the field. */
+export function segmentHexAt(x: number, y: number): string {
+  const { col, row } = segmentCellAt(x, y);
+  return SEGMENT_SWATCHES[row * PICKER_SEGMENT_COLS + col];
 }
 
 /** Every segmented swatch, row-major. */
 export const SEGMENT_SWATCHES: string[] = Array.from(
   { length: PICKER_SEGMENT_COLS * PICKER_SEGMENT_ROWS },
   (_, i) => pickerHexAt(
-    ((i % PICKER_SEGMENT_COLS) + 0.5) / PICKER_SEGMENT_COLS,
+    (i % PICKER_SEGMENT_COLS) / PICKER_SEGMENT_COLS,
     1 - SEGMENT_ROW_L[Math.floor(i / PICKER_SEGMENT_COLS)],
   ),
 );

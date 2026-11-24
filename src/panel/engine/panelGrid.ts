@@ -30,8 +30,6 @@ export const DEFAULT_SURFACE_DPI: Record<PanelSurface, number> = {
   desktop: 144,
   // Promoted OS monitors: a desk-distance density estimate (27" 1440p ≈ 109).
   monitor: 110,
-  // 640px across roughly 2.7in of round glass.
-  kraken: 240,
   // Cooler LCDs run 240-480px across 1.5-2.4in of glass; one estimate covers the
   // family because the record carries the real pixel size and DPI only scales text.
   'lcd-round': 210,
@@ -147,14 +145,15 @@ export function useRuntimePanelGrid(
   // Defaults to 0 for callers that don't have a theme in scope.
   widgetPaddingRatio = 0,
   shortSideSlots?: number,
+  transposedTile = false,
 ): PanelGridCapacity {
   // Initialise from the surface without touching `rootRef` (no ref reads
   // during render). The effect below re-reads with the mounted root on first
   // paint.
-  const [metrics, setMetrics] = useState(() => readRuntimePanelGrid(surface, null, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots));
+  const [metrics, setMetrics] = useState(() => readRuntimePanelGrid(surface, null, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots, transposedTile));
 
   useEffect(() => {
-    const update = () => setMetrics(readRuntimePanelGrid(surface, rootRef?.current ?? null, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots));
+    const update = () => setMetrics(readRuntimePanelGrid(surface, rootRef?.current ?? null, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots, transposedTile));
     update();
     const observed = rootRef?.current ?? null;
     const observer = observed && typeof ResizeObserver !== 'undefined'
@@ -172,7 +171,7 @@ export function useRuntimePanelGrid(
       window.removeEventListener(PANEL_SIMULATION_CHANGED_EVENT, update);
       observer?.disconnect();
     };
-  }, [surface, rootRef, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots]);
+  }, [surface, rootRef, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots, transposedTile]);
 
   return metrics;
 }
@@ -189,6 +188,7 @@ export function readRuntimePanelGrid(
   deviceDpi?: number,
   widgetPaddingRatio = 0,
   shortSideSlots?: number,
+  transposedTile = false,
 ): PanelGridCapacity {
   if (typeof window === 'undefined') {
     return panelGridCapacityForCanvas(682, 2560, {
@@ -197,6 +197,7 @@ export function readRuntimePanelGrid(
       sizing: getPanelGridSizingSettings(),
       shortSideSlots,
       paddingRatio: widgetPaddingRatio,
+      transposedTile,
     });
   }
 
@@ -237,6 +238,7 @@ export function readRuntimePanelGrid(
     sizing: getPanelGridSizingSettings(),
     shortSideSlots,
     paddingRatio: widgetPaddingRatio,
+    transposedTile,
   });
   // Column/row counts are decided in physical px (density), but every length
   // returned drives CSS (contentScale, gap and padding as injected custom

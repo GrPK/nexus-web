@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import classNames from 'classnames';
 import {
-  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen,
+  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftDashed, PanelLeftOpen,
   MoreVertical, Settings, FlaskConical, Info, Unplug,
   SlidersHorizontal, RefreshCw, Maximize2, Minimize2,
 } from 'lucide-react';
@@ -35,6 +35,8 @@ interface TopBarProps {
   // sidebar (the collapse button has nothing to act on).
   hasSidebar: boolean;
   compact: boolean;
+  // Viewport too narrow to expand the sidebar: the toggle is disabled.
+  compactLocked?: boolean;
   onToggleCompact: () => void;
   // Centered page name shown inside the search-bar pill.
   pageTitle: string;
@@ -64,8 +66,6 @@ interface TopBarProps {
   onOpenUpdate: () => void;
   // The update status button's action when an update is staged: start install.
   onInstall: () => void;
-  // Conflict modal's "Manage apps" target (Settings' Manage conflicting apps modal).
-  onManageConflictApps: () => void;
   // Profile dropdown's "Manage profiles" target (standalone Profiles page).
   onManageProfiles: () => void;
   // Profile dropdown's top account entry target (standalone Account page).
@@ -148,6 +148,7 @@ function TopBarMenu({ onNavigateSettings, onNavigateTools, onOpenAbout, onOpenUp
 export function TopBar({
   hasSidebar,
   compact,
+  compactLocked = false,
   onToggleCompact,
   pageTitle,
   canGoBack,
@@ -165,7 +166,6 @@ export function TopBar({
   onNavigateTools,
   onOpenUpdate,
   onInstall,
-  onManageConflictApps,
   onManageProfiles,
   onNavigateAccount,
   isWindowsApp,
@@ -191,6 +191,7 @@ export function TopBar({
   // SidebarCollapsedSync); the button only renders with a sidebar, so
   // `compact` is the state being toggled away from.
   const toggleCompact = () => {
+    if (compactLocked) return;
     onToggleCompact();
     updateUiSettings({ sidebarCollapsed: !compact });
   };
@@ -210,7 +211,20 @@ export function TopBar({
       })}
     >
       <div className={styles.leftCluster}>
-        {hasSidebar && !fullscreen && (
+        {hasSidebar && !fullscreen && compactLocked && (
+          // aria-disabled, not disabled: a native-disabled button has no
+          // pointer events, so its mousedown would start a window drag.
+          <button
+            type="button"
+            className={styles.iconButton}
+            onClick={toggleCompact}
+            aria-disabled="true"
+            aria-label={t('sidebar.expand')}
+          >
+            <PanelLeftDashed size={18} />
+          </button>
+        )}
+        {hasSidebar && !fullscreen && !compactLocked && (
           <HoverTooltip body={compact ? t('sidebar.expand') : t('sidebar.collapse')} side="bottom">
             <button
               type="button"
@@ -280,7 +294,7 @@ export function TopBar({
       {!fullscreen && (palette ? (
         <TopSearch pageTitle={pageTitle} online={online} platform={platform} />
       ) : (
-        <div className={styles.searchBar}>
+        <div className={styles.searchBar} data-topbar-search>
           <h1 className={styles.searchTitle}>{pageTitle}</h1>
         </div>
       ))}
@@ -310,7 +324,7 @@ export function TopBar({
             and update-available (green). Each hides itself when inactive.
             All hidden in Focus mode along with the rest of this cluster - only
             the window controls (below) survive it. */}
-        {!fullscreen && <ConflictStatusSlot serviceOnline={online} onManageApps={onManageConflictApps} />}
+        {!fullscreen && <ConflictStatusSlot serviceOnline={online} />}
         {!fullscreen && OFFICIAL_BUILD && <UpdateStatusSlot serviceOnline={online} onOpen={onOpenUpdate} onInstall={onInstall} />}
         {!fullscreen && (
           <TopBarMenu onNavigateSettings={onNavigateSettings} onNavigateTools={onNavigateTools} onOpenAbout={() => setAboutOpen(true)} onOpenUpdate={onOpenUpdate} />

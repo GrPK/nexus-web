@@ -28,6 +28,7 @@ import { resolveTileValue, sessionsForProcess, truncateMiddle, type ProcessLiveU
 import { formatRate } from './shared';
 import type { HistoryMetric } from './metricHistoryHelpers';
 import styles from './ProcessDetailPanel.module.scss';
+import { HoverTooltip } from '../../../../components/common/HoverTooltip/HoverTooltip';
 
 export interface ProcessDetailPanelProps {
   onClose: () => void;
@@ -88,7 +89,7 @@ function CopyableValue({ value, fieldLabel, mono, truncate }: { value: string; f
   const display = truncate ? truncateMiddle(value, PATH_TRUNCATE_CHARS) : value;
   return (
     <span className={styles.copyableValue}>
-      <span className={mono ? styles.mono : undefined} title={value}>{display}</span>
+      <HoverTooltip body={value}><span className={mono ? styles.mono : undefined}>{display}</span></HoverTooltip>
       <button
         type="button"
         className={styles.copyBtn}
@@ -235,12 +236,12 @@ export function ProcessDetailPanel({
   const sessions = sessionsForProcess(privacySessions, name);
   const showPrivacy = privacySupported && sessions.length > 0;
 
-  const relativeAndAbsolute = (ms: number) => `${relativeTimeLabel(new Date(ms).toISOString(), nowMs, t)} · ${formatAbsolute(ms, dateFormat, timeFormat)}`;
+  const relativeAndAbsolute = (ms: number) => `${relativeTimeLabel(new Date(ms).toISOString(), nowMs, t)} - ${formatAbsolute(ms, dateFormat, timeFormat)}`;
 
   const headerMeta = (instanceCount !== undefined || data?.publisher) ? (
     <span className={styles.headerMeta}>
       {instanceCount !== undefined && t(pluralKey('monitoring.processDetail.instances', language, instanceCount), { count: instanceCount })}
-      {instanceCount !== undefined && data?.publisher && ' · '}
+      {instanceCount !== undefined && data?.publisher && ' - '}
       {data?.publisher}
     </span>
   ) : undefined;
@@ -298,7 +299,7 @@ export function ProcessDetailPanel({
             <>
               <ProcessMiniChart points={chartSeries.points} />
               <div className={styles.chartMeta}>
-                {t('monitoring.history.avg')} {valueFormat(chartSeries.avg)} · {t('monitoring.history.max')} {valueFormat(chartSeries.max)}
+                {t('monitoring.history.avg')} {valueFormat(chartSeries.avg)} - {t('monitoring.history.max')} {valueFormat(chartSeries.max)}
               </div>
             </>
           )}

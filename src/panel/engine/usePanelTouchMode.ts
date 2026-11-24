@@ -20,7 +20,11 @@ const PANEL_SCROLLABLE_SELECTOR = '[data-panel-scrollable="true"]';
 // etc.) - tapping one of these should fire its own action, not bubble
 // up to "tap-to-immersive".
 // `data-panel-interactive` marks an SDK app's tappable stage (an interactive Layer): its taps belong to the app.
-const INTERACTIVE_SELECTOR = 'button, input, select, textarea, a, [role="button"], [role="slider"], [role="switch"], [role="checkbox"], [role="tab"], [role="menuitem"], [role="option"], [data-panel-interactive="true"]';
+// Controls that handle their own press: a tap on one is theirs, and a drag on one is theirs too.
+export const CONTROL_SELECTOR = 'button, input, select, textarea, a, [role="button"], [role="slider"], [role="switch"], [role="checkbox"], [role="tab"], [role="menuitem"], [role="option"]';
+// What a locked widget lets drag: a tap-only stage does not consume a drag, only a grabbed manipulable does.
+export const DRAG_CONSUMER_SELECTOR = `${CONTROL_SELECTOR}, [data-layer-gestures="true"] [data-manipulable-id]`;
+export const INTERACTIVE_SELECTOR = `${CONTROL_SELECTOR}, [data-panel-interactive="true"]`;
 
 function isNonPrimaryMouseButton(e: React.PointerEvent): boolean {
   return e.pointerType === 'mouse' && e.button !== 0;
@@ -30,6 +34,8 @@ export interface ContextMenuState {
   widget: PanelWidget;
   x: number;
   y: number;
+  /** The element right-clicked; absent for a long-press or a host-reported click. */
+  target?: EventTarget | null;
   // Bumped on every open. PanelApp keys the menu on it so a right-click
   // on another widget while a menu is up remounts a fresh menu instead of
   // re-rendering the one whose outside-pointerdown close timer is already
@@ -47,6 +53,8 @@ interface PanelTouchModeOpts {
   // surface's touch support: on a touch surface the hold is the gesture
   // regardless of what the OS calls the pointer.
   mouseLongPress?: boolean;
+  // Restricted mode: no widget context menu opens by any path.
+  menuDisabled?: boolean;
 }
 
 /**
@@ -56,7 +64,7 @@ interface PanelTouchModeOpts {
  * single flat-list path. This hook only disambiguates tap / long-press
  * / drag and tracks rearrange visuals.
  */
-export function usePanelTouchMode({ onCellTap, mouseLongPress = false }: PanelTouchModeOpts) {
+export function usePanelTouchMode({ onCellTap, mouseLongPress = false, menuDisabled = false }: PanelTouchModeOpts) {
   const [rearranging, setRearranging] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
   const [pressedWidgetId, setPressedWidgetId] = useState<string | null>(null);
@@ -65,6 +73,28 @@ export function usePanelTouchMode({ onCellTap, mouseLongPress = false }: PanelTo
   const pressFeedbackTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const movedDuringDragRef = useRef(false);
   const ctxSeqRef = useRef(0);
+  // The menu opened ahead of its native contextmenu: a host-reported right-click (that event arrives on release once the native view hides) or a long-press (the browser's own contextmenu follows). The next one is swallowed so the menu does not remount.
+  const hostOpenedRef = useRef(false);
+  // The release of a hold that opened the menu still clicks the control under
+  // the finger; that one click is swallowed so the control does not also fire.
+  const swallowClickRef = useRef(false);
+
+  useEffect(() => {
+    const clear = () => { hostOpenedRef.current = false; swallowClickRef.current = false; };
+    // Window capture runs before React's root listeners, so neither a widget nor the background sees the release.
+    const swallow = (e: MouseEvent) => {
+      if (!hostOpenedRef.current) return;
+      hostOpenedRef.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener('pointerdown', clear, true);
+    window.addEventListener('contextmenu', swallow, true);
+    return () => {
+      window.removeEventListener('pointerdown', clear, true);
+      window.removeEventListener('contextmenu', swallow, true);
+    };
+  }, []);
 
   const clearPressFeedback = useCallback(() => {
     if (pressFeedbackTimerRef.current) {
@@ -91,11 +121,13 @@ export function usePanelTouchMode({ onCellTap, mouseLongPress = false }: PanelTo
     // The shrink lands as the menu opens; snap the cell back so the menu is
     // what reads as "happened".
     clearPressFeedback();
-    if (w) {
+    if (w && !menuDisabled) {
       triggerHaptic('medium');
+      hostOpenedRef.current = true;
+      swallowClickRef.current = true;
       setCtxMenu({ widget: w, x, y, seq: ++ctxSeqRef.current });
     }
-  }, [clearPressFeedback]);
+  }, [clearPressFeedback, menuDisabled]);
 
   const longPress = useLongPress(handleLongPress, CONTEXT_MENU_TRIGGER_MS, { allowMouse: mouseLongPress });
 
@@ -103,10 +135,21 @@ export function usePanelTouchMode({ onCellTap, mouseLongPress = false }: PanelTo
     e.preventDefault();
     e.stopPropagation();
     clearPressFeedback();
-    setCtxMenu({ widget, x: e.clientX, y: e.clientY, seq: ++ctxSeqRef.current });
-  }, [clearPressFeedback]);
+    // A host that fires contextmenu mid-hold already opened the menu; a pending long-press would reopen it as a new seq.
+    longPress.onPointerUp();
+    if (menuDisabled) return;
+    setCtxMenu({ widget, x: e.clientX, y: e.clientY, target: e.target, seq: ++ctxSeqRef.current });
+  }, [clearPressFeedback, longPress, menuDisabled]);
+
+  const openCtxMenu = useCallback((widget: PanelWidget, x: number, y: number) => {
+    clearPressFeedback();
+    if (menuDisabled) return;
+    hostOpenedRef.current = true;
+    setCtxMenu({ widget, x, y, seq: ++ctxSeqRef.current });
+  }, [clearPressFeedback, menuDisabled]);
 
   const closeCtxMenu = useCallback(() => {
+    hostOpenedRef.current = false;
     clearPressFeedback();
     setCtxMenu(null);
   }, [clearPressFeedback]);
@@ -141,6 +184,13 @@ export function usePanelTouchMode({ onCellTap, mouseLongPress = false }: PanelTo
   const pressOnInteractiveRef = useRef(false);
 
   const bindCellPointers = useCallback((widget: PanelWidget) => ({
+    onClickCapture: (e: React.MouseEvent) => {
+      if (!swallowClickRef.current) return;
+      swallowClickRef.current = false;
+      if (e.detail === 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+    },
     onPointerDown: (e: React.PointerEvent) => {
       if (e.isPrimary === false) return;
       if (isNonPrimaryMouseButton(e)) {
@@ -236,6 +286,7 @@ export function usePanelTouchMode({ onCellTap, mouseLongPress = false }: PanelTo
     pressedWidgetId,
     closeCtxMenu,
     handleContextMenu,
+    openCtxMenu,
     handleDragStart,
     handleDragMove,
     handleDragEnd,

@@ -1,4 +1,4 @@
-import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PanelLayout, PanelSurface, PanelWidgetSize } from './types';
 
@@ -97,7 +97,7 @@ afterEach(() => {
 
 describe('PanelApp background under an opaque tile', () => {
   it('covers the shader while a photo fills kraken glass', async () => {
-    fetchMock.mockResolvedValue({ found: true, record: recordWith('kraken', '2x2round') });
+    fetchMock.mockResolvedValue({ found: true, record: recordWith('lcd-round', '2x2round') });
     await mountKiosk();
     await waitFor(() => expect(shaderCovered.at(-1)).toBe(true));
     expect(shaderCovered).toContain(false);
@@ -113,10 +113,85 @@ describe('PanelApp background under an opaque tile', () => {
   }
 
   it('keeps it drawing while the photo is letterboxed', async () => {
-    fetchMock.mockResolvedValue({ found: true, record: recordWith('kraken', '2x2round', { fit: true }) });
+    fetchMock.mockResolvedValue({ found: true, record: recordWith('lcd-round', '2x2round', { fit: true }) });
     await mountKiosk();
     await waitFor(() => expect(document.querySelector('img')).not.toBeNull());
     expect(shaderCovered.length).toBeGreaterThan(0);
     expect(shaderCovered.every(c => !c)).toBe(true);
+  });
+});
+
+describe('PanelApp Media background with nothing to show', () => {
+  it('paints the solid background color rather than the bare backdrop', async () => {
+    fetchMock.mockResolvedValue({ found: true, record: { ...recordWith('lcd-round', '2x2round'), backgroundMode: 'media' } });
+    await mountKiosk();
+    await waitFor(() => expect(document.querySelector('[data-panel-bg-layer]')?.className).toMatch(/backgroundSolid/));
+  });
+
+  const withMedia = () => ({
+    ...recordWith('lcd-round', '2x2round'),
+    backgroundMode: 'media',
+    backgroundMediaId: 'm1',
+    backgroundMediaType: 'static',
+    backgroundFrostLevel: 50,
+  });
+  const bgImage = () => document.querySelector('img[class*="backgroundMediaContent"]');
+  const solidLayer = () => [...document.querySelectorAll('[data-panel-bg-layer]')].find(el => /backgroundSolid/.test(el.className));
+
+  it('shows the solid color without frost when the media fails to load, then retries on a growing delay', async () => {
+    fetchMock.mockResolvedValue({ found: true, record: withMedia() });
+    await mountKiosk();
+    await waitFor(() => expect(bgImage()).not.toBeNull());
+    expect(solidLayer()).toBeUndefined();
+    expect(document.querySelector('[data-panel-frost]')).not.toBeNull();
+
+    await act(async () => { fireEvent.error(bgImage()!); });
+    expect(bgImage()).toBeNull();
+    expect(solidLayer()).toBeDefined();
+    expect(document.querySelector('[data-panel-frost]')).toBeNull();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(4_900); });
+    expect(bgImage()).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    expect(bgImage()).not.toBeNull();
+
+    // A second failure waits longer before the next attempt.
+    await act(async () => { fireEvent.error(bgImage()!); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(14_000); });
+    expect(bgImage()).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_200); });
+    expect(bgImage()).not.toBeNull();
+  });
+});
+
+describe('PanelApp background at 0% opacity', () => {
+  const media = (opacity: number) => ({
+    ...recordWith('lcd-round', '2x2round'),
+    backgroundMode: 'media',
+    backgroundMediaId: 'm1',
+    backgroundMediaType: 'static',
+    backgroundOpacity: opacity,
+    backgroundFrostLevel: 50,
+  });
+
+  it('mounts no media, shader or frost layer, and mounts them again above 0%', async () => {
+    fetchMock.mockResolvedValue({ found: true, record: media(0) });
+    await mountKiosk();
+    // The record has loaded and the widgets render, so the missing layers are the 0% rule, not a pending load.
+    await waitFor(() => expect(document.querySelector('[data-panel-widget-id]')).not.toBeNull());
+    expect(document.querySelector('img[class*="backgroundMediaContent"]')).toBeNull();
+    expect(document.querySelector('[data-panel-bg-layer]')).toBeNull();
+    expect(document.querySelector('[data-panel-frost]')).toBeNull();
+    cleanup();
+    fetchMock.mockResolvedValue({ found: true, record: media(0.5) });
+    await mountKiosk();
+    await waitFor(() => expect(document.querySelector('img[class*="backgroundMediaContent"]')).not.toBeNull());
+  });
+
+  it('never starts the shader at 0%', async () => {
+    fetchMock.mockResolvedValue({ found: true, record: { ...recordWith('lcd-round', '2x2round'), backgroundOpacity: 0 } });
+    await mountKiosk();
+    await waitFor(() => expect(document.querySelector('[data-panel-widget-id]')).not.toBeNull());
+    expect(shaderCovered).toHaveLength(0);
   });
 });

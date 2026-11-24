@@ -1,42 +1,33 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { AudioSnapshot } from '../../../../hooks/useAudioState';
 import { useShaderRenderer } from '../../../../hooks/useShaderRenderer';
-import type { LightingScene, SceneCamera, Vec3 } from '../../../../api/lightingScene';
+import type { LightingScene, SceneCamera } from '../../../../api/lightingScene';
 import type { EffectState } from '../../../../types/lighting';
 import { CanvasBackground } from '../../../../components/common/DeviceCanvas/DeviceCanvas';
-import { SceneRenderer, type ScenePick, type SceneTheme } from '../../../../lib/scene/sceneRenderer';
+import { SceneRenderer, type CaseScene, type ScenePick, type SceneTheme } from '../../../../lib/scene/sceneRenderer';
 import { setScenePoints } from '../../../../lib/scene/scenePointsStore';
 import { useTranslation } from '../../../../lib/i18n';
 import styles from './Scene.module.scss';
-
-/** The drag payload a device row carries onto the viewport. */
-export const DEVICE_DRAG_TYPE = 'application/x-nexus-device';
 
 export type Backdrop = 'full' | 'dim' | 'off';
 
 interface SceneViewportProps {
   scene: LightingScene;
   model: ArrayBuffer | null;
+  caseScene: CaseScene | null;
   leds: Map<string, Float32Array>;
   selectedDeviceId: string | null;
-  selectedObjectId: string | null;
-  placing: boolean;
-  editable: boolean;
   backdrop: Backdrop;
   shaderEffect: string | null;
   shaderState: EffectState | null;
   shaderPaused?: boolean;
   audioRef?: RefObject<AudioSnapshot | null>;
-  onPick: (pick: ScenePick | null) => void;
+  onPick: (pick: ScenePick | null, stack: ScenePick[]) => void;
   onCamera: (camera: SceneCamera, final: boolean) => void;
-  onMoveObject?: (objectId: string, position: Vec3) => void;
-  onDropDevice?: (deviceId: string, pick: ScenePick | null) => void;
   /** Names what the pointer rests on, shown as a chip beside it; null shows nothing. */
-  hoverLabel?: (pick: ScenePick) => string | null;
+  hoverLabel?: (pick: ScenePick, stack: ScenePick[]) => string | null;
   /** Feed the device cards' readouts with where the camera puts each LED. */
   publishPoints?: boolean;
-  /** False pauses drawing while the view is covered (the inline view under the open editor). */
-  active?: boolean;
   rendererRef?: { current: SceneRenderer | null };
   className?: string;
   children?: ReactNode;
@@ -53,9 +44,9 @@ function cssColor(el: Element, name: string, fallback: string): string {
 }
 
 export function SceneViewport({
-  scene, model, leds, selectedDeviceId, selectedObjectId, placing, editable, backdrop,
+  scene, model, caseScene, leds, selectedDeviceId, backdrop,
   shaderEffect, shaderState, shaderPaused, audioRef,
-  onPick, onCamera, onMoveObject, onDropDevice, hoverLabel, publishPoints, active = true, rendererRef, className, children,
+  onPick, onCamera, hoverLabel, publishPoints, rendererRef, className, children,
 }: SceneViewportProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -63,15 +54,14 @@ export function SceneViewport({
   const glCanvasRef = useRef<HTMLCanvasElement>(null);
   const rendererInst = useRef<SceneRenderer | null>(null);
   const [failed, setFailed] = useState(false);
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [hover, setHover] = useState<{ text: string; x: number; y: number } | null>(null);
   const shaderStateRef = useRef(shaderState);
   shaderStateRef.current = shaderState;
   const { ready } = useShaderRenderer(glCanvasRef, backdrop === 'off' ? null : shaderEffect, shaderStateRef, audioRef, undefined, shaderPaused);
 
   // Latest callbacks, read by the renderer without rebuilding it.
-  const handlers = useRef({ onPick, onCamera, onMoveObject, publishPoints, hoverLabel });
-  handlers.current = { onPick, onCamera, onMoveObject, publishPoints, hoverLabel };
+  const handlers = useRef({ onPick, onCamera, publishPoints, hoverLabel });
+  handlers.current = { onPick, onCamera, publishPoints, hoverLabel };
 
   useEffect(() => {
     const host = threeHostRef.current;
@@ -93,11 +83,11 @@ export function SceneViewport({
     try {
       renderer = new SceneRenderer(canvas, {
         onCamera: (cam, final) => handlers.current.onCamera(cam, final),
-        onPick: pick => handlers.current.onPick(pick),
-        onMoveObject: (id, pos) => handlers.current.onMoveObject?.(id, pos),
+        onPick: (pick, stack) => handlers.current.onPick(pick, stack),
+        onMoveObject: () => undefined,
         onProjected: points => { if (handlers.current.publishPoints) setScenePoints(points); },
-        onHover: (pick, clientX, clientY) => {
-          const text = pick ? handlers.current.hoverLabel?.(pick) ?? null : null;
+        onHover: (pick, clientX, clientY, stack) => {
+          const text = pick ? handlers.current.hoverLabel?.(pick, stack) ?? null : null;
           const rect = container.getBoundingClientRect();
           setHover(text ? { text, x: clientX - rect.left, y: clientY - rect.top } : null);
         },
@@ -123,8 +113,8 @@ export function SceneViewport({
   }, [model]);
 
   useEffect(() => {
-    rendererInst.current?.setActive(active);
-  }, [active]);
+    rendererInst.current?.setCaseScene(caseScene);
+  }, [caseScene]);
 
   useEffect(() => {
     rendererInst.current?.setState({
@@ -132,40 +122,18 @@ export function SceneViewport({
       bindings: scene.bindings,
       leds,
       selectedDeviceId,
-      selectedObjectId,
-      placing,
-      dropTarget,
-      editable,
+      selectedObjectId: null,
+      editable: false,
     });
-  }, [scene.objects, scene.bindings, leds, selectedDeviceId, selectedObjectId, placing, dropTarget, editable]);
+  }, [scene.objects, scene.bindings, leds, selectedDeviceId]);
 
   const camera = scene.view.camera;
   useEffect(() => {
     if (camera) rendererInst.current?.setCamera(camera);
   }, [camera]);
 
-  const dropKey = (pick: ScenePick | null) => (pick?.kind === 'anchor' ? `${pick.objectId}\n${pick.anchorId}` : null);
-
   return (
-    <div
-      ref={containerRef}
-      className={`${styles.viewport} ${className ?? ''}`}
-      onDragOver={e => {
-        if (!onDropDevice || !e.dataTransfer.types.includes(DEVICE_DRAG_TYPE)) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const key = dropKey(rendererInst.current?.pickAt(e.clientX, e.clientY) ?? null);
-        if (key !== dropTarget) setDropTarget(key);
-      }}
-      onDragLeave={() => setDropTarget(null)}
-      onDrop={e => {
-        const id = e.dataTransfer.getData(DEVICE_DRAG_TYPE);
-        setDropTarget(null);
-        if (!id || !onDropDevice) return;
-        e.preventDefault();
-        onDropDevice(id, rendererInst.current?.pickAt(e.clientX, e.clientY) ?? null);
-      }}
-    >
+    <div ref={containerRef} className={`${styles.viewport} ${className ?? ''}`}>
       <div className={styles.backdrop} data-backdrop={backdrop}>
         <CanvasBackground />
         <canvas ref={glCanvasRef} className={`${styles.glBackdrop} ${ready ? styles.glBackdropReady : ''}`} />

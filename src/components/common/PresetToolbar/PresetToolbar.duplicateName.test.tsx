@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { PresetToolbar, type PresetToolbarPreset } from './PresetToolbar';
 
@@ -121,5 +121,90 @@ describe('PresetToolbar duplicate-name validation (rename)', () => {
     expect(screen.getByRole('textbox')).toHaveValue('My Preset');
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByRole('button', { name: 'lighting.layoutPresets.rename' })).not.toBeDisabled();
+  });
+});
+
+describe('PresetToolbar reserved names', () => {
+  it('blocks a create or rename onto a reserved name, without case', () => {
+    render(<PresetToolbar {...defaultProps({ activeId: 'a', reservedNames: ['Flat'] })} />);
+    openCreatePrompt();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'flat' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('lighting.layoutPresets.duplicateName');
+    expect(screen.getByRole('button', { name: 'lighting.layoutPresets.new' })).toBeDisabled();
+  });
+
+  it('blocks a rename onto a reserved name', () => {
+    render(<PresetToolbar {...defaultProps({ activeId: 'a', reservedNames: ['Flat'] })} />);
+    openRenamePrompt();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'FLAT' } });
+    expect(screen.getByRole('button', { name: 'lighting.layoutPresets.rename' })).toBeDisabled();
+  });
+});
+
+describe('PresetToolbar inline save and header', () => {
+  it('opens the new-preset prompt from the inline save button, unless disabled', () => {
+    const { rerender } = render(<PresetToolbar {...defaultProps({ inlineSave: { label: 'Save now' } })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    rerender(<PresetToolbar {...defaultProps({ inlineSave: { label: 'Save now', disabled: true } })} />);
+    expect(screen.getByRole('button', { name: 'Save now' })).toBeDisabled();
+  });
+
+  it('puts a group header over the presets', () => {
+    render(<PresetToolbar {...defaultProps({ presetsHeader: 'Custom presets', builtins: [{ id: 'x', label: 'Stock' }] })} />);
+    const labels = [...screen.getByTestId('preset-select').querySelectorAll('option')].map(o => o.textContent);
+    expect(labels.slice(0, 4)).toEqual(['Stock', 'Custom presets', 'My Preset', 'Other Preset']);
+  });
+});
+
+describe('PresetToolbar create modal (New preset / Duplicate current)', () => {
+  it('titles the create modal with the createTitle key and the rename modal with namePrompt', () => {
+    render(<PresetToolbar {...defaultProps({ activeId: 'a' })} />);
+    openCreatePrompt();
+    expect(screen.getByRole('heading')).toHaveTextContent('lighting.layoutPresets.createTitle');
+    fireEvent.click(screen.getByRole('button', { name: 'confirm.cancel' }));
+    openRenamePrompt();
+    expect(screen.getByRole('heading')).toHaveTextContent('lighting.layoutPresets.namePrompt');
+    expect(screen.queryByRole('button', { name: 'lighting.layoutPresets.duplicateCurrent' })).toBeNull();
+  });
+
+  it('hides Duplicate current when no preset is active', () => {
+    render(<PresetToolbar {...defaultProps()} />);
+    openCreatePrompt();
+    expect(screen.queryByRole('button', { name: 'lighting.layoutPresets.duplicateCurrent' })).toBeNull();
+  });
+
+  it('hides Duplicate current while a built-in entry is active', () => {
+    render(<PresetToolbar {...defaultProps({ activeId: 'a', builtins: [{ id: 'x', label: 'X' }], activeBuiltinId: 'x' })} />);
+    openCreatePrompt();
+    expect(screen.queryByRole('button', { name: 'lighting.layoutPresets.duplicateCurrent' })).toBeNull();
+  });
+
+  it('New preset calls onCreate with fresh: true', async () => {
+    const props = defaultProps({ activeId: 'a' });
+    render(<PresetToolbar {...props} />);
+    openCreatePrompt();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Brand New' } });
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.layoutPresets.new' }));
+    await waitFor(() => expect(props.onCreate).toHaveBeenCalledWith('Brand New', { fresh: true }));
+  });
+
+  it('Duplicate current calls onCreate with fresh: false and closes the modal', async () => {
+    const props = defaultProps({ activeId: 'a' });
+    render(<PresetToolbar {...props} />);
+    openCreatePrompt();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Copy' } });
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.layoutPresets.duplicateCurrent' }));
+    await waitFor(() => expect(props.onCreate).toHaveBeenCalledWith('Copy', { fresh: false }));
+    await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
+  });
+
+  it('Duplicate current shows the service error and keeps the modal open', async () => {
+    const props = defaultProps({ activeId: 'a', onCreate: vi.fn(() => Promise.resolve({ error: true, msg: 'Nope' })) });
+    render(<PresetToolbar {...props} />);
+    openCreatePrompt();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Copy' } });
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.layoutPresets.duplicateCurrent' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nope');
   });
 });

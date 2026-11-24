@@ -1,4 +1,5 @@
 @use '../../../styles/text' as *;
+@use '../../../styles/interactions' as *;
 
 // Canonical settings row - see SettingRow.tsx. text-body label, no per-row
 // divider (the only rule belongs under section headers, via SectionHeader).
@@ -6,6 +7,7 @@
 // the dashboard.
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -17,9 +19,9 @@
 .row.selected {
   margin-inline: -0.7rem;
   padding-inline: 0.7rem;
-  border: var(--border-width) solid var(--accent);
+  border: var(--border-width) solid transparent;
   border-radius: var(--radius-sm);
-  background: var(--accent-soft);
+  @include interactive-selected;
 }
 
 .disabled {
@@ -41,6 +43,8 @@
 // label wider than the row would otherwise starve it to zero and its content
 // would spill instead of wrapping; min-content floors it at one swatch wide.
 .row.wrapControl {
+  flex-wrap: nowrap;
+
   .info {
     flex: 0 1 auto;
   }
@@ -95,11 +99,12 @@
   }
 }
 
+// Floors the label at its longest word so a control too wide to fit wraps below it instead of overlapping.
 .info {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  min-width: 0;
+  min-width: min-content;
   // Fill the space between the (optional leading) icon and the control, so the
   // label/description stay hard-left instead of the row's space-between
   // floating a short info block into the middle.
@@ -109,6 +114,23 @@
 .label {
   @include text-body;
   color: var(--text);
+}
+
+// Opt-in (nested prop): a row that refines the row above it. Indented, tighter at the top, secondary label.
+.row.nested {
+  padding-top: 0;
+  padding-inline-start: var(--space-lg);
+
+  .label {
+    font-size: var(--type-small);
+    color: var(--text-dim);
+  }
+}
+
+// One component's rows (a toggle and its nested refinements) as a single unit between the section's hairlines.
+.group {
+  display: flex;
+  flex-direction: column;
 }
 
 // Optional accent glyph before the label text (e.g. the relay satellite).
@@ -183,11 +205,15 @@
   align-items: center;
   gap: 8px;
   flex: none;
+  margin-inline-start: auto;
 }
 
-// Width holder so an inline Slider (width:100%) forms a right-aligned bar in
-// the control slot instead of collapsing. Shrinks on narrow (mobile /
-// panel-editor) viewports so the bar doesn't crowd the label.
-.sliderControl {
-  width: min(12rem, 45vw);
+// A slider row: the control slot grows up to the shared inline slider width (a
+// share of the row; max-width percentages resolve against the row, not the slot).
+// Its basis is the floor, so the wrap decision sees the shrunk slot and the
+// slider narrows before the row wraps. The label-less Slider inside fills the slot.
+.row.sliderRow .control {
+  flex: 1000 1 var(--slider-inline-slot-min);
+  max-width: var(--slider-inline-width);
+  min-width: var(--slider-inline-slot-min);
 }

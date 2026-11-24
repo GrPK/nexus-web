@@ -2,23 +2,47 @@ import type { Pin, PinKind } from '../../../api/lighting';
 import { hexToHsv, hsvToHex } from '../../../lib/settings';
 import { nearestPaletteId, paletteColorForKey, paletteFamilyKey, paletteKey, type PaletteColor } from '../../../types/lightingPalette';
 import { EFFECTS, type EffectState, type LightingMode } from '../../../types/lighting';
-import { isSimpleAnimation, simpleAnimationLabelKey } from './simpleAnimations';
+import { canonicalSimpleKey } from './simpleAnimations';
 import { canvasLabelName } from '../../../lib/canvasLabelName';
 
 /** Device id to the pin it wears. Absent means following the global mode. */
 export type Pins = Readonly<Record<string, Pin>>;
 
 /**
- * Keys of the per-device-pick era and of a persisted selection. The selection is
- * not stored any more: a restored one would silently turn the next pick into a
- * pin, so every visit starts at "All devices".
+ * The selection the lighting page keeps across navigation. An empty selection
+ * means "all devices": a pick then applies globally and pins nothing.
  */
+export const SELECTED_DEVICES_STORAGE_KEY = 'nexus.lighting.pinSelection';
+
+/** The selection's anchor device, highlighted on the canvas and 3D scene. */
+export const PRIMARY_DEVICE_STORAGE_KEY = 'nexus.lighting.primaryDevice';
+
+/** The tab a press opened for a selection, kept so leaving the page and coming back reopens it. */
+export const SELECTION_TAB_STORAGE_KEY = 'nexus.lighting.selectionTab';
+
+/** The global mode that tab was opened under, so a change made while away drops it. */
+export const SELECTION_TAB_BASE_STORAGE_KEY = 'nexus.lighting.selectionTabBase';
+
+/**
+ * Keeps the opened selection tab across a remount. A global mode change drops it,
+ * but only once the service state has loaded: before that `mode` is the placeholder
+ * and would wipe the stored tab on every mount.
+ */
+export function reconcileSelectionTab(
+  tab: LightingMode | null,
+  base: LightingMode | null,
+  mode: LightingMode,
+  synced: boolean,
+): { tab: LightingMode | null; base: LightingMode | null } {
+  if (!synced || base === mode) return { tab, base };
+  return { tab: base === null ? tab : null, base: mode };
+}
+
+/** Keys of the per-device-pick era. */
 const LEGACY_LIGHTING_KEYS = [
   'nexus.lighting.selectedDevices',
   'nexus.lighting.devicePicks',
   'nexus.lighting.selectionSeeded',
-  'nexus.lighting.pinSelection',
-  'nexus.lighting.primaryDevice',
 ];
 
 export function clearLegacyLightingKeys(): void {
@@ -41,6 +65,25 @@ export function withPins(prev: Pins, ids: readonly string[], pin: Pin | null): P
     }
   }
   return next ?? prev;
+}
+
+/**
+ * The selection after `ids` are unpinned: they leave it, because a later pick
+ * lands on the selection and would pin them again. The other cards stay
+ * selected; the primary falls back to the last remaining one in `order` (device
+ * order, as the device list does). Null when none
+ * of `ids` was selected, so the caller leaves the selection alone.
+ */
+export function selectionWithoutUnpinned(
+  selected: ReadonlySet<string>,
+  primary: string | null,
+  ids: readonly string[],
+  order: readonly string[],
+): { ids: Set<string>; primary: string | null } | null {
+  if (!ids.some(id => selected.has(id))) return null;
+  const next = new Set([...selected].filter(id => !ids.includes(id)));
+  const nextPrimary = primary && next.has(primary) ? primary : ([...order].reverse().find(id => next.has(id)) ?? null);
+  return { ids: next, primary: nextPrimary };
 }
 
 /** The static pin for a pattern picked from the grid. The whole look travels, so
@@ -150,7 +193,7 @@ export const isPickTarget = (d: { id: string } & Reach, pins: Pins, selectedIds:
 
 /**
  * The lit, controlled cards a press or pick changes: the selection, or with none
- * every unpinned one. Game Sync and Off override pins, so they reach them all.
+ * every unpinned one. Off overrides pins, so it reaches them all.
  */
 export function pressReach(
   devices: readonly ({ id: string } & Reach)[],
@@ -164,9 +207,9 @@ export function pressReach(
   return new Set(lit.filter(d => !(d.id in pins)).map(d => d.id));
 }
 
-/** A press on the tab already showing changes no card with nothing selected, on Game Sync, or when the selection already wears that mode's pin. */
+/** A press on the tab already showing changes no card with nothing selected, or when the selection already wears that mode's pin. */
 export const tabPressChangesNothing = (key: string, activeKey: string | undefined, selectedCount: number, selectionPinned: boolean): boolean =>
-  key === activeKey && (selectedCount === 0 || key === 'gamesync' || selectionPinned);
+  key === activeKey && (selectedCount === 0 || selectionPinned);
 
 /**
  * The Static picker's marks, on the color each device wears (an unpinned one
@@ -217,7 +260,7 @@ export function pinModeTargetLabel(pin: Pin, t: (key: string, params?: Record<st
   return name ? t('lighting.pin.modeTarget', { mode, name }) : mode;
 }
 
-/** What a pin points at, for tooltips: the shader or simple sweep, the palette swatch or hex, or Mirror. */
+/** What a pin points at, for tooltips: the shader, the palette swatch or hex, or Mirror. */
 export function pinTargetLabel(pin: Pin, t: (key: string) => string): string {
   if (pin.kind === 'mirror') return t('lighting.mode.screen');
   if (pin.kind === 'media') return t('lighting.mode.gif');
@@ -226,7 +269,6 @@ export function pinTargetLabel(pin: Pin, t: (key: string) => string): string {
     return palette ? `${t(paletteFamilyKey(palette.family))} ${palette.shade}` : (pin.color ?? '').toUpperCase();
   }
   if (!pin.effect) return '';
-  if (isSimpleAnimation(pin.effect)) return t(simpleAnimationLabelKey(pin.effect));
-  const def = EFFECTS.find(e => e.key === pin.effect);
+  const def = EFFECTS.find(e => e.key === canonicalSimpleKey(pin.effect!));
   return def ? t(def.labelKey) : pin.effect;
 }

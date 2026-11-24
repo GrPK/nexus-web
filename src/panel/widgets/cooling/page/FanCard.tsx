@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { isMultiSelectModifier } from '../../../../lib/platform';
-import { CircleSlash, Cpu, Fan, GaugeCircle, Gpu, Link2, Link2Off, MousePointerClick, Pencil, Pin, PinOff, Plus, RotateCcw, Unplug } from 'lucide-react';
-import { type FanChannel, type FanRole, isFanDisconnected } from '../../../../api/cooling';
+import { CircleSlash, Cpu, EyeOff, Fan, GaugeCircle, Gpu, Link2, Link2Off, MousePointerClick, Pencil, Pin, PinOff, Plus, RotateCcw, Unplug } from 'lucide-react';
+import { type FanChannel, type FanRole, isFanUnresponsive } from '../../../../api/cooling';
 import { useUnitPrefs } from '../../../../hooks/useUiSettings';
 import { useTranslation } from '../../../../lib/i18n';
 import { Badge } from '../../../../components/common/Badge/Badge';
@@ -17,6 +17,7 @@ import { MenuArrowButton } from '../../../../components/common/DeviceCanvas/Menu
 import { bulkMenuLabel } from '../../../../components/common/DeviceCanvas/bulkMenuLabel';
 import { groupMenuItems, type GroupMove } from '../../../../components/common/DeviceCanvas/groupMenuItems';
 import { type SortableRowArgs } from '../../../../components/common/SortableList/SortableList';
+import { pinTooltipKey } from './pinHelp';
 import styles from '../CoolingPage.module.scss';
 
 /**
@@ -25,10 +26,9 @@ import styles from '../CoolingPage.module.scss';
  * count), a thin duty bar, and the mode dropdown (BIOS / Manual / curves /
  * Create curve). Wire DnD also binds / unbinds when a wire layer is present.
  *
- * When the fan is disconnected (calibration marked it "Unresponsive" AND it
- * reports no RPM - see isFanDisconnected), the card collapses to a single
- * "Disconnected" marker and hides the duty bar + dropdown - nothing here can
- * drive the channel. A "Fixed" fan (RPM barely moves across the duty sweep)
+ * A fan calibration marked "Unresponsive" that reports no RPM (see
+ * isFanUnresponsive) shows "Unresponsive" in place of the RPM readout and
+ * stays fully controllable. A "Fixed" fan (RPM barely moves across the duty sweep)
  * keeps its RPM readout but shows a "Fixed speed" marker and no mode dropdown.
  */
 /**
@@ -63,7 +63,7 @@ export const FanCard = memo(function FanCard({
   hubMode, hubSupportsFirmware,
   hubSupportsBios = true,
   nubRef, cardRef: cardRefProp, onWirePointerDown, onWireHover,
-  onSetMode, onCreateCurve, onRename, onSpeedChange, onTogglePin, onToggleControlled, onSetRole, onClearOffset, drag,
+  onSetMode, onCreateCurve, onRename, onSpeedChange, onTogglePin, onToggleControlled, onHideUnresponsive, onSetRole, onClearOffset, drag,
   onSelectOnly, bulk, groupMove, hazard,
 }: {
   channel: FanChannel;
@@ -115,6 +115,9 @@ export const FanCard = memo(function FanCard({
   /** Nexus Control on/off for this channel. Off releases it to the motherboard
    *  and keeps every preset apply off it. Absent on surfaces that cannot set it. */
   onToggleControlled?: (id: string, controlled: boolean) => void;
+  /** Turns the page's hide filter on. Passed only while the filter is off, so the
+   *  menu offers it on an unresponsive fan and nowhere else. */
+  onHideUnresponsive?: () => void;
   onSetRole: (id: string, role: FanRole) => void;
   /** Clears a per-fan duty offset (the FanControl import is what creates them). Absent on surfaces that do not offer it. */
   onClearOffset?: (id: string) => void;
@@ -153,10 +156,8 @@ export const FanCard = memo(function FanCard({
   // Driven = Nexus controls this fan (Manual or a Curve), i.e. not BIOS/FW.
   // Highlighted on the duty bar (see .fanCardActive), not by tinting the card.
   const driven = swEnabled && hubOverrideMode === null;
-  // Hardware-level disconnect (no tach, no controllable duty). When true the
-  // card collapses to a single "Disconnected" marker; the dropdown and duty
-  // bar disappear because nothing the user does here will drive the channel.
-  const isHwDisconnected = isFanDisconnected(channel);
+  // No tach signal and no RPM now: label the readout. The fan still obeys PWM.
+  const unresponsive = isFanUnresponsive(channel);
   // Fixed-speed fan: calibration found the RPM barely moves across the full
   // 0-100% duty sweep (classification = "Fixed"), i.e. the header ignores
   // PWM and no software control is possible. The card keeps its live RPM
@@ -176,12 +177,10 @@ export const FanCard = memo(function FanCard({
   // the lighting device card's treatment for the same state.
   const controlled = channel.controlled !== false;
   // Nexus Control off does not block a click: selecting is how the user
-  // reaches the row that turns it back on. A disconnected, fixed-speed or
-  // BIOS-owned fan has nothing behind it to act on, so those still do.
-  const clickable = !isHwDisconnected && !isFixed && !isReadOnly;
-  const stateBadge = isHwDisconnected
-    ? { icon: <Unplug size={11} />, label: t('cooling.fan.disconnected') }
-    : isFixed ? { icon: <CircleSlash size={11} />, label: t('cooling.fan.fixed') }
+  // reaches the row that turns it back on. A fixed-speed or read-only fan has
+  // nothing behind it to act on, so those still do.
+  const clickable = !isFixed && !isReadOnly;
+  const stateBadge = isFixed ? { icon: <CircleSlash size={11} />, label: t('cooling.fan.fixed') }
     : !controlled ? { icon: <Link2Off size={11} />, label: t('cooling.fan.notControlled') }
     : null;
   const pinned = channel.pinned ?? false;
@@ -290,7 +289,7 @@ export const FanCard = memo(function FanCard({
   const dragClasses = [
     driven && !isFixed ? styles.fanCardActive : '',
     compact ? styles.fanCardCompact : '',
-    isHwDisconnected || isFixed || !controlled ? styles.fanCardOff : '',
+    isFixed || !controlled ? styles.fanCardOff : '',
     drag?.isDragging ? drag.placeholderClassName : '',
   ].filter(Boolean).join(' ');
 
@@ -315,12 +314,33 @@ export const FanCard = memo(function FanCard({
       { value: '__create__', label: t('cooling.card.createCurve'), className: styles.fanModeOptionCreate, icon: <Plus size={14} /> },
     ] : []),
   ];
-  // Select renders the selected option's icon in its trigger, so hanging the
-  // pin on the current mode is what puts it inside the dropdown ("[pin]
-  // Silent"). The fan icon no longer carries it.
-  const modeOptions: SelectOption[] = pinned
-    ? baseModeOptions.map(o => o.value === modeValue ? { ...o, icon: <Pin size={14} /> } : o)
-    : baseModeOptions;
+  const pinTip = t(pinTooltipKey(channel));
+  const roleBtnRef = useRef<HTMLButtonElement>(null);
+  // The pin unpins, like the lighting card's: it writes the same override the
+  // menu's Unpin does. The press unmounts the button, so a keyboard press first
+  // hands focus to the role picker, which is always present.
+  // A telemetry-only channel exposes no controls, so its pin is an inert glyph
+  // with no tooltip.
+  const pinInteractive = !isReadOnly;
+  const pinButton = pinned && pinInteractive ? (
+    <HoverTooltip body={pinTip} side="top">
+      <button
+        type="button"
+        className={styles.fanPinBtn}
+        aria-label={t('cooling.pin.unpin')}
+        data-no-dnd
+        onClick={e => {
+          e.stopPropagation();
+          if (e.detail === 0) roleBtnRef.current?.focus();
+          onTogglePin(channel.id, false);
+        }}
+      >
+        <Pin size={12} className={styles.fanPinOn} aria-hidden="true" />
+        <PinOff size={12} className={styles.fanPinOff} aria-hidden="true" />
+      </button>
+    </HoverTooltip>
+  ) : null;
+  const pinInert = pinned && !pinInteractive ? <Pin size={12} className={styles.fanPinGlyph} aria-hidden="true" /> : null;
 
   const handleModeChange = (v: string) => {
     if (v === '__create__') { onCreateCurve(); return; }
@@ -361,13 +381,17 @@ export const FanCard = memo(function FanCard({
 
     if (isControlled) {
       items.push(isPinned
-        ? { key: 'pin', icon: <PinOff size={14} />, label: label('cooling.pin.unpin', 'cooling.pin.unpinCount'), onSelect: () => setPinned(false) }
-        : { key: 'pin', icon: <Pin size={14} />, label: label('cooling.pin.pin', 'cooling.pin.pinCount'), onSelect: () => setPinned(true) });
+        ? { key: 'pin', icon: <PinOff size={14} />, label: label('cooling.pin.unpin', 'cooling.pin.unpinCount'), description: t('cooling.pin.unpinDesc'), onSelect: () => setPinned(false) }
+        : { key: 'pin', icon: <Pin size={14} />, label: label('cooling.pin.pin', 'cooling.pin.pinCount'), description: t('cooling.pin.pinDesc'), onSelect: () => setPinned(true) });
       // An offset belongs to one fan, so a selection has nothing to clear -
       // the same rule the lighting menu applies to the LED map row.
       if (!bulk && offset !== 0 && onClearOffset) {
         items.push({ key: 'clearOffset', icon: <RotateCcw size={14} />, label: t('cooling.card.clearOffset'), onSelect: () => onClearOffset(channel.id) });
       }
+    }
+    if (unresponsive && onHideUnresponsive) {
+      if (items.length > 0) items[items.length - 1] = { ...items[items.length - 1], separatorAfter: true };
+      items.push({ key: 'hideUnresponsive', icon: <EyeOff size={14} />, label: t('cooling.fan.menuHideUnresponsive'), onSelect: onHideUnresponsive });
     }
     if (onToggleControlled) {
       const setControlled = (next: boolean) => bulk ? bulk.setControlled(next) : onToggleControlled(channel.id, next);
@@ -408,15 +432,8 @@ export const FanCard = memo(function FanCard({
     }
     return items;
   };
-  // A hardware-dead channel has no state worth changing, and a read-only one
-  // exposes no controls at all.
-  const menuEnabled = !isHwDisconnected && !isReadOnly && menuItems().length > 0;
-
-  // The pin normally rides the selected mode option's icon, so a branch with
-  // no dropdown (disconnected, fixed, read-only, Nexus Control off) would show
-  // no pin at all - and the menu still offers Pin/Unpin there. Carry it
-  // beside the state badge in those rows instead.
-  const pinGlyph = pinned ? <Pin size={12} className={styles.fanPinGlyph} aria-hidden="true" /> : null;
+  // A read-only channel exposes no controls at all.
+  const menuEnabled = !isReadOnly && menuItems().length > 0;
 
   return (
     <div
@@ -467,6 +484,7 @@ export const FanCard = memo(function FanCard({
               </span>
             ) : (
               <button
+                ref={roleBtnRef}
                 type="button"
                 className={`${styles.fanKindToggle} ${styles.fanPinToggle}`}
                 aria-haspopup="menu"
@@ -521,6 +539,14 @@ export const FanCard = memo(function FanCard({
               <span className={styles.fanRpmLabel}>{t('cooling.fan.rpmUnavailable')}</span>
             </span>
           </HoverTooltip>
+        ) : unresponsive ? (
+          <HoverTooltip title={t('cooling.fan.unresponsive')} body={t('cooling.fan.unresponsiveHint')}>
+            <span className={styles.fanRpmReadout}>
+              <span className={styles.fanRpmLabel} role="img" aria-label={t('cooling.fan.unresponsive')}>
+                <Unplug size={12} aria-hidden="true" />
+              </span>
+            </span>
+          </HoverTooltip>
         ) : (
           <span className={styles.fanRpmReadout}>
             <span className={styles.fanRpm}>{formatNumber(channel.rpm, numberFormat)}</span>
@@ -533,21 +559,19 @@ export const FanCard = memo(function FanCard({
         <div className={styles.fanOffsetBadge}>
           <Badge
             label={t('cooling.fan.offsetBadge', { value: offset > 0 ? `+${offset}` : String(offset) })}
-            compact uppercase color="var(--text-dim)"
+            compact color="var(--text-dim)"
           />
         </div>
       )}
 
-      {isHwDisconnected || !controlled ? (
-        // Hardware unresponsive, or the user handed the channel away: the whole
-        // fan block is "off", so the badge replaces the duty bar and the mode
-        // dropdown. Nothing here would drive the channel, and leaving a live
-        // dropdown would imply otherwise.
+      {!controlled ? (
+        // The user handed the channel away: the whole fan block is "off", so
+        // the badge replaces the duty bar and the mode dropdown.
         <div className={styles.fanModeRow}>
           <div className={styles.fanStateBadge}>
-            <Badge label={stateBadge!.label} icon={stateBadge!.icon} compact uppercase color="var(--text-dim)" />
+            <Badge label={stateBadge!.label} icon={stateBadge!.icon} compact color="var(--text-dim)" />
           </div>
-          {pinGlyph}
+          {pinButton ?? pinInert}
         </div>
       ) : isReadOnly ? null : isFixed ? (
         // Fixed speed: the RPM readout stays in the header and the duty bar
@@ -556,10 +580,10 @@ export const FanCard = memo(function FanCard({
         <div className={styles.fanModeRow}>
           <HoverTooltip body={t('cooling.fan.fixedHint')} side="top">
             <div className={styles.fanStateBadge}>
-              <Badge label={stateBadge!.label} icon={stateBadge!.icon} compact uppercase color="var(--text-dim)" />
+              <Badge label={stateBadge!.label} icon={stateBadge!.icon} compact color="var(--text-dim)" />
             </div>
           </HoverTooltip>
-          {pinGlyph}
+          {pinButton ?? pinInert}
         </div>
       ) : (
         <>
@@ -588,12 +612,12 @@ export const FanCard = memo(function FanCard({
             )}
             {isManual ? (
               <>
-                <div className={styles.fanDutyFillActual} style={{ width: `${dutyPct}%` }} />
+                <div className={styles.fanDutyFillActual} style={{ width: `${dutyPct}%` }} data-skin-part="bar-fill" />
                 <div className={styles.fanDutyFillTarget} style={{ width: `${targetPct}%` }} />
                 <div className={styles.fanDutyKnob} style={{ left: `${targetPct}%` }} />
               </>
             ) : (
-              <div className={styles.fanDutyFill} style={{ width: `${dutyPct}%` }} />
+              <div className={styles.fanDutyFill} style={{ width: `${dutyPct}%` }} data-skin-part="bar-fill" />
             )}
           </div>
 
@@ -609,7 +633,8 @@ export const FanCard = memo(function FanCard({
               value={modeValue}
               onChange={handleModeChange}
               ariaLabel={t('cooling.card.mode')}
-              options={modeOptions}
+              options={baseModeOptions}
+              leadingAction={pinButton}
             />
             </span>
           </div>

@@ -1,0 +1,29 @@
+@use '../../../styles/text' as *;
+
+.switch {
+  flex-shrink: 0;
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0 0.35rem;
+  border-radius: var(--radius-pill);
+  @include text-caption;
+  background: var(--border);
+  color: inherit;
+}
+
+// On the solid accent chip the label is --accent-text, so the pill inverts: that same
+// contrast-paired color as the fill and the accent as the text, readable on any accent.
+:global(.chip-active) .pill {
+  background: var(--accent-text);
+  color: var(--accent);
+}

@@ -137,6 +137,9 @@ export const fetchCloudAccounts = () =>
 export const cloudRegister = (email: string, password: string, username: string) =>
   cloudFetch<CloudRegisterResponse>('/cloud/register', 'POST', { email, password, username });
 
+export const cloudResendVerification = (email: string) =>
+  cloudFetch<CloudEnvelope>('/cloud/resend-verification', 'POST', { email });
+
 export const cloudLogin = (identifier: string, password: string) =>
   cloudFetch<CloudLoginResponse>('/cloud/login', 'POST', { identifier, password });
 
@@ -327,7 +330,7 @@ export const fetchCloudLibrary = () =>
 export interface CloudImportResult {
   status: number;
   /** `name` is present on a 409 and is the LOCAL name that clashed, not the source row's name. */
-  body: { error?: boolean; msg?: string; name?: string } | null;
+  body: { error?: boolean; msg?: string; name?: string; pcSetup?: string } | null;
 }
 
 /**

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   applyProfile, fetchCurves, fetchFanChannels, fetchProfiles, fetchTemperatureSources,
-  isFanDisconnected,
   releaseFanAuto,
   renameFan as apiRenameFan,
   resetPresetCurve as apiResetPresetCurve,
@@ -35,7 +34,7 @@ import {
 } from '../../../../api/qseries';
 import { useCoolingRealtime } from '../../../../hooks/useCooling';
 import { useCoolingCurves } from '../../../../hooks/useCoolingCurves';
-import { usePersistentIdSet } from '../../../../hooks/usePersistentState';
+import { usePanelIdSet } from '../../../../hooks/usePanelIdSet';
 import { useMultiplex, useTopicCallback } from '../../../../hooks/useMultiplexSocket';
 import { useServiceState } from '../../../../hooks/useServiceState';
 import { useTempSensorPrefs } from '../../../../hooks/useUiSettings';
@@ -122,9 +121,10 @@ export function useCoolingImmersive(): CoolingImmersiveController {
   // Seeded from the cached curves so a revisit paints the hero card
   // immediately (same as CoolingPage).
   const [selectedCurveId, setSelectedCurveId] = useState<string | null>(() => cachedSeed.curves[0]?.id ?? null);
-  // Shared with the desktop page's fan rail, so a selection made on either
-  // surface is the one the other acts on.
-  const [selectedFanIds, setSelectedFanIds] = usePersistentIdSet('nexus.cooling.selectedFans');
+  // Keyed on the id list: the realtime merge reallocates every channel each tick.
+  const channelIdKey = useMemo(() => channels.map(c => c.id).join('|'), [channels]);
+  const presentFanIds = useMemo(() => new Set(channelIdKey === '' ? [] : channelIdKey.split('|')), [channelIdKey]);
+  const [selectedFanIds, setSelectedFanIds] = usePanelIdSet('nexus.cooling.selectedFans', 'coolingSelection', presentFanIds);
   const presetLockUntilRef = useRef(0);
   const activeProfileRef = useRef('');
   const tempPrefs = useTempSensorPrefs();
@@ -297,7 +297,7 @@ export function useCoolingImmersive(): CoolingImmersiveController {
     activeProfileRef.current = 'custom';
     presetLockUntilRef.current = Date.now() + PRESET_LOCK_MS;
     publishControlSync({ domain: 'cooling', activePreset: 'custom' });
-    await applyProfile('custom');
+    await applyProfile('custom', 'exit-off');
   }, []);
 
   const applyPreset = useCallback((key: CoolingModeKey) => {
@@ -323,7 +323,7 @@ export function useCoolingImmersive(): CoolingImmersiveController {
       await exitOffToCustomIfNeeded();
       const nextStates = { ...fanStates, [fanId]: { softwareControl: true, curveId: null } };
       setFanStates(nextStates);
-      await apiSetFanSpeed(fanId, 50);
+      await apiSetFanSpeed(fanId, 50, { source: 'seed', target: 'manual' });
     } else {
       const nextStates = { ...fanStates };
       delete nextStates[fanId];
@@ -368,7 +368,7 @@ export function useCoolingImmersive(): CoolingImmersiveController {
       next[id] = { ...next[id], softwareControl: true, curveId };
     }
     setFanStates(next);
-    for (const id of needSpeedSeed) await apiSetFanSpeed(id, 50);
+    for (const id of needSpeedSeed) await apiSetFanSpeed(id, 50, { source: 'seed', target: curveId ? 'curve' : 'manual' });
     await pushCurves(curves, next);
     if (needSpeedSeed.length > 0) {
       const fans = await fetchFanChannels();
@@ -440,7 +440,7 @@ export function useCoolingImmersive(): CoolingImmersiveController {
     if (!wasSw) {
       const nextStates = { ...fanStates, [fanId]: { softwareControl: true, curveId: targetCurveId } };
       setFanStates(nextStates);
-      await apiSetFanSpeed(fanId, 50);
+      await apiSetFanSpeed(fanId, 50, { source: 'seed', target: targetCurveId ? 'curve' : 'manual' });
       await pushCurves(curves, nextStates);
       const fans = await fetchFanChannels();
       if (fans?.channels) setChannels(fans.channels);
@@ -476,7 +476,7 @@ export function useCoolingImmersive(): CoolingImmersiveController {
     setCurves(nextCurves);
     setFanStates(nextStates);
     setSelectedCurveId(id);
-    if (!wasSw) await apiSetFanSpeed(fanId, 50);
+    if (!wasSw) await apiSetFanSpeed(fanId, 50, { source: 'seed', target: 'curve' });
     void pushCurves(nextCurves, nextStates);
     if (!wasSw) {
       const fans = await fetchFanChannels();
@@ -555,26 +555,11 @@ export function useCoolingImmersive(): CoolingImmersiveController {
   // click, leaving no way to take it back out.
   const selectableFanIds = useMemo(
     () => channels
-      .filter(c => !isFanDisconnected(c) && !(c.readOnly ?? false) && c.classification !== 'Fixed'
+      .filter(c => !(c.readOnly ?? false) && c.classification !== 'Fixed'
         && c.controlled !== false)
       .map(c => c.id),
     [channels],
   );
-
-  // A restored selection can name fans that are gone (hub unplugged between
-  // visits); bulk actions would target ids no card can show.
-  // Keyed on the id list, not on `channels`: the realtime merge reallocates
-  // every channel each tick, and the persisted setter always rewrites
-  // localStorage, so reacting to the array itself would write on every tick.
-  const channelIdKey = useMemo(() => channels.map(c => c.id).join('|'), [channels]);
-  useEffect(() => {
-    if (channelIdKey === '') return;
-    const present = new Set(channelIdKey.split('|'));
-    setSelectedFanIds(prev => {
-      const kept = [...prev].filter(id => present.has(id));
-      return kept.length === prev.size ? prev : new Set(kept);
-    });
-  }, [channelIdKey, setSelectedFanIds]);
 
   // Touch has no multi-select modifier, so every tap toggles additively.
   const toggleFanSelection = useCallback((id: string) => {

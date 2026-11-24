@@ -36,7 +36,8 @@ interface PresetToolbarProps {
   presetCount: number;
   cap?: number;
   onLoad: (id: string) => void;
-  onCreate: (name: string) => Promise<{ error: boolean; msg?: string }>;
+  /** `fresh`: true starts from the stock defaults, false copies the active preset. */
+  onCreate: (name: string, opts: { fresh: boolean }) => Promise<{ error: boolean; msg?: string }>;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   /** Appends an "Import preset..." option after "New preset...", disabled at
@@ -59,6 +60,10 @@ interface PresetToolbarProps {
    *  for a local package distinct from onImport's own source (e.g. Elgato).
    *  Omit to hide the option entirely (every existing caller). */
   onImportFile?: () => void;
+  /** i18n key shown when a create fails below the cap with no message from
+   *  the caller (a refused write that is not the limit). Omit to fall back to
+   *  the cap message. */
+  createFailedKey?: string;
   /** Undo/Redo controls, plus Reset when `onReset` is supplied. Off for
    *  callers with no editable history to undo; on (default) matches the
    *  original lighting-canvas toolbar. */
@@ -99,18 +104,24 @@ interface PresetToolbarProps {
   builtins?: PresetToolbarEntry[];
   activeBuiltinId?: string | null;
   onSelectBuiltin?: (id: string) => void;
+  /** Names a preset may not take besides its siblings', e.g. built-ins the caller lists itself; matched without case. */
+  reservedNames?: readonly string[];
+  /** Group header over the presets in the menu, below the built-ins. Omit for the plain divider. */
+  presetsHeader?: string;
+  /** A Save button beside the select that opens the new-preset prompt. */
+  inlineSave?: { label: string; disabled?: boolean };
 }
 
 export function PresetToolbar({
   presets, activeId, presetCount, cap = PRESET_CAP,
   onLoad, onCreate, onRename, onDelete, onImport, importLabelKey, importDisabled, onImportStarters, onManageApps,
-  onExport, onImportFile,
+  onExport, onImportFile, createFailedKey,
   showHistory = true, canUndo = false, canRedo = false, onReset, onUndo, onRedo,
   translationPrefix = 'lighting.layoutPresets',
   resetLabelKey, resetConfirmKey,
   allowCreateRename = true,
   allowDelete = true,
-  builtins = [], activeBuiltinId = null, onSelectBuiltin,
+  builtins = [], activeBuiltinId = null, onSelectBuiltin, reservedNames = [], presetsHeader, inlineSave,
   rail,
 }: PresetToolbarProps) {
   const { t } = useTranslation();
@@ -141,9 +152,10 @@ export function PresetToolbar({
     label: p.name,
     ...(p.hasApps ? { icon: <AppWindow size={14} aria-hidden /> } : {}),
   }));
+  const headed = presetsHeader && presetOptions.length > 0 ? [{ value: '__header__', label: presetsHeader, header: true }, ...presetOptions] : presetOptions;
   const groups = [
     builtins.map(entryOption(BUILTIN_PREFIX)),
-    presetOptions,
+    headed,
   ].filter(g => g.length > 0);
   const actionOptions = [
     ...(allowCreateRename ? [{ value: '__create__', label: t(key('newOption')), className: styles.createOption, disabled: atCap, icon: <Plus size={14} /> }] : []),
@@ -153,7 +165,7 @@ export function PresetToolbar({
   ];
 
   const selectOptions = [
-    ...groups.flatMap((g, i) => (i === 0 ? g : [divider(`g${i}`), ...g])),
+    ...groups.flatMap((g, i) => (i === 0 || presetsHeader ? g : [divider(`g${i}`), ...g])),
     ...(presetActionsOn ? [
       divider('actions'),
       ...(allowCreateRename ? [{ value: '__rename__', label: t(key('rename')), className: styles.actionOption, icon: <Pencil size={14} /> }] : []),
@@ -193,24 +205,33 @@ export function PresetToolbar({
 
   const validate = (v: string): string | null => {
     const excludeId = promptMode === 'rename' ? (activeId ?? undefined) : undefined;
-    if (isNameTaken(presets, v, excludeId)) return t(key('duplicateName'));
+    if (isNameTaken(presets, v, excludeId) || isNameTaken(reservedNames.map(name => ({ id: name, name })), v)) return t(key('duplicateName'));
     return promptMode === 'create' ? createValidate(v) : null;
+  };
+
+  const runCreate = async (name: string, fresh: boolean): Promise<string | null> => {
+    setLastAttemptedValue(name);
+    const result = await onCreate(name, { fresh });
+    if (result.error) {
+      const msg = result.msg ?? (createFailedKey && !atCap ? t(createFailedKey) : t(key('capReached'), { max: cap }));
+      setCreateError(msg);
+      return msg;
+    }
+    setCreateError(null);
+    setPromptOpen(false);
+    return null;
   };
 
   const handlePromptConfirm = async (name: string) => {
     if (promptMode === 'create') {
-      setLastAttemptedValue(name);
-      const result = await onCreate(name);
-      if (result.error) {
-        setCreateError(result.msg ?? t(key('capReached'), { max: cap }));
-        return;
-      }
-      setCreateError(null);
-    } else if (promptMode === 'rename' && activeId) {
-      onRename(activeId, name);
+      return runCreate(name, true);
     }
+    if (activeId) onRename(activeId, name);
     setPromptOpen(false);
+    return null;
   };
+
+  const canDuplicate = promptMode === 'create' && !!activePreset && !activeBuiltinId;
 
   const undoTitle = `${t(key('undo'))} (${isMac ? 'Cmd' : 'Ctrl'}+Z)`;
   const redoTitle = `${t(key('redo'))} (${isMac ? 'Cmd' : 'Ctrl'}+Shift+Z)`;
@@ -225,6 +246,15 @@ export function PresetToolbar({
         placeholder={t(key('placeholder'))}
         className={styles.presetSelect}
       />
+      {inlineSave && (
+        <Button
+          size="sm"
+          disabled={inlineSave.disabled || atCap}
+          onClick={() => { setPromptMode('create'); setCreateError(null); setPromptOpen(true); }}
+        >
+          {inlineSave.label}
+        </Button>
+      )}
       {showHistory && !activeBuiltinId && (
         <>
           {onReset && (
@@ -262,11 +292,12 @@ export function PresetToolbar({
       )}
       <PromptModal
         open={promptOpen}
-        title={t(key('namePrompt'))}
+        title={t(promptMode === 'create' ? key('createTitle') : key('namePrompt'))}
         initialValue={promptMode === 'rename' ? (activePreset?.name ?? '') : t(key('defaultName'), { n: presetCount + 1 })}
         maxLength={20}
         confirmLabel={promptMode === 'rename' ? t(key('rename')) : t(key('new'))}
         validate={validate}
+        secondary={canDuplicate ? { label: t(key('duplicateCurrent')), onClick: name => runCreate(name, false) } : undefined}
         onConfirm={handlePromptConfirm}
         onCancel={() => { setPromptOpen(false); setCreateError(null); }}
       />

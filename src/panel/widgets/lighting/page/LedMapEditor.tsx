@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   Undo2, Redo2, AlignHorizontalDistributeCenter, Grid3x3, RotateCw,
   Trash2, FlipHorizontal2, FlipVertical2, RotateCcw, CheckSquare, Square,
-  Merge, Scissors, ListRestart, Users, Palette, Droplet, Lightbulb, CircleDot, ExternalLink,
+  Merge, Scissors, ListRestart, Users, Palette, Droplet, Lightbulb, CircleDot, ExternalLink, Sun,
 } from 'lucide-react';
 import {
   fetchDeviceStructure, fetchDeviceMap, saveDeviceMap, saveDeviceZones, resetDeviceMap, resetDeviceZones,
@@ -22,10 +22,15 @@ import { PromptModal } from '../../../../components/common/PromptModal/PromptMod
 import { HoverTooltip } from '../../../../components/common/HoverTooltip/HoverTooltip';
 import { Slider } from '../../../../components/common/Slider/Slider';
 import { useThrottle } from '../../../../hooks/cadence';
+import { useLiveLedDots } from '../../../../hooks/useLiveLedDots';
 import { isApplePlatform, isMultiSelectModifier } from '../../../../lib/platform';
 import { CommunityMappingsPanel } from './CommunityMappingsPanel';
 import { ZoneChainList, type ChainRow } from './ZoneChainList';
 import { LedColorLockSection } from './LedColorLockSection';
+import { RateCapSelect } from './RateCapSelect';
+import { ColorSamplingSelect } from './ColorSamplingSelect';
+import { SamplingModeSelect } from './SamplingModeSelect';
+import { AreaCells } from '../../../../components/common/AreaCells/AreaCells';
 import {
   baselineFrom, buildSavePlan, checkMerge, defaultPartitionGuess, emptyHistory,
   flattenDeviceMap, isStagedZoneId, mergeStagedZones, orderZones,
@@ -33,12 +38,15 @@ import {
   pushHistory, redoHistory, relabelLedZones, reorderChainEntries, segmentOffsets,
   selectionCenter, selectionSnapAdjust, settleLed,
   splitStagedZones,
-  splitZone, stagedZoneId, toZoneLocalIndices, undoHistory, zoneDeviceIndices,
+  liveLedSources, splitZone, stagedZoneId, toZoneLocalIndices, undoHistory, zoneDeviceIndices,
   zoneEnabledCounts, zoneLedCount,
   SAME_POSITION_EPSILON, type BaselineEntry, type EditorHistory, type EditorLed, type EditorSnapshot, type ReceivedLed, type StagedPartition,
 } from './zoneUtils';
 import { shouldConsumeEditorEscape } from './ledMapEscape';
+import { useEffectiveBrightness } from './useEffectiveBrightness';
+import type { BrightnessCauseKind } from './effectiveBrightness';
 import { SettingsBlock } from '../../../../components/common/SettingsSection/SettingsSection';
+import { capScaleToBounds, dominantScale } from '../../../../lib/aspectResize';
 import styles from './LedMapEditor.module.scss';
 
 const isMac = isApplePlatform();
@@ -97,6 +105,12 @@ function onSamePoint(a: { u: number; v: number }, b: { u: number; v: number }): 
 // the segment's LED count by the per-fan ring size recovers the fan count.
 const LIANLI_LEDS_PER_FAN = 16;
 
+const BRIGHTNESS_CAUSE_NAME: Record<BrightnessCauseKind, string> = {
+  device: 'lighting.ledMap.brightnessDevice',
+  schedule: 'lighting.ledMap.brightnessSchedule',
+  master: 'lighting.settings.brightnessLabel',
+};
+
 type EditorMode = 'animation' | 'horizontal' | 'vertical' | 'none';
 
 type SavedLedState = { u: number; v: number; disabled: boolean; isCustom: boolean };
@@ -130,12 +144,14 @@ interface Props {
   initialCommunityOpen?: boolean;
   /** Called after a hub composition change is confirmed. Receives the hubId so the parent can find matching devices. */
   onCompositionChanged?: (hubId: string) => void;
+  /** The frame cap changed; the cap spans sibling zone cards, so the parent refetches the device list. */
+  onRateCapChanged?: () => void;
   /** Navigate to a device page by its unified device key; backs the hub
    * composition panel's "configure ports" deep link. */
   onNavigateToDevicePage?: (deviceKey: string) => void;
 }
 
-export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizable, onClose, initialCommunityOpen, onCompositionChanged, onNavigateToDevicePage }: Props) {
+export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizable, onClose, initialCommunityOpen, onCompositionChanged, onRateCapChanged, onNavigateToDevicePage }: Props) {
   const { t, language } = useTranslation();
   const { push } = useToast();
 
@@ -345,6 +361,15 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
     }
     return map;
   }, [zonesOrdered, offsets]);
+
+  // The saved zones, not the staged draft: the frame carries what the service
+  // is sending now, and its sections follow the saved partition.
+  const liveSources = useMemo(
+    () => liveLedSources(structure?.zones ?? [], offsets, devices),
+    [structure, offsets, devices],
+  );
+  const liveDotRef = useLiveLedDots();
+  const effectiveBrightnessInfo = useEffectiveBrightness(zoneCard?.brightness);
 
   // Enabled-LED count per zone for the chip labels, tracking the staged
   // editor state live as the user parks / restores LEDs.
@@ -1165,8 +1190,15 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
       // Avoid divide-by-zero when the selection started as a single LED
       // (origW or origH == 0). Fall back to a no-op in that axis so the
       // other axis still stretches if there's width/height there.
-      const sx = Math.abs(origW) > 0.001 ? newW / origW : 1;
-      const sy = Math.abs(origH) > 0.001 ? newH / origH : 1;
+      let sx = Math.abs(origW) > 0.001 ? newW / origW : 1;
+      let sy = Math.abs(origH) > 0.001 ? newH / origH : 1;
+      if (e.shiftKey) {
+        const flatX = Math.abs(origW) <= 0.001, flatY = Math.abs(origH) <= 0.001;
+        const raw = flatX ? sy : flatY ? sx : dominantScale(sx, sy);
+        const s = capScaleToBounds(raw, { u: anchorU, v: anchorV }, initialLeds.values());
+        sx = s;
+        sy = s;
+      }
       setLeds(prev => prev.map(l => {
         const init = initialLeds.get(l.index);
         if (!init) return l;
@@ -1441,6 +1473,12 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
   // ── Live preview push ─────────────────────────────────────────────────
 
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Area cells the service recomputed from the draft layout, with the card they belong to.
+  const [draftCells, setDraftCells] = useState<{ id: string; cells: number[][] } | null>(null);
+  const draftCellsSeq = useRef(0);
+  // Toggling the mode makes any held draft cells stale.
+  const samplingMode = devices.find(d => d.id === selectedZoneId)?.sampling;
+  useEffect(() => { draftCellsSeq.current += 1; setDraftCells(null); }, [samplingMode, selectedZoneId]);
 
   useEffect(() => {
     if (loading || saving) return;
@@ -1453,11 +1491,17 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
     clearTimeout(previewTimerRef.current);
     previewTimerRef.current = setTimeout(() => {
       if (isStagedZoneId(selectedZoneIdRef.current)) return;
+      const sentFor = selectedZoneIdRef.current;
+      const mine = ++draftCellsSeq.current;
       postLedPreviewLayout(
-        selectedZoneIdRef.current,
+        sentFor,
         ledCount,
-        zoneLeds.map(l => ({ index: l.index, u: l.u, v: l.v, disabled: l.disabled })),
-      ).catch(() => { /* best-effort */ });
+        // The service indexes a card's preview layout from 0, while a zone's LEDs carry device-level indices.
+        [...zoneLeds].sort((a, b) => a.index - b.index).map((l, i) => ({ index: zoneScoped ? i : l.index, u: l.u, v: l.v, disabled: l.disabled })),
+      ).then(r => {
+        // Newest response wins; the cells follow the draft the service just read.
+        if (mine === draftCellsSeq.current) setDraftCells(r && !r.error && r.areaCells ? { id: sentFor, cells: r.areaCells } : null);
+      }).catch(() => { /* best-effort */ });
     }, 80);
     return () => clearTimeout(previewTimerRef.current);
   }, [leds, selectedZoneId, loading, saving, zoneScoped]);
@@ -2274,7 +2318,7 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
           {/* Preview + selection tooling above the canvas, as two compact
               grouped sections: test pattern toggles (plus a smart light's own
               colour) on the left, select all / clear selection on the right.
-              Brightness and the colour trims live in the Color tuning modal,
+              Brightness and the colour trims live in the Brightness and color modal,
               which can act on several devices at once. */}
           <div className={styles.controlsRow}>
             <div className={styles.controlGroup}>
@@ -2453,6 +2497,23 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
             >
             </div>
 
+            {/* Sampling modes other than LED: the cell each LED reads, under the dots. Follows the cells the service returns for the draft layout, else the card's latest. */}
+            {zoneCard?.sampling && zoneCard.sampling !== 'led' && (draftCells?.id === zoneCard.id ? draftCells.cells : zoneCard.areaCells)?.length ? (() => {
+              const pad = getPadPercent();
+              return (
+                <AreaCells
+                  cells={draftCells?.id === zoneCard.id ? draftCells.cells : zoneCard.areaCells!}
+                  style={{
+                    left: `${devRect.x + pad.px}%`,
+                    top: `${devRect.y + pad.py}%`,
+                    width: `${devRect.w - 2 * pad.px}%`,
+                    height: `${devRect.h - 2 * pad.py}%`,
+                    zIndex: 0,
+                  }}
+                />
+              );
+            })() : null}
+
             {(() => {
               const rendered = new Set<number>();
               const elements: React.ReactElement[] = [];
@@ -2475,6 +2536,7 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
                   elements.push(
                     <div
                       key={repIdx}
+                      ref={liveDotRef(repIdx, liveSources.get(repIdx))}
                       data-led="1"
                       className={[
                         styles.led,
@@ -2505,6 +2567,7 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
                 elements.push(
                   <div
                     key={led.index}
+                    ref={liveDotRef(led.index, liveSources.get(led.index))}
                     data-led="1"
                     className={[
                       styles.led,
@@ -2796,28 +2859,76 @@ export function LedMapEditor({ deviceId, initialZoneId, devices, zoneCustomizabl
               );
             })()}
           </div>
-          {/* Under the canvas: what was removed on the left, Save on the
-              right. Fixed height so the restore button appearing does not
+          {/* Under the canvas: what was removed on the left, the frame cap
+              and Save on the right. Fixed height so the restore button appearing does not
               grow the modal under the pointer. */}
           <div className={styles.hintRow}>
-            {removedCount > 0 ? (
+            <div className={styles.hintLeft}>
+              {removedCount > 0 && (
+                <button
+                  type="button"
+                  className={styles.modeBtn}
+                  onClick={handleRestoreAll}
+                >
+                  <ListRestart size={13} aria-hidden />
+                  {t(pluralKey('lighting.ledMap.restoreRemovedCount', language, removedCount), { count: removedCount })}
+                </button>
+              )}
+              {effectiveBrightnessInfo !== null && effectiveBrightnessInfo.level < 100 && (
+                <HoverTooltip
+                  side="top"
+                  body={(
+                    <ul className={styles.brightnessCauses}>
+                      {effectiveBrightnessInfo.causes.map(c => (
+                        <li key={c.kind}>
+                          {t('lighting.ledMap.brightnessCause', { name: t(BRIGHTNESS_CAUSE_NAME[c.kind]), level: c.level })}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                >
+                  <span className={styles.brightnessNotice} role="status" tabIndex={0}>
+                    <Sun size={14} aria-hidden />
+                    {t('lighting.ledMap.brightnessDimmed')}
+                  </span>
+                </HoverTooltip>
+              )}
+            </div>
+            <div className={styles.saveGroup}>
+              {zoneCard && zoneCard.colorSampling !== undefined && (
+                <ColorSamplingSelect
+                  id={zoneCard.id}
+                  value={zoneCard.colorSampling ?? 'standard'}
+                  onFail={() => push({ title: t('lighting.ledMap.colorSamplingFailed') })}
+                  onSaved={onRateCapChanged}
+                />
+              )}
+              {zoneCard && zoneCard.sampling !== undefined && (
+                <SamplingModeSelect
+                  id={zoneCard.id}
+                  value={zoneCard.sampling}
+                  onFail={() => push({ title: t('lighting.ledMap.samplingFailed') })}
+                  onSaved={onRateCapChanged}
+                />
+              )}
+              {zoneCard?.rateCapSupported && (
+                <RateCapSelect
+                  key={zoneCard.id}
+                  id={zoneCard.id}
+                  value={zoneCard.maxRateHz ?? null}
+                  onFail={() => push({ title: t('lighting.ledMap.rateCapFailed') })}
+                  onSaved={onRateCapChanged}
+                />
+              )}
               <button
                 type="button"
-                className={styles.modeBtn}
-                onClick={handleRestoreAll}
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={handleSave}
+                disabled={!dirty || saving || chainBusy}
               >
-                <ListRestart size={13} aria-hidden />
-                {t(pluralKey('lighting.ledMap.restoreRemovedCount', language, removedCount), { count: removedCount })}
+                {t('lighting.ledMap.save')}
               </button>
-            ) : <span />}
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnPrimary}`}
-              onClick={handleSave}
-              disabled={!dirty || saving || chainBusy}
-            >
-              {t('lighting.ledMap.save')}
-            </button>
+            </div>
           </div>
           </div>
           </div>

@@ -5,6 +5,7 @@ import { PANEL_DEVICE_ID_KEY } from './panelRouting';
 const allocateMock = vi.fn();
 const patchMock = vi.fn();
 const claimMock = vi.fn();
+const confirmMock = vi.fn();
 const storePhoneTokenMock = vi.fn();
 let sessionToken: string | null = null;
 
@@ -12,6 +13,7 @@ vi.mock('../api/panel', () => ({
   allocatePanelDeviceWithStatus: (...args: unknown[]) => allocateMock(...args),
   patchPanelDeviceWithStatus: (...args: unknown[]) => patchMock(...args),
   claimPanelPhonePairing: (...args: unknown[]) => claimMock(...args),
+  confirmPanelPhonePairing: (...args: unknown[]) => confirmMock(...args),
 }));
 
 vi.mock('../api/auth', () => ({
@@ -22,7 +24,7 @@ vi.mock('../api/auth', () => ({
   getTokenSync: () => sessionToken,
 }));
 
-// PanelApp + simulator + overlay drag in the whole panel tree; replace with
+// PanelApp + simulator drag in the whole panel tree; replace with
 // sentinel divs so the test only exercises PanelEntrypoint's state machine.
 vi.mock('../panel/PanelApp', () => ({
   default: ({ deviceId }: { deviceId: string }) => (
@@ -32,10 +34,6 @@ vi.mock('../panel/PanelApp', () => ({
 
 vi.mock('../panel/embed/PanelSimulatorContent', () => ({
   PanelSimulatorContent: () => <div data-testid="panel-simulator" />,
-}));
-
-vi.mock('../overlay/OverlayShell', () => ({
-  default: () => <div data-testid="overlay-shell" />,
 }));
 
 vi.mock('../hooks/useMultiplexSocket', () => ({
@@ -60,6 +58,7 @@ beforeEach(() => {
   allocateMock.mockReset();
   patchMock.mockReset();
   claimMock.mockReset();
+  confirmMock.mockReset();
   storePhoneTokenMock.mockReset();
   // history.replaceState is called by finish(); spy so we can assert the
   // redirect to /panel/<id> happened without polluting jsdom navigation.
@@ -263,6 +262,159 @@ describe('PanelEntrypoint allocate-or-recover', () => {
     await waitFor(() => expect(allocateMock).toHaveBeenCalledTimes(1));
     expect(allocateMock).toHaveBeenCalledWith({ surface: 'y70' });
   });
+
+  it('drops a cached non-y70 record on a y70-hinted load and allocates', async () => {
+    localStorage.setItem(PANEL_DEVICE_ID_KEY, STALE_ID);
+    patchMock.mockResolvedValueOnce({ ok: true, record: { id: STALE_ID, capabilities: { surface: 'phone' } } });
+    allocateMock.mockResolvedValueOnce({ ok: true, record: { id: FRESH_ID } });
+
+    render(
+      <PanelEntrypoint
+        initialDeviceId={null}
+        isPhonePair={false}
+        pairToken={null}
+        pairDeviceId={null}
+        pairSpki={null}
+        surfaceHint="y70"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('panel-app').getAttribute('data-device-id')).toBe(FRESH_ID),
+    );
+    expect(patchMock).toHaveBeenCalledWith(STALE_ID, {});
+    expect(allocateMock).toHaveBeenCalledWith({ surface: 'y70' });
+    expect(localStorage.getItem(PANEL_DEVICE_ID_KEY)).toBe(FRESH_ID);
+  });
+
+  it('keeps a cached y70 record on a y70-hinted load', async () => {
+    localStorage.setItem(PANEL_DEVICE_ID_KEY, STALE_ID);
+    patchMock.mockResolvedValueOnce({ ok: true, record: { id: STALE_ID, capabilities: { surface: 'y70' } } });
+
+    render(
+      <PanelEntrypoint
+        initialDeviceId={null}
+        isPhonePair={false}
+        pairToken={null}
+        pairDeviceId={null}
+        pairSpki={null}
+        surfaceHint="y70"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('panel-app').getAttribute('data-device-id')).toBe(STALE_ID),
+    );
+    expect(allocateMock).not.toHaveBeenCalled();
+  });
+
+  it('adopts and stamps a cached record with no surface on a y70-hinted load', async () => {
+    localStorage.setItem(PANEL_DEVICE_ID_KEY, STALE_ID);
+    patchMock.mockResolvedValueOnce({ ok: true, record: { id: STALE_ID } });
+    patchMock.mockResolvedValueOnce({ ok: true, record: { id: STALE_ID } });
+
+    render(
+      <PanelEntrypoint
+        initialDeviceId={null}
+        isPhonePair={false}
+        pairToken={null}
+        pairDeviceId={null}
+        pairSpki={null}
+        surfaceHint="y70"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('panel-app').getAttribute('data-device-id')).toBe(STALE_ID),
+    );
+    expect(patchMock).toHaveBeenNthCalledWith(1, STALE_ID, {});
+    expect(patchMock).toHaveBeenNthCalledWith(2, STALE_ID, { capabilities: { surface: 'y70' } });
+    expect(allocateMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the cache on a y70-hinted load when verify fails non-404', async () => {
+    localStorage.setItem(PANEL_DEVICE_ID_KEY, STALE_ID);
+    patchMock.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    render(
+      <PanelEntrypoint
+        initialDeviceId={null}
+        isPhonePair={false}
+        pairToken={null}
+        pairDeviceId={null}
+        pairSpki={null}
+        surfaceHint="y70"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('panel-app').getAttribute('data-device-id')).toBe(STALE_ID),
+    );
+    expect(allocateMock).not.toHaveBeenCalled();
+  });
+
+  it('drops a cached record of another surface on a q60-hinted load and allocates q60', async () => {
+    localStorage.setItem(PANEL_DEVICE_ID_KEY, STALE_ID);
+    patchMock.mockResolvedValueOnce({ ok: true, record: { id: STALE_ID, capabilities: { surface: 'phone' } } });
+    allocateMock.mockResolvedValueOnce({ ok: true, record: { id: FRESH_ID } });
+
+    render(
+      <PanelEntrypoint
+        initialDeviceId={null}
+        isPhonePair={false}
+        pairToken={null}
+        pairDeviceId={null}
+        pairSpki={null}
+        surfaceHint="q60"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('panel-app').getAttribute('data-device-id')).toBe(FRESH_ID),
+    );
+    expect(patchMock).toHaveBeenCalledWith(STALE_ID, {});
+    expect(allocateMock).toHaveBeenCalledWith(expect.objectContaining({ surface: 'q60' }));
+    expect(localStorage.getItem(PANEL_DEVICE_ID_KEY)).toBe(FRESH_ID);
+  });
+
+  it('keeps a cached q60 record on a q60-hinted load', async () => {
+    localStorage.setItem(PANEL_DEVICE_ID_KEY, STALE_ID);
+    patchMock.mockResolvedValueOnce({ ok: true, record: { id: STALE_ID, capabilities: { surface: 'q60' } } });
+
+    render(
+      <PanelEntrypoint
+        initialDeviceId={null}
+        isPhonePair={false}
+        pairToken={null}
+        pairDeviceId={null}
+        pairSpki={null}
+        surfaceHint="q60"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('panel-app').getAttribute('data-device-id')).toBe(STALE_ID),
+    );
+    expect(patchMock).toHaveBeenCalledTimes(1);
+    expect(allocateMock).not.toHaveBeenCalled();
+  });
+
+  it('sends viewport capabilities in the verify patch on an unhinted load', async () => {
+    localStorage.setItem(PANEL_DEVICE_ID_KEY, STALE_ID);
+    patchMock.mockResolvedValueOnce({ ok: true, record: { id: STALE_ID } });
+
+    render(
+      <PanelEntrypoint
+        initialDeviceId={null}
+        isPhonePair={false}
+        pairToken={null}
+        pairDeviceId={null}
+        pairSpki={null}
+      />,
+    );
+    await waitFor(() => expect(patchMock).toHaveBeenCalledTimes(1));
+    const sent = patchMock.mock.calls[0][1] as { capabilities?: { surface?: string; cssWidth?: number } };
+    expect(sent.capabilities?.surface).toBeDefined();
+    expect(sent.capabilities?.cssWidth).toBeGreaterThan(0);
+  });
 });
 
 describe('PanelEntrypoint failure gate', () => {
@@ -404,5 +556,92 @@ describe('PanelEntrypoint failure gate', () => {
 
     await screen.findByRole('button', { name: 'panel.gate.retry' });
     expect(screen.queryByText('connection.sessionRevoked.pairAgain')).toBeNull();
+  });
+});
+
+describe('PanelEntrypoint QR claim with host approval', () => {
+  const pendingClaim = {
+    paired: false,
+    token: '',
+    error: '',
+    needsApproval: true,
+    requestId: 'req-1',
+    sas: '123456',
+    machineName: 'DESK',
+  };
+
+  function renderClaim() {
+    return render(
+      <PanelEntrypoint
+        initialDeviceId={null}
+        isPhonePair
+        pairToken="qr-token"
+        pairDeviceId={null}
+        pairSpki={null}
+      />,
+    );
+  }
+
+  it('shows the number while the host decides, then finishes like a direct mint', async () => {
+    let answer: (v: unknown) => void = () => {};
+    claimMock.mockResolvedValueOnce(pendingClaim);
+    confirmMock.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+    allocateMock.mockResolvedValueOnce({ ok: true, record: { id: FRESH_ID } });
+
+    renderClaim();
+
+    expect(await screen.findByText('123456')).toBeTruthy();
+    expect(screen.getByText('panel.gate.approval.body')).toBeTruthy();
+    expect(storePhoneTokenMock).not.toHaveBeenCalled();
+    expect(confirmMock).toHaveBeenCalledWith('req-1');
+
+    answer({ status: 'approved', token: 'sess-token', machineName: 'DESK' });
+
+    await waitFor(() => expect(storePhoneTokenMock).toHaveBeenCalledWith('sess-token'));
+    await waitFor(() =>
+      expect(screen.getByTestId('panel-app').getAttribute('data-device-id')).toBe(FRESH_ID),
+    );
+    expect(localStorage.getItem('nexus_phone_panel_pwa')).not.toBeNull();
+  });
+
+  it('shows denied when the host refuses', async () => {
+    claimMock.mockResolvedValueOnce(pendingClaim);
+    confirmMock.mockResolvedValueOnce({ status: 'denied' });
+    renderClaim();
+    expect(await screen.findByText('panel.gate.fail.deniedHeadline')).toBeTruthy();
+    expect(storePhoneTokenMock).not.toHaveBeenCalled();
+    expect(allocateMock).not.toHaveBeenCalled();
+  });
+
+  it('shows expired when the request lapses', async () => {
+    claimMock.mockResolvedValueOnce(pendingClaim);
+    confirmMock.mockResolvedValueOnce({ status: 'expired' });
+    renderClaim();
+    expect(await screen.findByText('panel.gate.fail.expiredHeadline')).toBeTruthy();
+  });
+
+  it('shows the update message for update_required', async () => {
+    claimMock.mockResolvedValueOnce({ paired: false, token: '', error: 'update_required' });
+    renderClaim();
+    expect(await screen.findByText('panel.gate.fail.updateRequiredHeadline')).toBeTruthy();
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  it('treats a pending claim without a number as a protocol error', async () => {
+    claimMock.mockResolvedValueOnce({ ...pendingClaim, sas: '' });
+    renderClaim();
+    expect(await screen.findByText('panel.gate.fail.expiredHeadline')).toBeTruthy();
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  it('tells the PC to drop the request when the gate unmounts mid-approval', async () => {
+    claimMock.mockResolvedValueOnce(pendingClaim);
+    confirmMock.mockReturnValue(new Promise(() => {}));
+    const view = renderClaim();
+    await screen.findByText('123456');
+    confirmMock.mockClear();
+    confirmMock.mockResolvedValue(null);
+    view.unmount();
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith('req-1', false));
   });
 });

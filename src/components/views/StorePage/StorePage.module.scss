@@ -102,6 +102,15 @@ $card-gap: 0.6rem;
   color: var(--text-dim);
 }
 
+/* Product button plus its reason line, in the slot Install would take. */
+.hardwareGate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 /* Where the Install button sits until the app's launch day. Accent rather than
    dim: it is an announcement, not the "not compatible" dead end above. */
 .comingSoon {
@@ -344,10 +353,14 @@ $card-gap: 0.6rem;
   min-width: 0;
 }
 
+// An opaque chip keeps the accent legible over any app's tint.
 .featuredEyebrow {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: var(--bg-elevated);
   @include text-label;
   color: var(--accent);
 }

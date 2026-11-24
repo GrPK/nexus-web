@@ -13,18 +13,20 @@ import { GAUGE_DESIGN_LABELS } from '../monitoring/gauges';
 import { DESIGN_ICONS } from '../monitoring/gauges/DesignIcons';
 import type { GaugeDesignKey } from '../monitoring/gauges';
 import {
-  DEFAULT_MICRO_DESIGN,
   DEFAULT_SLOTS,
   defaultSlotDesign,
   designKeysForSlot,
   isMicroLayout,
   isMicroMultiDevice,
+  MICRO_ALIGN_KEYS,
   MICRO_DESIGN_KEYS,
+  microAlignOf,
+  microDesignOf,
   microRowDevice,
   resolvedSlotLayout,
   resolveSlotDesign,
 } from '../monitoring/perfSlots';
-import type { DeviceKey } from '../monitoring/perfSlots';
+import type { DeviceKey, MicroAlign, MicroDesignKey } from '../monitoring/perfSlots';
 import { buildNetworkSensors, NETWORK_SENSOR_TOTAL } from '../monitoring/networkSensors';
 import { bareSensorLabel } from '../monitoring/sensorNames';
 import { DEFAULT_SCALE_MODE, defaultFixedMax, designSupportsRange, staticMaxForDevice, type ScaleMode } from '../monitoring/perfDomain';
@@ -36,6 +38,7 @@ import {
 } from '../../theme/gaugeGradient';
 import { RotateCcw } from 'lucide-react';
 import { labelForDevice, resolveSensor } from '../monitoring/MonitoringWidget';
+import { sensorCaptionName } from '../monitoring/sensorCategories';
 import { bottomLabelForDevice } from '../monitoring/MicroMonitoringWidget';
 import {
   CATEGORY_LABEL_KEYS, DEVICE_OPTION_KEYS, selectedSensorValue, sensorsForDevice, visibleDeviceKeys,
@@ -84,6 +87,12 @@ export const SCALE_OPTIONS: { value: ScaleMode; labelKey: string }[] = [
   { value: 'adaptive', labelKey: 'monitoring.settings.scaleAdaptive' },
   { value: 'fixed',    labelKey: 'monitoring.settings.scaleFixed' },
 ];
+
+const ALIGN_LABEL_KEYS: Record<MicroAlign, string> = {
+  left: 'monitoring.settings.alignLeft',
+  center: 'monitoring.settings.alignCenter',
+  right: 'monitoring.settings.alignRight',
+};
 
 // Auto / Hide / Custom caption modes. Keys are stored in `*_labelMode`
 // (absent = auto); labels route through i18n at render.
@@ -221,7 +230,7 @@ function microAutoLabel(
 ): string {
   const effectiveName = device === 'network' && !rawName ? NETWORK_SENSOR_TOTAL : rawName;
   const sensor = resolveSensor(sensors, [], networkSensors, device, effectiveName, undefined, extras);
-  const name = sensor?.name ?? '';
+  const name = sensorCaptionName(device, sensors, sensor) ?? '';
   if (prefixed) return labelForDevice(device, name || effectiveName);
   return bareSensorLabel(device, name) || name || effectiveName;
 }
@@ -417,8 +426,10 @@ export function MonitoringSettings({ widget, surface, desktopEditor, onUpdate, s
       disabled: !deviceHasEnoughSensorsForMicro(sensors, networkSensors, extras, category, count),
     }));
     const microCanType = canEditFreeText(surface, desktopEditor);
-    // Row style shared by every bar (Bars / Fill / Graph).
-    const microDesign = (widget.config?.micro_design as GaugeDesignKey | undefined) ?? DEFAULT_MICRO_DESIGN;
+    // Row style shared by every row.
+    const microDesign = microDesignOf(widget.config);
+    const microAlign = microAlignOf(widget.config);
+    const microDesignLabel = (k: MicroDesignKey) => (k === 'simple' ? t('monitoring.settings.designSimple') : GAUGE_DESIGN_LABELS[k]);
     // Micro has one shared range for every bar (no per-slot scale). The default
     // Fixed ceiling is the device's static max; the user types free overrides.
     const microScale = (widget.config?.micro_scale as ScaleMode | undefined) ?? DEFAULT_SCALE_MODE;
@@ -453,13 +464,23 @@ export function MonitoringSettings({ widget, surface, desktopEditor, onUpdate, s
                   className={styles.microDesignBtn}
                   active={k === microDesign}
                   icon={Icon ? <Icon aria-hidden="true" /> : undefined}
-                  title={GAUGE_DESIGN_LABELS[k]}
-                  ariaLabel={GAUGE_DESIGN_LABELS[k]}
+                  title={microDesignLabel(k)}
+                  ariaLabel={microDesignLabel(k)}
                   onPress={() => onUpdate({ micro_design: k })}
                 />
               );
             })}
           </div>
+          {microDesign === 'simple' && (
+            <SettingsRow label={t('monitoring.settings.align')}>
+              <ChipGroup
+                ariaLabel={t('monitoring.settings.align')}
+                activeKey={microAlign}
+                onChange={v => onUpdate({ micro_align: v })}
+                options={MICRO_ALIGN_KEYS.map(k => ({ key: k, label: t(ALIGN_LABEL_KEYS[k]) }))}
+              />
+            </SettingsRow>
+          )}
         </SettingsSection>
 
         <SettingsSection title={t('monitoring.settings.device')}>
@@ -633,7 +654,7 @@ export function MonitoringSettings({ widget, surface, desktopEditor, onUpdate, s
     ?? (activeConfig ? defaultValueColorReverse(activeConfig.device, activeSensor?.name ?? activeConfig.sensorName) : false);
   const slotLabelMode = (widget.config?.[`slot${activeSlot}_labelMode`] as string | undefined) ?? 'auto';
   const slotLabelOverride = (widget.config?.[`slot${activeSlot}_label`] as string | undefined) ?? '';
-  const slotAutoLabel = activeConfig ? labelForDevice(activeConfig.device, activeSensor?.name ?? activeConfig.sensorName) : '';
+  const slotAutoLabel = activeConfig ? labelForDevice(activeConfig.device, sensorCaptionName(activeConfig.device, sensors, activeSensor) ?? activeConfig.sensorName) : '';
 
   return (
     <div className={styles.settingsRoot}>
@@ -657,6 +678,11 @@ export function MonitoringSettings({ widget, surface, desktopEditor, onUpdate, s
                 );
               })}
             </div>
+            <SettingsToggle
+              label={t('monitoring.settings.scaleNumbers')}
+              checked={widget.config?.adaptiveNumbers === true}
+              onChange={next => onUpdate({ adaptiveNumbers: next })}
+            />
           </SettingsSection>
 
           <SettingsSection title={t('monitoring.settings.sensor')}>

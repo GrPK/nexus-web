@@ -8,8 +8,9 @@ import { ChipGroup } from '../../components/common/ChipGroup/ChipGroup';
 import { SearchInput } from '../../components/common/SearchInput/SearchInput';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { useTranslation } from '../../lib/i18n';
-import { singleWidgetSurfaceSize, surfaceSupportsTextInput, type ForcedGrid, type PanelLayout, type PanelSurface, type PanelWidget, type PanelWidgetSize } from '../types';
+import { hostedDisplayKeyboard, singleWidgetSurfaceSize, surfaceSupportsTextInput, type ForcedGrid, type PanelLayout, type PanelSurface, type PanelWidget, type PanelWidgetSize } from '../types';
 import { sizeToSpan } from '../engine/grid';
+import { catalogRowSizeForGlass } from './catalogTileAspect';
 import { PHONE_WIDGET_REFERENCE_CELL } from '../engine/panelGrid';
 import { appendWidget } from '../engine/panelLayoutOps';
 import { getCatalogEntries, pickerSizeFor, sizesForSurface, appAvailableForSurface } from '../widgets/registry';
@@ -20,10 +21,12 @@ import {
 } from '../../widgets/marketplaceRegistry';
 import { DEV_TOOLS } from '../../lib/devTools';
 import { PanelCatalogCell, type CatalogCellDrag } from '../dnd/PanelDragCells';
+import { splitPanelFontStyle } from '../theme/panelFont';
 import { playlistDisplayOrder } from '../engine/widgetPlaylist';
 import { SIZE_ICONS } from '../widgets/common/SizeIcons';
 import panelStyles from '../PanelApp.module.scss';
 import styles from './PanelWidgetCatalog.module.scss';
+import { usePanelSkinAttrs, type PanelSkinAttributes } from '../../components/common/ThemeScope/PanelSkinScope';
 
 // The catalog IS a panel grid. The column count is a multiple of 4 sized so
 // each cell lands near this target, then widgets pack row-major via the panel's
@@ -65,7 +68,7 @@ type CatalogEntry = ReturnType<typeof getCatalogEntries>[number];
 // bypass the curation so every installed widget is browseable for testing.
 export function catalogEntriesFor(
   surface: PanelSurface,
-  opts: { remote?: boolean; deviceTouch?: boolean; forcedGrid?: ForcedGrid } = {},
+  opts: { remote?: boolean; deviceTouch?: boolean; forcedGrid?: ForcedGrid; displayBound?: boolean; genericDisplay?: boolean; transposedTile?: boolean } = {},
 ): CatalogEntry[] {
   return getCatalogEntries().filter(([, def]) => {
     if (!appAvailableForSurface(def.meta, surface, opts)) return false;
@@ -114,6 +117,8 @@ export interface PanelWidgetCatalogProps {
   // modal) the surrounding stylesheet sets --accent to the desktop's accent;
   // without this prop the search input + previews highlight in the wrong hue.
   themeStyle?: CSSProperties;
+  // Skin attributes for a catalog outside a panel skin scope (the desktop device page); they scope the previews only.
+  skinAttrs?: PanelSkinAttributes;
   className?: string;
   // Highlight the card matching this widget type. Used by single-widget
   // surfaces (q-series) to mark the device's active widget.
@@ -129,8 +134,15 @@ export interface PanelWidgetCatalogProps {
   // Per-device touch capability (promoted monitors): touch-requiring widgets
   // are listed only when the device's display actually has a digitizer.
   deviceTouch?: boolean;
+  displayBound?: boolean;
+  genericDisplay?: boolean;
   // Forced short-axis slot count of the target grid, which narrows the offered sizes.
   forcedGrid?: ForcedGrid;
+  // The single-widget tile has its axes swapped (a quarter-turn render).
+  transposedTile?: boolean;
+  // Target glass width / height. A single-widget surface's tile takes this
+  // shape instead of the grid's square cells.
+  glassAspect?: number;
 }
 
 export function PanelWidgetCatalog({
@@ -144,12 +156,19 @@ export function PanelWidgetCatalog({
   remote = false,
   themeMode,
   themeStyle,
+  skinAttrs: skinAttrsProp,
   className,
   selectedWidgetType,
   playlist,
   deviceTouch,
+  displayBound,
+  genericDisplay,
   forcedGrid,
+  transposedTile = false,
+  glassAspect,
 }: PanelWidgetCatalogProps) {
+  const scopeSkinAttrs = usePanelSkinAttrs();
+  const skinAttrs = skinAttrsProp ? undefined : scopeSkinAttrs;
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   // Post-add confirmation on the card that was just clicked (desktop catalog
@@ -184,7 +203,7 @@ export function PanelWidgetCatalog({
 
   // Already-placed instances always render via lookupApp; listed apps
   // co-mingle in one grid - no separate section.
-  const catalogEntries = catalogEntriesFor(surface, { remote, deviceTouch, forcedGrid });
+  const catalogEntries = catalogEntriesFor(surface, { remote, deviceTouch, forcedGrid, displayBound, genericDisplay, transposedTile });
   const playlistOrder = playlist
     ? playlistDisplayOrder(playlist.order, catalogEntries.map(([type]) => type))
     : null;
@@ -200,12 +219,6 @@ export function PanelWidgetCatalog({
   const visible = entries.filter(([type, def]) => matchesSearch(type, def));
   const visibleCount = visible.length;
 
-  const rootClass = [
-    'panel-root',
-    styles.root,
-    variant === 'desktop-modal' ? styles.desktop : '',
-    className ?? '',
-  ].filter(Boolean).join(' ');
 
   // No search field on a keyboard-less surface (Y70 kiosk, Q-series): it
   // can't be typed into on-device. A desktop modal editing such a panel
@@ -245,16 +258,18 @@ export function PanelWidgetCatalog({
   // browse tiles size for reading rather than matching the target surface.
   // Always set (cols/cellSize fall back before the first measure) so
   // `--panel-columns` is never undefined, which would collapse the grid.
+  const rowSize = catalogRowSizeForGlass(surface, glassAspect, cellSize, gap, transposedTile) ?? cellSize;
+  const nonSquareTile = Math.abs(rowSize - cellSize) > 0.5;
   const panelGridVars: CSSProperties = {
     '--panel-columns': cols,
     '--panel-cell-size': `${cellSize}px`,
-    '--panel-row-size': `${cellSize}px`,
-    '--panel-content-scale': `${cellSize}px`,
+    '--panel-row-size': `${rowSize}px`,
+    '--panel-content-scale': `${Math.min(cellSize, rowSize)}px`,
     // Plain-number scale (cell / 90px design base). The default token derives
     // this via CSS trig (`tan(atan2(...))`), which `scale()` reads but the cell
     // scaler's `width: calc(inner / scale)` division does NOT evaluate -
     // leaving widget content scaled down without compensation. A number fills.
-    '--panel-scale': cellSize / PHONE_WIDGET_REFERENCE_CELL,
+    '--panel-scale': Math.min(cellSize, rowSize) / PHONE_WIDGET_REFERENCE_CELL,
     '--panel-gap': `${gap}px`,
   } as CSSProperties;
 
@@ -267,10 +282,10 @@ export function PanelWidgetCatalog({
   // widget supports it on this surface, else the widget's own picker size
   // (sole-size widgets and single-widget surfaces keep their shape).
   const pickSize = (meta: CatalogEntry[1]['meta']): PanelWidgetSize => {
-    if (sizesForSurface(meta, surface, deviceTouch, forcedGrid).includes(preferredSize)) {
+    if (sizesForSurface(meta, surface, deviceTouch, forcedGrid, transposedTile).includes(preferredSize)) {
       return preferredSize;
     }
-    return pickerSizeFor(meta, surface, deviceTouch, forcedGrid);
+    return pickerSizeFor(meta, surface, deviceTouch, forcedGrid, transposedTile);
   };
 
   const packEntries = (items: CatalogEntry[]): PanelWidget[] => {
@@ -337,6 +352,8 @@ export function PanelWidgetCatalog({
         <PanelCatalogCell
           key={w.id}
           widget={w}
+          previewStyle={previewFont}
+          previewScope={previewScope}
           surface={surface}
           deviceTouch={deviceTouch}
           label={def ? t(def.meta.i18nKey) || w.type : w.type}
@@ -374,15 +391,32 @@ export function PanelWidgetCatalog({
 
   // The widget browser always renders cards opaque; the device's widget-opacity
   // setting applies only on-device and in the device preview, not while browsing.
+  // In the desktop app the catalog chrome (search, chips, captions) keeps the app font; only the previews take the panel's.
+  const { chrome: chromeThemeStyle, font: previewFont } = variant === 'desktop-modal'
+    ? splitPanelFontStyle(themeStyle)
+    : { chrome: themeStyle, font: undefined };
   const catalogStyle = {
-    ...themeStyle,
+    ...chromeThemeStyle,
     ...panelGridVars,
     '--panel-card-bg-opacity': '100%',
   } as CSSProperties;
 
+  const previewScope = skinAttrsProp
+    ? { attrs: { ...skinAttrsProp, ...(themeMode ? { 'data-theme': themeMode } : {}), ...(surface ? { 'data-surface': surface } : {}) }, style: { ...themeStyle, ...catalogStyle } as CSSProperties }
+    : undefined;
+
+  const rootClass = [
+    'panel-root',
+    styles.root,
+    variant === 'desktop-modal' ? styles.desktop : '',
+    nonSquareTile ? panelStyles.glassTile : '',
+    className ?? '',
+  ].filter(Boolean).join(' ');
+
   return (
     <div
       className={rootClass}
+      {...skinAttrs}
       data-theme={themeMode}
       data-surface={surface}
       style={catalogStyle}
@@ -399,7 +433,7 @@ export function PanelWidgetCatalog({
               // the desktop modal and the desktop dashboard's add-widget sheet.
               // The phone renders the field but stays unfocused so the on-screen
               // keyboard doesn't pop up.
-              autoFocus={variant === 'desktop-modal' || surface === 'desktop'}
+              autoFocus={variant === 'desktop-modal' || surface === 'desktop' || hostedDisplayKeyboard(surface)}
             />
           )}
           {showSizeChips && (

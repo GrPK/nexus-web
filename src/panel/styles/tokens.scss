@@ -4,15 +4,32 @@
 // the browser silently drops the whole rule block if it sees it here.
 
 // Lexend is the unified default; the @font-face is loaded once from
-// global.scss. The Tools > Debug font picker fetches alternatives on
-// demand if the user picks one.
+// global.scss.
 
 // Widgets draw in one font: mono call sites resolve to the panel font (the
 // theme's font override included) and align digits via tabular-nums. The
 // [data-theme] form outranks variables.scss's [data-theme="dark"] token block,
-// which also lands on the panel root and would restore JetBrains Mono.
+// which also lands on the panel root and would restore the desktop stack.
 .panel-root,
 .panel-root[data-theme] { --font-mono: var(--panel-font); }
+
+// Type weights step down by --weight-shift and small text tracks out by --small-tracking, both set
+// by the resolved font. The weights are restated here because a light panel root inherits :root's
+// resolved values, which carry no shift.
+.panel-root[data-theme] {
+  --weight-shift: 0;
+  --weight-display-min: 0;
+  --small-tracking: 0em;
+  --weight-heading: max(400, calc(700 - var(--weight-shift)));
+  --weight-body: max(400, calc(500 - var(--weight-shift)));
+  --weight-strong: max(400, calc(600 - var(--weight-shift)));
+}
+// Oswald tops out at 700: values sit at the top of the file, everything smaller steps lighter and opens up.
+.panel-root[data-panel-font='oswald'][data-theme] {
+  --weight-shift: 100;
+  --weight-display-min: 700;
+  --small-tracking: 0.06em;
+}
 
 // --panel-scale: real cell ÷ 90px design base, as a unitless number
 // (tan(atan2(a,b)) == a/b - CSS can't divide two lengths). The single ratio
@@ -71,13 +88,9 @@
   --panel-card-radius: var(--radius);
   // Cell-scaled card radius. Surfaces opt in by assigning it to
   // --panel-card-radius (PanelApp.module.scss); it lives here so the grid and
-  // the drag clone portaled out of the panel root share one formula. Keys off
-  // the smaller cell axis so a wide cell reads as rounded as a small one.
-  --panel-card-radius-auto: clamp(
-    var(--radius-lg),
-    calc(min(var(--panel-cell-size), var(--panel-row-size, var(--panel-cell-size))) * 0.14),
-    40px
-  );
+  // the drag clone portaled out of the panel root share one formula. Scales
+  // with --panel-scale, so the radius follows the cell size.
+  --panel-card-radius-auto: clamp(var(--radius-lg), calc(var(--panel-scale, 1) * 12.6px), 40px);
   // The .panel-card fill. Defaults to translucent --surface so embedded hosts
   // (desktop dashboard, floating overlay - both buildEmbeddedPanelThemeVars)
   // keep their frosted look. Live device panels (buildPanelThemeVars) swap in
@@ -100,7 +113,7 @@
   // Card hover chrome, resolved here so an adaptive-ink host keeps the theme's:
   // the card itself never follows the ink.
   --panel-card-hover-fill: var(--surface-hover);
-  --panel-card-hover-border: var(--panel-border-strong);
+  --panel-card-hover-border: var(--border-hover);
 
   // --panel-widget-padding is the Theme "Widget padding" setting, resolved to
   // a concrete px length by useRuntimePanelGrid (grid.ts resolvePanelSpacing)
@@ -209,6 +222,7 @@
   --bg-card-hover: #202020;
   --border: #2a2a2a;
   --border-strong: #3a3a3a;
+  --border-hover: #3a3a3a;
   --control-border: rgba(245, 245, 245, 0.12);
   --control-border-strong: rgba(245, 245, 245, 0.4);
   --gauge-track: rgba(255, 255, 255, 0.2);
@@ -222,6 +236,8 @@
   --good: #10b981;
   --warn: #f59e0b;
   --bad: #ef4444;
+  --airflow-cool: #1e9bff;
+  --airflow-purple: #a53cff;
   // Notice levels (Notice.tsx): soft fills and borders. Fixed rgba, not color-mix (Chromium 83 panels).
   --info-soft: rgba(255, 255, 255, 0.05);
   --warn-soft: rgba(245, 158, 11, 0.12);
@@ -239,6 +255,7 @@
   --bg-card-hover: #f5f5f5;
   --border: #cacaca;
   --border-strong: #c6c6c6;
+  --border-hover: #9e9e9e;
   --control-border: rgba(26, 26, 46, 0.12);
   --control-border-strong: rgba(26, 26, 46, 0.4);
   --gauge-track: rgba(0, 0, 0, 0.2);
@@ -252,6 +269,8 @@
   --good: #059669;
   --warn: #d97706;
   --bad: #dc2626;
+  --airflow-cool: #0070e0;
+  --airflow-purple: #8a24e0;
   // Notice levels (Notice.tsx): soft fills and borders. Fixed rgba, not color-mix (Chromium 83 panels).
   --info-soft: rgba(0, 0, 0, 0.05);
   --warn-soft: rgba(217, 119, 6, 0.1);
@@ -262,6 +281,19 @@
   --chart-line-alt: #db2777;
 }
 
+// A flipped ink host (textColor.ts sets data-ink-fade for a moment, never on
+// the first stamp) eases its contents to the new palette instead of snapping.
+// Scoped to that moment so widgets keep their own transitions otherwise;
+// transform and opacity ride along so an in-flight press scale keeps animating.
+@media (prefers-reduced-motion: no-preference) {
+  .panel-root [data-ink-fade],
+  .panel-root [data-ink-fade] * {
+    transition: color var(--ease) ease-out, fill var(--ease) ease-out, stroke var(--ease) ease-out,
+      background-color var(--ease) ease-out, border-color var(--ease) ease-out,
+      transform var(--ease) ease-out, opacity var(--ease) ease-out !important;
+  }
+}
+
 // Sensor unit suffix inside any monitoring gauge (% / RPM / GB / °C / etc).
 // Smaller, dimmer, with a tiny gap from the value so the number stays the
 // primary read. Mirrors the desktop monitoring overview's value+unit pair.
@@ -269,8 +301,8 @@
   display: inline-block;
   margin-left: 0.18em;
   font-size: 0.55em;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: max(400, calc(700 - var(--weight-shift, 0)));
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   color: var(--text-dim);
   vertical-align: baseline;
 }
@@ -361,7 +393,7 @@
   font-family: var(--panel-font);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   cursor: pointer;
   transition: background-color var(--ease-fast) ease, color var(--ease-fast) ease, border-color var(--ease-fast) ease;
 

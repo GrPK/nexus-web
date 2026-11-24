@@ -75,10 +75,69 @@ export interface UnifiedDevice {
   // Transport the device lives on; drives the Devices-page section grouping.
   // Undefined means 'usb'.
   bus?: 'usb' | 'smbus';
+  // 'failing' while Nexus controls the device but its lighting writes keep failing.
+  writeHealth?: 'failing';
+  // Set on a device the sidebar and the Devices list show inside a group entry
+  // (the Lian Li page) instead of on its own row. Its own page still opens.
+  groupKey?: typeof LIANLI_GROUP;
+}
+
+/** The group the Lian Li devices share, and the key of its entry. */
+export const LIANLI_GROUP = 'lianli' as const;
+export const LIANLI_HUB_KEY = 'lianli-hub';
+// Below this many connected Lian Li devices each keeps its own row.
+const LIANLI_GROUP_MIN = 2;
+
+/** A Lian Li device by its handler or panel source id: the Uni hubs, TL, Galahad, L-Wireless, Flex, Strimer and the Lian Li screens. */
+export function isLianLiMemberId(id: string | undefined): boolean {
+  return !!id && (id === 'strimer' || id.startsWith('lianli'));
+}
+
+/**
+ * With two or more Lian Li devices connected, marks each as a member of the
+ * Lian Li group and adds one "Lian Li" entry for them, like L-Connect's single
+ * window. The members stay in the list, so their own pages, search and Nexus
+ * Control keep working; the sidebar and the Devices list show the entry.
+ */
+export function groupLianLiDevices(list: readonly UnifiedDevice[]): UnifiedDevice[] {
+  const memberKeys = new Set(
+    list.filter(d => d.connected && !d.simulated && isLianLiMemberId(d.curatedId)).map(d => d.key),
+  );
+  if (memberKeys.size < LIANLI_GROUP_MIN) return [...list];
+  const grouped = list.map((d): UnifiedDevice => (memberKeys.has(d.key) ? { ...d, groupKey: LIANLI_GROUP } : d));
+  const warning = grouped.find(d => d.groupKey && d.warning)?.warning;
+  grouped.push({
+    key: LIANLI_HUB_KEY,
+    shortName: 'Lian Li',
+    name: 'Lian Li',
+    subtitle: 'cooler',
+    category: 'cooler',
+    iconSrc: CURATED_ICONS.lianli ?? FALLBACK_ICON,
+    connected: true,
+    kind: 'curated',
+    navigable: true,
+    nexusControlEnabled: true,
+    supportsNexusControl: false,
+    experimental: false,
+    requiresBeta: false,
+    warning,
+    bus: 'usb',
+  });
+  return grouped;
+}
+
+/** The devices a group entry stands for. */
+export function groupMembers(list: readonly UnifiedDevice[], group: string): UnifiedDevice[] {
+  return list.filter(d => d.groupKey === group);
 }
 
 // A simulated panel carries the marker on its panel record; the Tryx sim sets
 // `simulated` directly. Neither marker alone covers both.
+/** Whether the Nexus Control gate on this device reads as a panel on/off rather than releasing the hardware. */
+export function controlGateIsPanel(device: Pick<UnifiedDevice, 'panelDevice'>): boolean {
+  return !!device.panelDevice?.genericDisplay || device.panelDevice?.secondaryMonitor === true;
+}
+
 /** The device-page key of a panel device. */
 export function panelDeviceKey(panelId: string): string {
   return `panel-${panelId}`;
@@ -97,6 +156,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   mouse: '/assets/devices/mouse.svg',
   keyboard: '/assets/devices/keyboard.svg',
   headset: '/assets/devices/headset.svg',
+  speaker: '/assets/devices/speaker.svg',
   gamepad: '/assets/devices/gamepad.svg',
   display: '/assets/devices/monitor.svg',
   cooler: '/assets/devices/fan.svg',
@@ -161,13 +221,21 @@ const CURATED_ICONS: Record<string, string> = {
   'lianli-tl': '/assets/devices/lianli.svg',
   'lianli-aio': '/assets/devices/lianli.svg',
   'lianli-wireless': '/assets/devices/lianli.svg',
+  'lianli-flex': '/assets/devices/lianli.svg',
   strimer: '/assets/devices/lianli.svg',
   nollie: '/assets/devices/nollie.svg',
   tryx: '/assets/devices/tryx.svg',
   'nzxt-kraken': '/assets/devices/nzxt.svg',
   'asus-ryujin-lcd': '/assets/devices/asus.svg',
+  'asus-slc4-lcd': '/assets/devices/asus.svg',
+  'asus-glacial-lcd': '/assets/devices/asus.svg',
+  'asus-ryujin-extreme': '/assets/devices/asus.svg',
+  'asus-astral': '/assets/devices/asus.svg',
   'asiahorse-umbra': '/assets/devices/asiahorse.svg',
 };
+
+/** The service names the handler for P28 V2 when every unit is one; otherwise the LCD Flex label stands. */
+export const flexShortName = (serviceName: string): string => (serviceName === 'Lian Li P28 V2' ? serviceName : 'Lian Li LCD Flex');
 
 const CURATED_SHORT_NAMES: Record<string, string> = {
   // y70 and qseries omitted: the service reports the connected variant's
@@ -192,6 +260,10 @@ const CURATED_SHORT_NAMES: Record<string, string> = {
   // display; the row is the whole cooler.
   'nzxt-kraken': 'NZXT Kraken',
   'asiahorse-umbra': 'Asiahorse Umbra V2',
+  'asus-glacial-lcd': 'ROG Crosshair X870E Glacial',
+  'asus-ryujin-extreme': 'ROG Ryujin III Extreme',
+  'asus-astral': 'ROG Astral',
+  'deepcool-mystique': 'DeepCool Mystique',
 };
 
 const FALLBACK_ICON = '/assets/devices/device.svg';
@@ -309,7 +381,7 @@ export function useUnifiedDevices(enabled: boolean) {
         bus: 'usb',
       });
     }
-    return list;
+    return groupLianLiDevices(list);
   }, [panels.devices, devices, deviceApps, streamDecks, tryxSimulated, t]);
 
   const turnedOffMonitorKeys = useMemo(
@@ -334,13 +406,14 @@ function buildUnifiedList(
   const claimedCuratedIds = new Set<string>();
 
   for (const p of panelDevices) {
-    if (p.sourceId) claimedCuratedIds.add(p.sourceId);
-    const sourceId = p.sourceId;
+    const isSimulated = p.connectionKind === 'simulated';
+    // A simulator shares its preset id with a real device (y70) and must not claim or inherit from it.
+    const sourceId = isSimulated ? undefined : p.sourceId;
+    if (sourceId) claimedCuratedIds.add(sourceId);
     // Real connected panels use CURATED_SHORT_NAMES where one exists so the
     // sidebar shows a normalized label. Simulator entries keep their preset
     // name so the resolution suffix ("HYTE Y70 Touch 2.5K" / "HYTE Y70 Touch
     // 4K") stays visible.
-    const isSimulated = p.connectionKind === 'simulated';
     const shortName = isSimulated
       ? p.name
       : (sourceId && CURATED_SHORT_NAMES[sourceId]) || p.name;
@@ -390,7 +463,7 @@ function buildUnifiedList(
     const displayName = d.id === 'smbus-dram' ? t('devices.smbusDram.name') : d.name;
     list.push({
       key: `curated-${d.id}`,
-      shortName: (isLianLiHubId(d.id) ? lianLiHubName(d.id) : CURATED_SHORT_NAMES[d.id]) || displayName,
+      shortName: (isLianLiHubId(d.id) ? lianLiHubName(d.id) : d.id === 'lianli-flex' ? flexShortName(d.name) : CURATED_SHORT_NAMES[d.id]) || displayName,
       name: displayName,
       subtitle: d.category,
       category: d.category,
@@ -406,10 +479,11 @@ function buildUnifiedList(
       supportsNexusControl: d.supportsNexusControl ?? false,
       experimental: d.experimental ?? false,
       requiresBeta: d.requiresBeta ?? false,
-      // Off never opens a cooler LCD's pipe, so its unavailable warning only restates the off state.
-      warning: (d.nexusControlEnabled === false && d.warning === 'bulk-pipe-unavailable' ? undefined : d.warning) ?? undefined,
+      // Off never opens a cooler LCD's pipe, so its pipe-unavailable and access-denied warnings only restate the off state.
+      warning: (d.nexusControlEnabled === false && (d.warning === 'bulk-pipe-unavailable' || d.warning === 'access-denied') ? undefined : d.warning) ?? undefined,
       conflictAppId: d.conflictAppId,
       bus: d.bus ?? 'usb',
+      writeHealth: d.writeHealth,
     });
   }
 

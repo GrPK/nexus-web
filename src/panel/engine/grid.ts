@@ -1,6 +1,7 @@
 import {
   isSingleWidgetSurface,
   normalizePanelWidgetSize,
+  parseWidgetSizeSpan,
   type PanelSurface,
   type PanelWidgetSize,
   singleWidgetSurfaceSize,
@@ -92,7 +93,8 @@ export function resolvePanelSpacing(extent: number, count: number, ratio: number
 }
 
 export function sizeToSpan(size: PanelWidgetSize | string): GridSpan {
-  switch (normalizePanelWidgetSize(size)) {
+  const normalized = normalizePanelWidgetSize(size);
+  switch (normalized) {
     case '1x1': return { cols: 1, rows: 1 };
     case '2x2': return { cols: 2, rows: 2 };
     case '2x4': return { cols: 2, rows: 4 };
@@ -101,25 +103,25 @@ export function sizeToSpan(size: PanelWidgetSize | string): GridSpan {
     case '4x4': return { cols: 4, rows: 4 };
     // Round is a 2x2 block; only its rendering is circular.
     case '2x2round': return { cols: 2, rows: 2 };
+    default: return parseWidgetSizeSpan(normalized) ?? { cols: 4, rows: 4 };
   }
 }
 
-// Cell stride a widget snaps to on each axis. 1x1 snaps every cell;
-// every multi-cell widget snaps in 2-cell increments so a 4x4 can
-// land at col/row 2 instead of being locked to multiples of 4.
-export function snapStride(span: number): number {
-  return span <= 1 ? 1 : 2;
-}
-
-// Scan passes for placement searches: stride-aligned first (snap
-// aesthetics), then every cell so off-stride free space (left by 1x1
-// neighbours or a tight repack) still accepts the widget instead of
-// the search reporting "no room" while blank cells are visible.
-export function strideScanSteps(colSpan: number, rowSpan: number): { col: number; row: number }[] {
-  const col = snapStride(colSpan);
-  const row = snapStride(rowSpan);
-  if (col === 1 && row === 1) return [{ col, row }];
-  return [{ col, row }, { col: 1, row: 1 }];
+// Where a dragged widget drops: the top-left cell index rounded to the nearest
+// cell and clamped so the rect stays inside the grid, so a multi-cell widget
+// can start on any column or row.
+export function snapDropCell(
+  continuousCol: number,
+  continuousRow: number,
+  span: GridSpan,
+  grid: { cols: number; rows: number },
+): { col: number; row: number } {
+  const maxCol = Math.max(0, grid.cols - span.cols);
+  const maxRow = Math.max(0, grid.rows - span.rows);
+  return {
+    col: Math.min(Math.max(0, Math.round(continuousCol)), maxCol),
+    row: Math.min(Math.max(0, Math.round(continuousRow)), maxRow),
+  };
 }
 
 export function panelGridCapacityForCanvas(
@@ -135,6 +137,7 @@ export function panelGridCapacityForCanvas(
     gap = PANEL_GRID_GAP,
     padding = PANEL_GRID_PREVIEW_PADDING,
     paddingRatio,
+    transposedTile = false,
   }: {
     surface?: PanelSurface;
     dpi?: number;
@@ -150,6 +153,8 @@ export function panelGridCapacityForCanvas(
     // single-widget surface (q60) regardless of the value passed in - any
     // inset there reads as a border around the one tile.
     paddingRatio?: number;
+    // The single-widget tile has its axes swapped (a quarter-turn render).
+    transposedTile?: boolean;
   } = {},
 ): PanelGridCapacity {
   // Y70 landscape transposes the portrait grid: the fixed long-axis cell
@@ -164,7 +169,7 @@ export function panelGridCapacityForCanvas(
   // span makes the widget fill the glass on any such surface. This reproduces the
   // Q-series 2x4 exactly and gives the round Kraken glass its 2x2.
   const singleSpan = (() => {
-    const size = singleWidgetSurfaceSize(surface);
+    const size = singleWidgetSurfaceSize(surface, transposedTile);
     return size === undefined ? undefined : sizeToSpan(size);
   })();
   const defaultColumns = singleSpan
@@ -177,7 +182,8 @@ export function panelGridCapacityForCanvas(
     : y70Landscape
       ? shortAxisSlots
       : surface === 'y70' && height >= width
-        ? PANEL_Y70_LONG_AXIS_CELLS
+        // A forced column count (Widget size) keeps the cells square, so the rows follow from the height.
+        ? (shortSideSlots === undefined ? PANEL_Y70_LONG_AXIS_CELLS : undefined)
         : undefined;
   const fixedRows = rows ?? defaultRows;
   const canvasW = Math.max(1, width);
@@ -283,16 +289,17 @@ export function columnsForPhysicalSize(
   dpi: number | undefined,
   sizing: PanelGridSizing | undefined,
 ): number {
-  if (!Number.isFinite(dpi) || !dpi || dpi <= 0) return PANEL_GRID_COLS;
+  if (!Number.isFinite(dpi) || !dpi || dpi <= 0) return toEvenRound(PANEL_GRID_COLS);
   const configuredJumpAtInches = sizing?.shortSideJumpAtInches;
   const jumpAtInches = configuredJumpAtInches !== undefined && Number.isFinite(configuredJumpAtInches)
     ? Math.max(1, configuredJumpAtInches)
     : DEFAULT_PANEL_GRID_SHORT_SIDE_JUMP_INCHES;
   const physical = panelPhysicalSize(width, height, dpi);
-  if (physical.shortSideInches < jumpAtInches) return PANEL_GRID_COLS;
+  if (physical.shortSideInches < jumpAtInches) return toEvenRound(PANEL_GRID_COLS);
   // Steps of four keep a Widget size half of the count even.
   const step = PANEL_GRID_COLS * PANEL_GRID_CELL_INCHES;
-  return Math.max(PANEL_LARGE_GRID_COLS, PANEL_GRID_COLS * Math.round(physical.shortSideInches / step));
+  // Never odd, so a 2x2 tile always fits.
+  return toEvenRound(Math.max(PANEL_LARGE_GRID_COLS, PANEL_GRID_COLS * Math.round(physical.shortSideInches / step)));
 }
 
 function toEvenRound(value: number): number {

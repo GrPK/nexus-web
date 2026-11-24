@@ -90,8 +90,10 @@ vi.mock('../dnd/PanelDragCells', () => ({
     addedStage,
     onEditAdded,
     onPointerLeave,
+    previewScope,
   }: {
     widget: { size: string };
+    previewScope?: { attrs: Record<string, string> };
     label: string;
     disabled?: boolean;
     disabledHint?: string;
@@ -104,6 +106,7 @@ vi.mock('../dnd/PanelDragCells', () => ({
       type="button"
       data-size={widget.size}
       data-hint={disabledHint}
+      data-scope-skin={previewScope?.attrs['data-panel-skin']}
       disabled={disabled}
       // Mirrors the real cell: while the overlay is up the card edits (or does
       // nothing) instead of adding again, and leaving it clears the overlay.
@@ -134,6 +137,46 @@ describe('PanelWidgetCatalog', () => {
 
     expect(search).toBeInTheDocument();
     expect(search).not.toHaveFocus();
+  });
+
+  describe('skin attributes outside a panel skin scope', () => {
+    it('hand the skin to each preview and keep the catalog chrome unskinned', () => {
+      const { container } = render(
+        <PanelWidgetCatalog surface="desktop" themeMode="dark" skinAttrs={{ 'data-panel-skin': 'lcd' }} onAdd={vi.fn()} />,
+      );
+
+      const root = container.firstElementChild as HTMLElement;
+      expect(root).not.toHaveAttribute('data-panel-skin');
+      const cards = screen.getAllByRole('button').filter(b => b.hasAttribute('data-scope-skin'));
+      expect(cards.length).toBeGreaterThan(0);
+      for (const card of cards) expect(card).toHaveAttribute('data-scope-skin', 'lcd');
+    });
+  });
+
+  describe('keyboard input on a hosted display', () => {
+    afterEach(() => vi.unstubAllGlobals());
+    const host = () => vi.stubGlobal('chrome', { webview: { postMessage: () => {} } });
+
+    it('shows a typable, focused search on a monitor panel under a kiosk host', () => {
+      host();
+      render(<PanelWidgetCatalog surface="monitor" onAdd={vi.fn()} />);
+      const search = screen.getByRole('textbox', { name: 'panel.add.searchPlaceholder' });
+      expect(search).toHaveFocus();
+      fireEvent.change(search, { target: { value: 'clo' } });
+      expect(screen.getByText('panel.widget.clock')).toBeInTheDocument();
+      expect(screen.queryByText('panel.widget.media')).toBeNull();
+    });
+
+    it('keeps the y70 searchless even under a kiosk host', () => {
+      host();
+      render(<PanelWidgetCatalog surface="y70" onAdd={vi.fn()} />);
+      expect(screen.queryByRole('textbox', { name: 'panel.add.searchPlaceholder' })).toBeNull();
+    });
+
+    it('keeps the search hidden on a monitor with no host', () => {
+      render(<PanelWidgetCatalog surface="monitor" onAdd={vi.fn()} />);
+      expect(screen.queryByRole('textbox', { name: 'panel.add.searchPlaceholder' })).toBeNull();
+    });
   });
 
   it('hides touch-only widgets on the q60 surface', () => {
@@ -360,5 +403,53 @@ describe('PanelWidgetCatalog', () => {
 
       expect(screen.queryByTestId('added-panel.widget.clock')).toBeNull();
     });
+  });
+});
+
+describe('PanelWidgetCatalog glass aspect', () => {
+  const rootOf = (container: HTMLElement) => container.firstElementChild as HTMLElement;
+  const varOf = (container: HTMLElement, name: string) =>
+    Number.parseFloat(rootOf(container).style.getPropertyValue(name));
+  const scaleOf = (container: HTMLElement) => varOf(container, '--panel-scale');
+  const isGlassTile = (container: HTMLElement) => /glassTile/.test(rootOf(container).className);
+
+  it('makes a portrait single-widget tile taller than wide and scales content to the short side', () => {
+    const { container } = render(<PanelWidgetCatalog surface="lcd-square" glassAspect={720 / 1280} onAdd={vi.fn()} />);
+    const cell = varOf(container, '--panel-cell-size');
+
+    expect(varOf(container, '--panel-row-size')).toBeGreaterThan(cell);
+    expect(varOf(container, '--panel-content-scale')).toBe(cell);
+    expect(scaleOf(container)).toBeCloseTo(cell / 90, 5);
+    expect(isGlassTile(container)).toBe(true);
+  });
+
+  it('scales content to the row on landscape square-surface glass', () => {
+    const { container } = render(<PanelWidgetCatalog surface="lcd-square" glassAspect={640 / 480} onAdd={vi.fn()} />);
+    const row = varOf(container, '--panel-row-size');
+
+    expect(row).toBeLessThan(varOf(container, '--panel-cell-size'));
+    expect(varOf(container, '--panel-content-scale')).toBeCloseTo(row, 5);
+    expect(scaleOf(container)).toBeCloseTo(row / 90, 5);
+    expect(isGlassTile(container)).toBe(true);
+  });
+
+  it('gives the q60 strip its real glass shape', () => {
+    const { container } = render(<PanelWidgetCatalog surface="q60" glassAspect={240 / 800} onAdd={vi.fn()} />);
+
+    expect(varOf(container, '--panel-row-size')).toBeGreaterThan(varOf(container, '--panel-cell-size'));
+    expect(isGlassTile(container)).toBe(true);
+  });
+
+  it('leaves square glass and grid surfaces exactly as before', () => {
+    const square = render(<PanelWidgetCatalog surface="lcd-square" glassAspect={1} onAdd={vi.fn()} />);
+    const cell = varOf(square.container, '--panel-cell-size');
+    expect(varOf(square.container, '--panel-row-size')).toBe(cell);
+    expect(scaleOf(square.container)).toBeCloseTo(cell / 90, 5);
+    expect(isGlassTile(square.container)).toBe(false);
+    square.unmount();
+
+    const grid = render(<PanelWidgetCatalog surface="monitor" glassAspect={720 / 1280} onAdd={vi.fn()} />);
+    expect(varOf(grid.container, '--panel-row-size')).toBe(varOf(grid.container, '--panel-cell-size'));
+    expect(isGlassTile(grid.container)).toBe(false);
   });
 });

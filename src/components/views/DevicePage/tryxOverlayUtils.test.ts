@@ -1,15 +1,18 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import { resolveHour12, type DateFormat } from '../../../lib/units';
 import type { HardwareSensor } from '../../../hooks/useSensors';
 import { SENSOR_CATEGORIES } from '../../../panel/widgets/monitoring/sensorCategories';
 import {
   applyDockedOverlayLayout,
   clampUnit,
   dockedOverlayItemPosition,
+  formatTryxClockPreview,
   formatTryxStorageFreePercent,
   isTryxOverlayAlign,
   isTryxSensorGroup,
   scalePanelMetric,
+  tryxClockSensors,
   tryxFontCssStyle,
   tryxOverlayJustifyStyle,
   formatTryxSensorValue,
@@ -23,6 +26,7 @@ import {
   TRYX_LABEL_OFFSET_PANEL_PX,
   TRYX_OVERLAY_ALIGNS,
   TRYX_SENSOR_GROUPS,
+  TRYX_SENSOR_GROUP_DISPLAY_ORDER,
   TRYX_STORAGE_CAPACITY_BYTES,
   TRYX_VALUE_FONT_PANEL_PX,
   type TryxSensorsByGroup,
@@ -162,9 +166,9 @@ describe('applyDockedOverlayLayout', () => {
 });
 
 describe('isTryxSensorGroup', () => {
-  it('accepts exactly the 8 monitoring groups, matching SENSOR_CATEGORIES', () => {
-    expect(TRYX_SENSOR_GROUPS).toEqual(SENSOR_CATEGORIES);
-    expect(TRYX_SENSOR_GROUPS).toEqual(['quick', 'cpu', 'gpu', 'memory', 'motherboard', 'storage', 'network', 'fps']);
+  it('accepts the 8 monitoring groups in SENSOR_CATEGORIES order, plus the clock pseudo-device', () => {
+    expect(TRYX_SENSOR_GROUPS.slice(0, SENSOR_CATEGORIES.length)).toEqual(SENSOR_CATEGORIES);
+    expect(TRYX_SENSOR_GROUPS).toEqual(['quick', 'cpu', 'gpu', 'memory', 'motherboard', 'storage', 'network', 'fps', 'clock']);
     for (const group of TRYX_SENSOR_GROUPS) expect(isTryxSensorGroup(group)).toBe(true);
   });
 
@@ -189,6 +193,7 @@ describe('tryxSensorOptionsForGroup', () => {
       storage: [],
       network: [],
       fps: [],
+      clock: [],
     };
     const options = tryxSensorOptionsForGroup('cpu', sensorsByGroup);
     expect(options).toEqual([
@@ -211,6 +216,7 @@ describe('tryxSensorOptionsForGroup', () => {
     const sensorsByGroup: TryxSensorsByGroup = {
       quick: [], cpu: [], gpu: [], memory: [], motherboard: [], storage: [], network: [],
       fps: [sensor({ id: 'fps/current', name: 'FPS', type: 'Framerate' })],
+      clock: [],
     };
     const options = tryxSensorOptionsForGroup('fps', sensorsByGroup);
     expect(options).toEqual([
@@ -258,18 +264,34 @@ describe('tryxSensorPlaceholder', () => {
 });
 
 describe('formatTryxSensorValue', () => {
-  it('rounds whole-number types to integers (matches the panel firmware)', () => {
-    expect(formatTryxSensorValue('Temperature', 52.4)).toBe('52°C');
-    expect(formatTryxSensorValue('Load', 33.6)).toBe('34%');
-    expect(formatTryxSensorValue('Clock', 4699.8)).toBe('4700MHz');
-    expect(formatTryxSensorValue('Frequency', 5999.5)).toBe('6000MHz');
-    expect(formatTryxSensorValue('SmallData', 511.6)).toBe('512MB');
-    expect(formatTryxSensorValue('Power', 64.7)).toBe('65W');
-    expect(formatTryxSensorValue('Fan', 1199.4)).toBe('1199RPM');
+  it('uses the shared decimals rule by default (one decimal for temp/load/power/frequency)', () => {
+    expect(formatTryxSensorValue('Temperature', 52.44)).toBe('52.4°C');
+    expect(formatTryxSensorValue('Load', 33.65)).toBe('33.6%');
+    expect(formatTryxSensorValue('Frequency', 5999.55)).toBe('5999.6MHz');
+    expect(formatTryxSensorValue('Power', 64.7)).toBe('64.7W');
+    expect(formatTryxSensorValue('Flow', 120.46)).toBe('120.5L/h');
+    expect(formatTryxSensorValue('Noise', 31.25)).toBe('31.3dBA');
   });
 
-  it('keeps fixed decimals for voltage/data', () => {
-    expect(formatTryxSensorValue('Voltage', 1.234)).toBe('1.23V');
+  it('keeps whole numbers for clock, fan and fps', () => {
+    expect(formatTryxSensorValue('Clock', 4699.8)).toBe('4700MHz');
+    expect(formatTryxSensorValue('SmallData', 511.6)).toBe('512MB');
+    expect(formatTryxSensorValue('Fan', 1199.4)).toBe('1199RPM');
+    expect(formatTryxSensorValue('Framerate', 59.6)).toBe('60fps');
+  });
+
+  it('rounds temp/load/power/frequency to whole numbers when the setting is on', () => {
+    expect(formatTryxSensorValue('Temperature', 52.5, true)).toBe('53°C');
+    expect(formatTryxSensorValue('Load', 33.6, true)).toBe('34%');
+    expect(formatTryxSensorValue('Power', 64.7, true)).toBe('65W');
+    expect(formatTryxSensorValue('Frequency', 5999.5, true)).toBe('6000MHz');
+  });
+
+  it('keeps fixed precision for voltage, current, frame time and data', () => {
+    expect(formatTryxSensorValue('Voltage', 1.2345, true)).toBe('1.234V');
+    expect(formatTryxSensorValue('Voltage', 0.85)).toBe('0.850V');
+    expect(formatTryxSensorValue('Current', 1.5)).toBe('1.500A');
+    expect(formatTryxSensorValue('FrameTime', 16.66, true)).toBe('16.7ms');
     expect(formatTryxSensorValue('Data', 12.94)).toBe('12.9GB');
   });
 
@@ -277,11 +299,6 @@ describe('formatTryxSensorValue', () => {
     expect(formatTryxSensorValue('Throughput', 12_000_000)).toBe('11.4MB/s');
     expect(formatTryxSensorValue('Throughput', 50_000)).toBe('48.8KB/s');
     expect(formatTryxSensorValue('Throughput', 512)).toBe('512B/s');
-  });
-
-  it('mirrors the service fps formats (round fps, 1-decimal frame time)', () => {
-    expect(formatTryxSensorValue('Framerate', 59.6)).toBe('60fps');
-    expect(formatTryxSensorValue('FrameTime', 16.66)).toBe('16.7ms');
   });
 });
 
@@ -312,10 +329,12 @@ describe('tryxOverlayPreviewValue', () => {
     cpu: [sensor({ id: 'cpu-temp', name: 'CPU Package', type: 'Temperature', value: 52.4, formatted: '52.4 °C' })],
     gpu: [], memory: [], motherboard: [], storage: [], network: [],
     fps: [sensor({ id: 'fps/current', name: 'FPS', type: 'Framerate', value: 59.6, formatted: '60' })],
+    clock: [],
   };
 
   it('formats the live value with the panel firmware rounding, not the monitoring string', () => {
-    expect(tryxOverlayPreviewValue('cpu', 'cpu-temp', 'Temperature', sensorsByGroup)).toBe('52°C');
+    expect(tryxOverlayPreviewValue('cpu', 'cpu-temp', 'Temperature', sensorsByGroup)).toBe('52.4°C');
+    expect(tryxOverlayPreviewValue('cpu', 'cpu-temp', 'Temperature', sensorsByGroup, true)).toBe('52°C');
   });
 
   it('falls back to a type-appropriate placeholder when the sensor is not live', () => {
@@ -328,5 +347,70 @@ describe('tryxOverlayPreviewValue', () => {
 
   it('falls back to the fps placeholder when the sensor is not live', () => {
     expect(tryxOverlayPreviewValue('fps', 'missing-id', 'FrameTime', sensorsByGroup)).toBe('16.7ms');
+  });
+});
+
+describe('clock pseudo-device', () => {
+  const at = (h: number, m: number) => new Date(2026, 10, 14, h, m, 0);
+  const sensorsByGroup: TryxSensorsByGroup = {
+    quick: [], cpu: [], gpu: [], memory: [], motherboard: [], storage: [], network: [], fps: [],
+    clock: tryxClockSensors(id => ({ time: 'Time', date: 'Date', datetime: 'Date & Time' })[id]),
+  };
+  const ctx = (now: Date, timeFormat: 'system' | '12h' | '24h' = '24h', dateFormat: DateFormat = 'system') => ({ now, timeFormat, dateFormat });
+
+  it('offers time, date, then date and time by translated name but sends an empty label', () => {
+    expect(tryxSensorOptionsForGroup('clock', sensorsByGroup)).toEqual([
+      { value: 'time', optionLabel: 'Time', bareLabel: 'Time', prefixedLabel: '', type: 'Text' },
+      { value: 'date', optionLabel: 'Date', bareLabel: 'Date', prefixedLabel: '', type: 'Text' },
+      { value: 'datetime', optionLabel: 'Date & Time', bareLabel: 'Date & Time', prefixedLabel: '', type: 'Text' },
+    ]);
+  });
+
+  it('lists the clock group first in the display order, then the shared categories', () => {
+    expect(TRYX_SENSOR_GROUP_DISPLAY_ORDER).toEqual(['clock', ...SENSOR_CATEGORIES]);
+  });
+
+  it('renders 24h as HH:mm, zero-padding a single-digit hour', () => {
+    expect(formatTryxClockPreview('time', ctx(at(9, 5)))).toBe('09:05');
+    expect(formatTryxClockPreview('time', ctx(at(15, 7), '24h'))).toBe('15:07');
+  });
+
+  it('renders 12h as h:mm with English AM/PM, including midnight and noon', () => {
+    expect(formatTryxClockPreview('time', ctx(at(9, 5), '12h'))).toBe('9:05 AM');
+    expect(formatTryxClockPreview('time', ctx(at(15, 5), '12h'))).toBe('3:05 PM');
+    expect(formatTryxClockPreview('time', ctx(at(0, 30), '12h'))).toBe('12:30 AM');
+    expect(formatTryxClockPreview('time', ctx(at(12, 0), '12h'))).toBe('12:00 PM');
+  });
+
+  it('maps a system date to "ddd, mmm d" and keeps English names whatever the app language', () => {
+    expect(formatTryxClockPreview('date', ctx(at(9, 5)))).toBe('Sat, Nov 14');
+    // The preview takes no locale, so a non-English app language cannot leak in.
+    expect(formatTryxClockPreview('date', ctx(at(9, 5), '24h', 'dd.mm.yyyy'))).toBe('14.11.2026');
+    expect(formatTryxClockPreview('date', ctx(at(9, 5), '24h', 'ddd d mmm'))).toBe('Sat 14 Nov');
+  });
+
+  it('renders datetime as date, two spaces, then time with each part following its own rules', () => {
+    expect(formatTryxClockPreview('datetime', ctx(at(9, 5)))).toBe('Sat, Nov 14  09:05');
+    expect(formatTryxClockPreview('datetime', ctx(at(15, 5), '12h', 'dd.mm.yyyy'))).toBe('14.11.2026  3:05 PM');
+  });
+
+  it('renders a system time format per the service hour cycle, in the service text shape', () => {
+    expect(formatTryxClockPreview('time', { ...ctx(at(15, 7), 'system'), systemClock12h: true })).toBe('3:07 PM');
+    expect(formatTryxClockPreview('time', { ...ctx(at(15, 7), 'system'), systemClock12h: false })).toBe('15:07');
+  });
+
+  it('falls back to the browser hour cycle for a system format when the service omits it', () => {
+    const expected = resolveHour12('system') ? '3:07 PM' : '15:07';
+    expect(formatTryxClockPreview('time', ctx(at(15, 7), 'system'))).toBe(expected);
+  });
+
+  it('ignores the service hour cycle for an explicit 12h or 24h format', () => {
+    expect(formatTryxClockPreview('time', { ...ctx(at(15, 7), '24h'), systemClock12h: true })).toBe('15:07');
+    expect(formatTryxClockPreview('time', { ...ctx(at(15, 7), '12h'), systemClock12h: false })).toBe('3:07 PM');
+  });
+
+  it('routes the clock device through tryxOverlayPreviewValue', () => {
+    expect(tryxOverlayPreviewValue('clock', 'time', 'Text', sensorsByGroup, false, ctx(at(9, 5)))).toBe('09:05');
+    expect(tryxOverlayPreviewValue('clock', 'time', 'Text', sensorsByGroup)).toBe('--');
   });
 });

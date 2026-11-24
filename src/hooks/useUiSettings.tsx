@@ -5,28 +5,28 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  loadSettings, saveSettings, cachePreferencesLocally,
-  applyThemeMode, applyAccentColor, applyBackgroundMode,
+  loadSettings, saveSettings, cachePreferencesLocally, COOLING_FLOW_MODES, DEFAULT_COOLING_FLOW_MODE,
+  applyThemeMode, setHostThemeMode, applyAccentColor, applyBackgroundMode,
   type NexusSettings, type ThemeMode, type Language, type BackgroundMode, type AccentSource,
-  type DashboardMode,
+  type DashboardMode, type CoolingFlowMode,
 } from '../lib/settings';
 import {
   fetchPreferences, savePreferences,
   type Preferences as ServerPreferences,
   type PreferencesPatch,
-  type DiagnosticsThresholds,
   type DiagnosticsNotificationPrefs,
   type DiagnosticsComponentPrefs,
   type FeaturesPrefs,
 } from '../api/profiles';
 import type { UpdateChannel, UpdateMode } from '../api/update';
 import {
-  DEFAULT_TEMP_UNIT, DEFAULT_TIME_FORMAT, DEFAULT_NUMBER_FORMAT, DEFAULT_DATE_FORMAT, DATE_FORMATS,
+  DEFAULT_TEMP_UNIT, DEFAULT_TIME_FORMAT, DEFAULT_NUMBER_FORMAT, DEFAULT_MONITORING_WHOLE_NUMBERS, DEFAULT_DATE_FORMAT, DATE_FORMATS,
   type TempUnit, type TimeFormat, type NumberFormat, type DateFormat,
 } from '../lib/units';
 import { useTopicCallback } from './useMultiplexSocket';
 import { useTranslation } from '../lib/i18n';
 import { sanitizeAppOrder, sanitizePinnedTail } from '../app/sidebarApps';
+import { withSidebarHidden } from '../lib/sidebarVisibility';
 
 /**
  * Unified user-settings hook.
@@ -59,6 +59,8 @@ export interface UiSettingsValue {
   accentSource: AccentSource;
   language: Language;
   themeMode: ThemeMode;
+  // Host OS theme from the service; not persisted locally. '' = not reported.
+  hostThemeMode: '' | 'dark' | 'light';
   accentColor: string;
   // Last colour picked from the accent palette's custom slot; '' = never used.
   // Held apart from accentColor so the slot survives picking a preset.
@@ -76,6 +78,7 @@ export interface UiSettingsValue {
   smartPollSeconds: Record<string, number>;
   smartPollDefaultSeconds: number;
   smartPollPerDrive: boolean;
+  liveDriveActivity: boolean;
   monitoringEventKindsHidden: string[];
   showMacStatusBarIcon: boolean;
   showWindowsTrayIcon: boolean;
@@ -118,16 +121,35 @@ export interface UiSettingsValue {
   // pages keep separate answers.
   showUncontrolledLightingDevices: boolean;
   showUncontrolledCoolingDevices: boolean;
+  // Whether each page opens on its 3D view. Server-mirrored under ui.lightingView3d / ui.coolingView3d.
+  lightingView3d: boolean;
+  coolingView3d: boolean;
+  coolingFlowMode: CoolingFlowMode;
+  coolingCollisionShapes: boolean;
+  // Sidebar DEVICES row keys the user hid; a row is omitted only while its
+  // Nexus Control is also off. Server-mirrored under ui.hiddenSidebarDevices.
+  hiddenSidebarDevices: string[];
+  recentStaticColors: string[];
+  recentAnimations: string[];
   // Display-unit choices, server-mirrored under the preferences `units` block.
   // monitoringTempUnit governs in-app hardware temps only (default 'c');
   // outdoor weather keeps its own per-widget unit. See lib/units.ts.
   monitoringTempUnit: TempUnit;
   timeFormat: TimeFormat;
   numberFormat: NumberFormat;
+  monitoringWholeNumbers: boolean;
   dateFormat: DateFormat;
   // Windows-only: seconds to wait before starting Nexus at system startup.
   // Server-mirrored under the preferences top-level startupDelaySeconds field.
   startupDelaySeconds: number;
+  // Machine-level, server-mirrored under the preferences top-level readRamTemperatures field.
+  readRamTemperatures: boolean;
+  // Machine-level, server-mirrored under the preferences top-level powerMonitorsEnabled field.
+  powerMonitorsEnabled: boolean;
+  // Linux-only, server-mirrored under the preferences top-level amdGpuLighting field.
+  amdGpuLighting: boolean;
+  // Read-only: the service reports whether the switch applies on this host.
+  amdGpuLightingApplicable: boolean;
   // Global feature switches (default on), server-mirrored under the
   // preferences `features` block. See {@link useFeatureFlags} for the
   // read-only accessor gated surfaces should use instead of this hook.
@@ -142,24 +164,13 @@ export interface UiSettingsValue {
   // Diagnostics Settings tab preferences (preferences.diagnostics), server-only
   // like the update block above. Flattened leaves of the wire contract -
   // see DIAGNOSTICS_SETTINGS_DEFAULTS below for the contract defaults.
-  diagnosticsCpuTempC: number;
-  diagnosticsGpuTempC: number;
-  diagnosticsStorageTempC: number;
-  diagnosticsRamTempC: number;
-  diagnosticsWarningLingerMinutes: number;
   diagnosticsNotificationsEnabled: boolean;
-  diagnosticsNotifyHighTemp: boolean;
   diagnosticsNotifyStorageHealth: boolean;
   diagnosticsNotifyCooling: boolean;
   diagnosticsNotifyMemoryTest: boolean;
   diagnosticsNotifySystemDevices: boolean;
   diagnosticsNotifyGpuThrottle: boolean;
   diagnosticsNotificationCooldownMinutes: number;
-  diagnosticsComponentCpu: boolean;
-  diagnosticsComponentGpu: boolean;
-  diagnosticsComponentStorage: boolean;
-  diagnosticsComponentRam: boolean;
-  diagnosticsComponentCooling: boolean;
   diagnosticsComponentSystem: boolean;
   diagnosticsIgnoredComponents: string[];
 }
@@ -168,27 +179,17 @@ export interface UiSettingsValue {
  *  DiagnosticsSettings defaults (TemperatureInsights.cs). Used for the
  *  pre-hydrate seed below and by the Settings tab's Reset action. */
 export const DIAGNOSTICS_SETTINGS_DEFAULTS = {
-  cpuTempC: 90,
-  gpuTempC: 85,
-  storageTempC: 70,
-  ramTempC: 60,
-  warningLingerMinutes: 0,
-  // Master switch off by default; every category on, so turning notifications
-  // on alerts for all of them without extra setup. Mirrors the service
-  // DiagnosticsNotifications defaults.
-  notificationsEnabled: false,
-  notifyHighTemp: true,
+  // Master switch and every category on by default, so a new install alerts
+  // without extra setup. Mirrors the service DiagnosticsNotifications defaults.
+  notificationsEnabled: true,
   notifyStorageHealth: true,
   notifyCooling: true,
   notifyMemoryTest: true,
   notifySystemDevices: true,
   notifyGpuThrottle: true,
   notificationCooldownMinutes: 60,
-  componentCpu: true,
-  componentGpu: true,
-  componentStorage: true,
-  componentRam: true,
-  componentCooling: true,
+  sensorNotifications: true,
+  sensorCooldownMinutes: 60,
   componentSystem: true,
   ignoredComponents: [] as string[],
 } as const;
@@ -220,6 +221,7 @@ function fromNexusSettings(src: NexusSettings): UiSettingsValue {
     accentSource: src.general.accentSource,
     language: src.general.language,
     themeMode: src.general.themeMode,
+    hostThemeMode: '',
     accentColor: src.general.accentColor,
     customAccentColor: src.general.customAccentColor,
     showConflictAlerts: src.general.showConflictAlerts,
@@ -233,6 +235,7 @@ function fromNexusSettings(src: NexusSettings): UiSettingsValue {
     smartPollSeconds: src.general.smartPollSeconds,
     smartPollDefaultSeconds: src.general.smartPollDefaultSeconds,
     smartPollPerDrive: src.general.smartPollPerDrive,
+    liveDriveActivity: src.general.liveDriveActivity,
     monitoringEventKindsHidden: src.general.monitoringEventKindsHidden,
     showMacStatusBarIcon: src.general.showMacStatusBarIcon,
     showWindowsTrayIcon: src.general.showWindowsTrayIcon,
@@ -250,11 +253,23 @@ function fromNexusSettings(src: NexusSettings): UiSettingsValue {
     coolingDashboardMode: src.general.coolingDashboardMode,
     showUncontrolledLightingDevices: src.general.showUncontrolledLightingDevices,
     showUncontrolledCoolingDevices: src.general.showUncontrolledCoolingDevices,
+    lightingView3d: src.general.lightingView3d,
+    coolingView3d: src.general.coolingView3d,
+    coolingFlowMode: COOLING_FLOW_MODES.find(m => m === src.general.coolingFlowMode) ?? DEFAULT_COOLING_FLOW_MODE,
+    coolingCollisionShapes: src.general.coolingCollisionShapes,
+    hiddenSidebarDevices: src.general.hiddenSidebarDevices,
+    recentStaticColors: src.general.recentStaticColors,
+    recentAnimations: src.general.recentAnimations,
     monitoringTempUnit: src.general.monitoringTempUnit,
     timeFormat: src.general.timeFormat,
     numberFormat: src.general.numberFormat,
+    monitoringWholeNumbers: src.general.monitoringWholeNumbers,
     dateFormat: src.general.dateFormat,
     startupDelaySeconds: src.general.startupDelaySeconds,
+    readRamTemperatures: src.general.readRamTemperatures,
+    powerMonitorsEnabled: src.general.powerMonitorsEnabled,
+    amdGpuLighting: src.general.amdGpuLighting,
+    amdGpuLightingApplicable: false,
     featureLightingEnabled: src.general.featureLightingEnabled,
     featureCoolingEnabled: src.general.featureCoolingEnabled,
     featureMonitoringEnabled: src.general.featureMonitoringEnabled,
@@ -262,24 +277,13 @@ function fromNexusSettings(src: NexusSettings): UiSettingsValue {
     updateMode: 'always' as UpdateMode,
     updateChannel: 'production' as UpdateChannel,
     lastDismissedUpdateVersion: '',
-    diagnosticsCpuTempC: DIAGNOSTICS_SETTINGS_DEFAULTS.cpuTempC,
-    diagnosticsGpuTempC: DIAGNOSTICS_SETTINGS_DEFAULTS.gpuTempC,
-    diagnosticsStorageTempC: DIAGNOSTICS_SETTINGS_DEFAULTS.storageTempC,
-    diagnosticsRamTempC: DIAGNOSTICS_SETTINGS_DEFAULTS.ramTempC,
-    diagnosticsWarningLingerMinutes: DIAGNOSTICS_SETTINGS_DEFAULTS.warningLingerMinutes,
     diagnosticsNotificationsEnabled: DIAGNOSTICS_SETTINGS_DEFAULTS.notificationsEnabled,
-    diagnosticsNotifyHighTemp: DIAGNOSTICS_SETTINGS_DEFAULTS.notifyHighTemp,
     diagnosticsNotifyStorageHealth: DIAGNOSTICS_SETTINGS_DEFAULTS.notifyStorageHealth,
     diagnosticsNotifyCooling: DIAGNOSTICS_SETTINGS_DEFAULTS.notifyCooling,
     diagnosticsNotifyMemoryTest: DIAGNOSTICS_SETTINGS_DEFAULTS.notifyMemoryTest,
     diagnosticsNotifySystemDevices: DIAGNOSTICS_SETTINGS_DEFAULTS.notifySystemDevices,
     diagnosticsNotifyGpuThrottle: DIAGNOSTICS_SETTINGS_DEFAULTS.notifyGpuThrottle,
     diagnosticsNotificationCooldownMinutes: DIAGNOSTICS_SETTINGS_DEFAULTS.notificationCooldownMinutes,
-    diagnosticsComponentCpu: DIAGNOSTICS_SETTINGS_DEFAULTS.componentCpu,
-    diagnosticsComponentGpu: DIAGNOSTICS_SETTINGS_DEFAULTS.componentGpu,
-    diagnosticsComponentStorage: DIAGNOSTICS_SETTINGS_DEFAULTS.componentStorage,
-    diagnosticsComponentRam: DIAGNOSTICS_SETTINGS_DEFAULTS.componentRam,
-    diagnosticsComponentCooling: DIAGNOSTICS_SETTINGS_DEFAULTS.componentCooling,
     diagnosticsComponentSystem: DIAGNOSTICS_SETTINGS_DEFAULTS.componentSystem,
     diagnosticsIgnoredComponents: DIAGNOSTICS_SETTINGS_DEFAULTS.ignoredComponents,
   };
@@ -306,6 +310,7 @@ function toNexusSettings(src: UiSettingsValue): NexusSettings {
       smartPollSeconds: src.smartPollSeconds,
       smartPollDefaultSeconds: src.smartPollDefaultSeconds,
       smartPollPerDrive: src.smartPollPerDrive,
+      liveDriveActivity: src.liveDriveActivity,
       monitoringEventKindsHidden: src.monitoringEventKindsHidden,
       showMacStatusBarIcon: src.showMacStatusBarIcon,
       showWindowsTrayIcon: src.showWindowsTrayIcon,
@@ -318,11 +323,22 @@ function toNexusSettings(src: UiSettingsValue): NexusSettings {
       coolingDashboardMode: src.coolingDashboardMode,
       showUncontrolledLightingDevices: src.showUncontrolledLightingDevices,
       showUncontrolledCoolingDevices: src.showUncontrolledCoolingDevices,
+      lightingView3d: src.lightingView3d,
+      coolingView3d: src.coolingView3d,
+      coolingFlowMode: src.coolingFlowMode,
+      coolingCollisionShapes: src.coolingCollisionShapes,
+      hiddenSidebarDevices: src.hiddenSidebarDevices,
+      recentStaticColors: src.recentStaticColors,
+      recentAnimations: src.recentAnimations,
       monitoringTempUnit: src.monitoringTempUnit,
       timeFormat: src.timeFormat,
       numberFormat: src.numberFormat,
+      monitoringWholeNumbers: src.monitoringWholeNumbers,
       dateFormat: src.dateFormat,
       startupDelaySeconds: src.startupDelaySeconds,
+      readRamTemperatures: src.readRamTemperatures,
+      powerMonitorsEnabled: src.powerMonitorsEnabled,
+      amdGpuLighting: src.amdGpuLighting,
       featureLightingEnabled: src.featureLightingEnabled,
       featureCoolingEnabled: src.featureCoolingEnabled,
       featureMonitoringEnabled: src.featureMonitoringEnabled,
@@ -344,13 +360,14 @@ function toServerPatch(patch: Patch): PreferencesPatch {
   if (patch.accentSource !== undefined) theme.accentSource = patch.accentSource;
   if (Object.keys(theme).length > 0) out.theme = theme;
   // monitoring block
-  const monitoring: Partial<{ showMacStatusBarIcon: boolean; showWindowsTrayIcon: boolean; detailedCollapsed: string[]; eventsEnabled: boolean; fpsOverlayEnabled: boolean; eventKindsHidden: string[]; smartPollSeconds: Record<string, number>; smartPollDefaultSeconds: number; smartPollPerDrive: boolean }> = {};
+  const monitoring: Partial<{ showMacStatusBarIcon: boolean; showWindowsTrayIcon: boolean; detailedCollapsed: string[]; eventsEnabled: boolean; fpsOverlayEnabled: boolean; eventKindsHidden: string[]; smartPollSeconds: Record<string, number>; smartPollDefaultSeconds: number; smartPollPerDrive: boolean; liveDriveActivity: boolean }> = {};
   if (patch.monitoringDetailedCollapsed !== undefined) monitoring.detailedCollapsed = patch.monitoringDetailedCollapsed;
   if (patch.monitoringEventsEnabled !== undefined) monitoring.eventsEnabled = patch.monitoringEventsEnabled;
   if (patch.monitoringFpsOverlayEnabled !== undefined) monitoring.fpsOverlayEnabled = patch.monitoringFpsOverlayEnabled;
   if (patch.smartPollSeconds !== undefined) monitoring.smartPollSeconds = patch.smartPollSeconds;
   if (patch.smartPollDefaultSeconds !== undefined) monitoring.smartPollDefaultSeconds = patch.smartPollDefaultSeconds;
   if (patch.smartPollPerDrive !== undefined) monitoring.smartPollPerDrive = patch.smartPollPerDrive;
+  if (patch.liveDriveActivity !== undefined) monitoring.liveDriveActivity = patch.liveDriveActivity;
   if (patch.monitoringEventKindsHidden !== undefined) monitoring.eventKindsHidden = patch.monitoringEventKindsHidden;
   if (patch.showMacStatusBarIcon !== undefined) monitoring.showMacStatusBarIcon = patch.showMacStatusBarIcon;
   if (patch.showWindowsTrayIcon !== undefined) monitoring.showWindowsTrayIcon = patch.showWindowsTrayIcon;
@@ -363,10 +380,9 @@ function toServerPatch(patch: Patch): PreferencesPatch {
   if (patch.preferredGpuId !== undefined) cooling.preferredGpuId = patch.preferredGpuId;
   if (Object.keys(cooling).length > 0) out.cooling = cooling;
   // ui block
-  const ui: Partial<{ showConflictAlerts: boolean; autoKillConflictsAtStartup: boolean; conflictAutoKillExclusions: string[]; notifyConflictLaunches: boolean; endConflictsOnLaunch: boolean; pinnedSidebarApps: string[]; sidebarAppOrder: string[]; sidebarCollapsed: boolean; oemAppSeeded: boolean; lightingDashboardMode: DashboardMode; coolingDashboardMode: DashboardMode; showUncontrolledLightingDevices: boolean; showUncontrolledCoolingDevices: boolean }> = {};
+  const ui: Partial<{ showConflictAlerts: boolean; autoKillConflictsAtStartup: boolean; notifyConflictLaunches: boolean; endConflictsOnLaunch: boolean; pinnedSidebarApps: string[]; sidebarAppOrder: string[]; sidebarCollapsed: boolean; oemAppSeeded: boolean; lightingDashboardMode: DashboardMode; coolingDashboardMode: DashboardMode; showUncontrolledLightingDevices: boolean; showUncontrolledCoolingDevices: boolean; lightingView3d: boolean; coolingView3d: boolean; coolingFlowMode: CoolingFlowMode; coolingCollisionShapes: boolean; hiddenSidebarDevices: string[]; recentStaticColors: string[]; recentAnimations: string[] }> = {};
   if (patch.showConflictAlerts !== undefined) ui.showConflictAlerts = patch.showConflictAlerts;
   if (patch.autoKillConflictsAtStartup !== undefined) ui.autoKillConflictsAtStartup = patch.autoKillConflictsAtStartup;
-  if (patch.conflictAutoKillExclusions !== undefined) ui.conflictAutoKillExclusions = patch.conflictAutoKillExclusions;
   if (patch.notifyConflictLaunches !== undefined) ui.notifyConflictLaunches = patch.notifyConflictLaunches;
   if (patch.endConflictsOnLaunch !== undefined) ui.endConflictsOnLaunch = patch.endConflictsOnLaunch;
   if (patch.pinnedSidebarApps !== undefined) ui.pinnedSidebarApps = patch.pinnedSidebarApps;
@@ -377,6 +393,13 @@ function toServerPatch(patch: Patch): PreferencesPatch {
   if (patch.coolingDashboardMode !== undefined) ui.coolingDashboardMode = patch.coolingDashboardMode;
   if (patch.showUncontrolledLightingDevices !== undefined) ui.showUncontrolledLightingDevices = patch.showUncontrolledLightingDevices;
   if (patch.showUncontrolledCoolingDevices !== undefined) ui.showUncontrolledCoolingDevices = patch.showUncontrolledCoolingDevices;
+  if (patch.lightingView3d !== undefined) ui.lightingView3d = patch.lightingView3d;
+  if (patch.coolingView3d !== undefined) ui.coolingView3d = patch.coolingView3d;
+  if (patch.coolingFlowMode !== undefined) ui.coolingFlowMode = patch.coolingFlowMode;
+  if (patch.coolingCollisionShapes !== undefined) ui.coolingCollisionShapes = patch.coolingCollisionShapes;
+  if (patch.hiddenSidebarDevices !== undefined) ui.hiddenSidebarDevices = patch.hiddenSidebarDevices;
+  if (patch.recentStaticColors !== undefined) ui.recentStaticColors = patch.recentStaticColors;
+  if (patch.recentAnimations !== undefined) ui.recentAnimations = patch.recentAnimations;
   if (Object.keys(ui).length > 0) out.ui = ui;
   // update block
   const update: Partial<{ updateMode: UpdateMode; updateChannel: UpdateChannel; lastDismissedUpdateVersion: string }> = {};
@@ -385,14 +408,18 @@ function toServerPatch(patch: Patch): PreferencesPatch {
   if (patch.lastDismissedUpdateVersion !== undefined) update.lastDismissedUpdateVersion = patch.lastDismissedUpdateVersion;
   if (Object.keys(update).length > 0) out.update = update;
   // units block
-  const units: Partial<{ monitoringTempUnit: TempUnit; timeFormat: TimeFormat; numberFormat: NumberFormat; dateFormat: DateFormat }> = {};
+  const units: Partial<{ monitoringTempUnit: TempUnit; timeFormat: TimeFormat; numberFormat: NumberFormat; monitoringWholeNumbers: boolean; dateFormat: DateFormat }> = {};
   if (patch.monitoringTempUnit !== undefined) units.monitoringTempUnit = patch.monitoringTempUnit;
   if (patch.timeFormat !== undefined) units.timeFormat = patch.timeFormat;
   if (patch.numberFormat !== undefined) units.numberFormat = patch.numberFormat;
+  if (patch.monitoringWholeNumbers !== undefined) units.monitoringWholeNumbers = patch.monitoringWholeNumbers;
   if (patch.dateFormat !== undefined) units.dateFormat = patch.dateFormat;
   if (Object.keys(units).length > 0) out.units = units;
   // Top-level field (not nested under a domain block), per the wire contract.
   if (patch.startupDelaySeconds !== undefined) out.startupDelaySeconds = patch.startupDelaySeconds;
+  if (patch.readRamTemperatures !== undefined) out.readRamTemperatures = patch.readRamTemperatures;
+  if (patch.powerMonitorsEnabled !== undefined) out.powerMonitorsEnabled = patch.powerMonitorsEnabled;
+  if (patch.amdGpuLighting !== undefined) out.amdGpuLighting = patch.amdGpuLighting;
   // features block
   const features: FeaturesPrefs = {};
   if (patch.featureLightingEnabled !== undefined) features.lighting = patch.featureLightingEnabled;
@@ -401,14 +428,8 @@ function toServerPatch(patch: Patch): PreferencesPatch {
   if (patch.featureDiagnosticsEnabled !== undefined) features.diagnostics = patch.featureDiagnosticsEnabled;
   if (Object.keys(features).length > 0) out.features = features;
   // diagnostics block
-  const thresholds: Partial<DiagnosticsThresholds> = {};
-  if (patch.diagnosticsCpuTempC !== undefined) thresholds.cpuC = patch.diagnosticsCpuTempC;
-  if (patch.diagnosticsGpuTempC !== undefined) thresholds.gpuC = patch.diagnosticsGpuTempC;
-  if (patch.diagnosticsStorageTempC !== undefined) thresholds.storageC = patch.diagnosticsStorageTempC;
-  if (patch.diagnosticsRamTempC !== undefined) thresholds.ramC = patch.diagnosticsRamTempC;
   const notifications: Partial<DiagnosticsNotificationPrefs> = {};
   if (patch.diagnosticsNotificationsEnabled !== undefined) notifications.enabled = patch.diagnosticsNotificationsEnabled;
-  if (patch.diagnosticsNotifyHighTemp !== undefined) notifications.highTemp = patch.diagnosticsNotifyHighTemp;
   if (patch.diagnosticsNotifyStorageHealth !== undefined) notifications.storageHealth = patch.diagnosticsNotifyStorageHealth;
   if (patch.diagnosticsNotifyCooling !== undefined) notifications.cooling = patch.diagnosticsNotifyCooling;
   if (patch.diagnosticsNotifyMemoryTest !== undefined) notifications.memoryTest = patch.diagnosticsNotifyMemoryTest;
@@ -416,15 +437,8 @@ function toServerPatch(patch: Patch): PreferencesPatch {
   if (patch.diagnosticsNotifyGpuThrottle !== undefined) notifications.gpuThrottle = patch.diagnosticsNotifyGpuThrottle;
   if (patch.diagnosticsNotificationCooldownMinutes !== undefined) notifications.cooldownMinutes = patch.diagnosticsNotificationCooldownMinutes;
   const components: Partial<DiagnosticsComponentPrefs> = {};
-  if (patch.diagnosticsComponentCpu !== undefined) components.cpu = patch.diagnosticsComponentCpu;
-  if (patch.diagnosticsComponentGpu !== undefined) components.gpu = patch.diagnosticsComponentGpu;
-  if (patch.diagnosticsComponentStorage !== undefined) components.storage = patch.diagnosticsComponentStorage;
-  if (patch.diagnosticsComponentRam !== undefined) components.ram = patch.diagnosticsComponentRam;
-  if (patch.diagnosticsComponentCooling !== undefined) components.cooling = patch.diagnosticsComponentCooling;
   if (patch.diagnosticsComponentSystem !== undefined) components.system = patch.diagnosticsComponentSystem;
   const diagnostics: PreferencesPatch['diagnostics'] = {};
-  if (Object.keys(thresholds).length > 0) diagnostics.thresholds = thresholds;
-  if (patch.diagnosticsWarningLingerMinutes !== undefined) diagnostics.warningLingerMinutes = patch.diagnosticsWarningLingerMinutes;
   if (Object.keys(notifications).length > 0) diagnostics.notifications = notifications;
   if (Object.keys(components).length > 0) diagnostics.components = components;
   if (patch.diagnosticsIgnoredComponents !== undefined) diagnostics.ignoredComponents = patch.diagnosticsIgnoredComponents;
@@ -459,6 +473,8 @@ function applyServerToLocal(server: ServerPreferences, base: UiSettingsValue): U
     ...base,
     language: (server.theme?.language as Language) ?? base.language,
     themeMode: (server.theme?.themeMode as ThemeMode) ?? base.themeMode,
+    hostThemeMode: server.theme?.resolvedThemeMode === 'dark' || server.theme?.resolvedThemeMode === 'light'
+      ? server.theme.resolvedThemeMode : '',
     accentColor: server.theme?.accentColor ?? base.accentColor,
     customAccentColor: server.theme?.customAccentColor ?? base.customAccentColor,
     // Empty (never written) falls back to the local value, so an upgraded
@@ -483,12 +499,20 @@ function applyServerToLocal(server: ServerPreferences, base: UiSettingsValue): U
       ?? server.ui?.showUncontrolledDevices ?? base.showUncontrolledLightingDevices,
     showUncontrolledCoolingDevices: server.ui?.showUncontrolledCoolingDevices
       ?? server.ui?.showUncontrolledDevices ?? base.showUncontrolledCoolingDevices,
+    lightingView3d: server.ui?.lightingView3d ?? base.lightingView3d,
+    coolingView3d: server.ui?.coolingView3d ?? base.coolingView3d,
+    coolingFlowMode: COOLING_FLOW_MODES.find(m => m === server.ui?.coolingFlowMode) ?? base.coolingFlowMode,
+    coolingCollisionShapes: server.ui?.coolingCollisionShapes ?? base.coolingCollisionShapes,
+    hiddenSidebarDevices: server.ui?.hiddenSidebarDevices ?? base.hiddenSidebarDevices,
+    recentStaticColors: server.ui?.recentStaticColors ?? base.recentStaticColors,
+    recentAnimations: server.ui?.recentAnimations ?? base.recentAnimations,
     monitoringDetailedCollapsed: server.monitoring?.detailedCollapsed ?? base.monitoringDetailedCollapsed,
     monitoringEventsEnabled: server.monitoring?.eventsEnabled ?? base.monitoringEventsEnabled,
     monitoringFpsOverlayEnabled: server.monitoring?.fpsOverlayEnabled ?? base.monitoringFpsOverlayEnabled,
     smartPollSeconds: server.monitoring?.smartPollSeconds ?? base.smartPollSeconds,
     smartPollDefaultSeconds: server.monitoring?.smartPollDefaultSeconds ?? base.smartPollDefaultSeconds,
     smartPollPerDrive: server.monitoring?.smartPollPerDrive ?? base.smartPollPerDrive,
+    liveDriveActivity: server.monitoring?.liveDriveActivity ?? base.liveDriveActivity,
     monitoringEventKindsHidden: server.monitoring?.eventKindsHidden ?? base.monitoringEventKindsHidden,
     showMacStatusBarIcon: server.monitoring?.showMacStatusBarIcon ?? base.showMacStatusBarIcon,
     showWindowsTrayIcon: server.monitoring?.showWindowsTrayIcon ?? base.showWindowsTrayIcon,
@@ -514,32 +538,26 @@ function applyServerToLocal(server: ServerPreferences, base: UiSettingsValue): U
     monitoringTempUnit: (server.units?.monitoringTempUnit as TempUnit) ?? base.monitoringTempUnit,
     timeFormat: (server.units?.timeFormat as TimeFormat) ?? base.timeFormat,
     numberFormat: (server.units?.numberFormat as NumberFormat) ?? base.numberFormat,
+    monitoringWholeNumbers: server.units?.monitoringWholeNumbers ?? base.monitoringWholeNumbers,
     // An open list: a pattern from a newer build would match no Settings option.
     dateFormat: server.units?.dateFormat === undefined ? base.dateFormat
       : DATE_FORMATS.includes(server.units.dateFormat) ? server.units.dateFormat : DEFAULT_DATE_FORMAT,
     startupDelaySeconds: server.startupDelaySeconds ?? base.startupDelaySeconds,
+    readRamTemperatures: server.readRamTemperatures ?? base.readRamTemperatures,
+    powerMonitorsEnabled: server.powerMonitorsEnabled ?? base.powerMonitorsEnabled,
+    amdGpuLighting: server.amdGpuLighting ?? base.amdGpuLighting,
+    amdGpuLightingApplicable: server.amdGpuLightingApplicable === true,
     featureLightingEnabled: server.features?.lighting ?? base.featureLightingEnabled,
     featureCoolingEnabled: server.features?.cooling ?? base.featureCoolingEnabled,
     featureMonitoringEnabled: server.features?.monitoring ?? base.featureMonitoringEnabled,
     featureDiagnosticsEnabled: server.features?.diagnostics ?? base.featureDiagnosticsEnabled,
-    diagnosticsCpuTempC: server.diagnostics?.thresholds?.cpuC ?? base.diagnosticsCpuTempC,
-    diagnosticsGpuTempC: server.diagnostics?.thresholds?.gpuC ?? base.diagnosticsGpuTempC,
-    diagnosticsStorageTempC: server.diagnostics?.thresholds?.storageC ?? base.diagnosticsStorageTempC,
-    diagnosticsRamTempC: server.diagnostics?.thresholds?.ramC ?? base.diagnosticsRamTempC,
-    diagnosticsWarningLingerMinutes: server.diagnostics?.warningLingerMinutes ?? base.diagnosticsWarningLingerMinutes,
     diagnosticsNotificationsEnabled: server.diagnostics?.notifications?.enabled ?? base.diagnosticsNotificationsEnabled,
-    diagnosticsNotifyHighTemp: server.diagnostics?.notifications?.highTemp ?? base.diagnosticsNotifyHighTemp,
     diagnosticsNotifyStorageHealth: server.diagnostics?.notifications?.storageHealth ?? base.diagnosticsNotifyStorageHealth,
     diagnosticsNotifyCooling: server.diagnostics?.notifications?.cooling ?? base.diagnosticsNotifyCooling,
     diagnosticsNotifyMemoryTest: server.diagnostics?.notifications?.memoryTest ?? base.diagnosticsNotifyMemoryTest,
     diagnosticsNotifySystemDevices: server.diagnostics?.notifications?.systemDevices ?? base.diagnosticsNotifySystemDevices,
     diagnosticsNotifyGpuThrottle: server.diagnostics?.notifications?.gpuThrottle ?? base.diagnosticsNotifyGpuThrottle,
     diagnosticsNotificationCooldownMinutes: server.diagnostics?.notifications?.cooldownMinutes ?? base.diagnosticsNotificationCooldownMinutes,
-    diagnosticsComponentCpu: server.diagnostics?.components?.cpu ?? base.diagnosticsComponentCpu,
-    diagnosticsComponentGpu: server.diagnostics?.components?.gpu ?? base.diagnosticsComponentGpu,
-    diagnosticsComponentStorage: server.diagnostics?.components?.storage ?? base.diagnosticsComponentStorage,
-    diagnosticsComponentRam: server.diagnostics?.components?.ram ?? base.diagnosticsComponentRam,
-    diagnosticsComponentCooling: server.diagnostics?.components?.cooling ?? base.diagnosticsComponentCooling,
     diagnosticsComponentSystem: server.diagnostics?.components?.system ?? base.diagnosticsComponentSystem,
     diagnosticsIgnoredComponents: server.diagnostics?.ignoredComponents ?? base.diagnosticsIgnoredComponents,
   };
@@ -554,10 +572,9 @@ interface UiSettingsProviderProps {
   /**
    * Whether server-driven theme / accent / language changes apply to
    * `document.documentElement` and global i18n state. `true` (default) for
-   * the desktop dashboard. `false` for the kiosk panel, overlay process,
-   * and simulator iframe: those own their own theme/language pipelines
-   * (usePanelTheme, the overlay's theme manager, the parent modal's
-   * postMessage feed) and would fight a second writer.
+   * the desktop dashboard. `false` for the kiosk panel and simulator
+   * iframe: those own their own theme/language pipelines (usePanelTheme,
+   * the parent modal's postMessage feed) and would fight a second writer.
    */
   manageDom?: boolean;
 }
@@ -612,10 +629,13 @@ export function UiSettingsProvider({
     // client-scoped fields - short-circuit to skip a pointless POST.
     // startupDelaySeconds is a top-level number (0 is a valid value), so it is
     // checked for definedness rather than truthiness like the domain blocks.
-    const anyBlock = serverPatch.theme || serverPatch.panel || serverPatch.overlay
+    const anyBlock = serverPatch.theme || serverPatch.panel
       || serverPatch.monitoring || serverPatch.cooling || serverPatch.ui || serverPatch.update
       || serverPatch.units || serverPatch.diagnostics || serverPatch.features
-      || serverPatch.startupDelaySeconds !== undefined;
+      || serverPatch.startupDelaySeconds !== undefined
+      || serverPatch.readRamTemperatures !== undefined
+      || serverPatch.powerMonitorsEnabled !== undefined
+      || serverPatch.amdGpuLighting !== undefined;
     if (!anyBlock) return;
     if (writeTimer.current) clearTimeout(writeTimer.current);
     // Merge into (not replace) the still-pending patch so fields from separate
@@ -664,15 +684,13 @@ export function UiSettingsProvider({
 
   const reload = useCallback((coalesceWithPendingWrite = false) => {
     if (!serviceOnline) return;
-    // The 'prefs' topic echoes our OWN writes back. A theme toggle makes two
-    // /preferences writes: themeMode (debounced 250ms via scheduleServerWrite)
-    // and, through ResolvedThemeSync, resolvedThemeMode (immediate). The
-    // immediate write's echo arrives before the debounced themeMode write
-    // lands, so re-hydrating now reads the pre-toggle themeMode and re-applies
-    // it - the visible flicker: new theme → snaps back to old → tweens to new
-    // once the real write settles. Skip the round-trip while our own write is
-    // still pending; that write's echo reloads once it flushes, when the
-    // server is consistent. (Mount / profile-switch reloads pass false.)
+    // The 'prefs' topic echoes our OWN writes back. A theme toggle writes
+    // themeMode debounced via scheduleServerWrite, so an echo of an earlier
+    // write can arrive first and re-hydrate the pre-toggle themeMode - the
+    // visible flicker: new theme → snaps back to old → tweens to new once the
+    // real write settles. Skip the round-trip while our own write is still
+    // pending; that write's echo reloads once it flushes, when the server is
+    // consistent. (Mount / profile-switch reloads pass false.)
     if (coalesceWithPendingWrite && writeTimer.current) return;
     // Bounds the local HTTP request with an AbortSignal (network I/O, as for the Nexus 2 preview); a relay-tunneled read ignores the signal and is not covered.
     const mine = ++readGeneration.current;
@@ -682,13 +700,15 @@ export function UiSettingsProvider({
     fetchPreferences(abort.signal).finally(() => clearTimeout(bound)).then(prefs => {
       if (mine !== readGeneration.current) return;
       if (!prefs) { markFailed(); return; }
+      // Only the DOM-managing dashboard applies the host theme to the page.
+      const hostThemeChanged = manageDom && setHostThemeMode(prefs.theme?.resolvedThemeMode);
       setSettings(prev => {
         const next = { ...applyServerToLocal(prefs, prev), ...pendingLocalRef.current };
         persistLocal(next);
         // Re-apply theme/accent when server state differs (profile-switch
         // path). Same `manageDom` guard as update().
         if (manageDom) {
-          if (next.themeMode !== prev.themeMode) applyThemeMode(next.themeMode);
+          if (next.themeMode !== prev.themeMode || hostThemeChanged) applyThemeMode(next.themeMode);
           if (next.accentColor !== prev.accentColor) applyAccentColor(next.accentColor);
           if (next.language !== prev.language) setLanguage(next.language);
         }
@@ -829,7 +849,7 @@ export function usePreferredGpuId(): string {
  * instead of crashing - same pattern as {@link useTempSensorPrefs}.
  */
 export function useUnitPrefs(): {
-  monitoringTempUnit: TempUnit; timeFormat: TimeFormat; numberFormat: NumberFormat; dateFormat: DateFormat;
+  monitoringTempUnit: TempUnit; timeFormat: TimeFormat; numberFormat: NumberFormat; monitoringWholeNumbers: boolean; dateFormat: DateFormat;
 } {
   const ctx = useContext(UiSettingsContext);
   if (!ctx) {
@@ -837,6 +857,7 @@ export function useUnitPrefs(): {
       monitoringTempUnit: DEFAULT_TEMP_UNIT,
       timeFormat: DEFAULT_TIME_FORMAT,
       numberFormat: DEFAULT_NUMBER_FORMAT,
+      monitoringWholeNumbers: DEFAULT_MONITORING_WHOLE_NUMBERS,
       dateFormat: DEFAULT_DATE_FORMAT,
     };
   }
@@ -844,19 +865,9 @@ export function useUnitPrefs(): {
     monitoringTempUnit: ctx.settings.monitoringTempUnit,
     timeFormat: ctx.settings.timeFormat,
     numberFormat: ctx.settings.numberFormat,
+    monitoringWholeNumbers: ctx.settings.monitoringWholeNumbers,
     dateFormat: ctx.settings.dateFormat,
   };
-}
-
-/**
- * Read-only accessor for how long a temperature warning lingers after the
- * episode ends (minutes; 0 = clears immediately). Returns the contract default
- * outside a UiSettingsProvider (tests, harness) so callers degrade instead of
- * crashing - same pattern as {@link useUnitPrefs}.
- */
-export function useDiagnosticsWarningLingerMinutes(): number {
-  const ctx = useContext(UiSettingsContext);
-  return ctx ? ctx.settings.diagnosticsWarningLingerMinutes : DIAGNOSTICS_SETTINGS_DEFAULTS.warningLingerMinutes;
 }
 
 const NO_IGNORED_COMPONENTS: string[] = [];
@@ -923,6 +934,24 @@ export function useFeatureFlags(): FeatureFlags {
     monitoring: ctx.settings.featureMonitoringEnabled,
     diagnostics: ctx.settings.featureDiagnosticsEnabled,
   };
+}
+
+const NO_HIDDEN_DEVICES: readonly string[] = [];
+
+/**
+ * The sidebar's hidden-device keys plus a setter that adds or removes one.
+ * Empty and inert outside a UiSettingsProvider, same pattern as
+ * {@link useFeatureFlags}.
+ */
+export function useSidebarHiddenDevices(): { hidden: readonly string[]; setHidden: (key: string, hide: boolean) => void } {
+  const ctx = useContext(UiSettingsContext);
+  const hidden = ctx ? ctx.settings.hiddenSidebarDevices : NO_HIDDEN_DEVICES;
+  const update = ctx?.update;
+  const setHidden = useCallback((key: string, hide: boolean) => {
+    const next = withSidebarHidden(hidden, key, hide);
+    if (next !== hidden) update?.({ hiddenSidebarDevices: [...next] });
+  }, [hidden, update]);
+  return { hidden, setHidden };
 }
 
 const NO_CONFLICT_EXCLUSIONS: string[] = [];

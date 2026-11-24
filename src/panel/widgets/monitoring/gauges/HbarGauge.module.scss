@@ -60,7 +60,7 @@
 }
 
 .value {
-  font-size: 1.4em;
+  font-size: 1.6em;
   font-weight: var(--weight-display);
   letter-spacing: -0.02em;
   line-height: 1;
@@ -71,8 +71,7 @@
   font-size: var(--type-gauge-caption);
   font-weight: var(--weight-strong);
   color: var(--text-dim);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: calc(0.04em + var(--small-tracking, 0em));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

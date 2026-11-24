@@ -29,7 +29,42 @@ const NON_UI_JSX_ATTRIBUTES = [
   'anchorId',
   // i18n key prefixes/overrides handed to a shared component so it reads its
   // caller's strings; these ARE the translation lookup, not display text.
-  'translationPrefix', 'resetLabelKey', 'resetConfirmKey', 'importLabelKey',
+  'translationPrefix', 'resetLabelKey', 'resetConfirmKey', 'importLabelKey', 'createFailedKey',
+]
+
+// One width for every inline slider: styles/global.scss (--slider-inline-*) is the
+// single source and Slider / SettingRow consume it. A call site never sets it.
+// Inline = SettingSlider, or a Slider with no orientation (inline is the default) or an
+// inline one; stacked and bare sliders are outside this rule.
+const INLINE_SLIDER = [
+  "JSXOpeningElement[name.name='SettingSlider']",
+  "JSXOpeningElement[name.name='Slider']:not(:has(> JSXAttribute[name.name='orientation']))",
+  "JSXOpeningElement[name.name='Slider']:has(> JSXAttribute[name.name='orientation'][value.value='inline'])",
+  "JSXOpeningElement[name.name='Slider']:has(> JSXAttribute[name.name='orientation'][value.expression.name='INLINE'])",
+]
+const SLIDER_WIDTH_BAN = [
+  {
+    selector: "JSXAttribute[name.name='controlWidth']",
+    message: 'Inline slider width comes from --slider-inline-* in styles/global.scss; there is no per-site width prop.',
+  },
+  ...INLINE_SLIDER.map(open => ({
+    selector: `${open} > JSXAttribute[name.name='style']`,
+    message: 'An inline slider takes no style: its width comes from --slider-inline-* in styles/global.scss.',
+  })),
+  {
+    selector: "Property[key.value=/^--slider-inline/]",
+    message: 'Only styles/global.scss defines --slider-inline-*.',
+  },
+]
+
+// Native `title` on a DOM element paints the browser tooltip; hover hints go
+// through HoverTooltip. Component props named `title` are not matched (only
+// lowercase tags). <iframe title> is the frame's accessible name: allowed.
+const NATIVE_TITLE_BAN = [
+  {
+    selector: "JSXOpeningElement[name.name=/^(?!iframe$)[a-z]/] > JSXAttribute[name.name='title']",
+    message: "Native title= shows the browser tooltip. Wrap the element in <HoverTooltip body={...}> (components/common/HoverTooltip) and keep aria-label for the accessible name.",
+  },
 ]
 
 export default defineConfig([
@@ -79,6 +114,11 @@ export default defineConfig([
       // issue in production.
       'react-refresh/only-export-components': 'off',
     },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/components/common/Slider/Slider.tsx', 'src/components/common/SettingRow/SettingRow.tsx'],
+    rules: { 'no-restricted-syntax': ['error', ...SLIDER_WIDTH_BAN, ...NATIVE_TITLE_BAN] },
   },
   {
     // Internal / developer-only surfaces that never ship as end-user UI: test

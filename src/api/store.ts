@@ -14,6 +14,8 @@ export interface StoreVersion {
   hasPage: boolean;
   requiresTouch: boolean;
   sizes: string[];
+  /** The app's widget resizes freely beyond the declared sizes. */
+  freeform?: boolean;
   surfaces: string[];
   releasedAt: string;
   /** The version manifest's capabilities as published; author-supplied JSON, so every field is unchecked. */
@@ -25,6 +27,13 @@ export interface StoreVersion {
 export interface StoreRating {
   average: number;
   count: number;
+}
+
+export interface StoreHardware {
+  name: string;
+  /** Product page that opens externally for a machine without the hardware. */
+  url: string;
+  matched: boolean;
 }
 
 export interface StoreApp {
@@ -41,6 +50,10 @@ export interface StoreApp {
   releaseDate?: string | null;
   rating: StoreRating;
   latest: StoreVersion | null;
+  /** Lowest Nexus version that can install the app, set only when this build is below every release's minimum (latest is then null). */
+  requiresNexus?: string | null;
+  /** Present only on an app gated to specific hardware; `matched` says whether this machine has it attached. */
+  hardware?: StoreHardware;
   /** DEV_TOOLS service only: synthesized from a sideloaded app's manifest and store/ folder because the cloud catalog lacks it. Never installable from here (latest.sha256 is empty). */
   localPreview?: boolean;
 }
@@ -55,7 +68,7 @@ export interface StoreInstallResult {
   appId: string;
   version: string;
   ok: boolean;
-  /** 'sign_in_required' is the account gate, 'not_yet_released' the launch-day one; the rest are download/verify failures. */
+  /** 'sign_in_required' is the account gate, 'not_yet_released' the launch-day one, 'hardware_required' the missing-hardware one; the rest are download/verify failures. */
   reason?: string;
 }
 

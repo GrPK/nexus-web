@@ -4,14 +4,20 @@
 
 import type { FanChannel } from '../../../api/cooling';
 import type { LianLiWirelessFan } from '../../../api/lianli-wireless';
+import { isHydroShiftDevice } from './LianLiWirelessFansTab';
 
 // Matches Slv3CoolingProvider.IdPrefix / PortId in nexus-service.
-const CHANNEL_PREFIX = 'lianli-wireless:';
+export const WIRELESS_CHANNEL_PREFIX = 'lianli-wireless:';
 
 /** The generic-cooling channel id the service registers for one port of a
- *  bound wireless fan chain. */
-export function lianliWirelessPortChannelId(mac: string, port: number): string {
-  return `${CHANNEL_PREFIX}${mac}:port${port}`;
+ *  bound fan chain; the prefix names the handler that owns it. */
+export function lianliWirelessPortChannelId(mac: string, port: number, prefix = WIRELESS_CHANNEL_PREFIX): string {
+  return `${prefix}${mac}:port${port}`;
+}
+
+/** The one radiator-fan channel the service registers for a HydroShift II. */
+export function lianliWirelessAioFansChannelId(mac: string, prefix = WIRELESS_CHANNEL_PREFIX): string {
+  return `${prefix}${mac}:fans`;
 }
 
 export interface LianLiWirelessCoolingPort {
@@ -26,6 +32,9 @@ export interface LianLiWirelessCoolingPort {
 export interface LianLiWirelessCoolingChain {
   mac: string;
   fanType: number;
+  devType: number;
+  /** A HydroShift II: one shared radiator-fan row bound to the :fans channel. */
+  aio: boolean;
   ports: LianLiWirelessCoolingPort[];
 }
 
@@ -40,24 +49,44 @@ export interface LianLiWirelessCoolingChain {
 export function buildLianLiWirelessCoolingChains(
   fans: readonly LianLiWirelessFan[],
   channels: readonly FanChannel[],
+  prefix = WIRELESS_CHANNEL_PREFIX,
 ): LianLiWirelessCoolingChain[] {
   const byId = new Map<string, FanChannel>();
   for (const ch of channels) {
-    if (ch.id.startsWith(CHANNEL_PREFIX)) byId.set(ch.id, ch);
+    if (ch.id.startsWith(prefix)) byId.set(ch.id, ch);
   }
   const chains: LianLiWirelessCoolingChain[] = [];
   for (const fan of fans) {
     if (!fan.boundToUs) continue;
+    if (isHydroShiftDevice(fan.devType)) {
+      if (fan.fanCount <= 0) continue;
+      // The AIO applies one duty to all its radiator fans, so a single row.
+      // Slot 3 is the pump, so its tach never feeds the fans row.
+      const channel = byId.get(lianliWirelessAioFansChannelId(fan.mac, prefix)) ?? null;
+      const spinning = fan.rpm.slice(0, Math.min(fan.fanCount, 3)).filter(r => r > 0);
+      const avg = spinning.length ? Math.round(spinning.reduce((a, b) => a + b, 0) / spinning.length) : 0;
+      chains.push({
+        mac: fan.mac,
+        fanType: fan.fanType,
+        devType: fan.devType,
+        aio: true,
+        ports: [{ port: 0, rpm: channel?.rpm ?? avg, rpmUnavailable: false, channel }],
+      });
+      continue;
+    }
     // The service registers contiguous port0..portN-1 channels per chain, so
     // the channel count doubles as the highest port index + 1.
     const chainChannelCount = channels.filter(
-      ch => ch.id.startsWith(`${CHANNEL_PREFIX}${fan.mac}:port`),
+      ch => ch.id.startsWith(`${prefix}${fan.mac}:port`),
     ).length;
-    const portCount = chainChannelCount > 0 ? chainChannelCount : fan.fanCount;
+    // A P28 V2 has one duty channel for all its fans; each fan still gets an RPM row sharing it.
+    const sharedChannel = fan.family === 'p28v2' ? byId.get(lianliWirelessPortChannelId(fan.mac, 0, prefix)) ?? null : null;
+    const p28Count = fan.family === 'p28v2' ? Math.max(fan.fanCount, 1) : 0;
+    const portCount = p28Count || (chainChannelCount > 0 ? chainChannelCount : fan.fanCount);
     if (portCount <= 0) continue;
     const ports: LianLiWirelessCoolingPort[] = [];
     for (let port = 0; port < portCount; port++) {
-      const channel = byId.get(lianliWirelessPortChannelId(fan.mac, port)) ?? null;
+      const channel = p28Count ? sharedChannel : byId.get(lianliWirelessPortChannelId(fan.mac, port, prefix)) ?? null;
       ports.push({
         port,
         rpm: fan.rpm[port] ?? 0,
@@ -65,7 +94,7 @@ export function buildLianLiWirelessCoolingChains(
         channel,
       });
     }
-    chains.push({ mac: fan.mac, fanType: fan.fanType, ports });
+    chains.push({ mac: fan.mac, fanType: fan.fanType, devType: fan.devType, aio: false, ports });
   }
   return chains;
 }

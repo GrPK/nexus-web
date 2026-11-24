@@ -12,17 +12,17 @@ import {
   networkMaxValue,
   NETWORK_SENSOR_TOTAL,
 } from './networkSensors';
-import { DEFAULT_MICRO_DESIGN, isExtrasBackedDevice, isMicroMultiDevice, isTwoColumnMicro, microRowDevice, type DeviceKey } from './perfSlots';
-import type { GaugeDesignKey } from './gauges/types';
+import { isExtrasBackedDevice, isMicroMultiDevice, isTwoColumnMicro, microAlignOf, microDesignOf, microRowDevice, type DeviceKey, type MicroAlign, type MicroDesignKey } from './perfSlots';
 import {
   displayLabel,
   labelForDevice,
   percentForSensor,
+  isSavedSensorMissing,
   resolveSensor,
   staticMaxForDevice,
 } from './MonitoringWidget';
 import { bareSensorLabel } from './sensorNames';
-import { gpu2Components, igpuComponents } from './sensorCategories';
+import { gpu2Components, igpuComponents, sensorCaptionName } from './sensorCategories';
 import { chartDomainForScale, defaultFixedMax, DEFAULT_SCALE_MODE, fixedFillPercent, type ScaleMode } from './perfDomain';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
 import { MicroBar } from './MicroBar';
@@ -77,6 +77,7 @@ export function bottomLabelForDevice(
     case 'memoryModule': return t('monitoring.detailed.memoryModule');
     case 'battery': return t('monitoring.detailed.battery');
     case 'cooler': return t('monitoring.detailed.cooler');
+    case 'fanSensors': return t('monitoring.detailed.fanSensors');
     case 'psu': return t('monitoring.detailed.psu');
     case 'embeddedController': return t('monitoring.detailed.ec');
     case 'network': return 'Network';
@@ -100,7 +101,7 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
   const networkSensors = buildNetworkSensors(network);
   const extras = useSensorExtras(usesExtras);
   const tempPrefs = useTempSensorPrefs();
-  const { monitoringTempUnit, numberFormat } = useUnitPrefs();
+  const { monitoringTempUnit, numberFormat, monitoringWholeNumbers } = useUnitPrefs();
   // One toggle for every bar, like the shared Micro range.
   const microValueColor = (widget.config?.micro_valueColor as boolean | undefined) ?? false;
   const gaugeGradient = usePanelGaugeGradient();
@@ -117,17 +118,18 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
   const microScale = multiDevice ? DEFAULT_SCALE_MODE : (widget.config?.micro_scale as ScaleMode | undefined) ?? DEFAULT_SCALE_MODE;
   const microMin = widget.config?.micro_min as number | undefined;
   const microMax = widget.config?.micro_max as number | undefined;
-  // Row style shared by every bar; a 6/8-slot Micro on the wide 4x2 splits the
+  // Row style shared by every row; a 6/8-slot Micro on the wide 4x2 splits the
   // rows into two columns (3+3, 4+4) under the one shared caption. The tall 2x4
   // keeps all rows in one column.
-  const microDesign = (widget.config?.micro_design as GaugeDesignKey | undefined) ?? DEFAULT_MICRO_DESIGN;
+  const microDesign = microDesignOf(widget.config);
+  const microAlign = microAlignOf(widget.config);
   const twoColumn = isTwoColumnMicro(widget.size, count);
 
   const selectable = typeof onSelectSlot === 'function';
   const activeSlot = selectedSlot == null ? 0 : Math.max(0, Math.min(selectedSlot, count - 1));
 
-  // Only the bar design sizes itself to its content; fill and backdrop stretch.
-  const growsRow = microDesign === 'fill' || microDesign === 'backdrop';
+  // Only the bar design sizes itself to its content; fill, backdrop and simple stretch.
+  const growsRow = microDesign !== 'bar';
 
   const rowEls = sensorNames.map((rawName, i) => {
     const rowDevice = rowDevices[i];
@@ -145,6 +147,7 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
         labelOverride={widget.config?.[`micro_sensor${i}_label`] as string | undefined}
         labelMode={widget.config?.[`micro_sensor${i}_labelMode`] as string | undefined}
         design={microDesign}
+        align={microAlign}
         scale={microScale}
         fixedMin={microMin}
         fixedMax={microMax}
@@ -154,6 +157,7 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
         tempPrefs={tempPrefs}
         monitoringTempUnit={monitoringTempUnit}
         numberFormat={numberFormat}
+        monitoringWholeNumbers={monitoringWholeNumbers}
       />
     );
 
@@ -195,7 +199,7 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
       )}
       {!categoryHidden && (
         <HoverTooltip body={bottomLabel} side="top">
-          <div className={styles.bottomLabel}>{bottomLabel}</div>
+          <div className={`${styles.bottomLabel} ${microDesign === 'simple' ? styles[`caption_${microAlign}`] : ''}`}>{bottomLabel}</div>
         </HoverTooltip>
       )}
     </div>
@@ -213,7 +217,8 @@ interface MicroRowProps {
   sensorName: string;
   labelOverride?: string;
   labelMode?: string;
-  design: GaugeDesignKey;
+  design: MicroDesignKey;
+  align: MicroAlign;
   scale: ScaleMode;
   fixedMin?: number;
   fixedMax?: number;
@@ -224,15 +229,18 @@ interface MicroRowProps {
   tempPrefs?: { cpuId: string; gpuId: string };
   monitoringTempUnit: TempUnit;
   numberFormat: NumberFormat;
+  monitoringWholeNumbers: boolean;
 }
 
-function MicroRow({ sensors, fpsSensors, networkSensors, extras, device, prefixed, sensorName, labelOverride, labelMode, design, scale, fixedMin, fixedMax, valueColor, valueColorReverse, gaugeGradient, tempPrefs, monitoringTempUnit, numberFormat }: MicroRowProps) {
+function MicroRow({ sensors, fpsSensors, networkSensors, extras, device, prefixed, sensorName, labelOverride, labelMode, design, align, scale, fixedMin, fixedMax, valueColor, valueColorReverse, gaugeGradient, tempPrefs, monitoringTempUnit, numberFormat, monitoringWholeNumbers }: MicroRowProps) {
+  const { t } = useTranslation();
   const effectiveSensorName = device === 'network' && !sensorName ? NETWORK_SENSOR_TOTAL : sensorName;
   const sensor = resolveSensor(sensors, fpsSensors, networkSensors, device, effectiveSensorName, tempPrefs, extras);
   const rawValue = sensor?.value ?? 0;
-  const formatted = sensor ? formatSensorValue(sensor.value, sensor.units, sensor.formatted, monitoringTempUnit, numberFormat) : '-';
-  const sensorDisplayName = sensor?.name ?? '';
-  const autoLabel = prefixed
+  const formatted = sensor ? formatSensorValue(sensor.value, sensor.units, sensor.formatted, monitoringTempUnit, numberFormat, sensor.type, monitoringWholeNumbers) : '-';
+  const sensorDisplayName = sensorCaptionName(device, sensors, sensor) ?? '';
+  const sensorMissing = isSavedSensorMissing(device, effectiveSensorName, sensor, extras);
+  const autoLabel = sensorMissing ? t('monitoring.sensorMissing') : prefixed
     ? labelForDevice(device, sensorDisplayName || effectiveSensorName)
     : bareSensorLabel(device, sensorDisplayName) || sensorDisplayName || effectiveSensorName;
   const label = displayLabel(labelMode, labelOverride, autoLabel);
@@ -261,6 +269,7 @@ function MicroRow({ sensors, fpsSensors, networkSensors, extras, device, prefixe
       formatted={formatted}
       fillPercent={fillPercent}
       design={design}
+      align={align}
       history={history}
       historyDomain={[domainMin, domainMax]}
       gradient={gradient}

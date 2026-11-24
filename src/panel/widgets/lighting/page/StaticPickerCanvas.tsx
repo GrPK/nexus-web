@@ -4,8 +4,9 @@ import { useTranslation } from '../../../../lib/i18n';
 import { useEffectThumbnail } from '../../../../hooks/useEffectThumbnail';
 import {
   PICKER_SEGMENT_COLS, PICKER_SEGMENT_ROWS, SEGMENT_SWATCHES,
-  pickerHexAt, pickerPointFor, sameSwatch, segmentCellFor, snapToSegment,
+  canTakePick, pickerHexAt, pickerPointFor, sameSwatch, segmentCellFor, segmentHexAt,
 } from './staticPickerField';
+import { effectiveZoom, pointerFraction, rectZoomShortfall } from '../../../../lib/zoomedPointer';
 import styles from '../LightingPage.module.scss';
 
 export interface PickerDevice {
@@ -79,7 +80,10 @@ export function StaticPickerCanvas({
   const [notice, setNotice] = useState<{ title: string; body: string; seq: number } | null>(null);
   const noticeSeq = useRef(0);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragging = useRef(false);
+  // The pointer that owns the current pick; a second contact steers only by taking over from a quiet one.
+  const activePointer = useRef<number | null>(null);
+  // When the owner last touched down or dragged, so a late contact can tell a live stroke from a rest.
+  const lastActiveAt = useRef(0);
   const lastHex = useRef<string | null>(null);
   // Held only while the input is focused, so a half-typed hex is not clobbered
   // by the value the last valid keystroke already committed.
@@ -155,15 +159,21 @@ export function StaticPickerCanvas({
     return out;
   }, [devices, patternEffect, segmented, size.h, size.w]);
 
-  const hexAtEvent = useCallback((clientX: number, clientY: number) => {
+  // Fixed for a gesture: zoom and layout do not change while a finger is down.
+  const shortfall = useRef(1);
+
+  const hexAtEvent = useCallback((clientX: number, clientY: number, measure = false) => {
     const el = fieldRef.current;
     if (!el) return null;
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height) return null;
-    const fx = (clientX - r.left) / r.width;
-    const fy = (clientY - r.top) / r.height;
-    const p = segmented ? snapToSegment(fx, fy) : { x: fx, y: fy };
-    return pickerHexAt(p.x, p.y);
+    if (measure) shortfall.current = rectZoomShortfall(r.width, el.offsetWidth, effectiveZoom(el));
+    // The field sits under the immersive body's zoom, where older engines
+    // report the rect in unzoomed px while the pointer stays in viewport px.
+    const { x: fx, y: fy } = pointerFraction(
+      clientX, clientY, r, shortfall.current,
+    );
+    return segmented ? segmentHexAt(fx, fy) : pickerHexAt(fx, fy);
   }, [segmented]);
 
   const blocked = () => {
@@ -175,26 +185,35 @@ export function StaticPickerCanvas({
   };
 
   const handleDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // A new contact takes over from one that has gone quiet (a palm resting
+    // before the fingertip lands, or a missed release), never from a fresh
+    // tap or a drag in progress.
+    if (
+      activePointer.current !== null && e.pointerId !== activePointer.current
+      && !canTakePick(performance.now() - lastActiveAt.current)
+    ) return;
     if (blocked()) return;
-    const picked = hexAtEvent(e.clientX, e.clientY);
+    const picked = hexAtEvent(e.clientX, e.clientY, true);
     if (!picked) return;
-    dragging.current = true;
+    activePointer.current = e.pointerId;
+    lastActiveAt.current = performance.now();
     lastHex.current = picked;
     e.currentTarget.setPointerCapture(e.pointerId);
     onPreview(picked);
   };
 
   const handleMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragging.current) return;
+    if (e.pointerId !== activePointer.current) return;
     const picked = hexAtEvent(e.clientX, e.clientY);
     if (!picked || picked === lastHex.current) return;
     lastHex.current = picked;
+    lastActiveAt.current = performance.now();
     onPreview(picked);
   };
 
-  const handleUp = () => {
-    if (!dragging.current) return;
-    dragging.current = false;
+  const handleUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerId !== activePointer.current) return;
+    activePointer.current = null;
     if (lastHex.current) onCommit(lastHex.current);
   };
 
@@ -230,6 +249,7 @@ export function StaticPickerCanvas({
         onPointerMove={handleMove}
         onPointerUp={handleUp}
         onPointerCancel={handleUp}
+        onLostPointerCapture={handleUp}
       >
         {!patternEffect && segmented && (
           <div

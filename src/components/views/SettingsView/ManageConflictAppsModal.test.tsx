@@ -9,6 +9,7 @@ import { useConflictApps } from '../../../hooks/useConflictApps';
 
 vi.mock('../../../api/conflicts', () => ({
   HYTE_NEXUS2_CONFLICT_ID: 'hyte-nexus-2',
+  WINDOWS_DYNAMIC_LIGHTING_CONFLICT_ID: 'windows-dynamic-lighting',
   fetchConflictCatalog: vi.fn(),
   fetchDynamicLighting: vi.fn(),
   setDynamicLighting: vi.fn(),
@@ -39,7 +40,7 @@ function renderModal(overrides: Partial<Parameters<typeof ManageConflictAppsModa
     endOnLaunch: false,
     onEndOnLaunchChange: vi.fn(),
     exclusions: [] as string[],
-    onExclusionsChange: vi.fn(),
+    onWhitelistChange: vi.fn(),
     notifyLaunches: true,
     onNotifyLaunchesChange: vi.fn(),
     ...overrides,
@@ -77,24 +78,24 @@ describe('ManageConflictAppsModal', () => {
     expect(screen.getByLabelText('NZXT CAM').getAttribute('aria-checked')).toBe('true');
   });
 
-  it('turning an app off adds it to the exclusions', async () => {
+  it('turning an app off keeps it running, one app at a time', async () => {
     vi.mocked(fetchConflictCatalog).mockResolvedValue(CATALOG);
     vi.mocked(useConflictApps).mockReturnValue({ conflicts: [], ready: true });
     const props = renderModal();
 
     await waitFor(() => expect(screen.getByLabelText('NZXT CAM')).toBeTruthy());
     fireEvent.click(screen.getByLabelText('NZXT CAM'));
-    expect(props.onExclusionsChange).toHaveBeenCalledWith(['nzxt-cam']);
+    expect(props.onWhitelistChange).toHaveBeenCalledWith('nzxt-cam', true);
   });
 
-  it('turning an excluded app back on drops it from the exclusions', async () => {
+  it('turning an excluded app back on removes only that app', async () => {
     vi.mocked(fetchConflictCatalog).mockResolvedValue(CATALOG);
     vi.mocked(useConflictApps).mockReturnValue({ conflicts: [], ready: true });
     const props = renderModal({ exclusions: ['nzxt-cam', 'signalrgb'] });
 
     await waitFor(() => expect(screen.getByLabelText('NZXT CAM')).toBeTruthy());
     fireEvent.click(screen.getByLabelText('NZXT CAM'));
-    expect(props.onExclusionsChange).toHaveBeenCalledWith(['signalrgb']);
+    expect(props.onWhitelistChange).toHaveBeenCalledWith('nzxt-cam', false);
   });
 
   it('lifts a detected app into its own group ahead of the rest', async () => {
@@ -213,5 +214,17 @@ describe('ManageConflictAppsModal', () => {
     expect(
       screen.getByLabelText('settings.conflictApps.dynamicLighting.title').getAttribute('aria-checked'),
     ).toBe('false');
+  });
+
+  it('lists Dynamic Lighting once: the catalog row is hidden behind its own switch', async () => {
+    vi.mocked(fetchConflictCatalog).mockResolvedValue([
+      ...CATALOG,
+      { id: 'windows-dynamic-lighting', displayName: 'Windows Dynamic Lighting', category: 'lighting' },
+    ]);
+    vi.mocked(useConflictApps).mockReturnValue({ conflicts: [], ready: true });
+    renderModal();
+
+    await waitFor(() => expect(screen.getByLabelText('NZXT CAM')).toBeTruthy());
+    expect(screen.queryByLabelText('Windows Dynamic Lighting')).toBeNull();
   });
 });

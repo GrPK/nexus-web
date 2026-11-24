@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   animatePin, colorPin, MIRROR_PIN, paletteColorPin, pickerMarks, pinGridKey, pinHex, pinnedNamesByEffect,
   clearLegacyLightingKeys, pinModeTargetLabel, pinSignature, pinStripPick, pinTargetLabel, pressReach, isPickTarget, selectAllEligible, selectionPin, staticLookPin,
-  tabPressChangesNothing, withPins,
+  tabPressChangesNothing, withPins, selectionWithoutUnpinned, reconcileSelectionTab,
 } from './pins';
 import { defaultStateFor } from '../../../types/lighting';
+import { withStacked } from './page/deviceStacks';
 import { paletteColor, paletteKey } from '../../../types/lightingPalette';
 
 describe('withPins', () => {
@@ -197,7 +198,6 @@ describe('pressReach', () => {
     expect(tabPressChangesNothing('static', 'static', 0, false)).toBe(true);
     expect(tabPressChangesNothing('static', 'static', 1, false)).toBe(false);
     expect(tabPressChangesNothing('static', 'static', 1, true)).toBe(true);
-    expect(tabPressChangesNothing('gamesync', 'gamesync', 1, false)).toBe(true);
     expect(tabPressChangesNothing('animate', 'static', 0, false)).toBe(false);
   });
 });
@@ -211,22 +211,87 @@ describe('pinTargetLabel', () => {
     expect(pinTargetLabel(colorPin('#010203'), t)).toMatch(/^#010203$|^lighting\.palette\./);
   });
 
-  it('names a simple sweep by its own label, a shader by its effect label, and Mirror', () => {
-    expect(pinTargetLabel(animatePin('sweeprainbow'), t)).toBe('lighting.simple.anim.rainbow');
+  it('names a retired simple key by its replacement label, a shader by its effect label, and Mirror', () => {
+    expect(pinTargetLabel(animatePin('sweeprainbow'), t)).toBe('lighting.controls.rainbow');
     expect(pinTargetLabel(animatePin('plasma'), t)).toBe('lighting.controls.plasma');
     expect(pinTargetLabel(MIRROR_PIN, t)).toBe('lighting.mode.screen');
   });
 });
 
 describe('clearLegacyLightingKeys', () => {
-  it('removes the keys of the per-device-pick model and of a stored selection', () => {
-    for (const k of ['nexus.lighting.selectedDevices', 'nexus.lighting.devicePicks', 'nexus.lighting.selectionSeeded', 'nexus.lighting.pinSelection', 'nexus.lighting.primaryDevice']) {
+  it('removes the keys of the per-device-pick model and keeps the stored selection', () => {
+    for (const k of ['nexus.lighting.selectedDevices', 'nexus.lighting.devicePicks', 'nexus.lighting.selectionSeeded', 'nexus.lighting.pinSelection']) {
       localStorage.setItem(k, '1');
     }
     localStorage.setItem('nexus.lighting.customColor', '"#fff"');
     clearLegacyLightingKeys();
     expect(localStorage.getItem('nexus.lighting.selectedDevices')).toBeNull();
-    expect(localStorage.getItem('nexus.lighting.pinSelection')).toBeNull();
+    expect(localStorage.getItem('nexus.lighting.pinSelection')).toBe('1');
     expect(localStorage.getItem('nexus.lighting.customColor')).toBe('"#fff"');
+  });
+});
+
+describe('selectionWithoutUnpinned', () => {
+  const ORDER = ['a', 'b', 'c'];
+
+  it('falls back to the last remaining card in device order, not insertion order', () => {
+    const out = selectionWithoutUnpinned(new Set(['c', 'a', 'b']), 'b', ['b'], ORDER);
+    expect(out!.primary).toBe('c');
+    expect(selectionWithoutUnpinned(new Set(['c', 'a', 'b']), 'c', ['c'], ORDER)!.primary).toBe('b');
+  });
+
+  it('drops a whole stack when the caller expands the unpinned member to its stack', () => {
+    const stacks = [{ id: 's', name: '', members: ['a', 'b'] }];
+    const out = selectionWithoutUnpinned(new Set(['a', 'b', 'c']), 'a', [...withStacked(stacks, ['a'])], ORDER);
+    expect([...out!.ids]).toEqual(['c']);
+    expect(out!.primary).toBe('c');
+  });
+  it('drops only the unpinned device and keeps the rest selected', () => {
+    const out = selectionWithoutUnpinned(new Set(['a', 'b', 'c']), 'a', ['a'], ORDER);
+    expect([...out!.ids]).toEqual(['b', 'c']);
+    expect(out!.primary).toBe('c');
+  });
+
+  it('keeps the primary when another device is unpinned', () => {
+    const out = selectionWithoutUnpinned(new Set(['a', 'b']), 'a', ['b'], ORDER);
+    expect([...out!.ids]).toEqual(['a']);
+    expect(out!.primary).toBe('a');
+  });
+
+  it('empties the selection with no primary when the last device is unpinned', () => {
+    const out = selectionWithoutUnpinned(new Set(['a']), 'a', ['a'], ORDER);
+    expect(out!.ids.size).toBe(0);
+    expect(out!.primary).toBeNull();
+  });
+
+  it('leaves the selection alone when no unpinned device was selected', () => {
+    expect(selectionWithoutUnpinned(new Set(['a']), 'a', ['z'], ORDER)).toBeNull();
+  });
+
+  it('means a later effect pick does not pin the unpinned device again', () => {
+    let pins = withPins({}, ['a', 'b'], animatePin('plasma'));
+    pins = withPins(pins, ['a'], null);
+    const left = selectionWithoutUnpinned(new Set(['a', 'b']), 'a', ['a'], ORDER)!;
+    pins = withPins(pins, [...left.ids], animatePin('aurora'));
+    expect(pins.a).toBeUndefined();
+    expect(pins.b).toEqual(animatePin('aurora'));
+  });
+});
+
+describe('reconcileSelectionTab', () => {
+  it('keeps the opened tab on a remount while the service state is still loading', () => {
+    expect(reconcileSelectionTab('static', 'animate', 'none', false)).toEqual({ tab: 'static', base: 'animate' });
+  });
+
+  it('keeps the opened tab once the loaded mode matches the one it was opened under', () => {
+    expect(reconcileSelectionTab('gif', 'animate', 'animate', true)).toEqual({ tab: 'gif', base: 'animate' });
+  });
+
+  it('drops the tab when the global mode changed while away', () => {
+    expect(reconcileSelectionTab('static', 'animate', 'screen', true)).toEqual({ tab: null, base: 'screen' });
+  });
+
+  it('records the first loaded mode without dropping anything', () => {
+    expect(reconcileSelectionTab(null, null, 'animate', true)).toEqual({ tab: null, base: 'animate' });
   });
 });

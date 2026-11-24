@@ -7,13 +7,14 @@ import type { useSensorExtras } from '../../../hooks/useSensorExtras';
 import type { buildNetworkSensors } from './networkSensors';
 import { networkSensorOptions } from './networkSensors';
 import { bareSensorLabel } from './sensorNames';
-import { extrasSensorsForDevice, gpu2Sensors, igpuSensors, sensorsForCategory, smartStorageSensors } from './sensorCategories';
+import { extrasSensorsForDevice, gpu2Sensors, igpuSensors, sensorsForCategory, smartStorageSensors, storageSensorLabel } from './sensorCategories';
 import type { DeviceKey } from './perfSlots';
 
 export interface SensorOption {
   value: string;
   label: string;
   sensorName?: string;
+  type?: string;
 }
 
 // Picker order: the Tryx-shared categories (SENSOR_CATEGORIES, quick through
@@ -25,7 +26,7 @@ export interface SensorOption {
 export const DEVICE_OPTION_KEYS: readonly DeviceKey[] = [
   'quick', 'cpu', 'gpu', 'gpu2', 'igpu', 'memory', 'memoryModule', 'motherboard',
   'storage', 'smart', 'network', 'fps',
-  'battery', 'cooler', 'psu', 'embeddedController',
+  'battery', 'cooler', 'fanSensors', 'psu', 'embeddedController',
 ];
 
 export const CATEGORY_LABEL_KEYS: Record<DeviceKey, string> = {
@@ -45,6 +46,7 @@ export const CATEGORY_LABEL_KEYS: Record<DeviceKey, string> = {
   fps: 'monitoring.settings.category.fps',
   battery: 'monitoring.settings.category.battery',
   cooler: 'monitoring.settings.category.cooler',
+  fanSensors: 'monitoring.settings.category.fanSensors',
   psu: 'monitoring.settings.category.psu',
   embeddedController: 'monitoring.settings.category.embeddedController',
 };
@@ -67,7 +69,7 @@ export function sensorsForDevice(
   let options: SensorOption[];
   switch (device) {
     case 'quick':
-      options = sensorsForCategory('quick', sensors, networkSensors, []).map(s => ({ value: s.id, label: s.name, sensorName: s.name }));
+      options = sensorsForCategory('quick', sensors, networkSensors, []).map(s => ({ value: s.id, label: s.name, sensorName: s.name, type: s.type }));
       break;
     case 'cpu':
     case 'gpu':
@@ -77,15 +79,16 @@ export function sensorsForDevice(
         value: s.id,
         label: `${bareSensorLabel(device, s.name) || s.name} (${s.type})`,
         sensorName: s.name,
+        type: s.type,
       }));
       break;
     case 'fan':
       options = sensors.motherboard
         .filter(s => s.type === 'Fan')
-        .map(s => ({ value: s.id, label: s.name, sensorName: s.name }));
+        .map(s => ({ value: s.id, label: s.name, sensorName: s.name, type: s.type }));
       break;
     case 'storage':
-      options = sensorsForCategory('storage', sensors, networkSensors, []).map(s => ({ value: s.id, label: s.name, sensorName: s.name }));
+      options = sensorsForCategory('storage', sensors, networkSensors, []).map(s => ({ value: s.id, label: storageSensorLabel(sensors, s), sensorName: s.name, type: s.type }));
       break;
     case 'gpu2':
     case 'igpu':
@@ -93,6 +96,7 @@ export function sensorsForDevice(
         value: s.id,
         label: `${bareSensorLabel(device, s.name) || s.name} (${s.type})`,
         sensorName: s.name,
+        type: s.type,
       }));
       break;
     case 'smart':
@@ -100,17 +104,20 @@ export function sensorsForDevice(
         value: s.id,
         label: `${bareSensorLabel(device, s.name) || s.name} (${s.type})`,
         sensorName: s.name,
+        type: s.type,
       }));
       break;
     case 'memoryModule':
     case 'battery':
     case 'cooler':
+    case 'fanSensors':
     case 'psu':
     case 'embeddedController':
       options = extrasSensorsForDevice(device, extras).map(s => ({
         value: s.id,
         label: `${bareSensorLabel(device, s.name) || s.name} (${s.type})`,
         sensorName: s.name,
+        type: s.type,
       }));
       break;
     case 'network':

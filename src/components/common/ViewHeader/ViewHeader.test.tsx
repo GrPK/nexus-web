@@ -1,11 +1,15 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ViewHeader } from './ViewHeader';
+
+vi.mock('../../../lib/i18n', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
 
 const tabs = [{ key: 'one', label: 'One' }, { key: 'two', label: 'Two' }];
 
-// The tab row is the element that holds both the tab strip and the rail.
-const tabRow = () => screen.getByRole('tablist').parentElement as HTMLElement;
+// The tab row holds both the tab strip and the rail.
+const tabRow = () => screen.getByTestId('view-header-tab-row');
 
 describe('ViewHeader actions', () => {
   it('puts actions inside the tab row, not in a row of their own', () => {

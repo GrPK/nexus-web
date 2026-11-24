@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { kickPlay } from '../../../lib/kickPlay';
 import { ImageIcon } from 'lucide-react';
 import { PanelArrowButton } from '../../chrome/PanelArrowButton';
 import { PanelWidgetEmpty } from '../common/PanelWidgetChrome';
@@ -277,12 +278,6 @@ export function GalleryWidget({ widget, immersive, onSectionNavigate, onUpdate, 
     armCeiling();
   }, [goTo, nextIndex, intervalMs, armCeiling]);
 
-  // autoplay alone is not reliable on a remounted <video> in the panel
-  // WebViews; the background-media layer kicks play() the same way.
-  const kickPlay = useCallback((el: HTMLVideoElement | null) => {
-    el?.play()?.catch(() => {});
-  }, []);
-
   // Arrow visibility: revealed by any nav tap, hidden again after idle.
   const [arrowsVisible, setArrowsVisible] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -354,7 +349,8 @@ export function GalleryWidget({ widget, immersive, onSectionNavigate, onUpdate, 
           ref={kickPlay}
           src={galleryItemVideoUrl(current.id)}
           poster={url ?? undefined}
-          className={styles.image}
+          className={`${styles.image} ${styles.videoWakeLockPad}`}
+          data-wakelock-pad
           data-fit={fitWhole ? 'contain' : 'cover'}
           autoPlay
           muted

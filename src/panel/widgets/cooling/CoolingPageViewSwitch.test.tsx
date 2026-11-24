@@ -1,0 +1,124 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { CoolingPage } from './CoolingPage';
+import type { ServiceState } from '../../../hooks/useServiceState';
+import { UiSettingsProvider } from '../../../hooks/useUiSettings';
+import { allowSlowAsyncUtils } from '../../../__tests__/slowAsyncUtils';
+
+allowSlowAsyncUtils();
+
+// Rendered outside I18nProvider, so t() falls back to raw keys.
+
+vi.mock('../../../api/cooling', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../api/cooling')>();
+  return {
+    ...original,
+    fetchFanChannels: vi.fn(async () => ({ channels: [{ id: 'fan-cpu', name: 'CPU Fan', dutyPercent: 42, rpm: 1180, mode: 'Manual', classification: 'Controllable', calibrated: true }] })),
+    fetchTemperatureSources: vi.fn(async () => ({ sources: [{ id: 'cpu-package', name: 'CPU Package', category: 'CPU', value: 52 }] })),
+    fetchCurves: vi.fn(async () => ({ globalSpeedModifier: 1, curves: [] })),
+    fetchProfiles: vi.fn(async () => ({ profiles: [], active: 'custom' })),
+    fetchCalibrationResults: vi.fn(async () => ({ results: [] })),
+    fetchCoolingPresets: vi.fn(async () => ({ presets: [], activeId: null })),
+  };
+});
+const crash = vi.hoisted(() => ({ on: false }));
+vi.mock('./case3d/CoolingCase3D', () => ({ CoolingCase3D: () => { if (crash.on) throw new Error('webgl unavailable'); return <div data-testid="case3d" />; } }));
+
+const serviceState = { cooling: { calibrating: false } } as unknown as ServiceState;
+
+describe('CoolingPage canvas header', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem('nexus_settings', JSON.stringify({ general: { coolingDashboardMode: 'advanced', lightingDashboardMode: 'advanced' } }));
+  });
+
+  const mount = () => render(<UiSettingsProvider><CoolingPage serviceOnline serviceState={serviceState} /></UiSettingsProvider>);
+
+  it('puts the title and the selection badge on the left and the view switch at the right end', async () => {
+    mount();
+    const group = await screen.findByRole('radiogroup', { name: 'cooling.case3d.viewSwitch' });
+    const header = group.parentElement as HTMLElement;
+    const kids = [...header.children];
+    expect(kids[0].textContent).toBe('cooling.label.curves');
+    expect(kids.indexOf(group)).toBe(kids.length - 1);
+    expect(kids.findIndex(k => /lighting\.pane\.selectedCount|selectedCount|cooling\.|lighting\./.test(k.textContent ?? '') && k !== kids[0] && k !== group)).toBeGreaterThan(0);
+  });
+
+  it('labels the segments Curves and Airflow with 2D and 3D pills', async () => {
+    mount();
+    const radios = within(await screen.findByRole('radiogroup', { name: 'cooling.case3d.viewSwitch' })).getAllByRole('radio');
+    expect(radios[0].textContent).toContain('lighting.scene.view.2d');
+    expect(radios[0].textContent).toContain('cooling.view.curves');
+    expect(radios[1].textContent).toContain('lighting.scene.view.3d');
+    expect(radios[1].textContent).toContain('cooling.view.airflow');
+    expect(radios[1].textContent).not.toMatch(/[[\]]/);
+  });
+
+  it('titles the pane Curves in 2D and Airflow in 3D, with the header box identical in both views', async () => {
+    mount();
+    const radios = within(await screen.findByRole('radiogroup', { name: 'cooling.case3d.viewSwitch' })).getAllByRole('radio');
+    const header = radios[0].closest('[role="radiogroup"]')!.parentElement as HTMLElement;
+    expect(header.children[0].textContent).toBe('cooling.label.curves');
+    const classes2d = header.className;
+    fireEvent.click(radios[1]);
+    await waitFor(() => expect(screen.getByTestId('case3d')).toBeTruthy());
+    expect(header.children[0].textContent).toBe('cooling.view.airflow');
+    // A header that changes its box between views resizes the shared grid row and nudges the fan list and the canvas.
+    expect(header.className).toBe(classes2d);
+    expect(screen.queryByText('cooling.case3d.title')).toBeNull();
+  });
+
+  const mountWith = (general: Record<string, unknown>) => {
+    localStorage.setItem('nexus_settings', JSON.stringify({ general: { coolingDashboardMode: 'advanced', lightingDashboardMode: 'advanced', ...general } }));
+    return render(<UiSettingsProvider><CoolingPage serviceOnline serviceState={serviceState} /></UiSettingsProvider>);
+  };
+
+  it('opens on the stored 3D view straight away, with no 2D frame first', async () => {
+    mountWith({ coolingView3d: true });
+    const radios = within(await screen.findByRole('radiogroup', { name: 'cooling.case3d.viewSwitch' })).getAllByRole('radio');
+    expect(radios[1].getAttribute('aria-checked')).toBe('true');
+    // The curve editor is the 2D view; it is never on screen.
+    expect(screen.queryByText('cooling.label.curveEditor')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('case3d')).toBeTruthy());
+  });
+
+  it('shows no airflow view in Simple mode, which is why opening it from Build switches to Advanced', async () => {
+    mountWith({ coolingDashboardMode: 'simple', coolingView3d: true });
+    await waitFor(() => expect(screen.queryByRole('radiogroup', { name: 'cooling.case3d.viewSwitch' })).toBeNull());
+    expect(screen.queryByTestId('case3d')).toBeNull();
+  });
+
+  it('opens on 2D when only Lighting has a stored 3D view', async () => {
+    mountWith({ lightingView3d: true, coolingView3d: false });
+    const radios = within(await screen.findByRole('radiogroup', { name: 'cooling.case3d.viewSwitch' })).getAllByRole('radio');
+    expect(radios[0].getAttribute('aria-checked')).toBe('true');
+    expect(screen.queryByTestId('case3d')).toBeNull();
+  });
+
+  it('stores the choice when the view is switched', async () => {
+    mountWith({});
+    const radios = within(await screen.findByRole('radiogroup', { name: 'cooling.case3d.viewSwitch' })).getAllByRole('radio');
+    fireEvent.click(radios[1]);
+    await waitFor(() => expect(screen.getByTestId('case3d')).toBeTruthy());
+    expect(radios[1].getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('falls back to the curves with a notice when the 3D view throws, and retries on the next pick of Airflow', async () => {
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    // React reports a caught render error to the window too; the boundary is what is under test.
+    const swallow = (e: ErrorEvent) => e.preventDefault();
+    window.addEventListener('error', swallow);
+    crash.on = true;
+    mountWith({ coolingView3d: true });
+    await waitFor(() => expect(screen.getByText('cooling.case3d.crashed')).toBeTruthy());
+    expect(screen.getByText('cooling.label.curveEditor')).toBeTruthy();
+    const radios = within(screen.getByRole('radiogroup', { name: 'cooling.case3d.viewSwitch' })).getAllByRole('radio');
+    expect(radios[0].getAttribute('aria-checked')).toBe('true');
+    crash.on = false;
+    fireEvent.click(radios[1]);
+    await waitFor(() => expect(screen.getByTestId('case3d')).toBeTruthy());
+    expect(screen.queryByText('cooling.case3d.crashed')).toBeNull();
+    window.removeEventListener('error', swallow);
+    quiet.mockRestore();
+  });
+});

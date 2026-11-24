@@ -83,6 +83,8 @@ export interface TopologyDisplay {
   /** False when the user turned brightness control off for this display. */
   ddcEnabled: boolean;
   hostingSupported: boolean;
+  /** Virtual monitor of a USB device in secondary-monitor mode; its panel is the device's own. */
+  ownedByDevicePanel: boolean;
   assignedPanelDeviceId: string | null;
   assignedPanelName: string | null;
 }
@@ -174,6 +176,23 @@ export interface TouchMappingRepairResponse {
 
 export async function repairTouchMapping(): Promise<TouchMappingRepairResponse | null> {
   return postService<TouchMappingRepairResponse>('/displays/touch-mapping/repair', {});
+}
+
+/** Opens or focuses the app window at a dashboard path. */
+export function openAppAt(route: string) {
+  return postService<{ error?: boolean }>('/service/open-app', { route });
+}
+
+export interface IdentifyDisplayEntry {
+  displayId: string;
+  label: string;
+  name: string;
+}
+
+/** Shows each label large on its physical display for a few seconds. False when the service predates the call. */
+export async function identifyDisplays(displays: IdentifyDisplayEntry[]): Promise<boolean> {
+  const { status } = await authFetchWithStatus('/displays/identify', { method: 'POST', body: { displays } });
+  return status === 204 || status === 200;
 }
 
 // The wizard endpoint replies 202 with no body (the wizard runs on the host,

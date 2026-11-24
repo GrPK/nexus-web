@@ -1,6 +1,8 @@
-import { type CSSProperties, useEffect, useRef } from 'react';
+import { type CSSProperties, useCallback, useEffect, useRef } from 'react';
 import { backgroundMediaFileUrl } from '../../api/panelBackgroundMedia';
 import styles from '../PanelApp.module.scss';
+
+export const NULL_ERROR_GRACE_MS = 5_000;
 
 export function PanelBackgroundMedia({
   id,
@@ -40,11 +42,36 @@ export function PanelBackgroundMedia({
   const url = backgroundMediaFileUrl(deviceId, id);
   const style = { '--panel-background-opacity': opacity } as CSSProperties;
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const graceTimerRef = useRef(0);
+  const onFailedRef = useRef(onFailed);
+  useEffect(() => {
+    onFailedRef.current = onFailed;
+  });
 
   useEffect(() => {
     if (covered) videoRef.current?.pause();
     else videoRef.current?.play().catch(() => {});
   }, [url, covered]);
+
+  // A removed video otherwise holds its hardware decoder until GC, and a panel
+  // with a single decoder cannot start the next clip. A ref callback pairs
+  // with the element itself: it runs during the deletion, before a keyed
+  // sibling's commit, and for an element that outlives one effect run. The
+  // setup restores a src the cleanup stripped (StrictMode's simulated remount
+  // never rewrites an unchanged prop); a changed url is written by React
+  // between the cleanup and the setup.
+  const attachVideo = useCallback((video: HTMLVideoElement | null) => {
+    videoRef.current = video;
+    if (!video) return;
+    if (!video.hasAttribute('src')) video.setAttribute('src', url);
+    return () => {
+      window.clearTimeout(graceTimerRef.current);
+      videoRef.current = null;
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    };
+  }, [url]);
 
   return (
     <div
@@ -65,15 +92,30 @@ export function PanelBackgroundMedia({
         />
       ) : (
         <video
-          ref={videoRef}
+          ref={attachVideo}
           src={url}
           className={`${styles.backgroundMediaContent} ${styles.backgroundMediaVideo}`}
+          data-wakelock-pad
           autoPlay={!covered}
           loop={loop}
           muted
           playsInline
           onCanPlay={onLoaded}
-          onError={onFailed}
+          onError={e => {
+            const video = e.currentTarget;
+            window.clearTimeout(graceTimerRef.current);
+            if (video.error) {
+              onFailed?.();
+              return;
+            }
+            // Chrome 83 WebViews fire `error` with no MediaError on clips that
+            // then play, so wait before giving up.
+            graceTimerRef.current = window.setTimeout(() => {
+              if (videoRef.current === video && (video.error || video.readyState < 2)) {
+                onFailedRef.current?.();
+              }
+            }, NULL_ERROR_GRACE_MS);
+          }}
           onLoadedMetadata={onVideoMetadata ? e => onVideoMetadata(e.currentTarget) : undefined}
           onEnded={onVideoEnded ? e => onVideoEnded(e.currentTarget) : undefined}
         />

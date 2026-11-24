@@ -16,6 +16,7 @@ export function guardBannerKey(guard: GuardResponse | null): string | null {
     case 'floor': return 'cooling.guard.banner.floor';
     case 'escalated': return 'cooling.guard.banner.escalated';
     case 'tripped':
+      if (guard.fansNotResponding) return 'cooling.guard.banner.tripPartial';
       return guard.lastTrip?.reason === 'cooling-loss'
         ? 'cooling.guard.banner.tripLoss'
         : 'cooling.guard.banner.tripLimit';
@@ -75,11 +76,11 @@ export const healLines = (channels: HealChannel[], t: Translate): string[] =>
 export interface GuardErrorState {
   message: string;
   at: number;
-  kind?: 'undo';
+  kind?: 'undo' | 'restore';
 }
 
 let errorStamp = 0;
-export const newGuardError = (message: string, kind?: 'undo'): GuardErrorState => ({ message, at: ++errorStamp, kind });
+export const newGuardError = (message: string, kind?: 'undo' | 'restore'): GuardErrorState => ({ message, at: ++errorStamp, kind });
 
 /** The most recent of several errors, as text, or null when there are none. */
 export const latestError = (...errors: Array<GuardErrorState | null>): string | null =>

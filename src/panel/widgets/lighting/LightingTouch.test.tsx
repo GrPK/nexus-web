@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReactNode } from 'react';
 import { LightingTouch } from './LightingTouch';
-import { fetchAnimateSettings, fetchCurrentSync, fetchPins, fetchStaticSettings, saveAnimateTemplates, setPins, startStatic, type Pin } from '../../../api/lighting';
+import { PanelDeviceIdProvider } from '../common/PanelDeviceIdContext';
+import type { LightingDevice } from '../../../types/lighting';
+import { fetchLightingDevices, fetchAnimateSettings, fetchCurrentSync, fetchPins, fetchStaticSettings, saveAnimateTemplates, setPins, startStatic, type Pin } from '../../../api/lighting';
 import { defaultStateFor } from '../../../types/lighting';
 import { paletteColor } from '../../../types/lightingPalette';
 import type { PanelWidget } from '../types';
@@ -10,6 +13,8 @@ import type { PanelWidget } from '../types';
 // the subject is where a pick is routed (global, or a pin on the selection), and against which preset slot.
 // Static's picker rides in the widget's immersive canvas slot, so the stub has
 // to render what is handed to it or the subject disappears.
+const recorded = vi.hoisted(() => ({ recordColor: vi.fn(), recordAnimation: vi.fn() }));
+vi.mock('./useLightingRecents', () => ({ useLightingRecents: () => ({ colors: [], animations: [], ...recorded }) }));
 vi.mock('./LightingWidget', () => ({
   LightingWidget: ({ immersiveCanvas }: { immersiveCanvas?: React.ReactNode }) => <div>{immersiveCanvas}</div>,
 }));
@@ -103,9 +108,18 @@ vi.mock('../../../lib/i18n', () => ({
   useTranslation: () => ({ t: (key: string) => key, language: 'en' }),
 }));
 
+const panelRecords = vi.hoisted(() => ({ current: {} as Record<string, Record<string, string[]>> }));
+vi.mock('../../../api/panel', () => ({
+  fetchPanelDevice: vi.fn(async (id: string) => (panelRecords.current[id] ? { id, ...panelRecords.current[id] } : null)),
+  patchPanelDevice: vi.fn(async (id: string, patch: Record<string, string[]>) => {
+    panelRecords.current[id] = { ...panelRecords.current[id], ...patch };
+    return { id, ...panelRecords.current[id] };
+  }),
+}));
+
 const widget: PanelWidget = { id: 'w', type: 'lighting', size: '4x4', col: 0, row: 0 };
 
-// The selection is not persisted, so a test makes it the way the device tab does.
+// A test makes the selection the way the device tab does.
 const select = async (ids: string[]) => {
   await waitFor(() => expect(selectProps.current).not.toBeNull());
   act(() => {
@@ -179,6 +193,7 @@ describe('LightingTouch pins', () => {
     fireEvent.click(await screen.findByText('pick-custom'));
     await waitFor(() => expect(startStatic).toHaveBeenCalled());
     expect(vi.mocked(startStatic).mock.calls.at(-1)?.[8]).toBe('#123456');
+    expect(recorded.recordColor).toHaveBeenCalledWith('#123456');
     expect(setPins).not.toHaveBeenCalled();
     await waitFor(() => expect(pickerProps.current!.hex).toBe('#123456'));
   });
@@ -190,6 +205,18 @@ describe('LightingTouch pins', () => {
     expect(pickerProps.current).not.toHaveProperty('hasSelection');
     expect(typeof pickerProps.current!.onPreview).toBe('function');
     expect(typeof pickerProps.current!.onCommit).toBe('function');
+  });
+
+  it('snaps a near-blue pick to pure blue when the Swatches tile is pressed', async () => {
+    vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ 'dev-a': { kind: 'static', effect: 'flat', color: '#0011fa', slot: 0 } }));
+    render(<LightingTouch widget={widget} />);
+    await select(['dev-a']);
+    await waitFor(() => expect(pickerProps.current!.hex).toBe('#0011fa'));
+
+    fireEvent.click(await screen.findByText('lighting.static.pickerSegmented'));
+
+    await waitFor(() => expect(setPins).toHaveBeenCalled());
+    expect(lastPins()[1]).toMatchObject({ kind: 'static', effect: 'flat', color: '#0000ff' });
   });
 
   // A finger drag has to reach the hardware on every move.
@@ -204,13 +231,56 @@ describe('LightingTouch pins', () => {
     expect(lastPins()[1]).toMatchObject({ kind: 'static', effect: 'flat', color: '#abcdef' });
   });
 
+  const stripesBundle = (selected: number) => ({
+    effect: 'rainbow',
+    states: {},
+    templates: { stripes: { selected, slots: [0, 1, 2, 3].map(() => defaultStateFor('stripes')) } },
+  });
+
+  it('records an Animate grid pick and a changed preset pick as recent animations', async () => {
+    vi.mocked(fetchCurrentSync).mockImplementation(() => Promise.resolve({ sync: 'aurora' }));
+    vi.mocked(fetchAnimateSettings).mockResolvedValueOnce(stripesBundle(0));
+    recorded.recordAnimation.mockClear();
+    render(<LightingTouch widget={widget} />);
+    fireEvent.click(await screen.findByText('pick-stripes'));
+    expect(recorded.recordAnimation).toHaveBeenCalledWith('stripes', 0);
+    await waitFor(() => expect(controlsProps.current).not.toBeNull());
+    recorded.recordAnimation.mockClear();
+    act(() => { (controlsProps.current!.onTemplateSelect as (idx: number) => void)(0); });
+    expect(recorded.recordAnimation).not.toHaveBeenCalled();
+    act(() => { (controlsProps.current!.onTemplateSelect as (idx: number) => void)(1); });
+    expect(recorded.recordAnimation).toHaveBeenCalledWith('stripes', 1);
+  });
+
+  it('records no preset pick while the selection wears a static pin', async () => {
+    vi.mocked(fetchCurrentSync).mockImplementation(() => Promise.resolve({ sync: 'aurora' }));
+    vi.mocked(fetchAnimateSettings).mockResolvedValueOnce(stripesBundle(0));
+    vi.mocked(fetchPins).mockImplementation(() => Promise.resolve({ 'dev-a': { kind: 'static', effect: 'stripes', slot: 1 } }));
+    recorded.recordAnimation.mockClear();
+    render(<LightingTouch widget={widget} />);
+    await select(['dev-a']);
+    await waitFor(() => expect(gridProps.current?.effect).toBe('stripes'));
+    await waitFor(() => expect(controlsProps.current).not.toBeNull());
+    act(() => { (controlsProps.current!.onTemplateSelect as (idx: number) => void)(2); });
+    expect(recorded.recordAnimation).not.toHaveBeenCalled();
+  });
+
+  it('does not record a Static pattern pick as a recent animation', async () => {
+    recorded.recordAnimation.mockClear();
+    render(<LightingTouch widget={widget} />);
+    fireEvent.click(await screen.findByText('pick-stripes'));
+    expect(recorded.recordAnimation).not.toHaveBeenCalled();
+  });
+
   it('pins a custom color on the selected devices', async () => {
+    recorded.recordColor.mockClear();
     render(<LightingTouch widget={widget} />);
     await select(['dev-a']);
     fireEvent.click(await screen.findByText('pick-custom'));
     await waitFor(() => expect(setPins).toHaveBeenCalled());
     expect(lastPins()[0]).toEqual(['dev-a']);
     expect(lastPins()[1]).toMatchObject({ kind: 'static', effect: 'flat', color: '#123456' });
+    expect(recorded.recordColor).not.toHaveBeenCalled();
   });
 
   // The browsed effect is not what the devices wear: leaving the grid keyed on
@@ -265,14 +335,95 @@ describe('LightingTouch pins', () => {
     expect(name({ kind: 'mirror' })).toBe('lighting.mode.screen');
   });
 
-  it('does not restore a stored selection, and clears the old keys', async () => {
+  it('clears the keys of the old per-device-pick model', async () => {
     localStorage.setItem('nexus.lighting.selectedDevices', JSON.stringify(['dev-a']));
-    localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-a']));
     render(<LightingTouch widget={widget} />);
     await waitFor(() => expect(selectProps.current).not.toBeNull());
-    expect((selectProps.current!.selectedIds as Set<string>).size).toBe(0);
     expect(localStorage.getItem('nexus.lighting.selectedDevices')).toBeNull();
-    expect(localStorage.getItem('nexus.lighting.pinSelection')).toBeNull();
+  });
+});
+
+const lightDevice = (id: string) => ({ id, name: id, ledsOn: true, ledCount: 8 }) as unknown as LightingDevice;
+const selected = () => [...(selectProps.current!.selectedIds as Set<string>)];
+const inPanel = (panelId: string | null, ui: ReactNode) => (
+  <PanelDeviceIdProvider value={panelId}>{ui}</PanelDeviceIdProvider>
+);
+
+describe('LightingTouch remembered selection', () => {
+  afterEach(() => {
+    vi.mocked(fetchLightingDevices).mockImplementation(() => Promise.resolve({ devices: [] }));
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    selectProps.current = null;
+    panelRecords.current = {};
+    vi.mocked(fetchLightingDevices).mockImplementation(() => Promise.resolve({ devices: [lightDevice('dev-a'), lightDevice('dev-b')] }) as never);
+  });
+
+  it('desktop: restores the selection when the view is reopened', async () => {
+    const first = render(<LightingTouch widget={widget} />);
+    await select(['dev-a']);
+    first.unmount();
+    selectProps.current = null;
+
+    render(<LightingTouch widget={widget} />);
+    await waitFor(() => expect(selected()).toEqual(['dev-a']));
+  });
+
+  it('desktop: reads the selection storage holds on a fresh mount, as after a restart', async () => {
+    localStorage.setItem('nexus.lighting.pinSelection.immersive', JSON.stringify(['dev-b']));
+    render(<LightingTouch widget={widget} />);
+    await waitFor(() => expect(selected()).toEqual(['dev-b']));
+  });
+
+  it.each([null, 'panel-a'])('never shares its selection with the desktop Lighting page (panel %s)', async panelId => {
+    localStorage.setItem('nexus.lighting.pinSelection', JSON.stringify(['dev-b']));
+    render(inPanel(panelId, <LightingTouch widget={widget} />));
+    await waitFor(() => expect(selectProps.current).not.toBeNull());
+    expect(selected()).toEqual([]);
+    await select(['dev-a', 'dev-b']);
+    expect(JSON.parse(localStorage.getItem('nexus.lighting.pinSelection')!)).toEqual(['dev-b']);
+  });
+
+  it('keeps each panel its own selection, restored from the service on reopen', async () => {
+    const a = render(inPanel('panel-a', <LightingTouch widget={widget} />));
+    await select(['dev-a']);
+    await waitFor(() => expect(panelRecords.current['panel-a']?.lightingSelection).toEqual(['dev-a']));
+    a.unmount();
+    selectProps.current = null;
+
+    const b = render(inPanel('panel-b', <LightingTouch widget={widget} />));
+    await select(['dev-b']);
+    await waitFor(() => expect(panelRecords.current['panel-b']?.lightingSelection).toEqual(['dev-b']));
+    b.unmount();
+    selectProps.current = null;
+    localStorage.clear();
+
+    render(inPanel('panel-a', <LightingTouch widget={widget} />));
+    await waitFor(() => expect(selected()).toEqual(['dev-a']));
+    expect(panelRecords.current['panel-b']?.lightingSelection).toEqual(['dev-b']);
+  });
+
+  it('hides a remembered device that is not listed without forgetting it', async () => {
+    panelRecords.current['panel-a'] = { lightingSelection: ['dev-a', 'gone'] };
+    render(inPanel('panel-a', <LightingTouch widget={widget} />));
+    await waitFor(() => expect(selected()).toEqual(['dev-a']));
+    expect(panelRecords.current['panel-a'].lightingSelection).toEqual(['dev-a', 'gone']);
+  });
+
+  it('keeps the whole remembered selection when the device list is still filling in', async () => {
+    panelRecords.current['panel-a'] = { lightingSelection: ['dev-a', 'dev-b'] };
+    vi.mocked(fetchLightingDevices).mockImplementation(() => Promise.resolve({ devices: [lightDevice('dev-a')] }) as never);
+    const first = render(inPanel('panel-a', <LightingTouch widget={widget} />));
+    await waitFor(() => expect(selected()).toEqual(['dev-a']));
+    first.unmount();
+    selectProps.current = null;
+
+    vi.mocked(fetchLightingDevices).mockImplementation(() => Promise.resolve({ devices: [lightDevice('dev-a'), lightDevice('dev-b')] }) as never);
+    render(inPanel('panel-a', <LightingTouch widget={widget} />));
+    await waitFor(() => expect(selected()).toEqual(['dev-a', 'dev-b']));
+    expect(panelRecords.current['panel-a'].lightingSelection).toEqual(['dev-a', 'dev-b']);
   });
 });
 

@@ -34,6 +34,8 @@ export interface FanChannel {
   role?: FanRole;
   /** Enumerated from a GPU hardware node. Motherboard-header fans are the deviceId-less channels where this is false. */
   isGpu?: boolean;
+  /** Channel of an all-in-one liquid cooler, read from the hardware. AIO channels are pinned by default. */
+  isAio?: boolean;
   /** Duty points added to whatever drives this fan, in [-100,100]. 0 when it has none. */
   offset?: number;
   seriesId?: string; // sanitized id; "fan:" + seriesId is the monitoring series id
@@ -53,13 +55,12 @@ export interface FanChannel {
 }
 
 /**
- * A fan counts as disconnected only when calibration marked it Unresponsive
- * AND it is not currently spinning. Live RPM is ground truth: a fan reporting
- * RPM is physically connected, so a stale Unresponsive label (e.g. from a
- * calibration run while the fan was stopped) must not hide it. Re-calibration
- * refreshes the label; until then this recovers it immediately.
+ * Calibration read no tach signal on this fan at any duty, and it reports no
+ * RPM now. That proves nothing about control (a splitter or a tach-less fan
+ * still obeys PWM), so it labels the readout and nothing else. Live RPM wins
+ * over a stale classification.
  */
-export const isFanDisconnected = (c: FanChannel): boolean =>
+export const isFanUnresponsive = (c: FanChannel): boolean =>
   c.classification === 'Unresponsive' && (c.rpm ?? 0) <= 0;
 
 export interface FanCalibrationPoint {
@@ -202,14 +203,20 @@ export const fetchTemperatureSources = () =>
 export const fetchProfiles = () =>
   fetchService<ProfilesResponse>('/cooling/profiles');
 
-export const setFanSpeed = (id: string, speed: number) =>
-  postService(`/cooling/fan/${encodeURIComponent(id)}/speed`, { speed });
+/** What a non-user fan write is: a seed taking a fan from BIOS to `target`, or an undo replay. */
+export type FanSpeedIntent =
+  | { source: 'seed'; target: 'manual' | 'curve' }
+  | { source: 'undo' };
+
+export const setFanSpeed = (id: string, speed: number, intent?: FanSpeedIntent) =>
+  postService(`/cooling/fan/${encodeURIComponent(id)}/speed`, { speed, ...intent });
 
 export const releaseFanAuto = (id: string) =>
   postService(`/cooling/fan/${encodeURIComponent(id)}/auto`, {});
 
-export const applyProfile = (name: string) =>
-  postService(`/cooling/profile/${encodeURIComponent(name)}`, {});
+/** `source` marks an automatic apply ("exit-off", "undo"); omitted = a user pick. */
+export const applyProfile = (name: string, source?: 'exit-off' | 'undo') =>
+  postService(`/cooling/profile/${encodeURIComponent(name)}${source ? `?source=${source}` : ''}`, {});
 
 export const resetPresetCurve = (name: string) =>
   postService(`/cooling/profile/${encodeURIComponent(name)}/reset`, {});
@@ -264,9 +271,9 @@ export const fetchCoolingPresets = () =>
   fetchService<CoolingPresetsResponse>('/cooling/presets');
 
 /** `preset` is null on the error paths (blank name, cap reached). */
-export const createCoolingPreset = (name: string) =>
+export const createCoolingPreset = (name: string, fresh?: boolean) =>
   postService<{ preset: CoolingPreset | null; activeId: string | null; error: boolean; msg: string }>(
-    '/cooling/presets', { name });
+    '/cooling/presets', fresh ? { name, fresh: true } : { name });
 
 /** saveCurrent re-captures the live configuration into the preset. */
 export const updateCoolingPreset = (id: string, body: { name?: string; saveCurrent?: boolean }) =>
@@ -336,12 +343,16 @@ export interface GuardResponse {
   detectedLimitSource?: GuardLimitSource | null;
   limitOverrideC?: number | null;
   sinceUtcMs: number | null;
+  /** The guard is driving fans but one with a tach stays at 0 RPM or writes are not landing. */
+  fansNotResponding?: boolean;
   lastTrip: GuardLastTrip | null;
   heal: HealState;
-  /** The engine watchdog handed the fans to the BIOS. */
+  /** The engine watchdog latched cooling mode (all fans at full speed). */
   watchdogLatched?: boolean;
   /** The latch clears itself after steady ticks. False, or absent on an older service whose latch never clears itself: only a restart or a guard off/on clears it. */
   watchdogResumes?: boolean;
+  /** Full speed can be ended now and the saved curves resumed; absent on an older service. */
+  restoreAvailable?: boolean;
   /** Whether fans that can stop while the CPU is hot are flagged; absent on an older service (treat as on). */
   lintWarnings?: boolean;
   /** Critical hazards in the saved config; empty while warnings are off. Absent on an older service. */
@@ -369,6 +380,10 @@ export const setGuardConfig = (body: {
 /** Dismisses an ended trip's Diagnostics notice; answers with the guard, or error true while the trip is still active. */
 export const acknowledgeGuardTrip = () =>
   postService<GuardResponse & { error?: boolean; msg?: string }>('/cooling/guard/trip/acknowledge', {});
+
+/** Ends full speed and resumes the saved curves; answers with the guard, or error true when the service refused. */
+export const restoreGuardCurves = () =>
+  postService<GuardResponse & { error?: boolean; msg?: string }>('/cooling/guard/restore', {});
 
 export const undoHeal = () => postService<HealState>('/cooling/heal/undo', {});
 

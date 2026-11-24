@@ -1,4 +1,4 @@
-import { Boxes } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react';
 import { appIconComponent } from '../../components/icons/AppIconImage';
 import { MarketplaceTouch, MarketplaceWidget } from './marketplace/MarketplaceWidget';
 import { MarketplaceWidgetSettings } from './marketplace/MarketplaceWidgetSettings';
@@ -14,6 +14,7 @@ import {
 import type { AppManifest } from './types';
 import { sizeToSpan } from '../engine/grid';
 import {
+  LEGACY_KRAKEN_SURFACE,
   PANEL_SURFACES,
   SINGLE_WIDGET_SIZES,
   singleWidgetSurfaceSize,
@@ -56,7 +57,8 @@ import { snakeApp } from './snake';
 import { blocksApp } from './blocks';
 import { whiteboardApp } from './whiteboard';
 import { processesApp } from './processes';
-import { blankApp } from './blank';
+import { buildApp } from './build';
+import { webViewApp } from './web-view';
 
 // Single source of truth for app type -> manifest. "App" is the
 // conceptual unit (one per widget type); the manifest carries up to
@@ -93,7 +95,8 @@ export const APP_REGISTRY: Record<string, AppManifest> = {
   blocks:     blocksApp,
   whiteboard: whiteboardApp,
   processes:  processesApp,
-  blank:      blankApp,
+  build:      buildApp,
+  'web-view': webViewApp,
 };
 
 // Whether an app can appear on a given surface. The decision is
@@ -108,10 +111,13 @@ export const APP_REGISTRY: Record<string, AppManifest> = {
 export function appAvailableForSurface(
   meta: AppManifest['meta'],
   surface: PanelSurface,
-  opts?: { remote?: boolean; deviceTouch?: boolean; forcedGrid?: ForcedGrid },
+  opts?: { remote?: boolean; deviceTouch?: boolean; forcedGrid?: ForcedGrid; displayBound?: boolean; genericDisplay?: boolean; transposedTile?: boolean },
 ): boolean {
+  if (meta.portraitOnly && opts?.genericDisplay) return false;
   if (meta.touch && !surfaceSupportsTouch(surface, opts?.deviceTouch)) return false;
-  if (meta.surfaces && !meta.surfaces.includes(surface)) return false;
+  // A display panel replaces the legacy desktop overlay, so it also takes the widgets limited to the desktop.
+  const desktopOnDisplay = opts?.displayBound === true && surface === 'monitor' && meta.surfaces?.includes('desktop') === true;
+  if (meta.surfaces && !meta.surfaces.includes(surface) && !desktopOnDisplay) return false;
   // The phone surface only exists on remotely-connected panels, so it doubles
   // as the remote default for callers that don't carry the flag (layout
   // reconcile, PanelApp's render filter).
@@ -125,7 +131,7 @@ export function appAvailableForSurface(
   // Panel-only widgets (games) are driven entirely from their fullscreen Touch
   // view, which the desktop surface never opens - see meta.panelOnly.
   if (meta.panelOnly && surface === 'desktop') return false;
-  const single = singleWidgetSurfaceSize(surface);
+  const single = singleWidgetSurfaceSize(surface, opts?.transposedTile);
   if (single !== undefined) {
     return meta.sizes.includes(single);
   }
@@ -142,7 +148,7 @@ export function lookupApp(type: string): AppManifest | undefined {
     return makeMarketplaceAppManifest(
       id, listing.name, listing.sizes, listing.defaultSize, !!listing.page, listing.iconUrl,
       !!listing.immersive, !!listing.singleInstance, listing.surfaces, listing.gridSizes,
-      !!listing.immersiveDoubleSwipe,
+      !!listing.immersiveDoubleSwipe, !!listing.freeform,
     );
   }
   return APP_REGISTRY[type];
@@ -162,7 +168,7 @@ export function getCatalogEntries(): Array<[string, AppManifest]> {
     makeMarketplaceAppManifest(
       listing.id, listing.name, listing.sizes, listing.defaultSize, !!listing.page, listing.iconUrl,
       !!listing.immersive, !!listing.singleInstance, listing.surfaces, listing.gridSizes,
-      !!listing.immersiveDoubleSwipe,
+      !!listing.immersiveDoubleSwipe, !!listing.freeform,
     ),
   ]);
   return [...builtIns, ...marketplace];
@@ -183,7 +189,7 @@ const MARKETPLACE_PREVIEWS: Record<string, AppManifest['Preview']> = {};
 // the listing's manifest so a 1x1 app stays 1x1 and a 4x2-only
 // weather stays 4x2. Anything the manifest declares that the panel
 // engine doesn't know about is filtered out.
-function makeMarketplaceAppManifest(
+export function makeMarketplaceAppManifest(
   id: string,
   label: string,
   manifestSizes: string[] | undefined,
@@ -195,10 +201,14 @@ function makeMarketplaceAppManifest(
   manifestSurfaces?: string[],
   manifestGridSizes?: string[],
   immersiveDoubleSwipe = false,
+  freeform = false,
 ): AppManifest {
   // A manifest that names panel surfaces ("y70") is limited to them; the
   // legacy vocabulary ("dashboard", "cell", "page") names none and stays open.
+  // A manifest may still name the retired 'kraken' surface; it means round glass. This is a
+  // separate path from canonicalPanelRecord, which only handles device records.
   const surfaces = (manifestSurfaces ?? [])
+    .map(s => (s === LEGACY_KRAKEN_SURFACE ? 'lcd-round' : s))
     .filter((s): s is PanelSurface => (PANEL_SURFACES as readonly string[]).includes(s));
   const sizes = (manifestSizes ?? [])
     .filter((s): s is PanelWidgetSize => (VALID_MARKETPLACE_SIZES as readonly string[]).includes(s));
@@ -217,7 +227,7 @@ function makeMarketplaceAppManifest(
       // The app's own manifest mark when it ships one; the generic catalog
       // glyph otherwise. Not gated on `preinstalled` - the OEM flag decides
       // whether an app auto-seeds, not which icon it draws.
-      icon: iconUrl ? appIconComponent(iconUrl) : Boxes,
+      icon: iconUrl ? appIconComponent(iconUrl) : LayoutDashboard,
       sizes: safeSizes,
       defaultSize,
       gridSizes: gridSizes.length > 0 ? gridSizes : undefined,
@@ -229,6 +239,7 @@ function makeMarketplaceAppManifest(
       // host's usual single-swipe close.
       immersiveDoubleSwipe,
       singleInstance,
+      freeform: freeform || undefined,
       hasConfig: true,
       touch: false,
       surfaces: surfaces.length > 0 ? surfaces : undefined,
@@ -262,11 +273,11 @@ function makeMarketplaceAppManifest(
 // offer only an app's grid sizes when it declares them.
 // The reconciler snaps existing widgets at a hidden size to the nearest
 // non-reserved size on load.
-export function sizesForSurface(meta: AppManifest['meta'], surface?: PanelSurface, deviceTouch?: boolean, forcedGrid?: ForcedGrid): PanelWidgetSize[] {
+export function sizesForSurface(meta: AppManifest['meta'], surface?: PanelSurface, deviceTouch?: boolean, forcedGrid?: ForcedGrid, transposedTile = false): PanelWidgetSize[] {
   if (!surface) return [...meta.sizes];
   if (meta.touch && !surfaceSupportsTouch(surface, deviceTouch)) return [];
   if (meta.panelOnly && surface === 'desktop') return [];
-  const single = singleWidgetSurfaceSize(surface);
+  const single = singleWidgetSurfaceSize(surface, transposedTile);
   if (single !== undefined) {
     return meta.sizes.includes(single) ? [single] : [];
   }
@@ -290,8 +301,8 @@ function sizesForSlots(meta: AppManifest['meta'], { slots, landscape }: ForcedGr
 // back to a widget's sole supported size (4x4 / 2x2 / 1x1). Single-widget
 // surfaces (Q60, locked to 2x4) short-circuit: `sizesForSurface` already
 // collapsed to the one allowed size.
-export function pickerSizeFor(meta: AppManifest['meta'], surface?: PanelSurface, deviceTouch?: boolean, forcedGrid?: ForcedGrid): PanelWidgetSize {
-  const sizes = sizesForSurface(meta, surface, deviceTouch, forcedGrid);
+export function pickerSizeFor(meta: AppManifest['meta'], surface?: PanelSurface, deviceTouch?: boolean, forcedGrid?: ForcedGrid, transposedTile = false): PanelWidgetSize {
+  const sizes = sizesForSurface(meta, surface, deviceTouch, forcedGrid, transposedTile);
   if (surface && singleWidgetSurfaceSize(surface) && sizes.length > 0) {
     return sizes[0];
   }

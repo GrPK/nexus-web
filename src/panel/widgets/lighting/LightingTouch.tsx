@@ -12,6 +12,7 @@ import { StaticPickerCanvas } from './page/StaticPickerCanvas';
 import { PICKER_FIELD_SVG, PICKER_SEGMENTED_SVG, pickerHexAt, pickerPointFor, snapToSegment } from './page/staticPickerField';
 import { useColorWriteQueue } from './page/useColorWriteQueue';
 import { useGlobalColor } from './page/useGlobalColor';
+import { useLightingRecents } from './useLightingRecents';
 import { usePins } from './page/usePins';
 import { visibleCards } from './page/zoneUtils';
 import { EffectCard } from '../../../components/common/EffectCard/EffectCard';
@@ -51,10 +52,12 @@ import {
 import { mergeTemplates, slotThumbSignature } from '../../../types/lightingTemplates';
 import { normalizeSync as resolveImmersiveMode } from '../../../hooks/useLightingSync';
 import { usePersistentState } from '../../../hooks/usePersistentState';
+import { usePanelIdSet } from '../../../hooks/usePanelIdSet';
+import { zoneCardSelectionHoldable } from './page/ZoneCard';
 import { useTranslation } from '../../../lib/i18n';
 import { isPaletteKey } from '../../../types/lightingPalette';
 import {
-  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pickerMarks, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, clearLegacyLightingKeys,
+  staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, selectionPin, pinGridKey, pinHex, pinStripPick, pickerMarks, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, clearLegacyLightingKeys, SELECTED_DEVICES_STORAGE_KEY, selectionWithoutUnpinned,
 } from './pins';
 import type { WidgetProps } from '../types';
 import styles from './LightingPage.module.scss';
@@ -282,17 +285,17 @@ interface ImmersiveAnimateController {
 }
 
 /**
- * The lighting devices plus the selection the lighting page keeps, so a static
- * pick made here targets exactly what that page shows selected.
+ * The lighting devices plus this view's own remembered selection, which is
+ * never the desktop lighting page's.
  */
 function useImmersiveDevices(enabled: boolean) {
+  useState(clearLegacyLightingKeys);
   const [devices, setDevices] = useState<LightingDevice[]>([]);
-  // Not persisted: a restored selection would silently turn the next pick into a
-  // pin, so every visit starts at "All devices".
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
-    clearLegacyLightingKeys();
-    return new Set();
-  });
+  const holdableIds = useMemo(
+    () => new Set(visibleCards(devices).filter(zoneCardSelectionHoldable).map(d => d.id)),
+    [devices],
+  );
+  const [selectedIds, setSelectedIds] = usePanelIdSet(SELECTED_DEVICES_STORAGE_KEY, 'lightingSelection', holdableIds);
   const [, setPrimaryId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -341,6 +344,7 @@ function useImmersiveAnimateState(): {
   const [customStaticColor, setCustomStaticColor] = usePersistentState('nexus.lighting.customColor', '');
   // The exact flat color the global Static look is, from the service; '' when it is an effect.
   const [globalColor, setGlobalColor, readGlobalColor] = useGlobalColor();
+  const { recordColor, recordAnimation } = useLightingRecents();
 
   const selectionIds = useMemo(() => [...selectedIds], [selectedIds]);
   const selection = useMemo(() => selectionPin(pins, selectionIds), [pins, selectionIds]);
@@ -434,7 +438,7 @@ function useImmersiveAnimateState(): {
       setGlobalColor('', startStatic(key, s.intensity, s.hue, s.colorize, s.saturation, s.contrast, s.params, true));
       return;
     }
-    void startAnimate(key, s.speed, s.intensity, s.hue, s.colorize, s.saturation, s.contrast, s.params, true);
+    void startAnimate(key, s.speed, s.intensity, s.hue, s.colorize, s.saturation, s.contrast, s.params, true, s.sensors);
   }, [active, applyPins, mode, pinnedKey, selection, selectionIds, setGlobalColor]);
 
   const versionForSlot = useCallback((key: string, slot: number) => {
@@ -470,6 +474,7 @@ function useImmersiveAnimateState(): {
     const b = templates[key];
     const s = b?.slots[b.selected] ?? defaultStateFor(key);
     const slot = b?.selected ?? 0;
+    if (mode === 'animate') recordAnimation(key, slot);
     if (selectionIds.length > 0) {
       void applyPins(selectionIds, mode === 'static' ? staticLookPin(key, slot, s) : animatePin(key));
       return;
@@ -478,12 +483,13 @@ function useImmersiveAnimateState(): {
     stagedRef.current = null;
     force(n => n + 1);
     applyLook(key, s, slot);
-  }, [applyLook, applyPins, mode, selectionIds, templates]);
+  }, [applyLook, applyPins, mode, recordAnimation, selectionIds, templates]);
 
   const onSelectCustom = useCallback((hex: string) => {
     setCustomStaticColor(hex);
     // Nothing selected: the color is the exact global flat color.
     if (selectionIds.length === 0) {
+      recordColor(hex);
       setGlobalColor(hex, startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, hex));
       return;
     }
@@ -492,7 +498,7 @@ function useImmersiveAnimateState(): {
     const pin = colorPin(hex);
     recordPins(selectionIds, pin);
     queueColorWrite(pin, selectionIds);
-  }, [queueColorWrite, recordPins, selectionIds, setCustomStaticColor, setGlobalColor]);
+  }, [queueColorWrite, recordColor, recordPins, selectionIds, setCustomStaticColor, setGlobalColor]);
 
   const onPreviewCustom = useCallback((hex: string) => {
     if (selectionIds.length === 0) return;
@@ -532,6 +538,8 @@ function useImmersiveAnimateState(): {
   const onTemplateSelect = useCallback((idx: number) => {
     if (!bundle) return;
     const clamped = Math.min(Math.max(idx, 0), bundle.slots.length - 1);
+    // Like the page: a static pin's preset is not an animation pick, and re-picking the selected preset is no new pick.
+    if (mode === 'animate' && pinnedSlot === null && clamped !== bundle.selected) recordAnimation(shown, clamped);
     // A static pin repoints only its devices; the effect's shared pointer stays.
     const nextBundle: EffectTemplateBundle = pinnedSlot === null ? { ...bundle, selected: clamped } : bundle;
     const nextTemplates = { ...templates, [shown]: nextBundle };
@@ -542,7 +550,7 @@ function useImmersiveAnimateState(): {
     if (next) {
       applyLook(shown, next, clamped);
     }
-  }, [applyLook, bundle, pinnedSlot, shown, templates]);
+  }, [applyLook, bundle, mode, pinnedSlot, recordAnimation, shown, templates]);
 
   const onReset = useCallback(() => {
     stagedRef.current = null;
@@ -583,7 +591,12 @@ function useImmersiveAnimateState(): {
     pinSource: globalPin?.name ?? null,
     pinDisabledReason: globalPin ? undefined : t('lighting.pin.disabledUnavailable'),
     pinTargetName: (pin: Pin) => pinModeTargetLabel(pin, t),
-    onSetPin: (ids, pinned) => { if (!pinned) void applyPins(ids, null); else if (globalPin) void applyPins(ids, globalPin.pin); },
+    onSetPin: (ids, pinned) => {
+      if (pinned) { if (globalPin) void applyPins(ids, globalPin.pin); return; }
+      void applyPins(ids, null);
+      const left = selectionWithoutUnpinned(selectedIds, null, ids, devices.map(d => d.id));
+      if (left) onSetSelection(left.ids, left.primary);
+    },
   };
 
   const pinnedDevices = useMemo(() => {

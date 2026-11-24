@@ -31,6 +31,7 @@ import { controlActiveMedia, useMedia, type MediaSession } from '../../hooks/use
 import { systemPower } from '../../api/system';
 import { fetchRadios, setRadio, type RadioKind, type RadiosState } from '../../api/radios';
 import type { PanelSurface } from '../types';
+import { RestrictedIndicator } from './RestrictedIndicator';
 import { ControlCenterMixerView } from './ControlCenterMixerView';
 import styles from './PanelControlCenter.module.scss';
 
@@ -47,6 +48,9 @@ interface PanelControlCenterProps {
   surfaceRef: React.RefObject<HTMLElement | null>;
   // The panel record's display id, when this panel is a promoted monitor.
   displayId?: string;
+  // Set when the panel's own backlight is host-settable (record capabilities
+  // supportsBrightness); the slider then drives it instead of any display.
+  backlightRecordId?: string;
   isLandscape: boolean;
   resolvedThemeMode: 'dark' | 'light';
   onSetThemeMode: (mode: 'dark' | 'light') => void;
@@ -58,6 +62,8 @@ interface PanelControlCenterProps {
   rearranging: boolean;
   dragArmed: boolean;
   asleep: boolean;
+  // Restricted mode: only media and volume stay.
+  restricted?: boolean;
 }
 
 export function activeMediaSession(sessions: Record<string, MediaSession>): MediaSession | null {
@@ -75,6 +81,7 @@ export function PanelControlCenter({
   kioskBehavior,
   surfaceRef,
   displayId,
+  backlightRecordId,
   isLandscape,
   resolvedThemeMode,
   onSetThemeMode,
@@ -85,6 +92,7 @@ export function PanelControlCenter({
   rearranging,
   dragArmed,
   asleep,
+  restricted = false,
 }: PanelControlCenterProps) {
   const { t, language } = useTranslation();
   const immersiveOpen = usePanelImmersiveOpen();
@@ -204,7 +212,7 @@ export function PanelControlCenter({
           if (!target?.closest('[data-cc-keep="true"]')) onClose();
         }}
       >
-        {bodyMounted ? (
+        {bodyMounted ? (restricted ? <div className={styles.content}><RestrictedIndicator /></div> : (
           <ControlCenterBody
             open={open}
             isLandscape={isLandscape}
@@ -214,12 +222,13 @@ export function PanelControlCenter({
             language={language}
             surface={surface}
             displayId={displayId}
+            backlightRecordId={backlightRecordId}
             resolvedThemeMode={resolvedThemeMode}
             onSetThemeMode={onSetThemeMode}
             onClose={onClose}
             onScreenSleep={onScreenSleep}
           />
-        ) : null}
+        )) : null}
       </aside>
     </>
   );
@@ -235,6 +244,7 @@ interface BodyProps {
   language: string;
   surface: PanelSurface;
   displayId?: string;
+  backlightRecordId?: string;
   resolvedThemeMode: 'dark' | 'light';
   onSetThemeMode: (mode: 'dark' | 'light') => void;
   onClose: () => void;
@@ -242,7 +252,7 @@ interface BodyProps {
 }
 
 function ControlCenterBody({
-  open, active, isLandscape, view, setView, language, surface, displayId, resolvedThemeMode, onSetThemeMode, onClose, onScreenSleep,
+  open, active, isLandscape, view, setView, language, surface, displayId, backlightRecordId, resolvedThemeMode, onSetThemeMode, onClose, onScreenSleep,
 }: BodyProps) {
   const { t } = useTranslation();
 
@@ -264,7 +274,7 @@ function ControlCenterBody({
     [now, language],
   );
 
-  const brightness = usePanelBrightness(active, brightnessTargetFor(surface, displayId));
+  const brightness = usePanelBrightness(active, brightnessTargetFor(surface, displayId, backlightRecordId));
   const volume = useSystemVolume(active, null, 2000);
   const mic = useSystemMic(active);
 
@@ -371,6 +381,7 @@ function ControlCenterBody({
               ariaLabel={t('panel.controlCenter.brightness')}
               onChange={brightness.preview}
               onCommit={brightness.commit}
+              onDragEnd={brightness.endDrag}
             />
           )}
           {showMic && (

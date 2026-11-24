@@ -21,6 +21,7 @@ const LightingPage = lazy(() => import('../panel/widgets/lighting/LightingPage')
 const SmartLightsPage = lazy(() => import('../panel/widgets/smart-lights/SmartLightsPage').then(m => ({ default: m.SmartLightsPage })));
 const HomeAssistantPage = lazy(() => import('../panel/widgets/home-assistant/HomeAssistantPage').then(m => ({ default: m.HomeAssistantPage })));
 const StorePage = lazy(() => import('../components/views/StorePage/StorePage').then(m => ({ default: m.StorePage })));
+const CalendarPage = lazy(() => import('../panel/widgets/calendar/page/CalendarPage').then(m => ({ default: m.CalendarPage })));
 const ClockPage = lazy(() => import('../panel/widgets/clock/ClockPage').then(m => ({ default: m.ClockPage })));
 const WeatherPage = lazy(() => import('../panel/widgets/weather/WeatherPage').then(m => ({ default: m.WeatherPage })));
 const SteamPage = lazy(() => import('../panel/widgets/steam/SteamPage').then(m => ({ default: m.SteamPage })));
@@ -32,7 +33,8 @@ const FramesPage = lazy(() => import('../panel/widgets/frames/FramesPage').then(
 const BuildPage = lazy(() => import('../components/views/BuildPage/BuildPage').then(m => ({ default: m.BuildPage })));
 import { getMarketplaceListing, isMarketplaceType, loadMarketplaceApps, marketplaceIdFromType } from '../widgets/marketplaceRegistry';
 import { lookupApp } from '../panel/widgets/registry';
-import { useServiceStatus, DESKTOP_OFFLINE_GRACE_MS } from '../hooks/useServiceStatus';
+import { useServiceStatus } from '../hooks/useServiceStatus';
+import { DESKTOP_OFFLINE_GRACE_MS } from '../lib/serviceLiveness';
 import { useServiceState } from '../hooks/useServiceState';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus';
 import { useConflictApps } from '../hooks/useConflictApps';
@@ -52,6 +54,7 @@ import { onOpenFramesGame } from '../panel/widgets/frames/framesNav';
 import { onOpenBuild, useBuildFrameHistory } from '../components/views/BuildPage/buildNav';
 import { requestBenchmarkStart, takeBenchmarkStartRequest } from '../panel/widgets/benchmark/benchmarkNav';
 import { requestOpenDeckEditor } from '../panel/widgets/deck/deckOpenEditorNav';
+import { stashPanelEditorTarget } from '../panel/engine/panelEditorLink';
 import { getPendingDeckEdit, type PendingDeckEdit } from '../api/streamdeck';
 import { useUnifiedDevices, deviceTitle } from '../hooks/useUnifiedDevices';
 import { fetchPanelRemoteControlState } from '../api/panel';
@@ -62,8 +65,9 @@ import { LightingFeatureSeed } from './LightingFeatureSeed';
 import { PillarsReporter } from './PillarsReporter';
 import { importStepOffered } from './importStep';
 import { usePillarsLatch } from './usePillarsLatch';
-import { deriveOnboardingGates } from './onboardingGates';
+import { deriveEarlyGates, deriveOnboardingGates, featuresBackTarget, hyteBackTarget, shouldReopenHyte } from './onboardingGates';
 import { useConsumeSkippedOffers } from './useConsumeSkippedOffers';
+import { usePageViewed } from './pageViewed';
 import { useNexus2NonCoolingContent } from './useNexus2NonCoolingContent';
 import { useTranslation } from '../lib/i18n';
 import { applyThemeMode, applyAccentColor, cachePreferencesLocally, loadSettings } from '../lib/settings';
@@ -72,6 +76,7 @@ import type { Language, ThemeMode } from '../lib/settings';
 import { FULLSCREEN_CAPABLE_VIEWS, NAV_ICONS, PORTAL_NAV_KEYS } from './sidebarNav';
 import { PageVersionLabel } from './sidebar';
 import { TopBar } from './TopBar';
+import { resolveSidebarCompact } from './sidebarCompact';
 import { PageChromeProvider } from './PageChrome';
 import { AppBackdrop } from './AppBackdrop';
 import { BackgroundEffects } from './BackgroundEffects';
@@ -85,12 +90,15 @@ import { SidebarColumn } from './SidebarColumn';
 import { CrossZoneDragProvider } from './CrossZoneDrag';
 import { CommandPaletteProvider } from '../search/CommandPaletteProvider';
 import { requestSearchScroll } from '../search/scroll';
+import { requestCoolingFan } from '../lib/coolingFanIntent';
 import { fireSearchSignal } from '../search/signals';
 import { useSearchSignal } from '../search/signals';
 import { checkHelloGreetingOnce } from '../search/helloGreetingStore';
 import { PairPhoneModal } from './PairPhoneModal';
+import { announcePairPhoneClosed, onPairPhoneRequest } from './pairPhoneRequest';
 import { WelcomeScreen } from '../components/common/WelcomeScreen/WelcomeScreen';
 import { FeaturesOnboardingScreen } from '../components/common/FeaturesOnboardingScreen/FeaturesOnboardingScreen';
+import { HyteOnboardingScreen } from '../components/common/HyteOnboardingScreen/HyteOnboardingScreen';
 import { LightingOnboardingScreen } from '../components/common/LightingOnboardingScreen/LightingOnboardingScreen';
 import { ImportOnboardingScreen } from '../components/common/ImportOnboarding/ImportOnboardingScreen';
 import { FeatureGate } from '../components/common/FeatureDisabled/FeatureDisabled';
@@ -347,8 +355,10 @@ function ConflictOnboardingGate({
 }
 
 export function Dashboard() {
+  // Before useRoute: its canonical-path redirect drops the query this reads.
+  useState(() => stashPanelEditorTarget(window.location.pathname, window.location.search));
   const {
-    section, view, subtab,
+    route, section, view, subtab,
     navigate, setView, setSubtab,
     canGoBack: routeCanGoBack, canGoForward: routeCanGoForward, goBack: routeGoBack, goForward: routeGoForward,
   } = useRoute();
@@ -383,6 +393,7 @@ export function Dashboard() {
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [featuresOnboardingDismissed, setFeaturesOnboardingDismissed] = useState(false);
   const [lightingOnboardingDismissed, setLightingOnboardingDismissed] = useState(false);
+  const [hyteStepDismissed, setHyteStepDismissed] = useState(false);
   // Latched by FeaturesOnboardingScreen's onComplete when the user switched
   // Lighting off there. Dashboard's body can't call useUiSettings() itself
   // (it renders the provider), so this is the only way the skip decision
@@ -403,6 +414,7 @@ export function Dashboard() {
     if (readAt < latchedAt.current) return;
     if (onboardingStatus === 'pending') setOnboardingDismissed(false);
     if (featuresStatus === 'pending') setFeaturesOnboardingDismissed(false);
+    if (shouldReopenHyte({ welcomeStatus: onboardingStatus })) setHyteStepDismissed(false);
     if (lightingStatus === 'pending') setLightingOnboardingDismissed(false);
   }, [onboardingGeneration, readAt, onboardingStatus, featuresStatus, lightingStatus]);
 
@@ -413,12 +425,22 @@ export function Dashboard() {
   const welcomeOpen = (onboardingStatus === 'pending' || welcomeRevisit) && !onboardingDismissed;
   // First gate after welcome: which functional pillars (lighting/cooling/
   // monitoring/diagnostics) the user wants at all.
-  const featuresOpen = onboardingStatus !== 'unknown'
+  const featuresPending = onboardingStatus !== 'unknown'
     && (onboardingStatus === 'completed' || onboardingDismissed)
     && !welcomeOpen && featuresStatus === 'pending' && !featuresOnboardingDismissed;
   // Fetched on mount alongside onboarding (not deferred) so the handoff from
   // WelcomeScreen to this screen can land in the same render pass.
   const nexus2 = useNexus2WelcomeStatus();
+  // Between welcome and features, only while HYTE Nexus 2 is installed right
+  // now (`detected`, not the import offer). Features waits on the same read so
+  // it never flashes before this step.
+  const { hyteStepAvailable, hyteOpen, featuresOpen } = deriveEarlyGates({
+    featuresPending,
+    featuresReplay,
+    nexus2Known: nexus2.status !== 'unknown',
+    nexus2Installed: nexus2.payload?.detected === true,
+    hyteDismissed: hyteStepDismissed,
+  });
   const fanControl = useFanControlStatus();
   const [importDismissed, setImportDismissed] = useState(false);
   // Second gate: a returning Nexus 2 user closes/imports from the old app
@@ -436,7 +458,7 @@ export function Dashboard() {
   const serviceDown = status.state === 'offline' || status.state === 'offline-installed';
   const gateEverOpened = useRef(false);
   const { pillars, hydrated: pillarsHydrated, ready: pillarsReady, report: reportPillars } = usePillarsLatch(
-    onboardingStatus === 'unknown' || welcomeOpen || featuresOpen,
+    onboardingStatus === 'unknown' || welcomeOpen || hyteOpen || featuresOpen,
     serviceDown,
     gateEverOpened,
   );
@@ -513,7 +535,7 @@ export function Dashboard() {
     nexus2Known: nexus2.status !== 'unknown',
     fanControlKnown: fanControl.status !== 'unknown',
     welcomeOpen,
-    featuresOpen,
+    featuresOpen: featuresOpen || hyteOpen,
     welcomeDone: onboardingStatus === 'completed' || onboardingDismissed,
     importOffered,
     importDismissed,
@@ -692,13 +714,16 @@ export function Dashboard() {
   const restoreFullscreen = useCallback(() => setFullscreen(true), []);
   // Reopening the window lands where it was left, fullscreen included; a
   // service start clears it.
-  useLastRoute(
+  const restoreSettled = useLastRoute(
     view ? `/${section}/${view}${subtab ? `/${subtab}` : ''}` : '',
     navigate,
     online,
     fullscreenActive,
     restoreFullscreen,
   );
+  // Reported only once the service is reachable and the last-page restore has
+  // settled, so the first report is the page the user actually lands on.
+  usePageViewed(online && restoreSettled ? activeView : '');
 
   // Page name shown in the top-bar search pill. Portal sections use their
   // nav.section label; inside /system the active view resolves through the
@@ -730,18 +755,18 @@ export function Dashboard() {
     const meta = getSidebarAppMeta(activeView);
     return meta ? t(meta.i18nKey) : t('sidebar.section.apps');
   })();
-  // null = auto (follow viewport), true = user-collapsed, false = user-expanded.
+  // null = auto (follow viewport), true = user-collapsed; false acts as null.
   // Seeded from the local settings cache so a reload doesn't flash expanded
   // before SidebarCollapsedSync restores the server value.
   const [manualOverride, setManualOverride] = useState<boolean | null>(
     () => (loadSettings().general.sidebarCollapsed ? true : null),
   );
-  // A stored false only clears a user-collapse; the transient "expanded while
-  // narrow" override stays.
+  // A stored false only clears a user-collapse.
   const restoreSidebarCollapsed = useCallback((collapsed: boolean) => {
     setManualOverride(prev => (collapsed ? true : prev === true ? null : prev));
   }, []);
   const [pairPhoneOpen, setPairPhoneOpen] = useState(false);
+  useEffect(() => onPairPhoneRequest(() => setPairPhoneOpen(true)), []);
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [startedInstall, setStartedInstall] = useState(false);
@@ -826,18 +851,7 @@ export function Dashboard() {
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
   }, []);
-  // The "expanded while narrow" override (false) is transient: clear it when
-  // the viewport widens so the next narrow trip re-applies auto-collapse.
-  // Manual collapse (override === true) is the only preference that persists
-  // across width changes.
-  useEffect(() => {
-    if (!viewportNarrow && manualOverride === false) {
-      setManualOverride(null);
-    }
-  }, [viewportNarrow, manualOverride]);
-  // Manual override (true=collapsed, false=expanded) always wins over the
-  // viewport heuristic when set; null hands control back to auto-collapse.
-  const sidebarCompact = manualOverride !== null ? manualOverride : viewportNarrow;
+  const sidebarCompact = resolveSidebarCompact(manualOverride, viewportNarrow);
   const compact = hasSidebar && sidebarCompact;
 
   // Nothing opens the normal update modal over a running channel switch.
@@ -966,13 +980,19 @@ export function Dashboard() {
       case 'benchmark':  return <BenchmarkPage serviceOnline={online} connectionState={status.state} tab={subtab} onTabChange={setSubtab} />;
       case 'lighting':   return <FeatureGate feature="lighting"><LightingPage serviceOnline={online} serviceState={serviceState} accountUsername={cloudAccounts.activeAccount?.username ?? null} connectionState={status.state} activeProfileId={profilesHook.activeId} platform={status.ping?.platform ?? ''} onSectionNavigate={(target, payload) => {
         // The LED-map hub composition panel deep-links to a device page.
-        if (target === 'device' && payload?.deviceKey) { navigate('system', 'device', payload.deviceKey); return; }
+        if (target === 'device' && payload?.deviceKey) {
+          navigate('system', 'device', payload.deviceKey);
+          if (payload.scrollAnchors) requestSearchScroll(payload.scrollAnchors);
+          return;
+        }
         // The canvas GPU notice deep-links to the render-GPU picker.
         if (target === 'settings' && payload?.settingsTab) {
           navigate('system', 'settings', payload.settingsTab);
           if (payload.settingsAnchor) requestSearchScroll(payload.settingsAnchor);
           return;
         }
+        // Unsized OpenRGB headers deep-link to the Devices page's Available tab.
+        if (target === 'devices' && payload?.tab) { navigate('system', 'devices', payload.tab); return; }
         // The Studio links a just-published effect's Marketplace page.
         if (target === 'store' && payload?.tab) { navigate('system', 'store', payload.tab); return; }
         setView(target);
@@ -987,6 +1007,7 @@ export function Dashboard() {
           onDeviceSelect={k => navigate('system', 'device', k)}
           tab={subtab}
           onTabChange={setSubtab}
+          onOpenLighting={() => navigate('system', 'lighting')}
         />
       );
       case 'device':     return (
@@ -994,24 +1015,27 @@ export function Dashboard() {
           deviceKey={subtab ?? ''}
           serviceOnline={online}
           connectionState={status.state}
+          platform={status.ping?.platform}
           onTitleChange={onDeviceTitle}
           onOpenFirmware={() => navigate('system', 'devices', 'firmware')}
           onSectionNavigate={(target, payload) => {
             if (target === 'device' && payload?.deviceKey) { navigate('system', 'device', payload.deviceKey); return; }
             setView(target);
+            if (payload?.coolingFanId) requestCoolingFan(payload.coolingFanId);
             if (payload?.scrollAnchors) requestSearchScroll(payload.scrollAnchors);
           }}
         />
       );
-      case 'diagnostics': return <FeatureGate feature="diagnostics"><DiagnosticsPage serviceOnline={online} connectionState={status.state} platform={status.ping?.platform ?? ''} tab={subtab} onTabChange={setSubtab} onOpenCooling={() => navigate('system', 'cooling')} /></FeatureGate>;
+      case 'diagnostics': return <FeatureGate feature="diagnostics"><DiagnosticsPage serviceOnline={online} connectionState={status.state} platform={status.ping?.platform ?? ''} tab={subtab} navKey={route} onTabChange={setSubtab} onOpenCooling={() => navigate('system', 'cooling')} /></FeatureGate>;
       case 'frames':      return <FramesPage tab={subtab} onTabChange={setSubtab} />;
       case 'store':      return <StorePage tab={subtab} onTabChange={setSubtab} accounts={cloudAccounts} devices={unifiedDevices.unified} onOpenInLighting={key => { requestLightingEffect(key); navigate('system', 'lighting'); }} />;
-      case 'build':      return <BuildPage path={subtab} onOpenBenchmark={() => { requestBenchmarkStart(); navigate('system', 'benchmark', 'run'); }} onOpenLighting={() => navigate('system', 'lighting')} />;
+      case 'build':      return <BuildPage path={subtab} onOpenBenchmark={() => { requestBenchmarkStart(); navigate('system', 'benchmark', 'run'); }} onOpenLighting={() => navigate('system', 'lighting')} onOpenCooling={() => navigate('system', 'cooling')} platform={status.ping?.platform ?? ''} />;
+      case 'calendar':   return <CalendarPage tab={subtab} onTabChange={setSubtab} />;
       case 'clock':      return <ClockPage />;
-      case 'weather':    return <WeatherPage />;
+      case 'weather':    return <WeatherPage tab={subtab ?? undefined} />;
       case 'steam':      return <SteamPage />;
       case 'gallery':    return <GalleryPage />;
-      case 'settings':   return <SettingsView serviceOnline={online} connectionState={status.state} platform={status.ping?.platform ?? ''} tab={subtab} onTabChange={setSubtab} />;
+      case 'settings':   return <SettingsView serviceOnline={online} connectionState={status.state} platform={status.ping?.platform ?? ''} tab={subtab} onTabChange={setSubtab} onOpenDeckEditor={target => handleOpenDeckEditor({ ...target, token: 0 })} onOpenDevices={() => navigate('system', 'devices')} />;
       case 'profiles':   return <ProfilesView serviceOnline={online} connectionState={status.state} profiles={profilesHook} tab={subtab} onTabChange={setSubtab} />;
       case 'account':    return OFFICIAL_BUILD ? <AccountView serviceOnline={online} connectionState={status.state} accounts={cloudAccounts} tab={subtab} onTabChange={setSubtab} onOpenStoreApp={appId => navigate('system', 'store', appId)} onOpenStoreEffect={id => navigate('system', 'store', `effects/${id}`)} /> : <Placeholder title={activeView} />;
       case 'tools':      return DEV_TOOLS ? <ToolsView serviceOnline={online} connectionState={status.state} /> : <Placeholder title={activeView} />;
@@ -1074,6 +1098,7 @@ export function Dashboard() {
             <TopBar
               hasSidebar={hasSidebar}
               compact={compact}
+              compactLocked={viewportNarrow}
               onToggleCompact={() => setManualOverride(!sidebarCompact)}
               pageTitle={pageTitle}
               canGoBack={canGoBack}
@@ -1091,7 +1116,6 @@ export function Dashboard() {
               onNavigateTools={handleNavigateTools}
               onOpenUpdate={() => handleUpdateOpen()}
               onInstall={handleInstall}
-              onManageConflictApps={handleManageConflictApps}
               onManageProfiles={handleManageProfiles}
               onNavigateAccount={handleNavigateAccount}
               isWindowsApp={isWindowsAppShell()}
@@ -1120,6 +1144,7 @@ export function Dashboard() {
                   onDeviceSelect={k => navigate('system', 'device', k)}
                   onDevicesHeaderClick={() => navigate('system', 'devices')}
                   devicesHeaderActive={section === 'system' && activeView === 'devices'}
+                  onOpenFirmware={() => navigate('system', 'devices', 'firmware')}
                 />
               )}
 
@@ -1154,6 +1179,14 @@ export function Dashboard() {
             that sequence is still running. */}
         <PillarsReporter onPillars={reportPillars} />
         <LightingFeatureSeed active={featuresStatus === 'completed'} lightingPending={lightingStatus === 'pending'} onLightingOff={markLightingFeatureOff} />
+        <HyteOnboardingScreen
+          open={hyteOpen}
+          onContinue={() => setHyteStepDismissed(true)}
+          onSkipOnboarding={skipOnboarding}
+          onBack={hyteBackTarget({ welcomePending: onboardingStatus === 'pending' }) === 'welcome'
+            ? () => { setWelcomeRevisit(true); setOnboardingDismissed(false); }
+            : undefined}
+        />
         <FeaturesOnboardingScreen
           open={featuresOpen}
           fromCurrent={featuresReplay}
@@ -1163,9 +1196,12 @@ export function Dashboard() {
             if (!flags.lighting) setLightingFeatureOff(true);
           }}
           onSkipOnboarding={skipOnboarding}
-          onBack={onboardingStatus === 'pending'
-            ? () => { setWelcomeRevisit(true); setOnboardingDismissed(false); }
-            : undefined}
+          onBack={(() => {
+            const target = featuresBackTarget({ hyteStepAvailable, welcomePending: onboardingStatus === 'pending' });
+            if (target === 'hyte') return () => setHyteStepDismissed(false);
+            if (target === 'welcome') return () => { setWelcomeRevisit(true); setOnboardingDismissed(false); };
+            return undefined;
+          })()}
         />
         {/* Import gate: offers every app a previous setup can come from.
             Ending one is the conflict gate's job, on an explicit click. */}
@@ -1248,7 +1284,7 @@ export function Dashboard() {
           connectedCount={serviceState.panel?.phoneSubscribers ?? 0}
           remoteEnabled={remoteControlEnabled}
           onRemoteEnabledChange={setRemoteControlEnabled}
-          onClose={() => setPairPhoneOpen(false)}
+          onClose={() => { setPairPhoneOpen(false); announcePairPhoneClosed(); }}
         />
         {OFFICIAL_BUILD && (
           <AccountSignInModal

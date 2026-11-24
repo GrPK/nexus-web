@@ -6,6 +6,11 @@ import type { CommandContext } from './types';
 import { requestChannelSwitch } from '../lib/channelSwitch';
 
 const gate = vi.hoisted(() => ({ canSwitch: true }));
+const service = vi.hoisted(() => ({ post: vi.fn() }));
+vi.mock('../api/service', async importOriginal => ({
+  ...(await importOriginal<typeof import('../api/service')>()),
+  postService: service.post,
+}));
 vi.mock('../lib/channelSwitch', () => ({ requestChannelSwitch: vi.fn(), canSwitchChannel: () => gate.canSwitch }));
 import { EMPTY_LIVE_STATE, type SearchLiveState } from './useSearchLiveState';
 import type { LightingDevice } from '../api/lighting';
@@ -39,6 +44,12 @@ const LIVE: SearchLiveState = {
   cloud: { accounts: [], activeAccountId: 'acc1' },
   volume: { supported: true, volume: 0.4, muted: false },
   canAutoInstall: true,
+  sensorAlerts: [
+    {
+      id: 'r1', enabled: true, sensor: { category: 'cpu', id: 'cpu/temp/0', name: 'Core Max', type: 'Temperature', parentName: 'AMD Ryzen' },
+      low: null, high: 90, raiseAfterSeconds: 5, clearAfterSeconds: 5, severity: 'act', notifyDesktop: true, showInHealth: true, repeatMinutes: 0, builtIn: null,
+    },
+  ],
 };
 
 function ctx(online: boolean, over?: Partial<CommandContext>): CommandContext {
@@ -59,6 +70,7 @@ function ctx(online: boolean, over?: Partial<CommandContext>): CommandContext {
     activeProfileId: 'default',
     switchProfile: () => {},
     host: { goView: () => {}, goSection: () => {}, pairPhone: () => {} },
+    notify: () => {},
     close: () => {},
     ...over,
   };
@@ -137,11 +149,11 @@ describe('buildEntries', () => {
     const entries = buildEntries(ctx(true));
     const find = (id: string) => entries.find((e) => e.id === id);
     // Page-bearing apps not already covered by a curated NAV row.
-    for (const type of ['clock', 'gallery', 'steam', 'smart-lights', 'weather']) {
+    for (const type of ['calendar', 'clock', 'gallery', 'steam', 'smart-lights', 'weather']) {
       expect(find(`app:${type}`)?.kind).toBe('navigate');
     }
     // Page-less apps get an add-widget entry instead of a page open.
-    for (const type of ['calculator', 'emoji', 'timer', 'stocks', 'calendar']) {
+    for (const type of ['calculator', 'emoji', 'timer', 'stocks']) {
       expect(find(`app:${type}`)).toBeUndefined();
       expect(find(`widget:${type}`)?.kind).toBe('navigate');
     }
@@ -193,7 +205,7 @@ describe('buildEntries', () => {
     const ids = idsOf(false);
     for (const id of [
       'open:check-updates', 'open:about', 'open:discord-invite',
-      'open:add-widget', 'open:desktop-widgets', 'open:connected-devices', 'open:supported-devices',
+      'open:add-widget', 'open:connected-devices', 'open:supported-devices',
     ]) {
       expect(ids.has(id)).toBe(true);
     }
@@ -203,7 +215,7 @@ describe('buildEntries', () => {
     const win = idsOf(true);
     const mac = idsOf(true, { platform: 'macos' });
     // Windows-only: tray toggle + row, lock/sleep, event viewer.
-    for (const id of ['toggle:tray', 'system:lock', 'system:sleep', 'diag:event-viewer', 'gamesync:scan']) {
+    for (const id of ['toggle:tray', 'system:lock', 'system:sleep', 'diag:event-viewer']) {
       expect(win.has(id)).toBe(true);
       expect(mac.has(id)).toBe(false);
     }
@@ -219,6 +231,13 @@ describe('buildEntries', () => {
     // macOS-only: the menu-bar toggle.
     expect(mac.has('toggle:menubar')).toBe(true);
     expect(win.has('toggle:menubar')).toBe(false);
+  });
+
+  it('indexes the AMD graphics card lighting setting only when the service says it applies', () => {
+    const id = 'setting:settings.amdGpuLighting.label';
+    const on = { amdGpuLightingApplicable: true } as CommandContext['settings'];
+    expect(idsOf(true, { platform: 'linux' }).has(id)).toBe(false);
+    expect(idsOf(true, { platform: 'linux', settings: { ...ctx(true).settings, ...on } }).has(id)).toBe(true);
   });
 
   it('opens the channel switch modal for a channel change instead of saving it', () => {
@@ -322,6 +341,22 @@ describe('buildEntries', () => {
     expect(scoreEntry('folder', entries.find((e) => e.id === 'diag:open-data-folder')!)).not.toBeNull();
   });
 
+  it('lists watchlist entries by entry, sensor and device name and opens the Sensors tab on that entry', () => {
+    const goView = vi.fn();
+    const entries = buildEntries(ctx(true, { host: { goView, goSection: () => {}, pairPhone: () => {} } }));
+    const entry = entries.find((e) => e.id === 'watchlist:r1')!;
+    expect(entry.kind).toBe('navigate');
+    for (const q of ['core', 'ryzen']) expect(scoreEntry(q, entry)).not.toBeNull();
+    expect(scoreEntry('zzzz', entry)).toBeNull();
+    entry.run();
+    expect(goView).toHaveBeenCalledWith('diagnostics', 'cooling:r1');
+  });
+
+  it('offers no watchlist entries until the rule list is loaded', () => {
+    expect([...idsOf(false)].some((id) => id.startsWith('watchlist:'))).toBe(false);
+    expect([...idsOf(true, { live: { ...LIVE, sensorAlerts: [] } })].some((id) => id.startsWith('watchlist:'))).toBe(false);
+  });
+
   it('indexes background modes as appearance actions', () => {
     const entries = buildEntries(ctx(true));
     const flat = entries.find((e) => e.id === 'appearance:background-flat');
@@ -336,5 +371,27 @@ describe('buildEntries', () => {
     expect(green?.kind).toBe('action');
     green?.run();
     expect(patches).toEqual([{ accentColor: '#16c963', accentSource: 'custom' }]);
+  });
+});
+
+describe('open data folder action', () => {
+  const run = (notify: () => void) => buildEntries(ctx(true, { notify })).find((e) => e.id === 'diag:open-data-folder')!.run();
+
+  it('posts to the service and stays quiet on success', async () => {
+    const settled = Promise.resolve({ error: false });
+    service.post.mockReturnValueOnce(settled);
+    const notify = vi.fn();
+    run(notify);
+    expect(service.post).toHaveBeenCalledWith('/diagnostics/open-logs', {});
+    await settled;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('says so when the service refuses', async () => {
+    service.post.mockResolvedValueOnce(null);
+    const notify = vi.fn();
+    run(notify);
+    await vi.waitFor(() => expect(notify).toHaveBeenCalledWith('common.openFolderFailed'));
   });
 });

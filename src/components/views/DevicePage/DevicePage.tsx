@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Unplug } from 'lucide-react';
-import { useUnifiedDevices, claimsKey, type UnifiedDevice } from '../../../hooks/useUnifiedDevices';
+import { Eye, Unplug } from 'lucide-react';
+import {
+  useUnifiedDevices, controlGateIsPanel, claimsKey, groupMembers, LIANLI_GROUP, LIANLI_HUB_KEY, type UnifiedDevice,
+} from '../../../hooks/useUnifiedDevices';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { ServiceRequired } from '../ServiceRequired';
@@ -16,8 +18,17 @@ import { SdkMarketplacePage } from '../../../panel/widgets/marketplace/SdkMarket
 import { typeForMarketplace } from '../../../widgets/marketplaceRegistry';
 import { LianLiTlDevicePage } from './LianLiTlDevicePage';
 import { LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
+import { LianLiHubPage } from './LianLiHubPage';
+import { LianLiScreen88AbsentPage } from './LianLiScreen88Settings';
+import { LIANLI_SCREEN88_ID, LIANLI_SCREEN88_NAME } from '../../../api/lianliScreen88';
 import { Galahad2DevicePage } from './Galahad2DevicePage';
 import { AsiahorseUmbraDevicePage } from './AsiahorseUmbraDevicePage';
+import { AsusGlacialLcdDevicePage } from './AsusGlacialLcdDevicePage';
+import { AstralDevicePage } from './AstralDevicePage';
+import { AsusRyujinExtremeDevicePage } from './AsusRyujinExtremeDevicePage';
+import { LogitechSpeakerDevicePage } from './LogitechSpeakerDevicePage';
+import { DeepCoolMystiqueDevicePage } from './DeepCoolMystiqueDevicePage';
+import { GlacialPanelRoute } from './GlacialPanelRoute';
 import { KrakenDevicePage } from './KrakenDevicePage';
 import { StrimerDevicePage } from './StrimerDevicePage';
 import { NollieDevicePage } from './NollieDevicePage';
@@ -31,11 +42,13 @@ import { ExperimentalBadge } from '../../common/ExperimentalBadge/ExperimentalBa
 import { ExperimentalEnableModal } from '../../common/ExperimentalEnableModal/ExperimentalEnableModal';
 import { Spinner } from '../../common/Spinner/Spinner';
 import { useConflictApps } from '../../../hooks/useConflictApps';
-import { useUiSettings } from '../../../hooks/useUiSettings';
+import { useSidebarHiddenDevices, useUiSettings } from '../../../hooks/useUiSettings';
 import { canSwitchChannel, requestChannelSwitch } from '../../../lib/channelSwitch';
 import { getUpdateStatus } from '../../../api/update';
 import { useToast } from '../../common/Toast/Toast';
 import { promoteDisplayToPanel } from '../../../api/displays';
+import { patchPanelDevice } from '../../../api/panel';
+import { SettingToggle } from '../../common/SettingRow/SettingRow';
 import { isLianLiHubId } from '../../../api/lianli';
 import { useTranslation } from '../../../lib/i18n';
 import type { ConnectionState } from '../../../hooks/useServiceStatus';
@@ -69,13 +82,15 @@ interface DevicePageProps {
   deviceKey: string;
   serviceOnline: boolean;
   connectionState?: ConnectionState;
+  /** The service host's platform, empty until the ping lands. */
+  platform?: string;
   onOpenFirmware?: () => void;
   onSectionNavigate?: DashboardSectionNavigate;
   /** Reports the name of the device this page resolved for `deviceKey`, for the top bar. */
   onTitleChange?: (deviceKey: string, title: string | undefined) => void;
 }
 
-export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFirmware, onSectionNavigate, onTitleChange }: DevicePageProps) {
+export function DevicePage({ deviceKey, serviceOnline, connectionState, platform = '', onOpenFirmware, onSectionNavigate, onTitleChange }: DevicePageProps) {
   const { t } = useTranslation();
   const { push } = useToast();
   const { unified, controlDevice, turnedOffMonitorKeys } = useUnifiedDevices(serviceOnline);
@@ -140,7 +155,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
   }
 
   if (notConnected) {
-    return (
+    const notConnectedView = (
       <div className={styles.page}>
         <ViewHeader title={t('devices.page.title')} />
         {graceElapsed && (
@@ -150,6 +165,11 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
         )}
       </div>
     );
+    // The 8.8 in its own Windows display mode lists no panel, yet it is not unplugged.
+    if (deviceKey === `curated-${LIANLI_SCREEN88_ID}` || device?.curatedId === LIANLI_SCREEN88_ID) {
+      return <LianLiScreen88AbsentPage key={deviceKey} name={device?.shortName ?? LIANLI_SCREEN88_NAME} fallback={notConnectedView} />;
+    }
+    return notConnectedView;
   }
 
   // When the user turns Nexus Control off, the device's settings are
@@ -160,10 +180,13 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
     return (
       <NexusControlOff
         key={device.key}
+        deviceKey={device.key}
         deviceName={device.shortName}
         conflictAppId={device.conflictAppId}
         experimental={device.experimental}
         requiresBeta={device.requiresBeta}
+        panelMode={controlGateIsPanel(device)}
+        secondaryMonitorRecordId={device.panelDevice?.secondaryMonitor ? device.panelDevice.panelRecordId : undefined}
         onEnable={() => {
           detectReportedRef.current = false;
           setDetectingKey(device.key);
@@ -185,6 +208,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
     return (
       <NexusControlOff
         key={device.key}
+        deviceKey={device.key}
         deviceName={device.shortName}
         onEnable={() => {
           void promoteDisplayToPanel(offMonitorDisplayId).then(record => {
@@ -200,11 +224,11 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
   return (
     <>
       {holdBody && (
-        <NexusControlOff key={device.key} deviceName={device.shortName} experimental={device.experimental} detecting onEnable={() => {}} />
+        <NexusControlOff key={device.key} deviceKey={device.key} deviceName={device.shortName} experimental={device.experimental} detecting onEnable={() => {}} />
       )}
       <div className={holdBody ? styles.bodyHeld : styles.bodyShown}>
         <DeviceDetectingContext.Provider value={reportWaiting}>
-          <DeviceBody device={device} controlDevice={controlDevice} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />
+          <DeviceBody device={device} unified={unified} controlDevice={controlDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />
         </DeviceDetectingContext.Provider>
       </div>
     </>
@@ -213,12 +237,23 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, onOpenFi
 
 interface DeviceBodyProps {
   device: UnifiedDevice;
+  /** Every listed device, for a group entry's page. */
+  unified: readonly UnifiedDevice[];
   controlDevice: (id: string, nextEnabled: boolean) => Promise<unknown>;
+  platform: string;
   onOpenFirmware?: () => void;
   onSectionNavigate?: DashboardSectionNavigate;
 }
 
-function DeviceBody({ device, controlDevice, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
+function DeviceBody({ device, unified, controlDevice, platform, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
+  if (device.key === LIANLI_HUB_KEY) {
+    return <LianLiHubPage key={device.key} members={groupMembers(unified, LIANLI_GROUP)} controlDevice={controlDevice} onSectionNavigate={onSectionNavigate} />;
+  }
+
+  if (device.kind === 'panel' && device.panelDevice && device.curatedId === 'asus-glacial-lcd') {
+    return <GlacialPanelRoute key={device.key} device={device.panelDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />;
+  }
+
   if (device.kind === 'panel' && device.panelDevice) {
     // `key` forces unmount + remount when navigating between panel device
     // pages (e.g. Q60 → Y70). Without it React reuses the same
@@ -227,7 +262,7 @@ function DeviceBody({ device, controlDevice, onOpenFirmware, onSectionNavigate }
     // the previous device, so the new page paints at the old device's
     // scale until the tree is torn down. Remounting rebuilds the iframe
     // against the new device's canvas/DPR.
-    return <PanelDevicePage key={device.key} device={device.panelDevice} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />;
+    return <PanelDevicePage key={device.key} device={device.panelDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />;
   }
 
   if (device.curatedId === 'keeb') {
@@ -266,12 +301,38 @@ function DeviceBody({ device, controlDevice, onOpenFirmware, onSectionNavigate }
     return <AsiahorseUmbraDevicePage key={device.key} onSectionNavigate={onSectionNavigate} />;
   }
 
+  if (device.curatedId === 'asus-glacial-lcd') {
+    return <AsusGlacialLcdDevicePage key={device.key} />;
+  }
+
+  if (device.curatedId === 'asus-ryujin-extreme') {
+    return <AsusRyujinExtremeDevicePage key={device.key} />;
+  }
+
+  if (device.curatedId === 'asus-astral') {
+    return <AstralDevicePage key={device.key} />;
+  }
+
+  if (device.curatedId === 'logitech-speaker') {
+    return <LogitechSpeakerDevicePage key={device.key} />;
+  }
+
+  if (device.curatedId === 'deepcool-mystique') {
+    return <DeepCoolMystiqueDevicePage key={device.key} />;
+  }
+
   if (device.curatedId === 'nzxt-kraken') {
     return <KrakenDevicePage key={device.key} onSectionNavigate={onSectionNavigate} />;
   }
 
+  // Opened from the Lian Li page, which holds their lighting, screens and cooling,
+  // the L-Wireless and Flex pages show only their connection and wireless devices.
   if (device.curatedId === 'lianli-wireless') {
-    return <LianLiWirelessDevicePage key={device.key} onSectionNavigate={onSectionNavigate} />;
+    return <LianLiWirelessDevicePage key={device.key} onSectionNavigate={onSectionNavigate} devicesOnly={device.groupKey === LIANLI_GROUP} />;
+  }
+
+  if (device.curatedId === 'lianli-flex') {
+    return <LianLiWirelessDevicePage key={device.key} flex onSectionNavigate={onSectionNavigate} devicesOnly={device.groupKey === LIANLI_GROUP} />;
   }
 
   if (device.curatedId === 'strimer') {
@@ -301,16 +362,26 @@ function DeviceBody({ device, controlDevice, onOpenFirmware, onSectionNavigate }
     );
   }
 
-  return <PanelNotConnected name={device.shortName} />;
+  const panelNotConnected = <PanelNotConnected name={device.shortName} deviceKey={device.key} warning={device.warning} />;
+  // The 8.8's glass in its own Windows display mode: no panel, but no "not connected" either.
+  if (device.curatedId === LIANLI_SCREEN88_ID) {
+    return <LianLiScreen88AbsentPage key={device.key} name={device.shortName} fallback={panelNotConnected} />;
+  }
+  return panelNotConnected;
 }
 
 /** A screen whose page is its panel (a cooler LCD, a Q-series), before that panel connects. */
-function PanelNotConnected({ name }: { name: string }) {
+function PanelNotConnected({ name, deviceKey, warning }: { name: string; deviceKey: string; warning?: string }) {
   const { t } = useTranslation();
-  useReportDeviceWaiting(true);
+  // Access denied is a settled state with its own notice, so it never holds the detecting screen.
+  useReportDeviceWaiting(warning !== 'access-denied');
   // Unmounts when the panel row claims the key, which ends the detecting hold.
   const report = useContext(DeviceDetectingContext);
   useEffect(() => () => report?.(false), [report]);
+  // Windows refused the open, so this is not an unplugged panel: the same gate block explains it.
+  if (warning === 'access-denied') {
+    return <NexusControlOff key={deviceKey} deviceKey={deviceKey} deviceName={name} accessDenied onEnable={() => {}} />;
+  }
   return (
     <div className={styles.page}>
       <ViewHeader title={name} />
@@ -349,7 +420,7 @@ function BetaRequiredNotice() {
   );
 }
 
-export function NexusControlOff({ deviceName, conflictAppId, experimental, requiresBeta, detecting, onEnable }: { deviceName: string; conflictAppId?: string; experimental?: boolean; requiresBeta?: boolean; detecting?: boolean; onEnable: () => void }) {
+export function NexusControlOff({ deviceKey, deviceName, conflictAppId, experimental, requiresBeta, accessDenied, detecting, panelMode, secondaryMonitorRecordId, onEnable }: { deviceKey?: string; deviceName: string; conflictAppId?: string; experimental?: boolean; requiresBeta?: boolean; accessDenied?: boolean; detecting?: boolean; panelMode?: boolean; secondaryMonitorRecordId?: string; onEnable: () => void }) {
   const { t } = useTranslation();
   const { conflicts, ready } = useConflictApps(true);
   const activeConflict = conflictAppId ? conflicts.find(c => c.id === conflictAppId) : undefined;
@@ -358,12 +429,39 @@ export function NexusControlOff({ deviceName, conflictAppId, experimental, requi
   // the user can't turn Control on while a real conflict may still surface.
   const resolvingConflict = Boolean(conflictAppId) && !ready;
   const [confirmingExperimental, setConfirmingExperimental] = useState(false);
+  const { hidden, setHidden } = useSidebarHiddenDevices();
+  const { push: pushToast } = useToast();
+  // The switch renders only while the record says the monitor is on, so a record update to off removes it.
+  // An optimistic value holds until the newest write settles; only that write may roll back.
+  const [monitorPending, setMonitorPending] = useState<boolean | null>(null);
+  const monitorSeqRef = useRef(0);
+  // The switch unmounts its record when the monitor goes off, so a later turn-on starts from the record again.
+  useEffect(() => {
+    if (!secondaryMonitorRecordId) setMonitorPending(null);
+  }, [secondaryMonitorRecordId]);
+  const setMonitor = (id: string, next: boolean) => {
+    const seq = ++monitorSeqRef.current;
+    setMonitorPending(next);
+    patchPanelDevice(id, { secondaryMonitor: next })
+      .then(saved => saved === null ? Promise.reject(new Error('save failed')) : undefined)
+      .catch(() => {
+        if (seq !== monitorSeqRef.current) return;
+        setMonitorPending(null);
+        pushToast({ title: t('devices.panels.saveFailedTitle'), body: t('devices.panels.saveFailedBody') });
+      });
+  };
+  const shownInSidebar = deviceKey === undefined || !hidden.includes(deviceKey);
   return (
     <section className={styles.page}>
       <div className={styles.controlOff}>
         <h2 className={styles.controlOffTitle}>{deviceName}</h2>
         <div className={styles.controlOffBody}>
-          {requiresBeta ? (
+          {accessDenied ? (
+            <Notice tone="warning" role="status" className={styles.controlOffNotice}>
+              <span>{t('devices.accessDenied.title')}</span>
+              <NoticeSecondary>{t('devices.accessDenied.body')}</NoticeSecondary>
+            </Notice>
+          ) : requiresBeta ? (
             <BetaRequiredNotice />
           ) : activeConflict ? (
             <>
@@ -385,9 +483,24 @@ export function NexusControlOff({ deviceName, conflictAppId, experimental, requi
             </>
           ) : (
             <>
-              <p className={styles.controlOffHint}>{t('devices.nexusControlOff.enableHint')}</p>
-              <NexusControlCard checked={false} disabled={resolvingConflict} onChange={experimental ? () => setConfirmingExperimental(true) : onEnable} />
+              {!panelMode && <p className={styles.controlOffHint}>{t('devices.nexusControlOff.enableHint')}</p>}
+              <NexusControlCard checked={false} label={panelMode ? t('sidebar.device.panelOn') : undefined} disabled={resolvingConflict} onChange={experimental ? () => setConfirmingExperimental(true) : onEnable} />
             </>
+          )}
+          {secondaryMonitorRecordId && (
+            <SettingToggle
+              label={t('devices.lcd.secondaryMonitor')}
+              checked={monitorPending ?? true}
+              onChange={() => setMonitor(secondaryMonitorRecordId, !(monitorPending ?? true))}
+            />
+          )}
+          {deviceKey !== undefined && (
+            <NexusControlCard
+              checked={shownInSidebar}
+              icon={<Eye size={13} aria-hidden />}
+              label={t('devices.nexusControlOff.showInSidebar')}
+              onChange={() => setHidden(deviceKey, shownInSidebar)}
+            />
           )}
         </div>
         {experimental && <ExperimentalBadge />}

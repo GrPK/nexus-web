@@ -85,6 +85,8 @@ export interface WidgetSettingsProps {
   // so free-text fields remain editable even when the target surface (y70/q60)
   // has no keyboard.
   desktopEditor?: boolean;
+  // Companion to `surface` for surfaceInputMode: a monitor or USB display is touch only when its device has a digitizer.
+  deviceTouch?: boolean;
   onUpdate: (config: Record<string, PanelConfigValue>) => void;
   onResize: (size: PanelWidgetSize) => void;
   selectedSlot?: number;
@@ -122,6 +124,12 @@ export interface AppMetadata {
   defaultSize: PanelWidgetSize;
   /** The sizes offered on panels that hold several widgets, when fewer than `sizes`; a single-widget panel keeps its own. */
   gridSizes?: PanelWidgetSize[];
+  /**
+   * Opts the widget into freeform resizing in the panel editor: beyond `sizes` it may take
+   * any span from the freeform minimum side up that the device grid holds. Its content must lay out at any span.
+   * Built-ins set it in their meta; an SDK app sets it with `"freeform": true` in its manifest.
+   */
+  freeform?: boolean;
   // When false, the app is hidden from the Add-a-Widget picker: it can't be
   // newly added, but already-placed instances keep rendering (lookupApp and the
   // layout reconciler ignore this flag). Defaults to listed. SDK apps derive it
@@ -138,6 +146,8 @@ export interface AppMetadata {
   // with its own config - the long-standing behaviour for every built-in.
   singleInstance?: boolean;
   hasConfig: boolean;
+  // i18n key of an info notice the on-device edit sheet shows above the settings on every surface but the desktop dashboard, for settings only the desktop can change.
+  desktopOnlyHintKey?: string;
   // Whether the widget *requires* a touch / pointer input modality. true
   // means it's hidden on display-only surfaces (currently Q60). false means
   // it's available on every surface that can fit one of its `sizes` - desktop
@@ -160,15 +170,17 @@ export interface AppMetadata {
   // desktop overlay - never enters immersive, so the tile would be inert
   // there; set this to keep the widget on on-device panels only.
   panelOnly?: boolean;
+  // Plays only on a panel that can stand in portrait; a generic display panel cannot rotate, so it leaves the widget out.
+  portraitOnly?: boolean;
   // Whether the widget participates in slot selection during editing: the live
   // tile renders selectable cells and the edit sheet edits the selected slot
-  // (monitoring, deck). When true, PanelApp/WidgetEditSheet/PanelEditorSheet
+  // (monitoring, deck). When true, PanelApp/PanelEditorSheet
   // pass selectedSlot/onSelectedSlotChange through. Defaults to false.
   usesSlotSelection?: boolean;
   // Initial config a freshly-added widget is seeded with (e.g. the deck's
   // starter actions). Called once at insert time; returns a fresh object so two
   // widgets never share mutable config. Absent → the widget starts config-less.
-  defaultConfig?: () => Record<string, PanelConfigValue>;
+  defaultConfig?: (size: PanelWidgetSize) => Record<string, PanelConfigValue>;
   // Whether the live tile writes its own config (the gallery's picked image).
   // PanelApp passes onUpdate on every surface when set - unlike
   // usesSlotSelection, which only wires it while its edit sheet is open,

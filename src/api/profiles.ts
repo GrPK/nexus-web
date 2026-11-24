@@ -2,11 +2,11 @@ import { fetchService, postService, putService, deleteService, loopbackFetchInit
 import { getToken } from './auth';
 import type { PanelLayout } from '../panel/types';
 import type { PanelGaugeGradientStopDto } from './panel';
-import type { OverlayWidgetDto } from './overlay';
 import type { UpdateChannel, UpdateMode } from './update';
 import type { TempUnit, TimeFormat, NumberFormat, DateFormat } from '../lib/units';
+import type { CoolingFlowMode } from '../lib/settings';
 
-export const PROFILE_CATEGORIES = ['lighting', 'cooling', 'theme', 'dashboard', 'device'] as const;
+export const PROFILE_CATEGORIES = ['lighting', 'cooling', 'panels', 'theme', 'dashboard', 'device'] as const;
 export type ProfileCategory = typeof PROFILE_CATEGORIES[number];
 
 export interface ProfileEntry {
@@ -55,6 +55,7 @@ export interface MonitoringSettings {
   smartPollDefaultSeconds?: number;
   /** False: the default governs every drive. True: each drive uses its own entry. */
   smartPollPerDrive?: boolean;
+  liveDriveActivity?: boolean;
 }
 
 export interface PanelSettings {
@@ -81,39 +82,25 @@ export interface PanelSettings {
   dashboardGaugeGradient?: PanelGaugeGradientStopDto[] | null;
 }
 
-export interface OverlaySettings {
-  enabled: boolean;
-  alwaysOnTop: boolean;
-  scale: number;
-  opacity: number;
-  monitor: number;
-  layout: OverlayWidgetDto[];
-}
-
-// preferences.diagnostics - thresholds/notifications/component monitoring for
+// preferences.diagnostics - notifications/component monitoring for
 // the Diagnostics Settings tab. Mirrors nexus-service's DiagnosticsSettings
 // POCOs verbatim. Optional on Preferences: an older service omits it,
 // which the client treats as the contract defaults.
-export interface DiagnosticsThresholds {
-  cpuC: number;
-  gpuC: number;
-  storageC: number;
-  ramC: number;
-}
-
 export interface DiagnosticsNotificationPrefs {
   enabled: boolean;
-  highTemp: boolean;
   storageHealth: boolean;
   cooling: boolean;
   memoryTest: boolean;
   systemDevices: boolean;
   gpuThrottle: boolean;
   cooldownMinutes: number;
+  /** Master for sensor-alert desktop notifications, independent of `enabled`. */
+  sensorAlerts: boolean;
+  /** Minimum gap between two toasts for the same sensor rule. */
+  sensorCooldownMinutes: number;
 }
 
 export interface DiagnosticsComponentPrefs {
-  cpu: boolean;
   gpu: boolean;
   storage: boolean;
   ram: boolean;
@@ -122,8 +109,6 @@ export interface DiagnosticsComponentPrefs {
 }
 
 export interface DiagnosticsPrefs {
-  thresholds: DiagnosticsThresholds;
-  warningLingerMinutes: number;
   notifications: DiagnosticsNotificationPrefs;
   components: DiagnosticsComponentPrefs;
   // Health component ids ("storage:<serial>", "cooling:<deviceId>", "gpu:<n>")
@@ -133,8 +118,6 @@ export interface DiagnosticsPrefs {
 }
 
 export interface DiagnosticsPrefsPatch {
-  thresholds?: Partial<DiagnosticsThresholds>;
-  warningLingerMinutes?: number;
   notifications?: Partial<DiagnosticsNotificationPrefs>;
   components?: Partial<DiagnosticsComponentPrefs>;
   // Replaces the whole list when present.
@@ -194,6 +177,15 @@ export interface UiPrefs {
   showUncontrolledDevices?: boolean;
   showUncontrolledLightingDevices?: boolean;
   showUncontrolledCoolingDevices?: boolean;
+  lightingView3d?: boolean;
+  coolingView3d?: boolean;
+  coolingFlowMode?: CoolingFlowMode;
+  coolingCollisionShapes?: boolean;
+  hiddenSidebarDevices?: string[];
+  /** Lighting widget history, `#RRGGBB`, most recent first. Absent from a service that predates the field. */
+  recentStaticColors?: string[];
+  /** Lighting widget history of effect keys, most recent first. Absent from a service that predates the field. */
+  recentAnimations?: string[];
 }
 
 export interface UpdatePrefs {
@@ -210,6 +202,7 @@ export interface UnitsPrefs {
   monitoringTempUnit?: TempUnit;
   timeFormat?: TimeFormat;
   numberFormat?: NumberFormat;
+  monitoringWholeNumbers?: boolean;
   dateFormat?: DateFormat;
 }
 
@@ -232,7 +225,6 @@ export interface FeaturesPrefs {
 export interface Preferences {
   theme: ThemeSettings;
   panel: PanelSettings;
-  overlay: OverlaySettings;
   monitoring: MonitoringSettings;
   cooling: CoolingPrefs;
   ui: UiPrefs;
@@ -244,12 +236,22 @@ export interface Preferences {
   // boot-time start, clamped server-side to 0..60. Optional - an older service
   // omits it, and the client then keeps its last known value.
   startupDelaySeconds?: number;
+  // Machine-level (not per-profile): false stops reading the temperature
+  // sensor on each memory stick. Applies live. Missing means true.
+  readRamTemperatures?: boolean;
+  // Machine-level: false stops scanning USB serial ports for in-line GPU power
+  // meters. Applies live. Missing means true.
+  powerMonitorsEnabled?: boolean;
+  // Linux-only, machine-level: lets Nexus drive AMD graphics card lighting.
+  // Missing means off. The Applicable flag is read-only and true only on
+  // Linux; an older service omits both.
+  amdGpuLighting?: boolean;
+  amdGpuLightingApplicable?: boolean;
 }
 
 export interface PreferencesPatch {
   theme?: Partial<ThemeSettings>;
   panel?: Partial<PanelSettings>;
-  overlay?: Partial<OverlaySettings>;
   monitoring?: Partial<MonitoringSettings>;
   cooling?: Partial<CoolingPrefs>;
   ui?: Partial<UiPrefs>;
@@ -258,6 +260,11 @@ export interface PreferencesPatch {
   diagnostics?: DiagnosticsPrefsPatch;
   features?: FeaturesPrefs;
   startupDelaySeconds?: number;
+  readRamTemperatures?: boolean;
+  // Machine-level: false stops scanning USB serial ports for in-line GPU power
+  // meters. Applies live. Missing means true.
+  powerMonitorsEnabled?: boolean;
+  amdGpuLighting?: boolean;
 }
 
 interface GetProfilesResponse {
@@ -271,6 +278,8 @@ export interface ProfileResponse {
   error?: boolean;
   msg?: string;
   profile?: ProfileEntry;
+  /** Set when the file carried a PC setup. */
+  pcSetup?: string;
 }
 
 export interface ProfileFetchResult<T> {

@@ -6,6 +6,7 @@ import { isStaticFill } from '../../../../types/lighting';
 import { isPaletteKey } from '../../../../types/lightingPalette';
 import { cardEnabledLedCount } from './zoneUtils';
 import { type StackSlot } from '../../../../lib/stackSlots';
+import { deviceLedBytes } from '../../../../lib/deviceLedBytes';
 import { ledSample, sampleBox, sampleSpot } from '../../../../lib/ledSampling';
 import { getScenePoints } from '../../../../lib/scene/scenePointsStore';
 import type { LightingDevice } from '../../../../api/lighting';
@@ -73,32 +74,29 @@ function paint(
 }
 
 /**
- * The device's own LED bytes from the output frame, before brightness. One
+ * The device's own LED bytes from the output frame, already dimmed by the service. One
  * cell per strip cell, sampled along the LED order (a matrix device reads in
  * wiring order, which is the order the service and the hardware use). False
  * when the frame carries no bytes for it (no frame index, relay connection,
  * lighting off), so the caller falls back to sampling the canvas.
  */
 function paintDeviceBytes(canvas: HTMLCanvasElement, device: LightingDevice, frame: LedFrame): boolean {
-  if (device.frameIndex === undefined) return false;
-  const bytes = frame.devices?.get(device.frameIndex);
-  const leds = bytes ? Math.floor(bytes.length / 3) : 0;
-  if (!bytes || leds === 0) return false;
+  const bytes = deviceLedBytes(frame.devices, device.frameIndex);
+  if (!bytes) return false;
+  const leds = Math.floor(bytes.length / 3);
   const cells = stripCells(device);
   if (canvas.width !== cells) canvas.width = cells;
   if (canvas.height !== 1) canvas.height = 1;
   const ctx = canvas.getContext('2d');
   if (!ctx) return false;
-  // Same dimming the canvas path mirrors from the service.
-  const scale = Math.min(1, Math.max(0, (device.brightness ?? 100) / 100));
   const img = ctx.createImageData(cells, 1);
   const d = img.data;
   for (let i = 0; i < cells; i++) {
     const led = cells === 1 ? 0 : Math.round((i * (leds - 1)) / (cells - 1));
     const o = i * 4;
-    d[o] = bytes[led * 3] * scale;
-    d[o + 1] = bytes[led * 3 + 1] * scale;
-    d[o + 2] = bytes[led * 3 + 2] * scale;
+    d[o] = bytes[led * 3];
+    d[o + 1] = bytes[led * 3 + 1];
+    d[o + 2] = bytes[led * 3 + 2];
     d[o + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
@@ -175,6 +173,13 @@ function paintLook(
     return;
   }
 
+  // An area-sampled device is fed boxes' means the web cannot reproduce, so without the device's own bytes
+  // (older service, relay connection, lighting off) the readout shows nothing rather than a wrong spot read.
+  if (device.sampling && device.sampling !== 'led') {
+    ctx.clearRect(0, 0, cells, 1);
+    return;
+  }
+
   // Static assigns per device, so there is no shared canvas to fall back to:
   // a device with no assignment of its own is showing nothing in particular,
   // and sampling the effect frame would state a colour it is not wearing.
@@ -198,7 +203,7 @@ function paintLook(
       d[o + 3] = 255;
       if (Number.isNaN(cx)) continue;
       // The same spot mean the engine reads at an LED.
-      const [r, g, b] = sampleSpot({ pixels, w, h }, { sx: (cx / CW) * w, sy: (cy / CH) * h, halfW: Infinity, halfH: Infinity });
+      const [r, g, b] = sampleSpot({ pixels, w, h }, { sx: (cx / CW) * w, sy: (cy / CH) * h, halfW: Infinity, halfH: Infinity }, device.colorSampling);
       d[o] = r * scale;
       d[o + 1] = g * scale;
       d[o + 2] = b * scale;
@@ -216,7 +221,7 @@ function paintLook(
   for (let i = 0; i < cells; i++) {
     const led = cells === 1 ? 0 : Math.round((i * (leds - 1)) / (cells - 1));
     const at = ledSample(device, led, leds, w, h, { fullFrame: fullscreen, slot });
-    const [r, g, b] = fullscreen ? sampleBox(frameView, at) : sampleSpot(frameView, at);
+    const [r, g, b] = fullscreen ? sampleBox(frameView, at, device.colorSampling) : sampleSpot(frameView, at, device.colorSampling);
     const o = i * 4;
     d[o] = r * scale;
     d[o + 1] = g * scale;

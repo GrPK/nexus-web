@@ -1,7 +1,8 @@
 import type { PanelLayout, PanelPage, PanelWidget, PanelWidgetSize } from '../types';
 import { firstFreeRect, rectsOverlap, type PaginateCapacity } from './paginate';
-import { sizeToSpan, snapStride, strideScanSteps } from './grid';
+import { sizeToSpan } from './grid';
 import { createUuid } from '../../lib/uuid';
+import { clampFreeformSize } from './freeformResize';
 
 interface WidgetRect { col: number; row: number; colSpan: number; rowSpan: number; }
 
@@ -252,8 +253,8 @@ export function patchWidgetById(
  * widgets cascade row-major into the first empty rect that fits each
  * (skipping the active rect and earlier-displaced widgets). A Springboard
  * shift of the run between the source's old slot and the drop
- * (shiftPreview) replaces the cascade when the cascade fails, or when the
- * shift also lands the source on (col, row) and moves the siblings no
+ * (shiftPreview) replaces the cascade when it lands the source on (col, row)
+ * and either the cascade fails or the shift moves the siblings no
  * further - on a full column the cascade either fails or teleports a
  * neighbour into the vacated cell at the far end.
  */
@@ -264,6 +265,8 @@ export function previewDrag(
   col: number,
   row: number,
   capacity: PaginateCapacity,
+  // A displaced widget takes the free cell nearest its old one (display panels), not the first free one from the top.
+  nearestFree = false,
 ): PanelLayout | null {
   const cols = Math.max(1, capacity.gridCols);
   const rows = Math.max(1, capacity.pageRows);
@@ -332,23 +335,21 @@ export function previewDrag(
     const span = sizeToSpan(w.size);
     const colSpan = Math.max(1, Math.min(span.cols, cols));
     const rowSpan = Math.max(1, span.rows);
-    // Stride-aligned slots first (mirrors the active widget's snap
-    // grid), then a stride-1 pass so a displaced widget still homes
-    // into off-stride free space instead of refusing the whole drop.
     let found: { col: number; row: number } | null = null;
-    for (const step of strideScanSteps(colSpan, rowSpan)) {
-      for (let r = 0; r + rowSpan <= rows && !found; r += step.row) {
-        for (let c = 0; c + colSpan <= cols && !found; c += step.col) {
-          let fits = true;
-          for (let rr = r; rr < r + rowSpan && fits; rr++) {
-            for (let cc = c; cc < c + colSpan && fits; cc++) {
-              if (occupied[rr][cc]) fits = false;
-            }
+    // nearestFree scans every cell for the one closest to the old slot; otherwise first fit from the top.
+    let best = Infinity;
+    for (let r = 0; r + rowSpan <= rows && (nearestFree || !found); r++) {
+      for (let c = 0; c + colSpan <= cols && (nearestFree || !found); c++) {
+        let fits = true;
+        for (let rr = r; rr < r + rowSpan && fits; rr++) {
+          for (let cc = c; cc < c + colSpan && fits; cc++) {
+            if (occupied[rr][cc]) fits = false;
           }
-          if (fits) found = { col: c, row: r };
         }
+        if (!fits) continue;
+        const dist = (c - w.col) ** 2 + (r - w.row) ** 2;
+        if (!found || dist < best) { best = dist; found = { col: c, row: r }; }
       }
-      if (found) break;
     }
     if (!found) { displaced.length = 0; break; }
     mark({ col: found.col, row: found.row, colSpan, rowSpan });
@@ -357,13 +358,16 @@ export function previewDrag(
   const cascaded = displaced.length === sorted.length
     ? withTargetPage(layout, sourceId, sourcePageIdx, targetPageIdx, [...stationary, placed, ...displaced])
     : null;
-  if (overlapping.length === 0) return cascaded;
+  if (overlapping.length === 0 || nearestFree) return cascaded;
 
   const shifted = shiftPreview(layout, sourceId, sourcePageIdx, targetPageIdx, placed, cols, rows);
-  if (!cascaded) return shifted;
   if (!shifted) return cascaded;
   const landed = shifted.pages[targetPageIdx].widgets.find(w => w.id === sourceId);
-  if (!landed || landed.col !== col || landed.row !== row) return cascaded;
+  // The band reflow is first-fit, so it can land the source before the
+  // highlighted target; refuse rather than land elsewhere.
+  const onTarget = landed !== undefined && landed.col === col && landed.row === row;
+  if (!cascaded) return onTarget ? shifted : null;
+  if (!onTarget) return cascaded;
   // Ties go to the shift: it keeps the siblings' reading order, where the
   // cascade may leapfrog one past another into the vacated cell.
   return siblingTravel(layout, shifted, sourceId) <= siblingTravel(layout, cascaded, sourceId) ? shifted : cascaded;
@@ -475,19 +479,16 @@ function shiftPreview(
     const colSpan = Math.max(1, Math.min(span.cols, cols));
     const rowSpan = Math.max(1, span.rows);
     let found: { col: number; row: number } | null = null;
-    for (const step of strideScanSteps(colSpan, rowSpan)) {
-      for (let r = 0; r + rowSpan <= rows && !found; r += step.row) {
-        for (let c = 0; c + colSpan <= cols && !found; c += step.col) {
-          let fits = true;
-          for (let rr = r; rr < r + rowSpan && fits; rr++) {
-            for (let cc = c; cc < c + colSpan && fits; cc++) {
-              if (occupied[rr][cc]) fits = false;
-            }
+    for (let r = 0; r + rowSpan <= rows && !found; r++) {
+      for (let c = 0; c + colSpan <= cols && !found; c++) {
+        let fits = true;
+        for (let rr = r; rr < r + rowSpan && fits; rr++) {
+          for (let cc = c; cc < c + colSpan && fits; cc++) {
+            if (occupied[rr][cc]) fits = false;
           }
-          if (fits) found = { col: c, row: r };
         }
+        if (fits) found = { col: c, row: r };
       }
-      if (found) break;
     }
     if (!found) return null;
     mark({ col: found.col, row: found.row, colSpan, rowSpan });
@@ -510,7 +511,11 @@ function shiftPreview(
  * rejection: do NOT mutate state, surface feedback to the user.
  *
  * Cascade order: source page first (so a shrink stays put), then later
- * pages in order, then earlier pages, then a new trailing page.
+ * pages in order, then earlier pages, then a new trailing page. `at`
+ * places the widget at an explicit origin instead of sliding it in place,
+ * which is how freeform resize moves a top or left edge and moves a widget.
+ * `samePage` confines every displaced widget to the resized widget's page: no
+ * spill onto another page and no new page, so the resize is refused instead.
  */
 export function tryResizeWidget(
   layout: PanelLayout,
@@ -518,6 +523,8 @@ export function tryResizeWidget(
   newSize: PanelWidgetSize,
   capacity: PaginateCapacity,
   maxPages: number,
+  at?: { col: number; row: number },
+  options?: { samePage?: boolean },
 ): PanelLayout | null {
   const cols = Math.max(1, capacity.gridCols);
   const rows = Math.max(1, capacity.pageRows);
@@ -529,20 +536,17 @@ export function tryResizeWidget(
     if (found) { source = found; sourcePageIdx = i; break; }
   }
   if (!source) return layout;
-  if (source.size === newSize) return layout;
+  if (source.size === newSize && (!at || (at.col === source.col && at.row === source.row))) return layout;
 
-  const newSpan = sizeToSpan(newSize);
+  // A freeform size taller or wider than this grid is placed at the span it renders at; the stored size string is kept.
+  const newSpan = sizeToSpan(clampFreeformSize(newSize, { cols, rows }));
   const newColSpan = Math.max(1, Math.min(newSpan.cols, cols));
   const newRowSpan = Math.max(1, newSpan.rows);
   // Hard refusal: the size itself doesn't fit on any page.
   if (newRowSpan > rows) return null;
   // Slide left / up so the resized rect stays in bounds.
-  // The 4x1 is the only multi-cell size with a single-row stride; growing it
-  // returns the widget to the coarser grid the larger size snaps to.
-  const fromRowStrip = source.size === '4x1';
-  const snapDown = (value: number, span: number) => fromRowStrip ? value - (value % snapStride(span)) : value;
-  const placedCol = Math.max(0, Math.min(snapDown(source.col, newColSpan), cols - newColSpan));
-  const placedRow = Math.max(0, Math.min(snapDown(source.row, newRowSpan), rows - newRowSpan));
+  const placedCol = Math.max(0, Math.min(at ? at.col : source.col, cols - newColSpan));
+  const placedRow = Math.max(0, Math.min(at ? at.row : source.row, rows - newRowSpan));
   const placed: PanelWidget = { ...source, size: newSize, col: placedCol, row: placedRow };
   const placedRect: WidgetRect = { col: placedCol, row: placedRow, colSpan: newColSpan, rowSpan: newRowSpan };
 
@@ -584,32 +588,27 @@ export function tryResizeWidget(
     a.row !== b.row ? a.row - b.row : a.col - b.col,
   );
 
-  // Stride-aligned slots first, then a stride-1 pass so displaced
-  // widgets home into off-stride free space before spilling to the
-  // next page (or failing the resize outright).
   const findFitOnPage = (
     occupied: boolean[][],
     colSpan: number,
     rowSpan: number,
   ): { col: number; row: number } | null => {
-    for (const step of strideScanSteps(colSpan, rowSpan)) {
-      for (let r = 0; r + rowSpan <= rows; r += step.row) {
-        for (let c = 0; c + colSpan <= cols; c += step.col) {
-          let fits = true;
-          for (let rr = r; rr < r + rowSpan && fits; rr++) {
-            for (let cc = c; cc < c + colSpan && fits; cc++) {
-              if (occupied[rr][cc]) fits = false;
-            }
+    for (let r = 0; r + rowSpan <= rows; r++) {
+      for (let c = 0; c + colSpan <= cols; c++) {
+        let fits = true;
+        for (let rr = r; rr < r + rowSpan && fits; rr++) {
+          for (let cc = c; cc < c + colSpan && fits; cc++) {
+            if (occupied[rr][cc]) fits = false;
           }
-          if (fits) return { col: c, row: r };
         }
+        if (fits) return { col: c, row: r };
       }
     }
     return null;
   };
 
   for (const w of sorted) {
-    const span = sizeToSpan(w.size);
+    const span = sizeToSpan(clampFreeformSize(w.size, { cols, rows }));
     const colSpan = Math.max(1, Math.min(span.cols, cols));
     const rowSpan = Math.max(1, span.rows);
     if (rowSpan > rows) return null; // physically can't fit anywhere
@@ -617,7 +616,7 @@ export function tryResizeWidget(
     let landing: { pageIdx: number; col: number; row: number } | null = null;
     // Source page first (so resizing in place doesn't shuffle siblings to
     // page 2 unnecessarily), then later pages, then earlier pages.
-    const pageOrder: number[] = [
+    const pageOrder: number[] = options?.samePage ? [sourcePageIdx] : [
       sourcePageIdx,
       ...working.map((_, i) => i).filter(i => i > sourcePageIdx),
       ...working.map((_, i) => i).filter(i => i >= 0 && i < sourcePageIdx),
@@ -631,7 +630,7 @@ export function tryResizeWidget(
     }
 
     // No existing page fits - spawn a new trailing page if we have room.
-    if (!landing && working.length < maxPages) {
+    if (!landing && !options?.samePage && working.length < maxPages) {
       working.push({
         id: createUuid(),
         widgets: [],

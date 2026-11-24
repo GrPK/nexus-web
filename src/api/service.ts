@@ -5,6 +5,7 @@
 import { getToken, getTokenSync, handleUnauthorized, hasSessionToken } from './auth';
 import { relayFetch, type RelayHttpMethod } from './relayHttp';
 import type { RelayResponse } from './httpTunnelFraming';
+import { markServiceAnswered } from '../lib/serviceLiveness';
 
 const DEFAULT_SERVICE_PORT = '9400';
 const DEFAULT_HTTPS_PORT = '9443';
@@ -378,8 +379,20 @@ export interface PingResponse {
 interface RequestOptions {
   method?: string;
   body?: unknown;
+  /** Extra request headers; direct (non-tunneled) paths only. */
+  headers?: Record<string, string>;
   signal?: AbortSignal;
   cache?: RequestCache;
+  /** Lets the request outlive the page (pagehide flushes); direct (non-tunneled) paths only. */
+  keepalive?: boolean;
+  /** The HTTP cache may answer this route, so its response is no sign of life. */
+  mayBeCached?: boolean;
+}
+
+async function serviceFetch(path: string, init: RequestInit, mayBeCached = false): Promise<Response> {
+  const response = await fetch(resolveHttp(path), init);
+  if (!mayBeCached) markServiceAnswered();
+  return response;
 }
 
 async function authFetch(path: string, opts: RequestOptions = {}): Promise<Response | null> {
@@ -412,13 +425,13 @@ async function authFetch(path: string, opts: RequestOptions = {}): Promise<Respo
       cache: opts.cache,
     };
 
-    let response = await fetch(resolveHttp(path), init);
+    let response = await serviceFetch(path, init, opts.mayBeCached);
 
     if (response.status === 401) {
       const newToken = await handleUnauthorized();
       if (newToken) {
         headers['Authorization'] = `Bearer ${newToken}`;
-        response = await fetch(resolveHttp(path), init);
+        response = await serviceFetch(path, init, opts.mayBeCached);
       }
     }
 
@@ -539,7 +552,7 @@ export async function authFetchWithStatus(path: string, opts: RequestOptions = {
 
   try {
     const token = await getToken();
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...opts.headers };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
 
@@ -550,15 +563,16 @@ export async function authFetchWithStatus(path: string, opts: RequestOptions = {
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       signal: opts.signal,
       cache: opts.cache,
+      keepalive: opts.keepalive,
     };
 
-    let response = await fetch(resolveHttp(path), init);
+    let response = await serviceFetch(path, init, opts.mayBeCached);
 
     if (response.status === 401) {
       const newToken = await handleUnauthorized();
       if (newToken) {
         headers['Authorization'] = `Bearer ${newToken}`;
-        response = await fetch(resolveHttp(path), init);
+        response = await serviceFetch(path, init, opts.mayBeCached);
       }
     }
 
@@ -633,12 +647,12 @@ async function postForm(path: string, form: FormData): Promise<Response | null> 
     const token = await getToken();
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    let response = await fetch(resolveHttp(path), { ...loopbackFetchInit, method: 'POST', headers, body: form });
+    let response = await serviceFetch(path, { ...loopbackFetchInit, method: 'POST', headers, body: form });
     if (response.status === 401) {
       const newToken = await handleUnauthorized();
       if (newToken) {
         headers['Authorization'] = `Bearer ${newToken}`;
-        response = await fetch(resolveHttp(path), { ...loopbackFetchInit, method: 'POST', headers, body: form });
+        response = await serviceFetch(path, { ...loopbackFetchInit, method: 'POST', headers, body: form });
       }
     }
     return response;
@@ -703,12 +717,12 @@ async function sendServiceBytesWithStatus(method: 'PUT' | 'POST', path: string, 
     const headers: Record<string, string> = { 'Content-Type': contentType };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-    let response = await fetch(resolveHttp(path), { ...loopbackFetchInit, method, headers, body });
+    let response = await serviceFetch(path, { ...loopbackFetchInit, method, headers, body });
     if (response.status === 401) {
       const newToken = await handleUnauthorized();
       if (newToken) {
         headers['Authorization'] = `Bearer ${newToken}`;
-        response = await fetch(resolveHttp(path), { ...loopbackFetchInit, method, headers, body });
+        response = await serviceFetch(path, { ...loopbackFetchInit, method, headers, body });
       }
     }
     return { response, status: response.status };
@@ -732,14 +746,14 @@ export async function postServiceBytesWithStatus(path: string, bytes: Uint8Array
   return sendServiceBytesWithStatus('POST', path, bytes, contentType);
 }
 
-export async function fetchServiceBlob(path: string): Promise<Blob | null> {
+export async function fetchServiceBlob(path: string, opts: Pick<RequestOptions, 'mayBeCached'> = {}): Promise<Blob | null> {
   // No explicit cache directive: respect the server's Cache-Control header.
   // Effect thumbnails + app icons are static-per-key bytes; the routes that
   // care set Cache-Control accordingly. Forcing no-store here would void any
   // server cache hint and refetch on every mount.
   // An error status must yield null, not a blob of the JSON error body -
   // callers feed this straight into URL.createObjectURL for <img> sources.
-  const r = await authFetch(path);
+  const r = await authFetch(path, opts);
   if (!r || !r.ok) return null;
   try {
     return await r.blob();
@@ -751,8 +765,8 @@ export async function fetchServiceBlob(path: string): Promise<Blob | null> {
 
 /** Like fetchServiceBlob, but also returns the HTTP status (0 = transport
  *  failure) so a caller can tell a definitive miss from a transient one. */
-export async function fetchServiceBlobWithStatus(path: string): Promise<{ blob: Blob | null; status: number }> {
-  const { response, status } = await authFetchWithStatus(path);
+export async function fetchServiceBlobWithStatus(path: string, opts: Pick<RequestOptions, 'mayBeCached'> = {}): Promise<{ blob: Blob | null; status: number }> {
+  const { response, status } = await authFetchWithStatus(path, opts);
   if (!response || !response.ok) return { blob: null, status };
   try {
     return { blob: await response.blob(), status };

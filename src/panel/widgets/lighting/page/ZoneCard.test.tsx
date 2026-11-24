@@ -262,7 +262,7 @@ describe('ZoneCard bulk selection', () => {
     expect(rows).toEqual(['lighting.ledMap.settings']);
   });
 
-  it.each(['pl', 'ru'])('asks %s for the CLDR few form at 3', (language) => {
+  it.each(['pl', 'ru', 'cs'])('asks %s for the CLDR few form at 3', (language) => {
     i18n.language = language;
     renderBulkAndOpen(bulkProps({ count: 3, identifyCount: 3 }));
     expect(screen.getByRole('button', { name: /menuControlOffCount\.few/ })).toBeTruthy();
@@ -871,25 +871,33 @@ describe('ZoneCard pin', () => {
     renderPin({ disabledReason: 'lighting.pin.disabledMedia' });
     expect(button('lighting.pin.disabledMedia')).toBeNull();
     openMenu();
-    expect(menuRow(/^lighting\.devices\.pin$/)).toBeNull();
+    expect(menuRow(/^lighting\.devices\.pin/)).toBeNull();
   });
 
   it('offers Pin in the menu on a following card and Unpin on a pinned one', () => {
     const setPinned = vi.fn();
     renderPin({ setPinned });
     openMenu();
-    fireEvent.click(menuRow(/^lighting\.devices\.pin$/)!);
+    fireEvent.click(menuRow(/^lighting\.devices\.pinlighting\.pin\.pinDesc$/)!);
     expect(setPinned).toHaveBeenCalledWith(true);
-    expect(menuRow(/^lighting\.devices\.unpin$/)).toBeNull();
+    expect(menuRow(/^lighting\.devices\.unpin/)).toBeNull();
   });
 
   it('offers Unpin, and no Pin, on a pinned card', () => {
     const setPinned = vi.fn();
     renderPin({ pinned: true, targetName: 'x', setPinned });
     openMenu();
-    expect(menuRow(/^lighting\.devices\.pin$/)).toBeNull();
-    fireEvent.click(menuRow(/^lighting\.devices\.unpin$/)!);
+    expect(menuRow(/^lighting\.devices\.pin/)).toBeNull();
+    fireEvent.click(menuRow(/^lighting\.devices\.unpinlighting\.pin\.unpinDesc$/)!);
     expect(setPinned).toHaveBeenCalledWith(false);
+  });
+
+  it('describes what a pin does under the menu row and on the pin icon', () => {
+    renderPin({ pinned: true, targetName: 'Aurora' });
+    fireEvent.focus(button('lighting.pin.pinnedTo:{"name":"Aurora"}')!);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('lighting.pin.tooltipBody');
+    openMenu();
+    expect(menuRow(/^lighting\.devices\.unpinlighting\.pin\.unpinDesc$/)).not.toBeNull();
   });
 
   it('counts the members each row reaches in a selection', () => {
@@ -940,6 +948,74 @@ describe('ZoneCard LED colours badge', () => {
     fireEvent.click(badge()!);
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
     expect(setPinned).not.toHaveBeenCalled();
+  });
+});
+
+describe('ZoneCard color tuning badge', () => {
+  const bulkOf = (tunableCount: number): BulkSelection => ({
+    count: 3, identifyCount: 3, tunableCount, controlled: true, ledsOn: true,
+    setControlled: () => {}, setPower: () => {}, identify: () => {},
+  });
+  const badge = () => screen.queryByRole('button', { name: 'lighting.colorTuning.title' });
+
+  it('opens color tuning without selecting the card', () => {
+    const onOpenColorTuning = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <ZoneCard
+        device={baseDevice} selected={false} indent={false} onSelect={onSelect}
+        onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
+        colorTuned onOpenColorTuning={onOpenColorTuning}
+      />,
+    );
+    fireEvent.click(badge()!);
+    expect(onOpenColorTuning).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['toggle mode', { toggleMode: true }],
+    ['unavailable', { device: { ...baseDevice, ledCount: 0 }, bulk: bulkOf(3) }],
+    ['select-only', { selectOnly: true }],
+    ['firmware-owned', { firmwareControlled: true }],
+    ['not selectable', { device: { ...baseDevice, ledsOn: false } }],
+    ['dark in a selection', { device: { ...baseDevice, ledsOn: false }, bulk: bulkOf(3) }],
+    ['in a selection with nothing tunable', { bulk: bulkOf(0) }],
+  ] as const)('stays a plain mark when the card is %s', (_name, extra) => {
+    const onOpenColorTuning = vi.fn();
+    render(
+      <ZoneCard
+        device={baseDevice} selected={false} indent={false} onSelect={() => {}}
+        onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
+        colorTuned onOpenColorTuning={onOpenColorTuning}
+        {...(extra as object)}
+      />,
+    );
+    expect(badge()).toBeNull();
+    expect(screen.getByRole('img', { name: 'lighting.colorTuning.title' })).toBeTruthy();
+  });
+
+  it('shows the button for a selectable card in a selection with tunable cards', () => {
+    render(
+      <ZoneCard
+        device={baseDevice} selected indent={false} onSelect={() => {}}
+        onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
+        colorTuned onOpenColorTuning={() => {}} bulk={bulkOf(3)}
+      />,
+    );
+    expect(badge()).not.toBeNull();
+  });
+
+  it('stays a plain mark when nothing can open the modal', () => {
+    render(
+      <ZoneCard
+        device={baseDevice} selected={false} indent={false} onSelect={() => {}}
+        onTogglePower={() => {}} onToggleControlled={() => {}} onOpenSettings={() => {}}
+        colorTuned
+      />,
+    );
+    expect(badge()).toBeNull();
+    expect(screen.getByRole('img', { name: 'lighting.colorTuning.title' })).toBeTruthy();
   });
 });
 
@@ -1038,5 +1114,226 @@ describe('ZoneCard firmware-owned menu', () => {
     fireEvent.contextMenu(document.querySelector(`.${styles.deviceCard}`)!);
     expect(screen.getByRole('button', { name: /menuOpenDevicePage/ })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /menuTakeControl/ })).toBeNull();
+  });
+});
+
+describe('ZoneCard controlled-by strip', () => {
+  const strip = (controlled: boolean, names = ['Corsair iCUE']) => ({
+    controlled,
+    apps: names.map((name, i) => ({ id: `app-${i}`, name })),
+  });
+  function renderStrip(device: LightingDevice, appStrip?: ReturnType<typeof strip>, handlers: { onSelect?: () => void; onOpenAppStrip?: () => void } = {}) {
+    return render(
+      <ZoneCard
+        device={device}
+        selected={false}
+        indent={false}
+        onSelect={handlers.onSelect ?? (() => {})}
+        onOpenSettings={() => {}}
+        appStrip={appStrip}
+        onOpenAppStrip={handlers.onOpenAppStrip ?? (() => {})}
+      />,
+    );
+  }
+
+  it('reads as gray "controlled by" when Nexus does not drive the card', () => {
+    renderStrip({ ...baseDevice, controlled: false }, strip(false));
+    const button = screen.getByRole('button', { name: /lighting\.devices\.controlledBy/ });
+    expect(button.className).not.toContain(styles.deviceControlledByWarn);
+    expect(button.textContent).toContain('Corsair iCUE');
+    expect(document.querySelector(`.${styles.deviceCard}`)?.className).toContain(styles.deviceCardWithStrip);
+  });
+
+  it('reads as amber "running" when Nexus drives the card', () => {
+    renderStrip(baseDevice, strip(true));
+    const button = screen.getByRole('button', { name: /devices\.conflictRunning\.badge/ });
+    expect(button.className).toContain(styles.deviceControlledByWarn);
+  });
+
+  it('renders no strip without a matching running app', () => {
+    renderStrip(baseDevice, undefined);
+    expect(screen.queryByRole('button', { name: /controlledBy|conflictRunning/ })).toBeNull();
+    expect(document.querySelector(`.${styles.deviceCard}`)?.className).not.toContain(styles.deviceCardWithStrip);
+  });
+
+  it('lists several apps in the order given, comma-separated', () => {
+    renderStrip({ ...baseDevice, controlled: false }, strip(false, ['Corsair iCUE', 'SignalRGB', 'OpenRGB']));
+    expect(screen.getByRole('button', { name: /controlledBy/ }).textContent).toContain('Corsair iCUE, SignalRGB, and OpenRGB');
+  });
+
+  it('stays hidden in toggle, select-only, firmware-controlled and unavailable modes', () => {
+    const device = { ...baseDevice, controlled: false };
+    const props = { selected: false, indent: false, onSelect: () => {}, appStrip: strip(false), onOpenAppStrip: () => {} };
+    const hidden = (extra: Record<string, unknown>, dev: LightingDevice = device) => {
+      const view = render(<ZoneCard device={dev} {...props} {...extra} />);
+      const found = screen.queryByRole('button', { name: /controlledBy/ });
+      view.unmount();
+      return found;
+    };
+    expect(hidden({ toggleMode: true, onToggleControlled: () => {} })).toBeNull();
+    expect(hidden({ selectOnly: true })).toBeNull();
+    expect(hidden({ firmwareControlled: true })).toBeNull();
+    expect(hidden({}, { ...device, ledCount: 0 })).toBeNull();
+    expect(hidden({})).not.toBeNull();
+  });
+
+  it('keeps Enter and Space off the card but lets Escape bubble', () => {
+    const onKeyDown = vi.fn();
+    render(
+      <div onKeyDown={e => onKeyDown(e.key)}>
+        <ZoneCard device={{ ...baseDevice, controlled: false }} selected={false} indent={false} onSelect={() => {}} appStrip={strip(false)} onOpenAppStrip={() => {}} />
+      </div>,
+    );
+    const button = screen.getByRole('button', { name: /controlledBy/ });
+    fireEvent.keyDown(button, { key: 'Enter' });
+    fireEvent.keyDown(button, { key: ' ' });
+    expect(onKeyDown).not.toHaveBeenCalled();
+    fireEvent.keyDown(button, { key: 'Escape' });
+    expect(onKeyDown).toHaveBeenCalledWith('Escape');
+  });
+
+  it('opens the conflict dialog on press without selecting the card', () => {
+    const onSelect = vi.fn();
+    const onOpenAppStrip = vi.fn();
+    renderStrip({ ...baseDevice, controlled: false }, strip(false), { onSelect, onOpenAppStrip });
+    fireEvent.click(screen.getByRole('button', { name: /controlledBy/ }));
+    expect(onOpenAppStrip).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+});
+
+describe('ZoneCard unsized OpenRGB device', () => {
+  const empty: LightingDevice = { ...baseDevice, ledCount: 0 };
+
+  it('links to the Devices block instead of reporting a failed detection', () => {
+    const onOpenZoneSizes = vi.fn();
+    render(
+      <ZoneCard
+        device={empty} selected={false} indent={false} onSelect={() => {}} onTogglePower={() => {}}
+        onToggleControlled={() => {}} onOpenSettings={() => {}} onOpenZoneSizes={onOpenZoneSizes}
+      />,
+    );
+    expect(screen.queryByText('lighting.devices.detectionFailed')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.devices.setLedCounts' }));
+    expect(onOpenZoneSizes).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the detection-failed line when nothing can be sized', () => {
+    renderCard(empty);
+    expect(screen.getByText('lighting.devices.detectionFailed')).toBeTruthy();
+  });
+
+  it('says the counts come after setup where the Devices page is out of reach', () => {
+    render(
+      <ZoneCard
+        device={empty} selected={false} indent={false} onSelect={() => {}} onTogglePower={() => {}}
+        onToggleControlled={() => {}} onOpenSettings={() => {}} toggleMode needsLedCounts
+      />,
+    );
+    expect(screen.getByText('lighting.devices.setLedCountsAfterSetup')).toBeTruthy();
+    expect(screen.queryByText('lighting.devices.detectionFailed')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'lighting.devices.setLedCounts' })).toBeNull();
+  });
+});
+
+describe('ZoneCard not-responding strip', () => {
+  const failing: LightingDevice = { ...baseDevice, writeHealth: 'failing' };
+  const stripName = /lighting\.writeHealth\.badge/;
+
+  function renderFailing(device: LightingDevice, extra: Record<string, unknown> = {}, onOpenFixLighting: () => void = () => {}) {
+    return render(
+      <ZoneCard device={device} selected={false} indent={false} onSelect={() => {}} onOpenFixLighting={onOpenFixLighting} {...extra} />,
+    );
+  }
+
+  it('shows an amber strip for a failing device Nexus controls', () => {
+    renderFailing(failing);
+    const button = screen.getByRole('button', { name: stripName });
+    expect(button.className).toContain(styles.deviceControlledByWarn);
+    expect(document.querySelector(`.${styles.deviceCard}`)?.className).toContain(styles.deviceCardWithStrip);
+  });
+
+  it('shows nothing when healthy, when Nexus does not control the card, or without a handler', () => {
+    const hidden = (device: LightingDevice, handler = true) => {
+      const view = render(
+        <ZoneCard device={device} selected={false} indent={false} onSelect={() => {}} onOpenFixLighting={handler ? () => {} : undefined} />,
+      );
+      const found = screen.queryByRole('button', { name: stripName });
+      view.unmount();
+      return found;
+    };
+    expect(hidden(baseDevice)).toBeNull();
+    expect(hidden({ ...failing, controlled: false })).toBeNull();
+    expect(hidden(failing, false)).toBeNull();
+    expect(hidden(failing)).not.toBeNull();
+  });
+
+  it('stays hidden in toggle, select-only and firmware-controlled modes', () => {
+    const hidden = (extra: Record<string, unknown>) => {
+      const view = renderFailing(failing, extra);
+      const found = screen.queryByRole('button', { name: stripName });
+      view.unmount();
+      return found;
+    };
+    expect(hidden({ toggleMode: true, onToggleControlled: () => {} })).toBeNull();
+    expect(hidden({ selectOnly: true })).toBeNull();
+    expect(hidden({ firmwareControlled: true })).toBeNull();
+  });
+
+  it('yields to the running-app strip', () => {
+    renderFailing(failing, { appStrip: { controlled: true, apps: [{ id: 'icue', name: 'Corsair iCUE' }] }, onOpenAppStrip: () => {} });
+    expect(screen.queryByRole('button', { name: stripName })).toBeNull();
+    expect(screen.getByRole('button', { name: /devices\.conflictRunning\.badge/ })).toBeTruthy();
+  });
+
+  it('opens Fix lighting on press without selecting the card', () => {
+    const onSelect = vi.fn();
+    const onOpenFixLighting = vi.fn();
+    render(<ZoneCard device={failing} selected={false} indent={false} onSelect={onSelect} onOpenFixLighting={onOpenFixLighting} />);
+    fireEvent.click(screen.getByRole('button', { name: stripName }));
+    expect(onOpenFixLighting).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('ZoneCard needs-binding state', () => {
+  const unbound: LightingDevice = { ...baseDevice, id: 'lianli-wireless-unbound:AA', name: 'Strimer Wireless', ledCount: 0, ledsOn: false, controlled: false };
+
+  function renderUnbound(onOpenBinding: () => void) {
+    return render(
+      <ZoneCard
+        device={unbound}
+        selected={false}
+        indent={false}
+        onSelect={() => {}}
+        onTogglePower={() => {}}
+        onToggleControlled={() => {}}
+        onOpenSettings={() => {}}
+        onOpenBinding={onOpenBinding}
+      />,
+    );
+  }
+
+  it('shows the status, offers no lighting controls, and opens on tap or key', () => {
+    const open = vi.fn();
+    renderUnbound(open);
+    expect(screen.getByText('lighting.devices.needsBinding')).toBeTruthy();
+    expect(screen.queryByText('lighting.devices.detectionFailed')).toBeNull();
+    expect(screen.queryByLabelText('lighting.devices.moreActions')).toBeNull();
+    const card = screen.getByRole('button', { name: 'Strimer Wireless, lighting.devices.needsBinding' });
+    fireEvent.click(card);
+    fireEvent.keyDown(card, { key: 'Enter' });
+    fireEvent.keyDown(card, { key: ' ' });
+    expect(open).toHaveBeenCalledTimes(3);
+    fireEvent.click(screen.getByText('lighting.devices.needsBinding').closest('button')!);
+    expect(open).toHaveBeenCalledTimes(4);
+    const strip = screen.getByText('lighting.devices.needsBinding').closest('button')!;
+    expect(strip).toHaveAttribute('tabindex', '-1');
+    expect(strip).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('devices.lianli-wireless.unbound')).toBeTruthy();
+    expect(document.querySelectorAll(`.${styles.deviceControlledByWarn}`)).toHaveLength(1);
+    expect(card.className).toContain(styles.deviceCardWithStrip);
   });
 });

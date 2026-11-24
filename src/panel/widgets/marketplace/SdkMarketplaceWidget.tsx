@@ -8,20 +8,24 @@
 // (relay-aware). Everything else (worker, MessagePort UI channel, remote-dom)
 // runs locally in the panel's browser.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from '../../../lib/i18n';
 import { postService } from '../../../api/service';
+import { createAppDispatch } from '../../../sandbox/appDispatch';
+import { useToastSafe } from '../../../components/common/Toast/Toast';
 import { WidgetSettingsBridge } from '../../../widgets/settingsBridge';
 import type { AppInstalledListing } from '../../../widgets/types';
 import { SandboxedWidget } from '../../../sandbox/SandboxedWidget';
 import { usePanelPreview } from '../common/PanelPreviewContext';
-import { usePanelDisplayBound } from '../common/PanelDisplayBoundContext';
+import { usePanelDigitizer, usePanelDisplayBound, usePanelGenericDisplay } from '../common/PanelDisplayBoundContext';
 import { useReportOpaque } from '../common/PanelOpaqueContext';
 import { useSdkBundle, useSdkRuntime } from './useSdkBundle';
 import { isStreamedPanelSurface, surfaceInputMode, widgetDisplayShape, type PanelSurface, type PanelWidgetSize } from '../../types';
 import { sizeToSpan } from '../../engine/grid';
 import styles from './MarketplaceWidget.module.scss';
 import { usePanelGlassSurface } from '../common/PanelGlassSurfaceContext';
+
+const USED_PING_INTERVAL_MS = 60 * 60 * 1000;
 
 export interface SdkMarketplaceWidgetProps {
   listing: AppInstalledListing;
@@ -63,6 +67,16 @@ export function SdkMarketplaceWidget({ listing, instanceId, sandboxSurface, size
     return unsub;
   }, [settingsBridge, preview]);
 
+  // Tells the service the app is running, on mount and hourly while mounted so a kiosk widget that stays up
+  // across midnight counts each UTC day. The settings editor deliberately does not do this.
+  useEffect(() => {
+    if (preview) return;
+    const ping = () => { postService<unknown>(`/apps-api/instance/${encodeURIComponent(instanceId)}/used`, {}).catch(() => {}); };
+    ping();
+    const timer = setInterval(ping, USED_PING_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [instanceId, preview]);
+
   const netFetch = useMemo(() => listing.capabilities['net.fetch'] ?? [], [listing]);
   const sensorsRead = useMemo(() => listing.capabilities['sensors.read'] ?? [], [listing]);
   const mediaImport = useMemo(() => listing.capabilities.mediaImport ?? [], [listing]);
@@ -71,16 +85,26 @@ export function SdkMarketplaceWidget({ listing, instanceId, sandboxSurface, size
   const glass = usePanelGlassSurface(surface);
   const streamed = glass != null && isStreamedPanelSurface(glass, displayBound);
   const displayShape = widgetDisplayShape(size);
-  const displayInput = surfaceInputMode(surface ?? 'desktop', deviceTouch);
+  const digitizer = usePanelDigitizer();
+  const genericDisplay = usePanelGenericDisplay();
+  // A generic display without a digitizer is driven by its mouse; a known display keeps its own answer.
+  const displayInput = genericDisplay && digitizer !== true
+    ? 'pointer'
+    : surfaceInputMode(surface ?? 'desktop', deviceTouch);
   // The fullscreen view has no grid span.
   const displayCells = useMemo(() => (sandboxSurface === 'immersive' ? undefined : sizeToSpan(size)), [sandboxSurface, size]);
 
   // Gated host action: POST /apps-api/dispatch (relay-aware). Returns the
   // { ok, result } envelope so the worker's useDispatch / useHostAction work.
-  const onDispatch = useCallback(
-    (action: string, args?: Record<string, unknown>) =>
-      postService<unknown>('/apps-api/dispatch', { appId: listing.id, action, args: args ?? {} }),
-    [listing.id],
+  const { push } = useToastSafe();
+  const dispatchAllow = listing.capabilities.dispatch;
+  const onDispatch = useMemo(
+    () => createAppDispatch({
+      appId: listing.id,
+      allowed: dispatchAllow ?? [],
+      onSupportBundleFailed: () => push({ title: t('settings.diagnostics.supportBundleFailed') }),
+    }),
+    [listing.id, dispatchAllow, push, t],
   );
 
   if (failed) return <div className={styles.empty}>{t('marketplace.failedToLoad', { name: listing.name })}</div>;

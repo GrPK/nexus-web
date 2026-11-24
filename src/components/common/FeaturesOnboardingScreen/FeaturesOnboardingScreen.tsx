@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { ArrowLeft, Activity, Ban, Check, Fan, Lightbulb, SlidersHorizontal, Stethoscope, type LucideIcon } from 'lucide-react';
-import { SkipOnboardingButton } from '../SkipOnboardingButton/SkipOnboardingButton';
+import { Activity, Ban, Check, Fan, Lightbulb, SlidersHorizontal, Stethoscope, type LucideIcon } from 'lucide-react';
+import { OnboardingHeader } from '../OnboardingHeader/OnboardingHeader';
+import { OnboardingFooter } from '../OnboardingFooter/OnboardingFooter';
 import { useTranslation } from '../../../lib/i18n';
 import { Overlay } from '../Overlay/Overlay';
-import { Button } from '../Button/Button';
 import { completeFeaturesOnboarding, completeLightingOnboarding } from '../../../api/onboarding';
 import { savePreferences } from '../../../api/profiles';
 import { useFeatureFlags, useUiSettingsHydrated, useUiSettingsUpdateSafe, type FeatureFlags, type FeatureKey } from '../../../hooks/useUiSettings';
@@ -116,14 +116,7 @@ export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack
       className={styles.surface}
       backdropClassName={styles.backdrop}
     >
-      <div className={styles.topBar}>
-        {onBack ? (
-          <Button tone="ghost" size="sm" icon={<ArrowLeft />} disabled={submitting} onClick={onBack}>
-            {t('nav.back')}
-          </Button>
-        ) : <span />}
-        {onSkipOnboarding ? <SkipOnboardingButton onSkip={onSkipOnboarding} /> : <span />}
-      </div>
+      <OnboardingHeader onBack={onBack} onSkip={onSkipOnboarding} backDisabled={submitting} />
 
       <div className={styles.hero}>
         <span className={styles.heroIcon} aria-hidden>
@@ -146,29 +139,32 @@ export function FeaturesOnboardingScreen({ open, fromCurrent, onComplete, onBack
             <span className={styles.pillarIndicator} aria-hidden>
               {flags[key] ? <Check /> : <Ban />}
             </span>
-            <span className={styles.pillarIcon} aria-hidden><Icon size={36} /></span>
+            <span className={`${styles.pillarIcon} ${styles[`icon_${key}`]}`} aria-hidden>
+              <Icon size={56} strokeWidth={1.75} />
+              {key === 'lighting' && (
+                <svg className={styles.rays} viewBox="0 0 24 24" width={56} height={56} strokeWidth={1.75}>
+                  <path d="M12 -2.5v1.5" />
+                  <path d="M4.2 0.6l1 1" />
+                  <path d="M19.8 0.6l-1 1" />
+                  <path d="M1.5 7.5h1.5" />
+                  <path d="M21 7.5h1.5" />
+                </svg>
+              )}
+            </span>
             <span className={styles.pillarTitle}>{t(titleKey)}</span>
             <span className={styles.pillarDescription}>{t(`featuresOnboarding.pillar.${key}.description`)}</span>
           </button>
         ))}
       </div>
 
-      <OnboardingNote>{t('welcome.preferences.hint')}</OnboardingNote>
-
-      {error && <p className={styles.error}>{t('welcome.error')}</p>}
-
-      <div className={styles.footerRow}>
-        <Button
-          tone="accent"
-          size="lg"
-          onClick={handleContinue}
-          loading={submitting || waiting}
-          loadingHidesLabel
-          className={styles.continueButton}
-        >
-          {t('featuresOnboarding.continue')}
-        </Button>
-      </div>
+      <OnboardingFooter
+        label={t('featuresOnboarding.continue')}
+        onContinue={handleContinue}
+        loading={submitting || waiting}
+        error={error ? t('welcome.error') : undefined}
+      >
+        <OnboardingNote>{t('welcome.preferences.hint')}</OnboardingNote>
+      </OnboardingFooter>
     </Overlay>
   );
 }

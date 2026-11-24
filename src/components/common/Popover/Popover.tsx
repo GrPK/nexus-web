@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import classNames from 'classnames';
+import { usePortalRoot } from '../ThemeScope/ThemeScope';
 import styles from './Popover.module.scss';
 
 export type PopoverPlacement =
@@ -14,7 +15,8 @@ export type PopoverPlacement =
 
 export interface PopoverProps {
   open: boolean;
-  onClose: () => void;
+  /** Called for an outside press, a scroll of an ancestor, or Escape; `event` is the one that asked, so a caller can tell where a press landed. */
+  onClose: (event?: Event) => void;
   children: ReactNode;
   /**
    * The element the popover is anchored to. Used for click-outside detection
@@ -32,6 +34,10 @@ export interface PopoverProps {
    *  ancestor cannot cut it off. Flips to the other side when it would leave
    *  the viewport. */
   portal?: boolean;
+  /** With portal: keep the popover inside this element's box instead of the viewport. */
+  boundsRef?: RefObject<HTMLElement | null>;
+  /** With portal and a top or bottom placement: the distance, px, between the anchor and the popover on whichever side it opens. Defaults to the standard gap. */
+  gap?: number;
 }
 
 // Matches the inline placement offsets in Popover.module.scss.
@@ -68,8 +74,11 @@ export function Popover({
   role = 'dialog',
   ariaLabel,
   portal = false,
+  boundsRef,
+  gap = GAP,
 }: PopoverProps) {
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const portalRoot = usePortalRoot();
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
 
   const reposition = useCallback(() => {
@@ -80,24 +89,27 @@ export function Popover({
     const w = pop.offsetWidth;
     const h = pop.offsetHeight;
     const [side, align] = placement.split('-');
+    const b = boundsRef?.current?.getBoundingClientRect();
+    const minY = Math.max(VIEWPORT_MARGIN, b ? b.top + VIEWPORT_MARGIN : 0);
+    const bottomLimit = Math.min(window.innerHeight, b ? b.bottom : Infinity) - VIEWPORT_MARGIN;
     let top: number;
     let left: number;
     if (side === 'top' || side === 'bottom') {
-      const below = r.bottom + GAP;
-      const above = r.top - GAP - h;
-      const fitsBelow = below + h <= window.innerHeight - VIEWPORT_MARGIN;
-      const fitsAbove = above >= VIEWPORT_MARGIN;
+      const below = r.bottom + gap;
+      const above = r.top - gap - h;
+      const fitsBelow = below + h <= bottomLimit;
+      const fitsAbove = above >= minY;
       top = side === 'bottom' ? (fitsBelow || !fitsAbove ? below : above) : (fitsAbove || !fitsBelow ? above : below);
       left = align === 'start' ? r.left : r.right - w;
     } else {
       left = side === 'right' ? r.right + SIDE_GAP : r.left - SIDE_GAP - w;
       top = align === 'start' ? r.top : r.bottom - h;
     }
-    setCoords({
-      top: clamp(top, VIEWPORT_MARGIN, window.innerHeight - h - VIEWPORT_MARGIN),
-      left: clamp(left, VIEWPORT_MARGIN, window.innerWidth - w - VIEWPORT_MARGIN),
-    });
-  }, [anchorRef, placement]);
+    const minX = Math.max(VIEWPORT_MARGIN, b ? b.left + VIEWPORT_MARGIN : 0);
+    const maxX = Math.min(window.innerWidth, b ? b.right : Infinity) - w - VIEWPORT_MARGIN;
+    const maxY = bottomLimit - h;
+    setCoords({ top: clamp(top, minY, maxY), left: clamp(left, minX, maxX) });
+  }, [anchorRef, boundsRef, placement, gap]);
 
   useLayoutEffect(() => {
     if (open && portal) reposition();
@@ -108,7 +120,7 @@ export function Popover({
     // Mounted open, the anchor's ref attaches after this popover's layout effect.
     reposition();
     // A scrolling ancestor carries the anchor away; fixed coordinates cannot follow it.
-    const onScroll = (e: Event) => { if (!popoverRef.current?.contains(e.target as Node)) onClose(); };
+    const onScroll = (e: Event) => { if (!popoverRef.current?.contains(e.target as Node)) onClose(e); };
     window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', reposition);
     return () => {
@@ -123,10 +135,10 @@ export function Popover({
       const target = e.target as Node;
       const inAnchor = anchorRef.current?.contains(target) ?? false;
       const inPopover = popoverRef.current?.contains(target) ?? false;
-      if (!inAnchor && !inPopover) onClose();
+      if (!inAnchor && !inPopover) onClose(e);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onClose(e);
     };
     document.addEventListener('mousedown', onMouseDown);
     document.addEventListener('keydown', onKey);
@@ -146,9 +158,10 @@ export function Popover({
       className={classNames(styles.popover, portal ? styles.portaled : styles[`placement_${placement.replace('-', '_')}`], className)}
       style={portal ? { top: coords?.top ?? 0, left: coords?.left ?? 0, visibility: coords ? undefined : 'hidden' } : undefined}
       data-portaled-popover={portal || undefined}
+      data-skin-part="surface"
     >
       {children}
     </div>
   );
-  return portal ? createPortal(node, document.body) : node;
+  return portal ? createPortal(node, portalRoot) : node;
 }

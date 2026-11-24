@@ -58,7 +58,7 @@ The same widget as declarative JSON was ~120 lines plus a binding mini-language
   `Scroll`, `Layer`; content - `Text`, `Icon`, `Image`, `Sprite`, `Badge`, `Empty`, `Section`, `Card`; data viz -
   `Ring`, `Bar`, `Range`, `Gauge`, `Sparkline`, `Chart`; input - `Slider` (see `trackFill` /
   `orientation` below), `Button`, `Stepper`, `Input`, `Toggle`, `Segmented`, `Color` (native HSV
-  picker), `Curve` (draggable curve editor), `Spinner`; blessed composites - `Avatar` (host-rendered 3D character), `ClockFace`,
+  picker), `Curve` (draggable curve editor), `Spinner`; blessed composites - `Canvas` (a GPU canvas drawn by your own renderer module), `ClockFace`,
   `WorldClock`, `ViewHeader` (real native tab bar), `MediaImport` (host-mediated file pick +
   crop + upload). Props are semantic (`tone`/`size`/`weight`/`variant`) and theme through panel
   tokens. No `style`/`className` - that is deliberate (consistency). `Button`/`Card` also take
@@ -69,7 +69,11 @@ The same widget as declarative JSON was ~120 lines plus a binding mini-language
 - **`Slider` additions**: `trackFill` controls the accent fill (auto from value, or pass a
   `number` 0..100 to pin the fill end; bipolar ranges auto-fill centre-out). `orientation`
   selects `'inline'` (label+track+value on one row, default), `'stacked'` (label above,
-  full-width track), or `'bare'` (track only, for custom label layouts).
+  full-width track), or `'bare'` (track only, for custom label layouts). `tone` colors the fill, and
+  `thumbIcon` (an icon name) replaces the knob with that icon; a slider with either keeps full
+  opacity while `disabled`. `marks` (`{ value, label, detail?, tone?, side?, large? }[]`) draws labelled points on the track,
+  positioned with the knob's travel and kept inside it, each pointing at its value. A host that
+  predates these props ignores them: accent fill, the round knob and no marks.
 - **`Manipulable`** inside a `Layer` with `gestures`: a host-driven drag / pinch / twist on a
   placed child (any blessed content), reported back as a normalized transform. **`YouTube`**:
   an embed player by video id. **`useImmersive()`**: whether the render is the fullscreen
@@ -133,6 +137,7 @@ node sdk/cli/nexus-app.mjs new my-app     # scaffold nexus.app/1: index.tsx + ma
 node sdk/cli/nexus-app.mjs build my-app   # -> my-app/widget.mjs  (--dev, --sourcemap)
 node sdk/cli/nexus-app.mjs dev my-app     # rebuild widget.mjs on change (unminified)
 node sdk/cli/nexus-app.mjs validate my-app # check manifest + entry against the nexus.app/1 schema
+#   build also bundles renderer.ts -> renderer.mjs when present (see `Canvas`)
 ```
 
 The shim re-exports exactly what the runtime exports (probed). Runtime source: the installed

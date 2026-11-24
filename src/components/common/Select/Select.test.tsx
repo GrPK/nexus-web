@@ -1,5 +1,6 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { initPointerKind, resetPointerKindForTests } from '../../../lib/pointerKind';
 import { Select } from './Select';
 
 const OPTIONS = [
@@ -12,6 +13,181 @@ function open(label = 'fruit') {
   fireEvent.click(screen.getByRole('button', { name: label }));
   return screen.getByRole('listbox');
 }
+
+describe('Select leadingAction', () => {
+  it('comes before the trigger in DOM order, and pressing it does not open the list', () => {
+    const onLead = vi.fn();
+    render(
+      <Select
+        value="a" onChange={vi.fn()} options={OPTIONS} ariaLabel="fruit"
+        leadingAction={<button type="button" aria-label="lead" onClick={onLead} />}
+      />,
+    );
+    const lead = screen.getByRole('button', { name: 'lead' });
+    const trigger = screen.getByRole('button', { name: 'fruit' });
+    expect(lead.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(lead);
+    expect(onLead).toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+});
+
+describe('Select trailingAction', () => {
+  it('comes after the trigger in DOM order, and pressing it does not open the list', () => {
+    const onTrail = vi.fn();
+    render(
+      <Select
+        value="a" onChange={vi.fn()} options={OPTIONS} ariaLabel="fruit"
+        trailingAction={<button type="button" aria-label="trail" onClick={onTrail} />}
+      />,
+    );
+    const trail = screen.getByRole('button', { name: 'trail' });
+    const trigger = screen.getByRole('button', { name: 'fruit' });
+    expect(trigger.compareDocumentPosition(trail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(trail);
+    expect(onTrail).toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('closes an open list when the trailing action is pressed', () => {
+    render(
+      <Select
+        value="a" onChange={vi.fn()} options={OPTIONS} ariaLabel="fruit"
+        trailingAction={<button type="button" aria-label="trail" />}
+      />,
+    );
+    open();
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'trail' }));
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+});
+
+describe('Select renderValue', () => {
+  it('draws custom trigger content for the selected option and leaves the menu rows alone', () => {
+    render(
+      <Select
+        value="b" onChange={vi.fn()} options={OPTIONS} ariaLabel="fruit"
+        renderValue={option => <><strong>{option.label}</strong><em>chip</em></>}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'fruit' })).toHaveTextContent('Bananachip');
+    open();
+    expect(screen.getByRole('option', { name: 'Cherry' })).toBeInTheDocument();
+  });
+
+  it('shows the placeholder, not the callback, when nothing is selected', () => {
+    const renderValue = vi.fn();
+    render(<Select value="" onChange={vi.fn()} options={OPTIONS} ariaLabel="fruit" placeholder="Pick" renderValue={renderValue} />);
+    expect(screen.getByRole('button', { name: 'fruit' })).toHaveTextContent('Pick');
+    expect(renderValue).not.toHaveBeenCalled();
+  });
+});
+
+describe('Select description lines', () => {
+  it('keeps a newline in the description so the row can break there', () => {
+    render(<Select value="a" onChange={vi.fn()} options={[{ value: 'a', label: 'Apple', description: 'one\ntwo' }]} ariaLabel="fruit" />);
+    open();
+    expect(screen.getByRole('option').querySelector('[data-option-description]')!.textContent).toBe('one\ntwo');
+  });
+});
+
+describe('Select attached action rows', () => {
+  const rows = (onAction: () => void, extra: Record<string, unknown> = {}) => [
+    { value: 'a', label: 'Apple' },
+    { value: '', label: 'Peel', onAction, attached: true, ...extra },
+    { value: 'b', label: 'Banana' },
+  ];
+
+  it('tints an attached row with the chosen option above it and squares the joint', () => {
+    render(<Select value="a" onChange={vi.fn()} options={rows(vi.fn())} ariaLabel="fruit" />);
+    open();
+    const [apple, peel, banana] = screen.getAllByRole('option');
+    expect(peel.className).toMatch(/attachedChosen/);
+    expect(apple.className).toMatch(/hasAttached/);
+    expect(banana.className).not.toMatch(/attached/i);
+  });
+
+  it('does not tint an attached row under an option that is not chosen', () => {
+    render(<Select value="b" onChange={vi.fn()} options={rows(vi.fn())} ariaLabel="fruit" />);
+    open();
+    expect(screen.getByRole('option', { name: 'Peel' }).className).not.toMatch(/attachedChosen/);
+  });
+
+  it('runs the action, keeps the list open and commits no value', () => {
+    const onAction = vi.fn();
+    const onChange = vi.fn();
+    render(<Select value="a" onChange={onChange} options={rows(onAction)} ariaLabel="fruit" />);
+    open();
+    fireEvent.click(screen.getByRole('option', { name: 'Peel' }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+
+  it('shows a disabled attached row but does not run it', () => {
+    const onAction = vi.fn();
+    render(<Select value="a" onChange={vi.fn()} options={rows(onAction, { disabled: true })} ariaLabel="fruit" />);
+    open();
+    const row = screen.getByRole('option', { name: 'Peel' });
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(row);
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it('shows the hint through the tooltip', async () => {
+    render(<Select value="a" onChange={vi.fn()} options={rows(vi.fn(), { hint: 'Peel the apple' })} ariaLabel="fruit" />);
+    open();
+    fireEvent.pointerEnter(screen.getByRole('option', { name: 'Peel' }).querySelector('span')!);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Peel the apple');
+  });
+
+  it('exposes the hint to assistive tech as the row description', () => {
+    render(<Select value="a" onChange={vi.fn()} options={rows(vi.fn(), { hint: 'Peel the apple' })} ariaLabel="fruit" />);
+    open();
+    const row = screen.getByRole('option', { name: 'Peel' });
+    expect(row).toHaveAccessibleDescription('Peel the apple');
+  });
+
+  it('squares the anchor corners only when the attached row carries the tint', () => {
+    const { rerender } = render(<Select value="a" onChange={vi.fn()} options={rows(vi.fn())} ariaLabel="fruit" />);
+    open();
+    expect(screen.getByRole('option', { name: 'Apple' }).className).toMatch(/hasAttached/);
+    rerender(<Select value="b" onChange={vi.fn()} options={rows(vi.fn())} ariaLabel="fruit" />);
+    expect(screen.getByRole('option', { name: 'Apple' }).className).not.toMatch(/hasAttached/);
+  });
+
+  it('while searching, keeps an attached row only with its anchor', () => {
+    const many = Array.from({ length: 8 }, (_, n) => ({ value: `f${n}`, label: `Fruit ${n}` }));
+    const opts = [...many, { value: '', label: 'Peel', onAction: vi.fn(), attached: true }];
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: true, media: q, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), onchange: null, dispatchEvent: vi.fn() })) as unknown as typeof window.matchMedia;
+    try {
+      render(<Select value="f7" onChange={vi.fn()} options={opts} ariaLabel="fruit" />);
+      const list = open();
+      const search = screen.getByRole('combobox');
+      fireEvent.change(search, { target: { value: 'fruit 7' } });
+      expect(within(list).getByRole('option', { name: 'Peel' })).toBeInTheDocument();
+      fireEvent.change(search, { target: { value: 'fruit 3' } });
+      expect(within(list).queryByRole('option', { name: 'Peel' })).toBeNull();
+      expect(within(list).getByRole('option', { name: 'Fruit 3' })).toBeInTheDocument();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+
+  it('keeps keyboard control working when the row the user was on is removed', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<Select value="a" onChange={onChange} options={rows(vi.fn())} ariaLabel="fruit" />);
+    const list = open();
+    fireEvent.keyDown(list, { key: 'ArrowDown' });
+    expect(screen.getByRole('option', { name: 'Peel' })).toHaveAttribute('id', list.getAttribute('aria-activedescendant'));
+    rerender(<Select value="a" onChange={onChange} options={[{ value: 'a', label: 'Apple' }, { value: 'b', label: 'Banana' }]} ariaLabel="fruit" />);
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' });
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('b');
+  });
+});
 
 describe('Select', () => {
   it('shows the selected option label on the trigger', () => {
@@ -29,9 +205,20 @@ describe('Select', () => {
     const trigger = screen.getByRole('button', { name: 'Language' });
     expect(trigger).not.toHaveTextContent('Italiano');
     expect(trigger).toHaveTextContent('🇮🇹');
-    expect(trigger).toHaveAttribute('title', 'Italiano');
+    expect(trigger).not.toHaveAttribute('title');
+    fireEvent.focus(trigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Italiano');
+    fireEvent.blur(trigger);
     open('Language');
     expect(screen.getByRole('option', { name: 'Italiano' })).toBeInTheDocument();
+  });
+
+  it('renders an option description in the menu row only', () => {
+    const opts = [{ value: 'a', label: 'Apple' }, { value: 'b', label: 'Banana', description: 'Ripe' }];
+    render(<Select value="b" onChange={vi.fn()} options={opts} ariaLabel="fruit" />);
+    expect(screen.getByRole('button', { name: 'fruit' })).not.toHaveTextContent('Ripe');
+    expect(screen.getByRole('button', { name: 'fruit' })).toHaveTextContent('Banana');
+    expect(within(open()).getByText('Ripe')).toBeInTheDocument();
   });
 
   it('draws a fontFamily option in its face in the menu row only', () => {
@@ -130,6 +317,53 @@ describe('Select', () => {
     expect(onChange).toHaveBeenCalledWith('b');
   });
 
+  it('renders a header as a non-option heading that nav and clicks skip', () => {
+    const onChange = vi.fn();
+    const grouped = [
+      { value: '', label: 'Fruit', header: true },
+      { value: 'a', label: 'Apple' },
+      { value: '', label: 'Veg', header: true },
+      { value: 'b', label: 'Beet' },
+    ];
+    render(<Select value="a" onChange={onChange} options={grouped} ariaLabel="fruit" />);
+    const listbox = open();
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+    expect(within(listbox).getByText('Veg')).toBeInTheDocument();
+    fireEvent.click(within(listbox).getByText('Veg'));
+    expect(onChange).not.toHaveBeenCalled();
+    // ArrowDown from Apple skips the Veg header and lands on Beet.
+    fireEvent.keyDown(listbox, { key: 'ArrowDown' });
+    fireEvent.keyDown(listbox, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('b');
+  });
+
+  it('never selects a header whose value equals the current value', () => {
+    const grouped = [
+      { value: '', label: 'Heading', header: true },
+      { value: '', label: 'None' },
+      { value: 'a', label: 'Apple' },
+    ];
+    render(<Select value="" onChange={vi.fn()} options={grouped} ariaLabel="fruit" />);
+    expect(screen.getByRole('button', { name: 'fruit' })).toHaveTextContent('None');
+    expect(screen.getByRole('button', { name: 'fruit' })).not.toHaveTextContent('Heading');
+    const listbox = open();
+    expect(within(listbox).getByRole('option', { selected: true })).toHaveTextContent('None');
+  });
+
+  it('typeahead does not land on a header', () => {
+    const onChange = vi.fn();
+    const grouped = [
+      { value: '', label: 'Veg', header: true },
+      { value: 'a', label: 'Apple' },
+      { value: 'b', label: 'Vine' },
+    ];
+    render(<Select value="a" onChange={onChange} options={grouped} ariaLabel="fruit" />);
+    const listbox = open();
+    fireEvent.keyDown(listbox, { key: 'v' });
+    fireEvent.keyDown(listbox, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('b');
+  });
+
   it('does not open when disabled', () => {
     render(<Select value="a" onChange={vi.fn()} options={OPTIONS} ariaLabel="fruit" disabled />);
     fireEvent.click(screen.getByRole('button', { name: 'fruit' }));
@@ -223,5 +457,270 @@ describe('Select in-menu search', () => {
     const labels = screen.getAllByRole('option').map(o => o.textContent);
     expect(labels).not.toContain('');
     expect(labels).toEqual(['Apple', 'Apricot', 'Banana', 'Grape', 'Mango', 'Orange', 'Peach', 'Pear']);
+  });
+
+  it('keeps a header only when an option in its group matches', () => {
+    const grouped = [
+      { value: '', label: 'Output', header: true },
+      ...FRUITS.slice(0, 4).map(f => ({ ...f })),
+      { value: '', label: 'Input', header: true },
+      ...FRUITS.slice(4),
+    ];
+    render(<Select value="f0" onChange={vi.fn()} options={grouped} ariaLabel="fruit" />);
+    open();
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'apple' } });
+    expect(screen.getByText('Output')).toBeInTheDocument();
+    expect(screen.queryByText('Input')).toBeNull();
+  });
+
+  it('does not count headers toward the search threshold', () => {
+    const grouped = [
+      { value: '', label: 'H1', header: true },
+      ...FRUITS.slice(0, 5),
+      { value: '', label: 'H2', header: true },
+      ...FRUITS.slice(5, 7),
+    ];
+    render(<Select value="f0" onChange={vi.fn()} options={grouped} ariaLabel="fruit" />);
+    open();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+});
+
+describe('Select action rows', () => {
+  it('runs the action on click and Enter without committing, closing or moving the selection', () => {
+    const onChange = vi.fn();
+    const onAction = vi.fn();
+    render(
+      <Select
+        value="a" onChange={onChange} ariaLabel="fruit"
+        options={[...OPTIONS, { value: '', label: 'Load more', onAction }]}
+      />,
+    );
+    const list = open();
+    const row = within(list).getByRole('option', { name: 'Load more' });
+    fireEvent.click(row);
+    expect(onAction).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(list, { key: 'End' });
+    fireEvent.keyDown(list, { key: 'Enter' });
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('listbox')).toBeTruthy();
+    expect(within(screen.getByRole('listbox')).getByRole('option', { name: 'Apple' }).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('ignores activation while busy', () => {
+    const onAction = vi.fn();
+    render(<Select value="a" onChange={vi.fn()} ariaLabel="fruit" options={[...OPTIONS, { value: '', label: 'Loading', onAction, busy: true }]} />);
+    const row = within(open()).getByRole('option', { name: 'Loading' });
+    expect(row.getAttribute('aria-busy')).toBe('true');
+    fireEvent.click(row);
+    expect(onAction).not.toHaveBeenCalled();
+  });
+});
+
+describe('Select action rows and in-place option changes', () => {
+  it('never marks an action row selected, even when its value equals the current value', () => {
+    render(<Select value="" onChange={vi.fn()} ariaLabel="fruit" options={[...OPTIONS, { value: '', label: 'Load more', onAction: vi.fn() }]} />);
+    const row = within(open()).getByRole('option', { name: 'Load more' });
+    expect(row.getAttribute('aria-selected')).toBe('false');
+  });
+
+  it('clears the active row when options are replaced while open, so Enter commits nothing', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<Select value="zzz" onChange={onChange} ariaLabel="fruit" options={[...OPTIONS, { value: '', label: 'Load more', onAction: vi.fn() }]} />);
+    const list = open();
+    rerender(<Select value="zzz" onChange={onChange} ariaLabel="fruit" options={[...OPTIONS, { value: 'd', label: 'Date' }, { value: 'e', label: 'Elder' }]} />);
+    fireEvent.keyDown(list, { key: 'Enter' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('listbox')).toBeTruthy();
+  });
+});
+
+describe('Select action row button look', () => {
+  it('shows the spinner only while busy, inside the same option', () => {
+    const { rerender } = render(<Select value="a" onChange={vi.fn()} ariaLabel="fruit" options={[...OPTIONS, { value: '', label: 'Load', onAction: vi.fn() }]} />);
+    let row = within(open()).getByRole('option', { name: 'Load' });
+    expect(within(row).queryByRole('img', { hidden: true })).toBeNull();
+    rerender(<Select value="a" onChange={vi.fn()} ariaLabel="fruit" options={[...OPTIONS, { value: '', label: 'Load', busyLabel: 'Loading', onAction: vi.fn(), busy: true }]} />);
+    row = within(screen.getByRole('listbox')).getByRole('option', { name: 'Loading' });
+    expect(within(row).getByRole('img', { hidden: true })).toBeTruthy();
+    expect(row.getAttribute('aria-busy')).toBe('true');
+    expect(row.getAttribute('aria-selected')).toBe('false');
+    expect(row.getAttribute('aria-describedby')).toBeNull();
+    // The idle label stays in the DOM (hidden by CSS) to hold the button size.
+    const label = within(row).getByText('Load');
+    expect(label.parentElement?.className).toMatch(/actionButtonBusy/);
+  });
+
+  it('falls back to the label as the busy accessible name', () => {
+    render(<Select value="a" onChange={vi.fn()} ariaLabel="fruit" options={[...OPTIONS, { value: '', label: 'Load', onAction: vi.fn(), busy: true }]} />);
+    expect(within(open()).getByRole('option', { name: 'Load' }).getAttribute('aria-busy')).toBe('true');
+  });
+});
+
+describe('Select in-place option swaps', () => {
+  const load = { value: '', label: 'Load', onAction: vi.fn() };
+
+  it('with a search active, Enter after the list grows commits nothing', () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({ value: `f${i}`, label: `Font ${i}` }));
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q === '(hover: hover) and (pointer: fine)', media: q, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn() }));
+    const onChange = vi.fn();
+    const { rerender } = render(<Select value="zzz" onChange={onChange} ariaLabel="fruit" options={[...many, load]} />);
+    const list = open();
+    const input = screen.getByRole('combobox') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'font' } });
+    rerender(<Select value="zzz" onChange={onChange} ariaLabel="fruit" options={[...many, { value: 'x', label: 'Font X' }]} />);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(list.isConnected).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it('a same-count swap resets the active row', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<Select value="zzz" onChange={onChange} ariaLabel="fruit" options={[...OPTIONS, load]} />);
+    const list = open();
+    rerender(<Select value="zzz" onChange={onChange} ariaLabel="fruit" options={[...OPTIONS, { value: 'd', label: 'Date' }]} />);
+    fireEvent.keyDown(list, { key: 'Enter' });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('Select grid', () => {
+  const grid = { headings: ['PC', 'Processor', 'Graphics'], columns: 'minmax(0, 1fr) minmax(0, 1fr)' };
+  const rows = [
+    { value: 'a', label: 'Desk', cells: ['Ryzen 7', 'RTX 5080'], badge: <i>chip</i> },
+    { value: 'b', label: 'Draft', note: 'No parts yet' },
+    { value: 'c', label: 'Mid', cells: ['Core i5', undefined] },
+  ];
+
+  it('draws the selected option across the columns in the bar and again in its row', () => {
+    render(<Select value="a" onChange={vi.fn()} options={rows} ariaLabel="fruit" grid={grid} />);
+    const trigger = screen.getByRole('button', { name: 'fruit' });
+    expect(trigger).toHaveTextContent('DeskchipProcessor: Ryzen 7Graphics: RTX 5080');
+    const list = open();
+    expect(within(list).getAllByRole('option')[0]).toHaveTextContent('DeskchipProcessor: Ryzen 7Graphics: RTX 5080');
+    expect(within(list).getAllByRole('option')[1]).toHaveTextContent('DraftNo parts yet');
+    expect(document.querySelector('[data-select-menu]')).toHaveTextContent(/^PCProcessorGraphics/);
+  });
+
+  it('lets a row name its columns to assistive tech through the cell headings', () => {
+    render(<Select value="a" onChange={vi.fn()} options={rows} ariaLabel="fruit" grid={grid} />);
+    const list = open();
+    expect(within(list).getByRole('option', { name: /Desk.*Processor:\s*Ryzen 7.*Graphics:\s*RTX 5080/ })).toBeInTheDocument();
+  });
+
+  it('sizes an attached action to the row it hangs off', () => {
+    const attached = (owner: object) => [
+      { value: 'a', label: 'Desk', ...owner },
+      { value: 'act', label: 'Resync', onAction: vi.fn(), attached: true },
+    ];
+    const { unmount } = render(<Select value="a" onChange={vi.fn()} options={attached({ cells: ['x', 'y'] })} ariaLabel="fruit" grid={grid} />);
+    expect(within(open()).getByRole('option', { name: 'Resync' }).className).not.toMatch(/gridAttachedPlain/);
+    unmount();
+    render(<Select value="a" onChange={vi.fn()} options={attached({})} ariaLabel="fruit" grid={grid} />);
+    expect(within(open()).getByRole('option', { name: 'Resync' }).className).toMatch(/gridAttachedPlain/);
+  });
+
+  it('keeps choosing and keyboard navigation working', () => {
+    const onChange = vi.fn();
+    render(<Select value="a" onChange={onChange} options={rows} ariaLabel="fruit" grid={grid} />);
+    const list = open();
+    fireEvent.keyDown(list, { key: 'ArrowDown' });
+    fireEvent.keyDown(list, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('b');
+  });
+
+  it('offers no search field however long the list is', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    const many = Array.from({ length: 12 }, (_, i) => ({ value: `v${i}`, label: `Row ${i}`, cells: ['x', 'y'] }));
+    render(<Select value="v0" onChange={vi.fn()} options={many} ariaLabel="fruit" grid={grid} />);
+    open();
+    expect(screen.queryByRole('combobox')).toBeNull();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('Select in-menu search on touchscreen and pointer-less hosts', () => {
+  const FRUITS = ['Apple', 'Apricot', 'Banana', 'Blueberry', 'Cherry', 'Grape', 'Mango', 'Orange', 'Peach', 'Pear']
+    .map((label, i) => ({ value: `f${i}`, label }));
+
+  function stubMedia(matching: string[]) {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: matching.includes(query), media: query, onchange: null,
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+    }));
+  }
+  function pointer(pointerType: string) {
+    const event = new Event('pointermove');
+    Object.defineProperty(event, 'pointerType', { value: pointerType });
+    act(() => { window.dispatchEvent(event); });
+  }
+  beforeEach(() => { resetPointerKindForTests(); initPointerKind(); });
+  afterEach(() => { vi.unstubAllGlobals(); resetPointerKindForTests(); });
+
+  it('offers search on a touchscreen PC whose primary pointer is coarse but has a mouse attached', () => {
+    stubMedia(['(any-hover: hover) and (any-pointer: fine)']);
+    render(<Select value="f0" onChange={vi.fn()} options={FRUITS} ariaLabel="fruit" />);
+    open();
+    expect(screen.getByRole('combobox')).toBeTruthy();
+  });
+
+  it('offers search in a WebView that reports no pointer once a mouse is used', () => {
+    stubMedia(['(pointer: none)']);
+    render(<Select value="f0" onChange={vi.fn()} options={FRUITS} ariaLabel="fruit" />);
+    pointer('mouse');
+    open();
+    expect(screen.getByRole('combobox')).toBeTruthy();
+  });
+
+  it('stays plain on a pointer-less host while only touch is used, as on the touch kiosk', () => {
+    stubMedia(['(pointer: none)']);
+    render(<Select value="f0" onChange={vi.fn()} options={FRUITS} ariaLabel="fruit" />);
+    pointer('touch');
+    open();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('stays plain on a touch-only device', () => {
+    stubMedia(['(pointer: coarse)', '(any-pointer: coarse)']);
+    render(<Select value="f0" onChange={vi.fn()} options={FRUITS} ariaLabel="fruit" />);
+    open();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+});
+
+describe('Select rowAction', () => {
+  it('runs the action and closes the menu without choosing the row', () => {
+    const onChange = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <Select
+        value="a" onChange={onChange} ariaLabel="fruit"
+        options={[OPTIONS[0], { ...OPTIONS[1], rowAction: { icon: <i data-testid="pencil" />, label: 'Edit', onSelect } }]}
+      />,
+    );
+    open();
+    fireEvent.click(screen.getByTestId('pencil'));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('draws no action on a disabled row and returns focus to the trigger after running it', () => {
+    const onSelect = vi.fn();
+    render(
+      <Select
+        value="a" onChange={vi.fn()} ariaLabel="fruit"
+        options={[
+          { ...OPTIONS[0], rowAction: { icon: <i data-testid="on" />, label: 'Edit', onSelect } },
+          { ...OPTIONS[1], disabled: true, rowAction: { icon: <i data-testid="off" />, label: 'Edit', onSelect } },
+        ]}
+      />,
+    );
+    open();
+    expect(screen.queryByTestId('off')).toBeNull();
+    fireEvent.click(screen.getByTestId('on'));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'fruit' }));
   });
 });

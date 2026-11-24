@@ -1,7 +1,7 @@
 import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UiSettingsProvider, useIgnoredComponents, useUiSettings, type UiSettingsContextValue } from './useUiSettings';
-import { applyThemeMode } from '../lib/settings';
+import { applyThemeMode, setHostThemeMode } from '../lib/settings';
 
 // Capture the 'prefs' topic callback and stub the network so the test can drive
 // a server echo by hand. vi.hoisted keeps the holder reachable from the hoisted
@@ -163,6 +163,45 @@ describe('UiSettingsProvider - prefs-topic reload', () => {
   });
 });
 
+describe('UiSettingsProvider - host theme', () => {
+  const flush = () => act(async () => { await Promise.resolve(); });
+  const withHost = (host: string) => ({
+    theme: { themeMode: 'system', accentColor: '#7c5cff', language: 'en', resolvedThemeMode: host },
+  });
+  const mount = (manageDom: boolean) => act(async () => {
+    render(
+      <UiSettingsProvider serviceOnline manageDom={manageDom}>
+        <Consumer />
+      </UiSettingsProvider>,
+    );
+  });
+
+  afterEach(() => { setHostThemeMode(''); });
+
+  it('exposes the host theme and re-applies the dashboard theme when a prefs push changes it', async () => {
+    h.fetchPreferences.mockResolvedValue(withHost('light'));
+    await mount(true);
+    await flush();
+    expect(captured.ctx!.settings.hostThemeMode).toBe('light');
+    const applyCalls = vi.mocked(applyThemeMode).mock.calls.length;
+
+    h.fetchPreferences.mockResolvedValue(withHost('dark'));
+    await act(async () => { h.prefsCb?.(); });
+    await flush();
+    expect(captured.ctx!.settings.hostThemeMode).toBe('dark');
+    expect(vi.mocked(applyThemeMode).mock.calls.length).toBe(applyCalls + 1);
+    expect(vi.mocked(applyThemeMode)).toHaveBeenLastCalledWith('system');
+  });
+
+  it('a panel provider (manageDom off) exposes the value but never records the page-global host theme', async () => {
+    h.fetchPreferences.mockResolvedValue(withHost('light'));
+    await mount(false);
+    await flush();
+    expect(captured.ctx!.settings.hostThemeMode).toBe('light');
+    expect(setHostThemeMode('')).toBe(false);
+  });
+});
+
 describe('UiSettingsProvider - pinnedSidebarApps', () => {
   const flush = () => act(async () => { await Promise.resolve(); });
   // nexus-service has no PinnedSidebarApps field on UiSettings/UiSettingsPatch
@@ -250,7 +289,7 @@ describe('UiSettingsProvider - pinnedSidebarApps', () => {
     });
     await flush();
 
-    expect(captured.ctx!.settings.pinnedSidebarApps).toEqual(['monitoring', 'lighting', 'cooling', 'diagnostics', 'store']);
+    expect(captured.ctx!.settings.pinnedSidebarApps).toEqual(['monitoring', 'lighting', 'cooling', 'diagnostics']);
   });
 
   // Boot-order race: nothing in reload() may reset pinnedSidebarApps to
@@ -357,13 +396,13 @@ describe('UiSettingsProvider - debounced write merge', () => {
     });
     await flush();
 
-    await act(async () => { captured.ctx!.update({ diagnosticsCpuTempC: 80 }); });
-    await act(async () => { captured.ctx!.update({ diagnosticsGpuTempC: 75 }); });
+    await act(async () => { captured.ctx!.update({ diagnosticsNotificationsEnabled: false }); });
+    await act(async () => { captured.ctx!.update({ diagnosticsNotificationCooldownMinutes: 120 }); });
     await act(async () => { await new Promise(r => setTimeout(r, 300)); });
 
     expect(h.savePreferences).toHaveBeenCalledTimes(1);
     expect(h.savePreferences).toHaveBeenCalledWith({
-      diagnostics: { thresholds: { cpuC: 80, gpuC: 75 } },
+      diagnostics: { notifications: { enabled: false, cooldownMinutes: 120 } },
     });
   });
 });
@@ -611,5 +650,121 @@ describe('endConflictsOnLaunch', () => {
 
     await act(async () => { captured.ctx!.update({ endConflictsOnLaunch: false }); });
     await waitFor(() => expect(h.savePreferences).toHaveBeenCalledWith({ ui: { endConflictsOnLaunch: false } }));
+  });
+});
+
+describe('UiSettingsProvider - readRamTemperatures', () => {
+  const flush = () => act(async () => { await Promise.resolve(); });
+  const mount = async () => {
+    await act(async () => {
+      render(
+        <UiSettingsProvider serviceOnline manageDom>
+          <Consumer />
+        </UiSettingsProvider>,
+      );
+    });
+    await flush();
+  };
+  const base = { theme: { themeMode: 'dark', accentColor: '#2563eb', language: 'en' }, ui: {} };
+
+  it('is on when the server omits the field', async () => {
+    h.fetchPreferences.mockResolvedValue(base);
+    await mount();
+    expect(captured.ctx!.settings.readRamTemperatures).toBe(true);
+  });
+
+  it('hydrates false from the root preferences field', async () => {
+    h.fetchPreferences.mockResolvedValue({ ...base, readRamTemperatures: false });
+    await mount();
+    expect(captured.ctx!.settings.readRamTemperatures).toBe(false);
+  });
+
+  it('posts the change as a root field, not under monitoring', async () => {
+    h.fetchPreferences.mockResolvedValue(base);
+    h.savePreferences.mockResolvedValue(undefined);
+    await mount();
+    vi.useFakeTimers();
+    await act(async () => { captured.ctx!.update({ readRamTemperatures: false }); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(h.savePreferences).toHaveBeenCalledTimes(1);
+    expect(h.savePreferences).toHaveBeenCalledWith({ readRamTemperatures: false });
+  });
+});
+
+describe('UiSettingsProvider - powerMonitorsEnabled', () => {
+  const flush = () => act(async () => { await Promise.resolve(); });
+  const base = { theme: { themeMode: 'dark', accentColor: '#2563eb', language: 'en' }, ui: {} };
+  const mount = async () => {
+    await act(async () => {
+      render(
+        <UiSettingsProvider serviceOnline manageDom>
+          <Consumer />
+        </UiSettingsProvider>,
+      );
+    });
+    await flush();
+  };
+
+  it('defaults to true when the service omits the field', async () => {
+    h.fetchPreferences.mockResolvedValue(base);
+    await mount();
+    expect(captured.ctx!.settings.powerMonitorsEnabled).toBe(true);
+  });
+
+  it('hydrates false from the root preferences field', async () => {
+    h.fetchPreferences.mockResolvedValue({ ...base, powerMonitorsEnabled: false });
+    await mount();
+    expect(captured.ctx!.settings.powerMonitorsEnabled).toBe(false);
+  });
+
+  it('posts the change as a root field', async () => {
+    h.fetchPreferences.mockResolvedValue(base);
+    h.savePreferences.mockResolvedValue(undefined);
+    await mount();
+    vi.useFakeTimers();
+    await act(async () => { captured.ctx!.update({ powerMonitorsEnabled: false }); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(h.savePreferences).toHaveBeenCalledTimes(1);
+    expect(h.savePreferences).toHaveBeenCalledWith({ powerMonitorsEnabled: false });
+  });
+});
+
+describe('UiSettingsProvider - amdGpuLighting', () => {
+  const flush = () => act(async () => { await Promise.resolve(); });
+  const mount = async () => {
+    await act(async () => {
+      render(
+        <UiSettingsProvider serviceOnline manageDom>
+          <Consumer />
+        </UiSettingsProvider>,
+      );
+    });
+    await flush();
+  };
+  const base = { theme: { themeMode: 'dark', accentColor: '#2563eb', language: 'en' }, ui: {} };
+
+  it('is off and not applicable when the server omits the fields', async () => {
+    h.fetchPreferences.mockResolvedValue(base);
+    await mount();
+    expect(captured.ctx!.settings.amdGpuLighting).toBe(false);
+    expect(captured.ctx!.settings.amdGpuLightingApplicable).toBe(false);
+  });
+
+  it('hydrates both fields from the root preferences', async () => {
+    h.fetchPreferences.mockResolvedValue({ ...base, amdGpuLighting: true, amdGpuLightingApplicable: true });
+    await mount();
+    expect(captured.ctx!.settings.amdGpuLighting).toBe(true);
+    expect(captured.ctx!.settings.amdGpuLightingApplicable).toBe(true);
+  });
+
+  it('posts the change as a root field', async () => {
+    h.fetchPreferences.mockResolvedValue(base);
+    h.savePreferences.mockResolvedValue(undefined);
+    await mount();
+    vi.useFakeTimers();
+    await act(async () => { captured.ctx!.update({ amdGpuLighting: true }); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(h.savePreferences).toHaveBeenCalledTimes(1);
+    expect(h.savePreferences).toHaveBeenCalledWith({ amdGpuLighting: true });
   });
 });

@@ -36,6 +36,7 @@ import {
 } from '../../../lib/units';
 import type { FpsEstimateConfidence, FpsTableGameItem } from '../../../types/fps-estimates';
 import styles from './FramesPage.module.scss';
+import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
 
 const SESSIONS_LIMIT = 50;
 // The service's own fps scalar series retention (see the FPS benchmarks
@@ -368,7 +369,7 @@ function GameDetail({
                     <span className={styles.sessionMain}>
                       <span>{formatSessionDate(s.startedUtcMs, dateFormat, timeFormat)}</span>
                       <span className={styles.sessionMeta}>
-                        {`${formatResolution(`${s.dispW}x${s.dispH}`)} @ ${s.refreshHz} Hz · ${formatDurationMinutes(s.focusedSec)}`}
+                        {`${formatResolution(`${s.dispW}x${s.dispH}`)} @ ${s.refreshHz} Hz - ${formatDurationMinutes(s.focusedSec)}`}
                       </span>
                     </span>
                     <span className={styles.sessionStats}>
@@ -566,9 +567,11 @@ function StoreMark({ store }: { store: string }) {
   const key = store.toLowerCase();
   if (key !== 'steam' && key !== 'epic') return <Badge label={store} />;
   return (
-    <span className={styles.gameCardStore} title={store} aria-label={store} role="img">
-      {key === 'steam' ? <SteamIcon size={16} /> : <EpicIcon size={16} />}
-    </span>
+    <HoverTooltip body={store}>
+      <span className={styles.gameCardStore} aria-label={store} role="img">
+        {key === 'steam' ? <SteamIcon size={16} /> : <EpicIcon size={16} />}
+      </span>
+    </HoverTooltip>
   );
 }
 
@@ -616,16 +619,17 @@ function ConfidenceMark({ confidence }: { confidence: FpsEstimateConfidence }) {
   const { t } = useTranslation();
   const filled = CONFIDENCE_BARS[confidence] ?? 1;
   return (
-    <span
-      className={`${styles.confidence} ${styles[`confidence_${confidence}`] ?? ''}`}
-      role="img"
-      aria-label={t(`frames.discover.confidence.${confidence}`)}
-      title={t(`frames.discover.confidence.${confidence}`)}
-    >
-      {[1, 2, 3].map(bar => (
-        <span key={bar} className={bar <= filled ? styles.confidenceBarOn : styles.confidenceBar} />
-      ))}
-    </span>
+    <HoverTooltip body={t(`frames.discover.confidence.${confidence}`)}>
+      <span
+        className={`${styles.confidence} ${styles[`confidence_${confidence}`] ?? ''}`}
+        role="img"
+        aria-label={t(`frames.discover.confidence.${confidence}`)}
+      >
+        {[1, 2, 3].map(bar => (
+          <span key={bar} className={bar <= filled ? styles.confidenceBarOn : styles.confidenceBar} />
+        ))}
+      </span>
+    </HoverTooltip>
   );
 }
 
@@ -647,7 +651,7 @@ function DiscoverGameCard({ game, requestedRes }: { game: FpsTableGameItem; requ
         />
       </div>
       <div className={styles.gameCardBody}>
-        <div className={styles.gameCardName} title={game.title}>{game.title}</div>
+        <HoverTooltip body={game.title}><div className={styles.gameCardName}>{game.title}</div></HoverTooltip>
         <div className={styles.gameCardAvg}>
           <span className={styles.gameCardAvgValue}>{Math.round(game.avg)}</span>
           <span className={styles.gameCardAvgUnit}>{t('frames.card.fpsUnit')}</span>
@@ -663,7 +667,7 @@ function DiscoverGameCard({ game, requestedRes }: { game: FpsTableGameItem; requ
           <ConfidenceMark confidence={game.confidence} />
           <span className={styles.discoverBasisText}>
             {t(`frames.discover.level.${game.level}`)}
-            {fellBack && ` · ${t('frames.discover.resBasis', { res: formatResolution(requestedRes) })}`}
+            {fellBack && ` - ${t('frames.discover.resBasis', { res: formatResolution(requestedRes) })}`}
           </span>
         </div>
       </div>

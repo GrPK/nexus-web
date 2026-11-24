@@ -254,6 +254,17 @@ describe('CloudProfilesSection profile list', () => {
     });
   });
 
+  it('shows an info notice, not an error, when the import skipped the PC setup', async () => {
+    vi.mocked(importCloudProfile).mockResolvedValue({ status: 200, body: { error: false, pcSetup: 'skipped_other_machine' } });
+    renderSection();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'profile.cloud.import.open' }));
+
+    const note = await screen.findByText('profile.importSetupSkipped');
+    expect(note.closest('[data-tone]')).toHaveAttribute('data-tone', 'info');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('marks the row as imported once the copy lands', async () => {
     renderSection();
     await waitFor(() => {
@@ -299,7 +310,7 @@ describe('CloudProfilesSection profile list', () => {
     vi.mocked(importCloudProfile).mockResolvedValue({ status: 200, body: { error: false } });
     renderSection();
 
-    await waitFor(() => expect(screen.getByText(/profile\.cloud\.backup\.includes apps=com\.hellonexus\.aquarium/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/profile\.cloud\.backup\.includes apps=Aquarium/)).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'profile.cloud.import.open' }));
 
     await waitFor(() => expect(screen.getByText('profile.restore.importTitle name=Default')).toBeInTheDocument());

@@ -1,7 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalA11y } from './useModalA11y';
+import { useOverlayScale } from './overlayScale';
 import { acquireBlurScrim, releaseBlurScrim } from './blurScrimGuard';
+import { useSkinPortalHost } from '../ThemeScope/PanelSkinScope';
 import styles from './Overlay.module.scss';
 
 /**
@@ -56,6 +58,8 @@ export function Overlay({
   children,
 }: OverlayProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const scale = useOverlayScale();
+  const skinHost = useSkinPortalHost();
   useModalA11y({ open, onClose, onEnter, noEscDismiss, autoFocus, containerRef: surfaceRef });
 
   // Only the centered variants paint a blurring backdrop; sheets bring their
@@ -85,7 +89,7 @@ export function Overlay({
   // ancestor transforms / filters / contain rules (which silently re-anchor
   // fixed children to their bounding box - that's what made dialogs render
   // squished inside animated header slots etc.).
-  const portalTarget = typeof document !== 'undefined' ? document.body : null;
+  const portalTarget = typeof document !== 'undefined' ? skinHost ?? document.body : null;
 
   const content = (
     <div
@@ -101,7 +105,10 @@ export function Overlay({
     >
       <div
         ref={surfaceRef}
+        data-skin-part="surface"
         className={`${styles.surface} ${className ?? ''}`}
+        // Sheets are placed by their owner; only centered dialogs follow the host's scale.
+        style={variant !== 'sheet' && scale !== 1 ? scaledSurfaceStyle(scale) : undefined}
         tabIndex={-1}
         onPointerDown={e => { pointerDownInSurface.current = true; e.stopPropagation(); }}
         onClick={e => e.stopPropagation()}
@@ -112,4 +119,17 @@ export function Overlay({
   );
 
   return portalTarget ? createPortal(content, portalTarget) : content;
+}
+
+// Zoom multiplies every length inside, vh-based limits included, so the
+// viewport caps are divided by the scale (as the editor sheet does) and a
+// dialog taller than the screen scrolls instead of spilling off it. The inset
+// is the backdrop's own padding, shared through --overlay-inset.
+function scaledSurfaceStyle(scale: number): CSSProperties {
+  return {
+    zoom: scale,
+    maxWidth: `calc((100vw - 2 * var(--overlay-inset)) / ${scale})`,
+    maxHeight: `calc((100dvh - 2 * var(--overlay-inset)) / ${scale})`,
+    overflowY: 'auto',
+  };
 }

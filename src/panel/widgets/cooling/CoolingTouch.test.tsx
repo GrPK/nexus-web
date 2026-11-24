@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { PanelDeviceIdProvider } from '../common/PanelDeviceIdContext';
 import { CoolingTouch } from './CoolingTouch';
 import type { PanelWidget } from '../../types';
 
@@ -83,18 +84,41 @@ vi.mock('../../../api/minihub', async (importOriginal) => {
 });
 
 import { applyProfile, fetchFanChannels } from '../../../api/cooling';
+import { getNp50ConnectionState } from '../../../api/np50';
+
+// The page reads channels and the hub state more than once, so a per-test override must hold for every read and be undone for the next test.
+const defaultFetchFanChannels = vi.mocked(fetchFanChannels).getMockImplementation()!;
+const defaultNp50State = vi.mocked(getNp50ConnectionState).getMockImplementation();
+
+// The service's panel records, by panel id.
+const panelRecords = vi.hoisted(() => ({ current: {} as Record<string, Record<string, string[]>> }));
+vi.mock('../../../api/panel', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/panel')>()),
+  fetchPanelDevice: vi.fn(async (id: string) => (panelRecords.current[id] ? { id, ...panelRecords.current[id] } : null)),
+  patchPanelDevice: vi.fn(async (id: string, patch: Record<string, string[]>) => {
+    panelRecords.current[id] = { ...panelRecords.current[id], ...patch };
+    return { id, ...panelRecords.current[id] };
+  }),
+}));
 
 const widget = { id: 'w-cooling', type: 'cooling', size: '4x4', col: 0, row: 0 } as PanelWidget;
 
-function renderTouch() {
-  return render(<CoolingTouch widget={widget} immersiveGrid={{ columns: 4, rows: 8 }} />);
+function renderTouch(panelId: string | null = null) {
+  return render(
+    <PanelDeviceIdProvider value={panelId}>
+      <CoolingTouch widget={widget} immersiveGrid={{ columns: 4, rows: 8 }} />
+    </PanelDeviceIdProvider>,
+  );
 }
 
 describe('CoolingTouch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(fetchFanChannels).mockImplementation(defaultFetchFanChannels);
+    if (defaultNp50State) vi.mocked(getNp50ConnectionState).mockImplementation(defaultNp50State);
     // Isolate the shared cooling cache + fan-group collapse persistence.
     localStorage.clear();
+    panelRecords.current = {};
   });
 
   it('renders preset mode buttons with the active preset hydrated from /cooling/profiles', async () => {
@@ -138,17 +162,16 @@ describe('CoolingTouch', () => {
     expect(addChip.compareDocumentPosition(options) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('lists connected fans on the Devices tab and hides unresponsive hardware', async () => {
+  it('lists every fan on the Devices tab, an unresponsive one included', async () => {
     renderTouch();
     fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
     expect(await screen.findByText('CPU Fan')).toBeInTheDocument();
     expect(screen.getByText('Case Fan')).toBeInTheDocument();
-    expect(screen.queryByText('Dead Header')).toBeNull();
+    expect(screen.getByText('Dead Header')).toBeInTheDocument();
   });
 
   it('groups external-hub fans under a collapsible device header', async () => {
-    const { fetchFanChannels } = await import('../../../api/cooling');
-    vi.mocked(fetchFanChannels).mockResolvedValueOnce({
+    vi.mocked(fetchFanChannels).mockResolvedValue({
       channels: [
         {
           id: 'fan-cpu', name: 'CPU Fan', dutyPercent: 42, rpm: 1180, mode: 'Curve',
@@ -189,35 +212,84 @@ describe('CoolingTouch', () => {
     fireEvent.click(selectAll);
     await waitFor(() => expect(selectAll).toBeDisabled());
     expect(selectNone).toBeEnabled();
-    // The unresponsive header is not listed, so it never joins the selection.
-    expect(JSON.parse(localStorage.getItem('nexus.cooling.selectedFans') ?? '[]').sort())
-      .toEqual(['fan-case', 'fan-cpu']);
+    // The unresponsive header is a normal fan, so it joins the selection.
+    expect(JSON.parse(localStorage.getItem('nexus.cooling.selectedFans.immersive') ?? '[]').sort())
+      .toEqual(['fan-case', 'fan-cpu', 'fan-dead']);
 
     fireEvent.click(selectNone);
     await waitFor(() => expect(selectNone).toBeDisabled());
-    expect(JSON.parse(localStorage.getItem('nexus.cooling.selectedFans') ?? '[]')).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('nexus.cooling.selectedFans.immersive') ?? '[]')).toEqual([]);
   });
 
-  // The selection is shared with the desktop rail, as the lighting one is.
-  it('restores a stored selection and drops fans that are gone', async () => {
-    localStorage.setItem('nexus.cooling.selectedFans', JSON.stringify(['fan-cpu', 'ghost-fan']));
+  it('shows only the fans that are listed without forgetting a stored one', async () => {
+    localStorage.setItem('nexus.cooling.selectedFans.immersive', JSON.stringify(['fan-cpu', 'ghost-fan']));
     renderTouch();
     fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
-    await waitFor(() => expect(
-      JSON.parse(localStorage.getItem('nexus.cooling.selectedFans') ?? '[]'),
-    ).toEqual(['fan-cpu']));
+    expect(await screen.findByRole('button', { name: /lighting.ledMap.selectNone/ })).toBeEnabled();
+    expect(JSON.parse(localStorage.getItem('nexus.cooling.selectedFans.immersive') ?? '[]')).toEqual(['fan-cpu', 'ghost-fan']);
+  });
+
+  it.each([null, 'panel-a'])('never shares its selection with the desktop Cooling page (panel %s)', async panelId => {
+    localStorage.setItem('nexus.cooling.selectedFans', JSON.stringify(['fan-cpu']));
+    renderTouch(panelId);
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    const selectAll = await screen.findByRole('button', { name: /lighting.ledMap.selectAll/ });
+    expect(screen.getByRole('button', { name: /lighting.ledMap.selectNone/ })).toBeDisabled();
+    fireEvent.click(selectAll);
+    await waitFor(() => expect(selectAll).toBeDisabled());
+    expect(JSON.parse(localStorage.getItem('nexus.cooling.selectedFans') ?? '[]')).toEqual(['fan-cpu']);
+  });
+
+  it('desktop: reopening the view restores the selection', async () => {
+    const first = renderTouch();
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    fireEvent.click(await screen.findByRole('button', { name: /lighting.ledMap.selectAll/ }));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('nexus.cooling.selectedFans.immersive') ?? '[]').sort()).toEqual(['fan-case', 'fan-cpu', 'fan-dead']));
+    first.unmount();
+
+    renderTouch();
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    expect(await screen.findByRole('button', { name: /lighting.ledMap.selectNone/ })).toBeEnabled();
+  });
+
+  it('keeps each panel its own selection and restores it from the service on reopen', async () => {
+    const a = renderTouch('panel-a');
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    fireEvent.click(await screen.findByRole('button', { name: /lighting.ledMap.selectAll/ }));
+    await waitFor(() => expect([...(panelRecords.current['panel-a']?.coolingSelection ?? [])].sort()).toEqual(['fan-case', 'fan-cpu', 'fan-dead']));
+    a.unmount();
+
+    // Another panel and the desktop start with nothing selected.
+    const b = renderTouch('panel-b');
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    expect(await screen.findByRole('button', { name: /lighting.ledMap.selectNone/ })).toBeDisabled();
+    expect(panelRecords.current['panel-b']).toBeUndefined();
+    b.unmount();
+    expect(localStorage.getItem('nexus.cooling.selectedFans')).toBeNull();
+    expect(localStorage.getItem('nexus.cooling.selectedFans.immersive')).toBeNull();
+
+    localStorage.clear();
+    renderTouch('panel-a');
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /lighting.ledMap.selectNone/ })).toBeEnabled());
+  });
+
+  it('a panel hides a remembered fan that is gone and keeps it on the record', async () => {
+    panelRecords.current['panel-a'] = { coolingSelection: ['fan-cpu', 'ghost-fan'] };
+    renderTouch('panel-a');
+    fireEvent.click(await screen.findByRole('tab', { name: 'lighting.rightPane.devices' }));
+    expect(await screen.findByRole('button', { name: /lighting.ledMap.selectNone/ })).toBeEnabled();
+    expect(panelRecords.current['panel-a'].coolingSelection).toEqual(['fan-cpu', 'ghost-fan']);
   });
 
   // A hub's cooling mode is one byte for the whole hub, and a curve cannot
   // drive it from firmware mode - so the batch assign hands the hub over once.
   it('switches a hub to software once when a curve is bound to several of its fans', async () => {
     const { setNp50LiveCoolingMode } = await import('../../../api/np50');
-    const { getNp50ConnectionState } = await import('../../../api/np50');
-    vi.mocked(getNp50ConnectionState).mockResolvedValueOnce({
+    vi.mocked(getNp50ConnectionState).mockResolvedValue({
       deviceId: 'np50:AB12', coolingMode: 'Motherboard',
     } as Awaited<ReturnType<typeof getNp50ConnectionState>>);
-    // Once, not for the rest of the file: clearAllMocks resets calls, not impls.
-    vi.mocked(fetchFanChannels).mockResolvedValueOnce({
+    vi.mocked(fetchFanChannels).mockResolvedValue({
       channels: [
         { id: 'hub-1', name: 'Hub Fan 1', dutyPercent: 35, rpm: 900, mode: 'Auto',
           classification: 'Controllable', calibrated: true, deviceId: 'np50:AB12', deviceName: 'HYTE NP50' },
@@ -225,7 +297,7 @@ describe('CoolingTouch', () => {
           classification: 'Controllable', calibrated: true, deviceId: 'np50:AB12', deviceName: 'HYTE NP50' },
       ],
     });
-    localStorage.setItem('nexus.cooling.selectedFans', JSON.stringify(['hub-1', 'hub-2']));
+    localStorage.setItem('nexus.cooling.selectedFans.immersive', JSON.stringify(['hub-1', 'hub-2']));
     renderTouch();
 
     fireEvent.click(await screen.findByRole('button', { name: 'My Graph Curve' }));

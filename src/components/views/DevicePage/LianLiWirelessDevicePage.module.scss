@@ -58,6 +58,10 @@
   margin: 0;
 }
 
+.lockGuard {
+  display: inline-flex;
+}
+
 // Screen tab - selector + live preview row.
 .screenPreviewGrid {
   display: flex;
@@ -171,4 +175,9 @@
 .contentLocked {
   opacity: 0.5;
   pointer-events: none;
+}
+
+// One line of a row's detail text, so each fact stands on its own.
+.detailLine {
+  display: block;
 }

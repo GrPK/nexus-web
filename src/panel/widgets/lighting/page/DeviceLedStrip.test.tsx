@@ -63,6 +63,17 @@ describe('DeviceLedStrip', () => {
     expect(ctx.fillStyle).toBe('#0000ff');
   });
 
+  it('shows no per-LED colors for an area-sampled card without device bytes, and its bytes when present', () => {
+    publishRed();
+    const area: LightingDevice = { ...device, frameIndex: 7, sampling: 'nearest', areaCells: [[0, 0, 1, 0, 1, 1, 0, 1]] };
+    render(<DeviceLedStrip device={area} fullscreen />);
+    expect(ctx.putImageData).not.toHaveBeenCalled();
+    expect(ctx.clearRect).toHaveBeenCalled();
+    publishLedFrame(new Uint8Array(3 * 4), 2, 2, new Map([[7, new Uint8Array([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255])]]));
+    render(<DeviceLedStrip device={area} />);
+    expect(ctx.putImageData).toHaveBeenCalled();
+  });
+
   describe('real device bytes', () => {
     const withIndex: LightingDevice = { ...device, frameIndex: 7 };
     // 4 LEDs: red, green, blue, white.
@@ -84,10 +95,10 @@ describe('DeviceLedStrip', () => {
       expect(ctx.fillRect).not.toHaveBeenCalled();
     });
 
-    it('applies the device brightness', () => {
+    it('does not dim the bytes again: they already carry the brightness', () => {
       publishLedFrame(null, 0, 0, new Map([[7, bytes]]));
       render(<DeviceLedStrip device={{ ...withIndex, brightness: 50 }} />);
-      expect(lastImage()[0]).toBe(128);
+      expect(lastImage()[0]).toBe(255);
     });
 
     it('reads a matrix device in wiring order, evenly across its LEDs', () => {
@@ -100,6 +111,12 @@ describe('DeviceLedStrip', () => {
       expect(reds[0]).toBe(0);
       expect(reds[23]).toBe(95);
       expect([...reds].sort((a, b) => a - b)).toEqual(reds);
+    });
+
+    it('still applies brightness to the canvas-sampling fallback, whose pixels are pre-brightness', () => {
+      publishRed();
+      render(<DeviceLedStrip device={{ ...withIndex, brightness: 50 }} />);
+      expect(lastImage()[0]).toBe(128);
     });
 
     it('falls back to sampling the canvas when the frame has no bytes for it', () => {

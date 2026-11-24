@@ -8,9 +8,9 @@ import { ContextMenuManager } from './components/common/ContextMenu/ContextMenuM
 import './styles/variables.scss';
 import './styles/global.scss';
 import { loadSettings, applyThemeMode, applyAccentColor, applyBackgroundMode, watchSystemTheme } from './lib/settings';
-import { bootDebugFont } from './lib/debugFont';
 import { preloadInstallDefaults } from './api/installDefaultsCache';
 import { isRemoteOrigin } from './api/service';
+import { initPointerKind } from './lib/pointerKind';
 import { initMemoryProbe } from './diag/memoryProbe';
 import { initBuildReloadWatcher } from './lib/buildReloadWatcher';
 import { initHoverGuard } from './lib/hoverGuard';
@@ -25,7 +25,6 @@ applyThemeMode(general.themeMode);
 applyAccentColor(general.accentColor);
 applyBackgroundMode(general.backgroundMode);
 watchSystemTheme(general.themeMode);
-bootDebugFont();
 initHoverGuard();
 
 // Kick off the install-defaults fetch in parallel with React mount; the
@@ -39,6 +38,8 @@ void preloadInstallDefaults();
 // Skipped on remote origins (phones, public website) - the leaking surface is
 // always a local renderer and the endpoint is loopback-only.
 if (!isRemoteOrigin) initMemoryProbe();
+
+initPointerKind();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

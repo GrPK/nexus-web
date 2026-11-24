@@ -1,7 +1,14 @@
 import { authFetchWithStatus } from '../api/service';
+import { isReloadingForBuild } from '../lib/buildReloadWatcher';
 import { isStaleChunkMessage, recoverFromStaleChunkNow } from '../lib/staleChunkRecovery';
 
-export type ErrorKind = 'window-error' | 'unhandled-rejection' | 'render';
+export type ErrorKind = 'window-error' | 'unhandled-rejection' | 'render' | 'app' | 'app-log';
+
+/** Identity of the SDK app behind a kind 'app' or 'app-log' report; tag is the service log prefix and rides along in the context. */
+export interface AppErrorSource {
+  id: string;
+  tag: string;
+}
 
 interface ClientError {
   kind: ErrorKind;
@@ -10,25 +17,36 @@ interface ClientError {
   message: string;
   stack: string;
   context: string;
+  app?: string;
   count: number;
 }
 
 const ENDPOINT = '/telemetry/client-errors';
 const FLUSH_DELAY_MS = 5000;
 const MAX_DISTINCT = 20;
+const MAX_DISTINCT_APP = 20;
 const MAX_PER_POST = 10;
 const GATE_WINDOW_MS = 1000;
 const GATE_MAX = 10;
+const GATE_MAX_APP = 5;
+const APP_MESSAGE_CAP = 500;
+const MAX_CAUSE_DEPTH = 3;
+const CAUSE_STACK_CAP = 300;
 const CAPS = { fingerprint: 64, type: 128, message: 1000, stack: 2000, context: 500 };
 
 const records = new Map<string, { entry: ClientError; unsent: number }>();
 const dirty = new Set<string>();
-let gateStart = 0;
-let gateCount = 0;
+interface Gate { start: number; count: number }
+const hostGate: Gate = { start: 0, count: 0 };
+const appGate: Gate = { start: 0, count: 0 };
 let dropped = 0;
 let installed = false;
 let reporting = false;
 let timer: ReturnType<typeof setTimeout> | null = null;
+
+// Stale-chunk errors waiting on a recovery that can take about a minute; a page that unloads meanwhile reports them from pagehide.
+interface Held { error: unknown; kind: ErrorKind; context?: string }
+const held = new Set<Held>();
 
 function cap(value: string, max: number): string {
   return value.length > max ? value.slice(0, max) : value;
@@ -62,25 +80,82 @@ export function fingerprintOf(type: string, message: string): string {
   return hash(`${type}|${normalizeMessage(message)}`);
 }
 
-function describe(error: unknown): { type: string; message: string; stack: string } {
+function errorName(error: Error): string {
+  const name: unknown = error.name;
+  return typeof name === 'string' && name !== '' ? name : 'Error';
+}
+
+// React wraps the real recovered error in cause; only Error causes are followed.
+function describeCauses(error: Error): { message: string; stack: string } {
+  let message = '';
+  let stack = '';
+  const seen = new Set<unknown>([error]);
+  let current: unknown = error.cause;
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth++) {
+    if (!(current instanceof Error) || seen.has(current)) break;
+    seen.add(current);
+    message += ` cause: ${errorName(current)}: ${String(current.message)}`;
+    const causeStack = cap(String(current.stack ?? ''), CAUSE_STACK_CAP);
+    if (causeStack !== '') stack += `\ncause: ${causeStack}`;
+    current = current.cause;
+  }
+  return { message, stack };
+}
+
+// An Error from another realm (iframe, injected script) fails instanceof but still carries the Error tag.
+function isForeignError(error: object): boolean {
+  let tag = '';
+  try {
+    tag = Object.prototype.toString.call(error);
+  } catch {
+    return false;
+  }
+  return tag === '[object Error]' || tag === '[object DOMException]';
+}
+
+function stringField(error: object, field: string): string {
+  try {
+    const value: unknown = (error as Record<string, unknown>)[field];
+    return typeof value === 'string' ? value : '';
+  } catch {
+    return '';
+  }
+}
+
+function describe(error: unknown): { type: string; message: string; own: string; stack: string } {
   if (error instanceof Error) {
-    const name: unknown = error.name;
+    const causes = describeCauses(error);
+    const own = String(error.message);
     return {
-      type: typeof name === 'string' && name !== '' ? name : 'Error',
-      message: String(error.message),
-      stack: String(error.stack ?? ''),
+      type: errorName(error),
+      message: cap(own, Math.max(0, CAPS.message - causes.message.length)) + causes.message,
+      own,
+      stack: cap(String(error.stack ?? ''), Math.max(0, CAPS.stack - causes.stack.length)) + causes.stack,
     };
   }
-  if (typeof error === 'string') return { type: 'string', message: error, stack: '' };
+  if (typeof error === 'string') return { type: 'string', message: error, own: error, stack: '' };
   if (typeof error === 'function') {
-    return { type: 'function', message: `function ${String(error.name)}`, stack: '' };
+    const message = `function ${String(error.name)}`;
+    return { type: 'function', message, own: message, stack: '' };
   }
   if (typeof error === 'object' && error !== null) {
+    if (isForeignError(error)) {
+      const name = stringField(error, 'name');
+      const message = stringField(error, 'message');
+      return {
+        type: name === '' ? 'Error' : cap(name, CAPS.type),
+        message: cap(message, CAPS.message),
+        own: message,
+        stack: cap(stringField(error, 'stack'), CAPS.stack),
+      };
+    }
     const ctor: unknown = Object.getPrototypeOf(error)?.constructor?.name;
     const type = typeof ctor === 'string' && ctor !== '' ? ctor : 'object';
-    return { type, message: `${type}{${Object.keys(error).slice(0, 10).join(',')}}`, stack: '' };
+    const message = `${type}{${Object.getOwnPropertyNames(error).slice(0, 10).join(',')}}`;
+    return { type, message, own: message, stack: '' };
   }
-  return { type: error === null ? 'null' : typeof error, message: String(error), stack: '' };
+  const message = String(error);
+  return { type: error === null ? 'null' : typeof error, message, own: message, stack: '' };
 }
 
 function isNoise(message: string, stack: string): boolean {
@@ -98,7 +173,7 @@ function currentContext(extra?: string): string {
   return extra ? `${path} ${extra}` : path;
 }
 
-async function flush(): Promise<void> {
+async function flush(keepalive = false): Promise<void> {
   timer = null;
   const errors: ClientError[] = [];
   for (const fp of dirty) {
@@ -112,7 +187,7 @@ async function flush(): Promise<void> {
   if (dirty.size > 0) schedule();
   if (errors.length === 0) return;
   try {
-    await authFetchWithStatus(ENDPOINT, { method: 'POST', body: { errors } });
+    await authFetchWithStatus(ENDPOINT, { method: 'POST', body: { errors }, ...(keepalive ? { keepalive } : {}) });
   } catch {
     return;
   }
@@ -123,36 +198,50 @@ function schedule(): void {
   timer = setTimeout(() => { void flush(); }, FLUSH_DELAY_MS);
 }
 
-function gateOpen(): boolean {
+function gateOpen(gate: Gate, max: number): boolean {
   const now = Date.now();
-  if (now - gateStart >= GATE_WINDOW_MS || now < gateStart) {
-    gateStart = now;
-    gateCount = 0;
+  if (now - gate.start >= GATE_WINDOW_MS || now < gate.start) {
+    gate.start = now;
+    gate.count = 0;
   }
-  if (gateCount >= GATE_MAX) {
+  if (gate.count >= max) {
     dropped += 1;
     return false;
   }
-  gateCount += 1;
+  gate.count += 1;
   return true;
 }
 
-export function reportError(error: unknown, kind: ErrorKind, context?: string, recoveryTried = false): void {
-  if (!recoveryTried && installed && staleChunkMessageOf(error)) {
+// App reports have their own gate and record budget, so a broken app can never crowd out the host's own errors.
+function isAppKind(kind: ErrorKind): boolean {
+  return kind === 'app' || kind === 'app-log';
+}
+
+// recoveryTried: true, or the reason a stale-chunk recovery did not reload (it leads the stored context so the cap cannot cut it).
+export function reportError(error: unknown, kind: ErrorKind, context?: string, recoveryTried: boolean | string = false, app?: AppErrorSource): void {
+  const staleMessage = !recoveryTried && installed ? staleChunkMessageOf(error) : null;
+  if (staleMessage !== null) {
     // A reload onto a new build makes the error moot; otherwise report it as usual.
-    void recoverFromStaleChunkNow().then((reloaded) => {
-      if (!reloaded) reportError(error, kind, context, true);
+    const entry: Held = { error, kind, context };
+    held.add(entry);
+    void recoverFromStaleChunkNow(staleMessage).then((outcome) => {
+      // Already reported by pagehide.
+      if (!held.delete(entry) || outcome === 'reloaded') return;
+      reportError(error, kind, context, outcome);
     });
     return;
   }
-  if (!installed || reporting || !gateOpen()) return;
+  const forApp = isAppKind(kind);
+  if (!installed || reporting || !(forApp ? gateOpen(appGate, GATE_MAX_APP) : gateOpen(hostGate, GATE_MAX))) return;
   reporting = true;
   try {
     const d = describe(error);
+    // Apps share error names and messages, so the app id keeps their fingerprints apart.
+    if (app) d.type = `${app.id}:${d.type}`;
     const stack = stripUrlSecrets(d.stack);
     if (isNoise(d.message, stack)) return;
-    const message = stripUrlSecrets(d.message);
-    const fingerprint = cap(fingerprintOf(d.type, d.message), CAPS.fingerprint);
+    const message = cap(stripUrlSecrets(d.message), forApp ? APP_MESSAGE_CAP : CAPS.message);
+    const fingerprint = cap(fingerprintOf(d.type, message), CAPS.fingerprint);
     const existing = records.get(fingerprint);
     if (existing) {
       existing.unsent += 1;
@@ -160,10 +249,12 @@ export function reportError(error: unknown, kind: ErrorKind, context?: string, r
       schedule();
       return;
     }
-    if (records.size >= MAX_DISTINCT) {
+    let sameBudget = 0;
+    for (const rec of records.values()) if (isAppKind(rec.entry.kind) === forApp) sameBudget += 1;
+    if (sameBudget >= (forApp ? MAX_DISTINCT_APP : MAX_DISTINCT)) {
       let evict: string | null = null;
       for (const [fp, rec] of records) {
-        if (rec.unsent === 0) {
+        if (rec.unsent === 0 && isAppKind(rec.entry.kind) === forApp) {
           evict = fp;
           break;
         }
@@ -179,9 +270,10 @@ export function reportError(error: unknown, kind: ErrorKind, context?: string, r
       kind,
       fingerprint,
       type: cap(d.type, CAPS.type),
-      message: cap(message, CAPS.message),
+      message,
       stack: cap(stack, CAPS.stack),
-      context: cap(stripUrlSecrets(currentContext(context)), CAPS.context),
+      context: cap(stripUrlSecrets(typeof recoveryTried === 'string' ? `no-reload:${recoveryTried} ${currentContext(context)}` : currentContext(context)), CAPS.context),
+      ...(app ? { app: cap(app.tag, CAPS.context) } : {}),
       count: 1,
     } });
     schedule();
@@ -192,14 +284,15 @@ export function reportError(error: unknown, kind: ErrorKind, context?: string, r
   }
 }
 
-function staleChunkMessageOf(error: unknown): boolean {
-  if (reporting) return false;
+function staleChunkMessageOf(error: unknown): string | null {
+  if (reporting) return null;
   // describe() reads error getters, which may raise error events themselves.
   reporting = true;
   try {
-    return isStaleChunkMessage(describe(error).message);
+    const own = describe(error).own;
+    return isStaleChunkMessage(own) ? own : null;
   } catch {
-    return false;
+    return null;
   } finally {
     reporting = false;
   }
@@ -237,25 +330,39 @@ function onRejection(event: PromiseRejectionEvent): void {
   reportError(event.reason, 'unhandled-rejection');
 }
 
+function onPageHide(): void {
+  const pending = [...held];
+  held.clear();
+  // A reload onto a new build caused this pagehide, so the held errors are moot.
+  if (!isReloadingForBuild()) for (const h of pending) reportError(h.error, h.kind, h.context, 'unload');
+  if (timer !== null) clearTimeout(timer);
+  void flush(true);
+}
+
 export function installGlobalErrorReporting(): void {
   if (installed || typeof window === 'undefined') return;
   installed = true;
   window.addEventListener('error', onWindowError);
   window.addEventListener('unhandledrejection', onRejection);
+  window.addEventListener('pagehide', onPageHide);
 }
 
 export function resetErrorReportingForTests(): void {
   if (timer !== null) clearTimeout(timer);
   timer = null;
   records.clear();
+  held.clear();
   dirty.clear();
-  gateStart = 0;
-  gateCount = 0;
+  hostGate.start = 0;
+  hostGate.count = 0;
+  appGate.start = 0;
+  appGate.count = 0;
   dropped = 0;
   reporting = false;
   if (installed && typeof window !== 'undefined') {
     window.removeEventListener('error', onWindowError);
     window.removeEventListener('unhandledrejection', onRejection);
+    window.removeEventListener('pagehide', onPageHide);
   }
   installed = false;
 }

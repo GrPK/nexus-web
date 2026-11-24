@@ -1,5 +1,6 @@
 @use '../../../styles/scrollbar' as *;
 @use '../../../styles/interactions' as *;
+@use '../../../styles/text' as *;
 
 .lighting {
   display: flex;
@@ -14,29 +15,6 @@
   width: 100%;
   min-width: 0;
   min-height: 2.6rem;
-}
-
-// The schedule clock beside the master slider's label; opens the schedule
-// editor. Accent-tinted while the schedule is on.
-.scheduleMarker {
-  display: inline-flex;
-  margin-left: 0.25rem;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  color: var(--text);
-  cursor: pointer;
-  transition: color var(--ease-fast) ease, background var(--ease-fast) ease;
-
-  &:hover:not([aria-disabled]) { color: var(--accent); }
-  &[data-active] {
-    color: var(--accent);
-    background: var(--accent-soft);
-  }
-  &:focus-visible { @include focus-ring; }
-  &[aria-disabled] { cursor: default; }
 }
 
 .body {
@@ -223,8 +201,12 @@
 }
 
 // 2D | 3D chip pair beside the Effects title.
-.sceneViewSwitch {
-  margin-left: 0.5rem;
+.headerEnd {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  min-width: 0;
 }
 
 // Holds the canvas's footprint while the 3D view's chunk loads.
@@ -271,60 +253,6 @@
     color: var(--accent);
     border-color: var(--accent);
     background: var(--accent-soft);
-  }
-}
-
-.musicReactive {
-  position: absolute;
-  top: 0.4rem;
-  left: 0.4rem;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  // Leaves the fullscreen button its corner on a narrow canvas.
-  max-width: calc(100% - 3rem);
-}
-
-// Output name + chevron beside the toggle; the trigger ellipsizes a long name.
-.musicReactiveOutput {
-  min-width: 0;
-  max-width: 22rem;
-  --select-bg: var(--surface);
-}
-
-.musicReactiveBtn {
-  flex: none;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: var(--border-width) solid transparent;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text-dim);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color var(--ease-fast), border-color var(--ease-fast), background var(--ease-fast), box-shadow var(--ease-fast);
-
-  &:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-    background: var(--accent-soft);
-  }
-}
-
-.musicReactiveBtnOn {
-  color: var(--accent-text);
-  border-color: var(--accent);
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow-shadow);
-
-  &:hover {
-    color: var(--accent-text);
-    background: var(--accent-glow);
-    border-color: var(--accent-glow);
   }
 }
 
@@ -710,7 +638,7 @@
 .effectLabel {
   font-size: var(--type-mini);
   font-weight: var(--weight-body);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   color: var(--text);
   text-align: center;
   text-transform: capitalize;
@@ -798,7 +726,7 @@
   --effect-template-border-width: var(--picker-border-width);
   --effect-template-border: transparent;
   --effect-template-preview-inset: var(--picker-fill-gap);
-  --effect-template-hover-border: var(--border-strong);
+  --effect-template-hover-border: var(--border-hover);
   // Transparent so the inset preview floats with no plate around it, matching
   // the colour swatches' transparent gap.
   --effect-template-bg: transparent;
@@ -839,10 +767,18 @@
   gap: 0.35rem;
 }
 
+// Label on the left, control right-aligned (toggle and colour params).
+.paramRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .paramEnumLabel {
   font-size: var(--type-small);
   color: var(--text-dim);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
 }
 
 // Pinned-to-bottom footer holding the scoped Reset button; stays
@@ -864,7 +800,7 @@
   color: var(--text-dim);
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em + var(--small-tracking, 0em));
   cursor: pointer;
   transition: border-color var(--ease-fast), color var(--ease-fast), background var(--ease-fast), opacity var(--ease-fast);
 
@@ -1006,7 +942,7 @@
   font-size: var(--type-small);
   font-family: inherit;
   cursor: pointer;
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   white-space: nowrap;
   transition: border-color var(--ease-fast) ease, background var(--ease-fast) ease, color var(--ease-fast) ease;
 
@@ -1055,7 +991,7 @@
 .monitorButtonTitle {
   font-size: var(--type-mini);
   font-weight: var(--weight-display);
-  letter-spacing: 0.01em;
+  letter-spacing: calc(0.01em + var(--small-tracking, 0em));
 }
 
 .monitorButtonRes {
@@ -1150,6 +1086,13 @@
   gap: 0.4rem;
 }
 
+// "Lighting doesn't match?" link closing the list. TroubleshootLink carries its
+// own top margin; this adds the bottom breathing room above the pane edge.
+.fixLightingLink {
+  align-self: center;
+  margin-bottom: var(--space-md);
+}
+
 // Dashed "add smart lights" entry pinned to the end of the device list. Faint
 // by default; firms up on hover. Geometry matches .deviceCard so it aligns.
 .addSmartLights {
@@ -1171,6 +1114,14 @@
     color: var(--text);
     background: var(--surface);
   }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border-strong);
+    color: var(--text-dim);
+    background: transparent;
+  }
 }
 
 .deviceCard {
@@ -1185,9 +1136,7 @@
   cursor: pointer;
   transition: border-color var(--ease-fast), background var(--ease-fast);
 
-  &:hover {
-    border-color: var(--border-strong);
-  }
+  @include interactive-hover;
 
   // The selection's border without its fill: a pick lands here. After :hover,
   // like the selected state, so hovering does not drop the accent.
@@ -1214,8 +1163,7 @@
   }
 
   &.deviceCardSelected {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+    @include interactive-selected;
   }
 
   // Detection-failed / 0-LED non-resizable zones: dimmed + dashed as a state
@@ -1223,8 +1171,12 @@
   &.deviceCardUnavailable {
     opacity: 0.55;
     border-style: dashed;
+  }
 
-    &:hover { border-color: var(--border-strong); }
+  &.deviceCardNeedsBinding {
+    cursor: pointer;
+
+    &:hover { border-color: var(--warn-line); }
   }
 
   // Dim the device name + meta when the toggle is off. The card itself keeps
@@ -1233,6 +1185,64 @@
     .deviceName { color: var(--text-dim); }
     .deviceMeta { opacity: 0.6; }
   }
+}
+
+// A card carrying the controlled-by strip: the strip wraps onto its own row
+// inside the card, so one border, fill and outline cover both. The strip's own
+// top margin stands in for the card's bottom padding, so the part above the
+// separator measures the same as a card without a strip.
+.deviceCardWithStrip {
+  flex-wrap: wrap;
+  row-gap: 0;
+  padding-bottom: 0;
+}
+
+// Bleeds to the card's inner edges; the left inset puts the icon under a compact badge's icon.
+.deviceControlledBy {
+  @include text-caption;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: calc(100% + 1.5rem);
+  margin: 0.6rem -0.75rem 0;
+  padding: 0.5rem 0.75rem 0.5rem calc(0.75rem + 5px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-top: var(--border-width) solid var(--separator);
+  border-radius: 0 0 calc(var(--radius) - var(--border-width)) calc(var(--radius) - var(--border-width));
+  background: transparent;
+  color: var(--text-dim);
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: calc(0.04em + var(--small-tracking, 0em));
+  cursor: pointer;
+  transition: background var(--ease-fast);
+
+  svg { width: 11px; height: 11px; flex: none; }
+  b { font-weight: inherit; color: var(--text); }
+
+  &:hover,
+  &:focus-visible { background: rgb(255 255 255 / var(--alpha-faint)); }
+
+  :global([data-theme="light"]) &:hover,
+  :global([data-theme="light"]) &:focus-visible { background: rgb(0 0 0 / var(--alpha-faint)); }
+
+  &:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+  }
+}
+
+.deviceControlledByWarn {
+  color: var(--warn);
+
+  b { color: var(--warn); }
+
+  &:hover,
+  &:focus-visible,
+  :global([data-theme="light"]) &:hover,
+  :global([data-theme="light"]) &:focus-visible { background: var(--warn-soft); }
 }
 
 // One device's zones under its name, stacked into a single card
@@ -1263,11 +1273,17 @@
 
 .deviceCardStackHeaderSelectable {
   cursor: pointer;
+  transition: background var(--ease-fast);
+
+  // Fill only: the header's outline is open at the bottom and a selected zone
+  // owns its own border, so a hover border here would draw a second outline.
+  &:hover { background: var(--surface-hover); }
 }
 
 // Any zone under the header selected: the fill only, so the selected zone's
 // own accent border stays the one outline in the card.
-.deviceCardStackHeaderSelected {
+.deviceCardStackHeaderSelected,
+.deviceCardStackHeaderSelected:hover {
   background: var(--accent-soft);
 }
 
@@ -1287,6 +1303,8 @@
     border-bottom-left-radius: var(--radius);
     border-bottom-right-radius: var(--radius);
   }
+
+  &:not(.deviceCardStackLast) .deviceControlledBy { border-radius: 0; }
 }
 
 // Second line of the device card: LED count on the left, action icons
@@ -1446,14 +1464,19 @@
 // corner, as wide as the menu button below it so the two glyphs share a column.
 // The color-tuning mark sits just left of it, same size and dimming.
 .deviceStackBadge,
-.deviceTuneBadge {
+.deviceTuneBadge,
+.deviceTuneBtn {
   flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 20px;
   margin-top: 0.15rem;
   margin-left: auto;
+}
+
+.deviceStackBadge,
+.deviceTuneBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-dim);
   opacity: var(--alpha-medium);
   transition: color var(--ease-fast), opacity var(--ease-fast);
@@ -1465,8 +1488,18 @@
   .deviceCardSelected & { color: var(--text); opacity: 1; }
 }
 
+// The press-to-open form of the tune mark: the LED colors badge button's look
+// (deviceSettingsBtn + deviceBadgeBtn). Its box is one name line tall and
+// centered on that line, so the glyph aligns with the stack badge and the row
+// neither grows nor reaches into the meta row below.
+.deviceTuneBtn {
+  height: 1rem;
+  margin-top: 0.05rem;
+}
+
 // Only the first mark takes the free space, so the two sit side by side.
-.deviceTuneBadge + .deviceStackBadge { margin-left: 0; }
+.deviceTuneBadge + .deviceStackBadge,
+.deviceTuneBtn + .deviceStackBadge { margin-left: 0; }
 
 // The (i) notice icon at the end of a device label or group title. Bare icon
 // (no button) so it can nest inside the group-header toggle; HoverTooltip owns
@@ -1502,6 +1535,16 @@
   color: var(--text);
   font-weight: var(--weight-body);
   font-size: 0.7rem;
+}
+
+.deviceMetaLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  @include text-caption;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .deviceMetaUnavailable {
@@ -1631,198 +1674,6 @@
   flex-shrink: 0;
 }
 
-// ── Game Sync games panel ─────────────────────────────────────────────────────
-
-// The section's action slot owns the right edge; Rescan just trails the title.
-.gameSyncGamesHeader {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-
-
-.gameSyncGamesList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.gameSyncGameRow {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--radius-sm);
-  background: var(--bg-card);
-  border: var(--border-width) solid transparent;
-  overflow: hidden;
-}
-
-// Steam capsule_231x87 thumbnail; width proportional to that ratio.
-.gameSyncGameThumb {
-  width: 58px;
-  height: 22px;
-  object-fit: cover;
-  border-radius: 2px;
-  flex-shrink: 0;
-  display: block;
-}
-
-// Name + store label stacked vertically, taking remaining row width.
-.gameSyncGameInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-  min-width: 0;
-}
-
-.gameSyncGameName {
-  font-size: var(--type-body);
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.gameSyncGameStore {
-  font-size: var(--type-small);
-  color: var(--text-dim);
-}
-
-.gameSyncGamesScanning {
-  font-size: var(--type-body);
-  color: var(--text-dim);
-  margin: 0;
-  font-style: italic;
-}
-
-.gameSyncGamesNone {
-  font-size: var(--type-body);
-  color: var(--text-dim);
-  margin: 0;
-}
-
-// ── Game Sync redesign: left pane ─────────────────────────────────────
-
-.gameSyncLeftPane {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden auto;
-  padding: 0.75rem 0.5rem 1rem 0;
-}
-
-// Width-fitted so the frame's whole bottom strip is not a click target.
-.gameSyncGuideLink {
-  position: absolute;
-  bottom: 0.55rem;
-  left: 0;
-  right: 0;
-  width: fit-content;
-  margin-inline: auto;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
-  font-size: var(--type-small);
-  color: rgb(255 255 255 / var(--alpha-strong));
-  text-decoration: none;
-  transition: color var(--ease-fast);
-
-  &:hover,
-  &:focus-visible {
-    color: #fff;
-  }
-}
-
-.gameSyncActivity {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  // Matches DeviceCanvas dark frame dimensions; same capped width, plus the
-  // height and pad that seat the guide link below the centred group.
-  height: 230px;
-  padding-bottom: 1.9rem;
-  width: min(100%, calc(440px * 5 / 3));
-  background: #080808;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  overflow: hidden;
-  position: relative;
-}
-
-.gameSyncActivityIcon {
-  color: #fff;
-  opacity: 0.35;
-  transition: color var(--ease-fast), opacity var(--ease-fast);
-}
-
-.gameSyncActivityIconActive {
-  color: var(--accent);
-  opacity: 0.85;
-}
-
-// Gradient scrim covering the lower third of the frame so the label is
-// readable over both dark idle state and bright artwork.
-.gameSyncActivity::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 50%;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
-  pointer-events: none;
-  z-index: 1;
-}
-
-// The frame keeps its dark fill in both themes, so its contents are pinned
-// light: a themed token is unreadable on it in light mode.
-.gameSyncActivityLabel {
-  font-size: var(--type-body);
-  color: #fff;
-  text-align: center;
-  padding: 0 0.5rem;
-  z-index: 2;
-}
-
-// Pinned for the same reason as the label: the dark-theme --warn amber, not
-// the token, so light mode does not swap in a colour tuned for a pale fill.
-.gameSyncActivityNote {
-  font-size: var(--type-small);
-  color: #f59e0b;
-  text-align: center;
-  max-width: 34rem;
-  padding: 0 1rem;
-  z-index: 2;
-}
-
-// With artwork the label anchors to the frame bottom over the gradient scrim;
-// without it (icon state) the label flows directly beneath the icon.
-.gameSyncActivityLabelOverArt {
-  position: absolute;
-  bottom: 2.5rem;
-  left: 0;
-  right: 0;
-}
-
-// Steam header art (460x215). Rounded corners via parent overflow:hidden.
-.gameSyncActivityArt {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
 .staticColorSlots {
   display: flex;
   flex-direction: column;
@@ -1834,7 +1685,7 @@
 .staticSwatchTitle {
   font-size: var(--type-small);
   color: var(--text-dim);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   text-align: center;
 }
 
@@ -2157,6 +2008,15 @@
   width: 100%;
 }
 
+// The Mirror tab's live capture, between the canvas stream and the frames.
+.mirrorBackdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 // The Media tab's still of the current media, between the canvas stream and the frames.
 .mediaBackdrop {
   position: absolute;
@@ -2165,4 +2025,10 @@
   height: 100%;
   object-fit: cover;
   pointer-events: none;
+}
+
+// Layout-neutral wrapper: the button stays a direct flex item of the header
+// rail, and the wrapper only gives the width measure a stable handle.
+.controlAll {
+  display: contents;
 }

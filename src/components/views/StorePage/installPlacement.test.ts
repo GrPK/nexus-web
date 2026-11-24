@@ -15,6 +15,7 @@ const fetchPanelDevices = vi.fn();
 const patchPanelDevice = vi.fn();
 const allocatePanelDevice = vi.fn();
 const broadcastLayoutChanged = vi.fn();
+const ensureSimulatedPanelRecord = vi.fn();
 
 vi.mock('../../../api/profiles', () => ({
   fetchPreferences: () => fetchPreferences(),
@@ -25,6 +26,10 @@ vi.mock('../../../api/panel', () => ({
   fetchPanelDevices: () => fetchPanelDevices(),
   patchPanelDevice: (id: string, patch: unknown) => patchPanelDevice(id, patch),
   allocatePanelDevice: (...args: unknown[]) => allocatePanelDevice(...args),
+}));
+vi.mock('../../../lib/panelSimulation', async () => ({
+  ...(await vi.importActual<typeof import('../../../lib/panelSimulation')>('../../../lib/panelSimulation')),
+  ensureSimulatedPanelRecord: (id: string) => ensureSimulatedPanelRecord(id),
 }));
 vi.mock('../../../panel/engine/panelSync', () => ({
   broadcastLayoutChanged: () => broadcastLayoutChanged(),
@@ -90,14 +95,14 @@ describe('planPlacement', () => {
 
   it('uses the grid sizes an app declares on multi-widget screens, and each small screen\'s own size', () => {
     const gridOnly = { ...meta, defaultSize: '4x4' as const, gridSizes: ['4x4' as const] };
-    const kraken: PlacementTarget = { key: 'stream-k', name: 'Kraken', iconSrc: null, surface: 'kraken' };
+    const kraken: PlacementTarget = { key: 'stream-k', name: 'Kraken', iconSrc: null, surface: 'lcd-round' };
     const square: PlacementTarget = { key: 'stream-s', name: 'LCD', iconSrc: null, surface: 'lcd-square' };
     const empty = (surface: PanelLayout['surface']) => ({ layout: layoutOf(surface, []) });
 
     expect(planPlacement(dashboard, empty('desktop'), TYPE, gridOnly, 10)?.widget.size).toBe('4x4');
     expect(planPlacement(y70, empty('y70'), TYPE, gridOnly, 10)?.widget.size).toBe('4x4');
     expect(planPlacement(q60, empty('q60'), TYPE, gridOnly, 10)?.widget.size).toBe('2x4');
-    expect(planPlacement(kraken, empty('kraken'), TYPE, gridOnly, 10)?.widget.size).toBe('2x2round');
+    expect(planPlacement(kraken, empty('lcd-round'), TYPE, gridOnly, 10)?.widget.size).toBe('2x2round');
     expect(planPlacement(square, empty('lcd-square'), TYPE, gridOnly, 10)?.widget.size).toBe('2x2');
   });
 
@@ -116,8 +121,8 @@ describe('planPlacement', () => {
   });
 
   it('offers nothing on round glass to an app without the round tile', () => {
-    const kraken: PlacementTarget = { key: 'stream-k', name: 'Kraken', iconSrc: null, surface: 'kraken' };
-    const plan = planPlacement(kraken, { layout: layoutOf('kraken', []) }, TYPE, { ...meta, sizes: ['2x2', '4x2'] }, 6);
+    const kraken: PlacementTarget = { key: 'stream-k', name: 'Kraken', iconSrc: null, surface: 'lcd-round' };
+    const plan = planPlacement(kraken, { layout: layoutOf('lcd-round', []) }, TYPE, { ...meta, sizes: ['2x2', '4x2'] }, 6);
 
     expect(plan).toBeNull();
   });
@@ -172,6 +177,57 @@ describe('planPlacement', () => {
     expect(plan?.widget.size).toBe('4x2');
     expect(plan?.capacity).toEqual({ gridCols: 8, pageRows: 2 });
     expect(planPlacement(screen88, { layout: layoutOf('monitor', []), record }, TYPE, { ...tall, sizes: ['2x4' as const, '4x4' as const] }, 6)).toBeNull();
+  });
+
+  it('sizes a display panel by its widget size; a generic display stays on one page', () => {
+    const record = {
+      id: 'rec-d', displayName: 'Display', firstSeenAt: 0, lastSeenAt: 0, displayId: 'disp-1', widgetSize: 'small',
+      capabilities: { surface: 'monitor', touch: false, cssWidth: 2560, cssHeight: 1440, dpr: 1, dpi: 110 },
+    } as PanelDeviceRecord;
+    const display: PlacementTarget = { key: 'display', name: 'Display', iconSrc: null, surface: 'monitor' };
+    const wide = { ...meta, singleInstance: false };
+
+    const rowsOf = (widgetSize: 'large' | 'midlarge' | 'small' | 'medium' | 'xsmall') =>
+      planPlacement(display, { layout: layoutOf('monitor', []), record: { ...record, widgetSize } }, TYPE, wide, 6)!.capacity.pageRows;
+    // 100% is the default grid, 75% and 50% add columns and rows; 150% and 200% (large) take fewer.
+    expect(rowsOf('large')).toBeLessThan(rowsOf('midlarge'));
+    expect(rowsOf('midlarge')).toBeLessThan(rowsOf('small'));
+    expect(rowsOf('small')).toBeLessThan(rowsOf('medium'));
+    expect(rowsOf('medium')).toBeLessThan(rowsOf('xsmall'));
+
+    const coarse = planPlacement(display, { layout: layoutOf('monitor', []), record: { ...record, widgetSize: 'large' } }, TYPE, wide, 6);
+    const { gridCols, pageRows } = coarse!.capacity;
+    const cells = Array.from({ length: (gridCols / 2) * (pageRows / 2) }, (_, i) => ({
+      type: 'clock', size: '2x2' as const, col: (i % (gridCols / 2)) * 2, row: Math.floor(i / (gridCols / 2)) * 2,
+    }));
+    const spilled = planPlacement(display, { layout: layoutOf('monitor', cells), record: { ...record, widgetSize: 'large' } }, TYPE, wide, 6);
+    expect(spilled).toBeNull();
+
+    // A curated device display (a family on its record) keeps its pages.
+    const known = { ...record, widgetSize: 'large', capabilities: { ...record.capabilities, family: 'xeneon-edge', touch: true } } as PanelDeviceRecord;
+    const knownCap = planPlacement({ ...display, family: 'xeneon-edge' }, { layout: layoutOf('monitor', []), record: known }, TYPE, wide, 6)!.capacity;
+    const pagedCells = Array.from({ length: (knownCap.gridCols / 2) * (knownCap.pageRows / 2) }, (_, i) => ({
+      type: 'clock', size: '2x2' as const, col: (i % (knownCap.gridCols / 2)) * 2, row: Math.floor(i / (knownCap.gridCols / 2)) * 2,
+    }));
+    const knownSpill = planPlacement({ ...display, family: 'xeneon-edge' }, { layout: layoutOf('monitor', pagedCells), record: known }, TYPE, wide, 6);
+    expect(knownSpill?.layout.pages.length).toBeGreaterThan(1);
+  });
+
+  it('copies the source widget size and config onto a display, keeping the default size when it does not fit', () => {
+    const record = {
+      id: 'rec-c', displayName: 'Display', firstSeenAt: 0, lastSeenAt: 0, displayId: 'disp-1',
+      capabilities: { surface: 'monitor', touch: false, cssWidth: 2560, cssHeight: 1440, dpr: 1, dpi: 110 },
+    } as PanelDeviceRecord;
+    const display: PlacementTarget = { key: 'display', name: 'Display', iconSrc: null, surface: 'monitor' };
+    const wide = { ...meta, singleInstance: false };
+    const empty = layoutOf('monitor', []);
+
+    const copied = planPlacement(display, { layout: empty, record }, TYPE, wide, 6, { size: '4x4', config: { city: 'Oslo' } });
+    expect(copied?.widget.size).toBe('4x4');
+    expect(copied?.widget.config).toEqual({ city: 'Oslo' });
+
+    const notAllowed = planPlacement(display, { layout: empty, record }, TYPE, { ...wide, sizes: ['2x2' as const], defaultSize: '2x2' as const }, 6, { size: '4x4' });
+    expect(notAllowed?.widget.size).toBe('2x2');
   });
 
   it('shows the page a multi-widget panel lands it on', () => {
@@ -257,6 +313,30 @@ describe('commitPlacement', () => {
     expect(await commitPlacement(q60, TYPE, meta, 6)).toBe(true);
 
     expect(patchPanelDevice).toHaveBeenCalledWith('rec-q60', expect.objectContaining({ layout: expect.any(Object) }));
+  });
+
+  it('writes a simulator target only into the record that simulator owns, never a real one of the surface', async () => {
+    const real = { id: 'real-q60', displayName: 'Q60', firstSeenAt: 0, lastSeenAt: 0, capabilities: { surface: 'q60' } };
+    fetchPanelDevices.mockResolvedValue({ devices: [real] });
+    ensureSimulatedPanelRecord.mockResolvedValue('sim-rec');
+    fetchPanelDevice.mockResolvedValue({ id: 'sim-rec', displayName: 'sim', firstSeenAt: 0, lastSeenAt: 0 });
+    const sim: PlacementTarget = { ...q60, key: 'sim-q60', simulatorId: 'q60' };
+
+    expect(await commitPlacement(sim, TYPE, meta, 6)).toBe(true);
+
+    expect(ensureSimulatedPanelRecord).toHaveBeenCalledWith('q60');
+    expect(patchPanelDevice).toHaveBeenCalledTimes(1);
+    expect(patchPanelDevice).toHaveBeenCalledWith('sim-rec', expect.anything());
+    expect(allocatePanelDevice).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing for a simulator whose record cannot be resolved', async () => {
+    fetchPanelDevices.mockResolvedValue({ devices: [] });
+    ensureSimulatedPanelRecord.mockResolvedValue(undefined);
+
+    expect(await commitPlacement({ ...q60, simulatorId: 'q60' }, TYPE, meta, 6)).toBe(false);
+    expect(patchPanelDevice).not.toHaveBeenCalled();
+    expect(allocatePanelDevice).not.toHaveBeenCalled();
   });
 
   it('allocates a record for a surface that never connected', async () => {

@@ -1,20 +1,29 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GalleryPage } from './GalleryPage';
+import { useTopicCallback } from '../../../../hooks/useMultiplexSocket';
+import { fetchServiceBlob } from '../../../../api/service';
+import { fetchGalleryItems, fetchGallerySources, updateGallerySort } from '../../../../api/gallery';
 
 const mockState = vi.hoisted(() => ({
   sources: [] as { id: string; kind: string; path: string; name: string; addedAtUnixMs: number; excluded: string[] }[],
   items: [] as { id: string; name: string; sourceId: string; kind?: 'image' | 'video' }[],
   playlists: [] as { id: string; name: string; createdAtUnixMs: number; sourceIds: string[]; itemIds: string[]; excludedIds: string[] }[],
-  uses: [] as { surface: 'dashboard' | 'panel' | 'desktop'; name: string; count: number }[] | null,
+  uses: [] as { surface: 'dashboard' | 'panel'; name: string; count: number }[] | null,
   bridgeAvailable: false,
+  truncated: false,
+  sort: undefined as { by: 'name' | 'modified' | 'added'; direction: 'asc' | 'desc' } | undefined,
 }));
 
 vi.mock('../../../../api/gallery', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../../api/gallery')>()),
   GALLERY_ERROR_DUPLICATE: 'duplicate',
   fetchGallerySources: vi.fn(() => Promise.resolve({ sources: mockState.sources })),
-  fetchGalleryItems: vi.fn(() => Promise.resolve({ items: mockState.items, playlists: mockState.playlists })),
+  fetchGalleryItems: vi.fn(() => Promise.resolve({ items: mockState.items, playlists: mockState.playlists, truncated: mockState.truncated, sort: mockState.sort })),
+  updateGallerySort: vi.fn((sort: typeof mockState.sort) => {
+    mockState.sort = sort;
+    return Promise.resolve(true);
+  }),
   createGalleryPlaylist: vi.fn((name: string) => {
     const playlist = { id: 'pl-new', name, createdAtUnixMs: 1, sourceIds: [], itemIds: [], excludedIds: [] };
     mockState.playlists = [...mockState.playlists, playlist];
@@ -75,10 +84,166 @@ beforeEach(() => {
   mockState.playlists = [];
   mockState.uses = [];
   mockState.bridgeAvailable = false;
+  mockState.truncated = false;
+  mockState.sort = undefined;
   vi.clearAllMocks();
+  vi.mocked(fetchServiceBlob).mockImplementation(() => Promise.resolve(null));
+  let n = 0;
+  URL.createObjectURL = vi.fn(() => `blob:t${n++}`);
+  URL.revokeObjectURL = vi.fn();
+});
+
+afterEach(() => {
+  delete (URL as Partial<typeof URL>).createObjectURL;
+  delete (URL as Partial<typeof URL>).revokeObjectURL;
 });
 
 describe('GalleryPage', () => {
+  it('shows the sort the service applies', async () => {
+    mockState.sort = { by: 'modified', direction: 'desc' };
+    render(<GalleryPage />);
+
+    expect(await screen.findByRole('button', { name: 'gallery.page.sort.descending' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'gallery.page.sort.label' }).textContent).toContain('gallery.page.sort.modified');
+  });
+
+  it('defaults to name ascending against a service without the setting', async () => {
+    render(<GalleryPage />);
+
+    expect(await screen.findByRole('button', { name: 'gallery.page.sort.ascending' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'gallery.page.sort.label' }).textContent).toContain('gallery.page.sort.name');
+  });
+
+  it('saves a new sort key, keeping the direction', async () => {
+    mockState.sort = { by: 'name', direction: 'desc' };
+    render(<GalleryPage />);
+    await screen.findByRole('button', { name: 'gallery.page.sort.descending' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'gallery.page.sort.label' }));
+    fireEvent.click(screen.getByRole('option', { name: 'gallery.page.sort.added' }));
+
+    await waitFor(() => expect(updateGallerySort).toHaveBeenCalledWith({ by: 'added', direction: 'desc' }));
+    expect(screen.getByRole('button', { name: 'gallery.page.sort.label' }).textContent).toContain('gallery.page.sort.added');
+  });
+
+  it('flips the direction on its own button', async () => {
+    mockState.sort = { by: 'added', direction: 'asc' };
+    render(<GalleryPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'gallery.page.sort.ascending' }));
+
+    await waitFor(() => expect(updateGallerySort).toHaveBeenCalledWith({ by: 'added', direction: 'desc' }));
+    expect(await screen.findByRole('button', { name: 'gallery.page.sort.descending' })).toBeTruthy();
+  });
+
+  it('keeps the last of two rapid sort changes, on screen and in storage', async () => {
+    mockState.sort = { by: 'name', direction: 'asc' };
+    mockState.sources = [folderSource('Pictures')];
+    const a = { id: 'i1', name: 'a.png', sourceId: 'Pictures', kind: 'image' as const };
+    const b = { id: 'i2', name: 'b.png', sourceId: 'Pictures', kind: 'image' as const };
+    mockState.items = [a, b];
+    vi.mocked(fetchServiceBlob).mockImplementation(() => Promise.resolve(new Blob(['x'])));
+    const saves: { sort: unknown; resolve: (ok: boolean) => void }[] = [];
+    const deferredSave = (sort: typeof mockState.sort) => new Promise<boolean>(resolve => {
+      saves.push({ sort, resolve: ok => { if (ok) mockState.sort = sort; resolve(ok); } });
+    });
+    vi.mocked(updateGallerySort).mockImplementationOnce(deferredSave).mockImplementationOnce(deferredSave);
+    render(<GalleryPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'gallery.page.sort.ascending' }));
+    fireEvent.click(screen.getByRole('button', { name: 'gallery.page.sort.label' }));
+    fireEvent.click(screen.getByRole('option', { name: 'gallery.page.sort.added' }));
+    // The second save waits for the first.
+    await waitFor(() => expect(saves).toHaveLength(1));
+    expect(saves[0].sort).toEqual({ by: 'name', direction: 'desc' });
+
+    // A read that goes out while a save is in flight and lands after both
+    // saves settle still answers with the stale order.
+    let landStale: () => void = () => {};
+    vi.mocked(fetchGalleryItems).mockImplementationOnce(() => new Promise(resolve => {
+      landStale = () => resolve({ items: [a, b], playlists: [], sort: { by: 'name', direction: 'asc' } });
+    }));
+    const onGallery = vi.mocked(useTopicCallback).mock.calls.at(-1)![2] as () => void;
+    await act(async () => { onGallery(); });
+
+    await act(async () => saves[0].resolve(true));
+    await waitFor(() => expect(saves).toHaveLength(2));
+    expect(saves[1].sort).toEqual({ by: 'added', direction: 'desc' });
+    await act(async () => saves[1].resolve(true));
+    // The service's broadcast after the last save refetches in the new order.
+    mockState.items = [b, a];
+    await act(async () => { onGallery(); });
+    await waitFor(() => expect(screen.getAllByRole('img').map(i => i.getAttribute('alt'))).toEqual(['b.png', 'a.png']));
+    await act(async () => landStale());
+
+    expect(screen.getAllByRole('img').map(i => i.getAttribute('alt'))).toEqual(['b.png', 'a.png']);
+    expect(mockState.sort).toEqual({ by: 'added', direction: 'desc' });
+    expect(screen.getByRole('button', { name: 'gallery.page.sort.label' }).textContent).toContain('gallery.page.sort.added');
+    expect(screen.getByRole('button', { name: 'gallery.page.sort.descending' })).toBeTruthy();
+  });
+
+  it('keeps an older read that lands after a newer read failed', async () => {
+    render(<GalleryPage />);
+    await screen.findByText('gallery.intro.title');
+    mockState.sources = [folderSource('Pictures')];
+    const items = [
+      { id: 'i1', name: 'a.png', sourceId: 'Pictures', kind: 'image' as const },
+      { id: 'i2', name: 'b.png', sourceId: 'Pictures', kind: 'image' as const },
+    ];
+    vi.mocked(fetchServiceBlob).mockImplementation(() => Promise.resolve(new Blob(['x'])));
+    let landOlder: () => void = () => {};
+    vi.mocked(fetchGallerySources)
+      .mockImplementationOnce(() => Promise.resolve({ sources: mockState.sources }))
+      .mockImplementationOnce(() => Promise.resolve(null));
+    vi.mocked(fetchGalleryItems)
+      .mockImplementationOnce(() => new Promise(resolve => {
+        landOlder = () => resolve({ items, playlists: [] });
+      }))
+      .mockImplementationOnce(() => Promise.resolve(null));
+    const onGallery = vi.mocked(useTopicCallback).mock.calls.at(-1)![2] as () => void;
+
+    await act(async () => { onGallery(); });
+    await act(async () => { onGallery(); });
+    await act(async () => landOlder());
+
+    expect(await screen.findByText('Pictures')).toBeTruthy();
+    await waitFor(() => expect(screen.getAllByRole('img').map(i => i.getAttribute('alt'))).toEqual(['a.png', 'b.png']));
+  });
+
+  it('drops a failure once a later save in the chain succeeds', async () => {
+    mockState.sort = { by: 'name', direction: 'asc' };
+    vi.mocked(updateGallerySort)
+      .mockImplementationOnce(() => Promise.resolve(false))
+      .mockImplementationOnce(sort => { mockState.sort = sort; return Promise.resolve(true); });
+    render(<GalleryPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'gallery.page.sort.ascending' }));
+    fireEvent.click(screen.getByRole('button', { name: 'gallery.page.sort.descending' }));
+
+    await waitFor(() => expect(updateGallerySort).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(screen.queryByText('gallery.page.sort.saveFailed')).toBeNull();
+  });
+
+  it('reads the stored sort back when a save fails', async () => {
+    mockState.sort = { by: 'name', direction: 'asc' };
+    vi.mocked(updateGallerySort).mockImplementationOnce(() => Promise.resolve(false));
+    render(<GalleryPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'gallery.page.sort.ascending' }));
+
+    expect(await screen.findByText('gallery.page.sort.saveFailed')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'gallery.page.sort.ascending' })).toBeTruthy();
+  });
+
+  it('explains that the sort also orders widgets and slideshows', async () => {
+    render(<GalleryPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'infoTooltip.ariaLabel' }));
+
+    expect(screen.getByRole('tooltip').textContent).toBe('gallery.page.sort.info');
+  });
+
   it('shows the feature intro when there are no sources', async () => {
     render(<GalleryPage />);
 
@@ -383,7 +548,6 @@ describe('GalleryPage', () => {
       mockState.uses = [
         { surface: 'dashboard', name: '', count: 2 },
         { surface: 'panel', name: 'Y70 Touch', count: 1 },
-        { surface: 'desktop', name: '', count: 1 },
       ];
       render(<GalleryPage />);
       fireEvent.click(await screen.findByRole('button', { name: /Desk/ }));
@@ -392,7 +556,6 @@ describe('GalleryPage', () => {
       expect(await screen.findByText('gallery.page.deletePlaylistInUse:name=Desk')).toBeTruthy();
       expect(screen.getByText('gallery.page.usage.count.other:name=gallery.page.usage.dashboard:count=2')).toBeTruthy();
       expect(screen.getByText('Y70 Touch')).toBeTruthy();
-      expect(screen.getByText('gallery.page.usage.desktop')).toBeTruthy();
       // Nothing is deleted until the user confirms.
       expect(deleteGalleryPlaylist).not.toHaveBeenCalled();
     });
@@ -410,5 +573,116 @@ describe('GalleryPage', () => {
       expect(await screen.findByText('gallery.page.deletePlaylistNote')).toBeTruthy();
       expect(screen.getByText('gallery.page.deletePlaylistMessage:name=Desk')).toBeTruthy();
     });
+  });
+});
+
+describe('GalleryPage paging', () => {
+  const many = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `i${i}`, name: `p${i}.png`, sourceId: 'Pictures' }));
+
+  it('renders one page of tiles and fetches thumbnails for that page only', async () => {
+    mockState.sources = [folderSource('Pictures')];
+    mockState.items = many(250);
+    vi.mocked(fetchServiceBlob).mockImplementation(() => Promise.resolve(new Blob(['x'])));
+    const { container } = render(<GalleryPage />);
+    await waitFor(() => expect(container.querySelectorAll('figure')).toHaveLength(100));
+    await waitFor(() => expect(container.querySelectorAll('figure img')).toHaveLength(100));
+    expect(vi.mocked(fetchServiceBlob)).toHaveBeenCalledTimes(100);
+    expect(screen.getByText('common.pager.pageOf:n=1:total=3')).toBeTruthy();
+  });
+
+  it('paging fetches the next page and revokes pages left behind', async () => {
+    mockState.sources = [folderSource('Pictures')];
+    mockState.items = many(450);
+    vi.mocked(fetchServiceBlob).mockImplementation(() => Promise.resolve(new Blob(['x'])));
+    const { container } = render(<GalleryPage />);
+    await waitFor(() => expect(vi.mocked(fetchServiceBlob)).toHaveBeenCalledTimes(100));
+
+    for (let i = 0; i < 3; i++) {
+      fireEvent.click(screen.getByLabelText('common.pager.next'));
+      await waitFor(() => expect(vi.mocked(fetchServiceBlob)).toHaveBeenCalledTimes(100 * (i + 2)));
+    }
+    // Pages 1 and 2 left the window when page 4 opened; the first item stays as the library cover.
+    await waitFor(() => expect(vi.mocked(URL.revokeObjectURL)).toHaveBeenCalledTimes(199));
+    const revoked = new Set(vi.mocked(URL.revokeObjectURL).mock.calls.map(c => c[0]));
+    const shown = Array.from(container.querySelectorAll('figure img')).map(img => img.getAttribute('src'));
+    expect(shown.length).toBeGreaterThan(0);
+    for (const src of shown) expect(revoked.has(src!)).toBe(false);
+  });
+
+  it('keeps a playlist cover cached while its first member is off the page', async () => {
+    mockState.sources = [folderSource('Pictures')];
+    mockState.items = many(450);
+    mockState.playlists = [{ id: 'pl1', name: 'Mine', createdAtUnixMs: 1, sourceIds: [], itemIds: ['i150'], excludedIds: [] }];
+    vi.mocked(fetchServiceBlob).mockImplementation(() => Promise.resolve(new Blob(['x'])));
+    render(<GalleryPage />);
+    const coverOf = () => screen.getByRole('button', { name: /Mine/ }).querySelector('img')?.getAttribute('src');
+    await waitFor(() => expect(coverOf()).toBeTruthy());
+    const cover = coverOf();
+
+    for (let i = 0; i < 4; i++) fireEvent.click(screen.getByLabelText('common.pager.next'));
+    await waitFor(() => expect(document.querySelectorAll('figure img')).toHaveLength(50));
+    expect(vi.mocked(URL.revokeObjectURL).mock.calls.some(c => c[0] === cover)).toBe(false);
+    expect(coverOf()).toBe(cover);
+  });
+
+  it('clamps the page back when the library shrinks', async () => {
+    mockState.sources = [folderSource('Pictures')];
+    mockState.items = many(250);
+    render(<GalleryPage />);
+    await screen.findByText('common.pager.pageOf:n=1:total=3');
+    fireEvent.click(screen.getByLabelText('common.pager.next'));
+    fireEvent.click(screen.getByLabelText('common.pager.next'));
+    await screen.findByText('common.pager.pageOf:n=3:total=3');
+    const refetch = vi.mocked(useTopicCallback).mock.calls[0][2] as () => Promise<void>;
+    mockState.items = many(120);
+    await act(async () => {
+      await refetch();
+    });
+    expect(await screen.findByText('common.pager.pageOf:n=2:total=2')).toBeTruthy();
+    // The written-back page holds when the library grows again.
+    mockState.items = many(250);
+    await act(async () => {
+      await refetch();
+    });
+    expect(await screen.findByText('common.pager.pageOf:n=2:total=3')).toBeTruthy();
+  });
+
+  it('a refresh that started before a create does not deselect the new playlist', async () => {
+    mockState.sources = [folderSource('Pictures')];
+    mockState.items = many(3);
+    render(<GalleryPage />);
+    await screen.findByText('Pictures');
+    const { fetchGalleryItems } = await import('../../../../api/gallery');
+    let release: (v: { items: typeof mockState.items; playlists: never[] }) => void = () => {};
+    vi.mocked(fetchGalleryItems).mockImplementationOnce(() => new Promise(r => { release = r; }) as never);
+    const refetch = vi.mocked(useTopicCallback).mock.calls[0][2] as () => Promise<void>;
+    let stale!: Promise<void>;
+    act(() => {
+      stale = refetch();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'gallery.page.newPlaylist' }));
+    fireEvent.change(screen.getByPlaceholderText('gallery.page.playlistName'), { target: { value: 'Desk' } });
+    fireEvent.click(screen.getByRole('button', { name: 'gallery.page.create' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Desk/ })).toBeTruthy());
+
+    await act(async () => {
+      release({ items: mockState.items, playlists: [] });
+      await stale;
+    });
+    expect(screen.getByRole('button', { name: /Desk/ }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('shows the truncation notice only when the service flags it', async () => {
+    mockState.sources = [folderSource('Pictures')];
+    mockState.items = many(2);
+    const { unmount } = render(<GalleryPage />);
+    await screen.findByText('Pictures');
+    expect(screen.queryByText(/gallery.page.truncated/)).toBeNull();
+    unmount();
+
+    mockState.truncated = true;
+    render(<GalleryPage />);
+    expect(await screen.findByText(/gallery.page.truncated/)).toBeTruthy();
   });
 });

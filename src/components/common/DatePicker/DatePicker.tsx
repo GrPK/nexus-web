@@ -3,10 +3,59 @@ import { Calendar } from 'lucide-react';
 import { useTranslation } from '../../../lib/i18n';
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import { formatDate, type DateFormat } from '../../../lib/units';
+import { MonthGrid } from '../MonthGrid/MonthGrid';
 import styles from './DatePicker.module.scss';
 
 const POPUP_MIN_WIDTH = 260;
 const VIEWPORT_MARGIN = 8;
+// Gap between trigger and popup; must match the .popup offset in DatePicker.module.scss.
+const POPUP_OFFSET = 6;
+// Both vertical borders of .popup, which scrollHeight excludes.
+const POPUP_BORDER_TOTAL = 2;
+
+interface VerticalPlacement {
+  above: boolean;
+  maxHeight?: number;
+}
+
+interface VerticalBounds {
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Opens below when it fits, else above when it fits, else on the roomier side
+ * with the height capped. Bounds are the visible area the popup may occupy.
+ */
+export function placePopupVertically(
+  triggerTop: number,
+  triggerBottom: number,
+  popupHeight: number,
+  bounds: VerticalBounds,
+): VerticalPlacement {
+  const below = bounds.bottom - triggerBottom - POPUP_OFFSET - VIEWPORT_MARGIN;
+  const above = triggerTop - bounds.top - POPUP_OFFSET - VIEWPORT_MARGIN;
+  if (popupHeight <= below) return { above: false };
+  if (popupHeight <= above) return { above: true };
+  return below >= above
+    ? { above: false, maxHeight: Math.max(below, 0) }
+    : { above: true, maxHeight: Math.max(above, 0) };
+}
+
+/** The viewport narrowed to the nearest scrolling ancestor, which clips the popup. */
+function visibleBounds(el: HTMLElement): VerticalBounds {
+  const bounds = { top: 0, bottom: window.innerHeight };
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const { overflowY } = window.getComputedStyle(node);
+    if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'hidden') {
+      const r = node.getBoundingClientRect();
+      bounds.top = Math.max(bounds.top, r.top);
+      bounds.bottom = Math.min(bounds.bottom, r.bottom);
+      break;
+    }
+  }
+  return bounds;
+}
 
 interface DatePickerProps {
   /** ISO date string YYYY-MM-DD. */
@@ -25,7 +74,9 @@ export function DatePicker({ value, max, min, onChange, ariaLabel }: DatePickerP
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(value.slice(0, 7));
   const [alignRight, setAlignRight] = useState(false);
+  const [vertical, setVertical] = useState<VerticalPlacement>({ above: false });
   const wrapRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setViewMonth(value.slice(0, 7));
@@ -48,6 +99,7 @@ export function DatePicker({ value, max, min, onChange, ariaLabel }: DatePickerP
   useLayoutEffect(() => {
     if (!open) {
       setAlignRight(false);
+      setVertical({ above: false });
       return;
     }
     const compute = () => {
@@ -55,13 +107,32 @@ export function DatePicker({ value, max, min, onChange, ariaLabel }: DatePickerP
       if (!wrap) return;
       const rect = wrap.getBoundingClientRect();
       setAlignRight(rect.left + POPUP_MIN_WIDTH > window.innerWidth - VIEWPORT_MARGIN);
+      const popup = popupRef.current;
+      if (popup) {
+        const next = placePopupVertically(
+          rect.top,
+          rect.bottom,
+          popup.scrollHeight + POPUP_BORDER_TOTAL,
+          visibleBounds(wrap),
+        );
+        setVertical(prev => (prev.above === next.above && prev.maxHeight === next.maxHeight ? prev : next));
+      }
     };
     compute();
     window.addEventListener('resize', compute);
-    return () => window.removeEventListener('resize', compute);
-  }, [open]);
+    // Capture phase: scroll does not bubble, and the clipping ancestor is not the window.
+    window.addEventListener('scroll', compute, true);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(compute);
+    if (popupRef.current) observer?.observe(popupRef.current);
+    return () => {
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', compute, true);
+      observer?.disconnect();
+    };
+  }, [open, viewMonth]);
 
-  const grid = useMemo(() => buildGrid(viewMonth), [viewMonth]);
+  const [viewYear, viewMonthNumber] = viewMonth.split('-').map(Number);
+  const viewMonthIndex = viewMonthNumber - 1;
   const todayIso = useMemo(() => isoToday(), []);
 
   const shiftMonth = (delta: number) => {
@@ -80,7 +151,6 @@ export function DatePicker({ value, max, min, onChange, ariaLabel }: DatePickerP
   const { dateFormat } = useUnitPrefs();
   const displayLabel = useMemo(() => formatDisplay(value, dateFormat), [value, dateFormat]);
   const monthLabel = useMemo(() => formatMonth(viewMonth), [viewMonth]);
-  const weekdays = useMemo(() => getWeekdayLabels(), []);
 
   const canGoNext = !max || monthEnd(viewMonth) < max || viewMonth < max.slice(0, 7);
   const canGoPrev = !min || monthStart(viewMonth) > min || viewMonth > min.slice(0, 7);
@@ -104,7 +174,9 @@ export function DatePicker({ value, max, min, onChange, ariaLabel }: DatePickerP
 
       {open && (
         <div
-          className={`${styles.popup}${alignRight ? ` ${styles.popupAlignRight}` : ''}`}
+          ref={popupRef}
+          className={`${styles.popup}${alignRight ? ` ${styles.popupAlignRight}` : ''}${vertical.above ? ` ${styles.popupAbove}` : ''}`}
+          style={vertical.maxHeight === undefined ? undefined : { maxHeight: vertical.maxHeight }}
           role="dialog"
           aria-label={t('datepicker.popup')}
         >
@@ -118,31 +190,16 @@ export function DatePicker({ value, max, min, onChange, ariaLabel }: DatePickerP
               aria-label={t('datepicker.nextMonth')}>›</button>
           </div>
 
-          <div className={styles.weekdays}>
-            {weekdays.map(w => <div key={w} className={styles.weekday}>{w}</div>)}
-          </div>
-
-          <div className={styles.grid}>
-            {grid.map((cell, i) => {
-              const isSelected = cell.iso === value;
-              const isToday = cell.iso === todayIso;
-              const isDisabled = (!!max && cell.iso > max) || (!!min && cell.iso < min);
-              const classes = [
-                cell.inMonth ? styles.cell : styles.cellOut,
-                isSelected ? styles.cellSelected : '',
-                isToday && !isSelected ? styles.cellToday : '',
-                isDisabled ? styles.cellDisabled : '',
-              ].filter(Boolean).join(' ');
-              return (
-                <button key={i} type="button"
-                  className={classes}
-                  onClick={() => pick(cell.iso)}
-                  disabled={isDisabled}>
-                  {cell.day}
-                </button>
-              );
-            })}
-          </div>
+          <MonthGrid
+            year={viewYear}
+            month={viewMonthIndex}
+            weekStart={0}
+            monoDays
+            isSelected={day => toIso(new Date(day)) === value}
+            isToday={day => toIso(new Date(day)) === todayIso}
+            isDisabled={day => { const iso = toIso(new Date(day)); return (!!max && iso > max) || (!!min && iso < min); }}
+            onPick={day => pick(toIso(new Date(day)))}
+          />
 
           <div className={styles.footer}>
             <button type="button" className={styles.todayBtn}
@@ -155,37 +212,6 @@ export function DatePicker({ value, max, min, onChange, ariaLabel }: DatePickerP
       )}
     </div>
   );
-}
-
-interface Cell {
-  iso: string;
-  day: number;
-  inMonth: boolean;
-}
-
-function buildGrid(ym: string): Cell[] {
-  const [y, m] = ym.split('-').map(Number);
-  const firstOfMonth = new Date(y, m - 1, 1);
-  const firstDow = firstOfMonth.getDay();
-  const daysInMonth = new Date(y, m, 0).getDate();
-  const prevMonthDays = new Date(y, m - 1, 0).getDate();
-
-  const cells: Cell[] = [];
-  for (let i = firstDow - 1; i >= 0; i--) {
-    const day = prevMonthDays - i;
-    const pd = new Date(y, m - 2, day);
-    cells.push({ iso: toIso(pd), day, inMonth: false });
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ iso: `${y}-${pad2(m)}-${pad2(d)}`, day: d, inMonth: true });
-  }
-  while (cells.length % 7 !== 0) {
-    const last = cells[cells.length - 1];
-    const [ly, lm, ld] = last.iso.split('-').map(Number);
-    const nd = new Date(ly, lm - 1, ld + 1);
-    cells.push({ iso: toIso(nd), day: nd.getDate(), inMonth: false });
-  }
-  return cells;
 }
 
 function monthStart(ym: string) { return ym + '-01'; }
@@ -216,15 +242,4 @@ function formatMonth(ym: string) {
   const [y, m] = ym.split('-').map(Number);
   const dt = new Date(y, m - 1, 1);
   return dt.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
-}
-
-function getWeekdayLabels() {
-  const base = new Date(2024, 0, 7);
-  const out: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(base);
-    d.setDate(base.getDate() + i);
-    out.push(d.toLocaleDateString(undefined, { weekday: 'narrow' }));
-  }
-  return out;
 }

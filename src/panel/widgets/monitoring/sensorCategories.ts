@@ -41,8 +41,8 @@ export function sensorsForCategory(
 
 // ── Widget-only categories ──────────────────────────────────────────────────
 // Not part of SENSOR_CATEGORIES/SensorCategory above: the Tryx overlay picker
-// (TRYX_SENSOR_GROUPS in tryxOverlayUtils.ts) mirrors that exact set, and
-// must never offer the iGPU, SSD SMART or the extras-topic device groups (see
+// (TRYX_SENSOR_GROUPS in tryxOverlayUtils.ts) is that set plus its own clock
+// pseudo-device, and must never offer the iGPU, SSD SMART or the extras-topic device groups (see
 // useSensors.storageSensors and useSensorExtras for why).
 
 /**
@@ -86,11 +86,53 @@ export function igpuSensors(sensors: SensorState): HardwareSensor[] {
   return igpuComponents(sensors).flatMap(g => g.sensors);
 }
 
+/**
+ * Display name of a storage sensor with its drive in front ("C: Used",
+ * "Games (D:) Free"). Every drive reports the same Used / Free / Usage names,
+ * so without the drive the picker and the widget caption cannot tell them
+ * apart. The service names a component "<volume> (<mount>)" on Windows and the
+ * bare volume label elsewhere, so the mount (the sensor's parent) is appended
+ * when the component name does not already carry it.
+ */
+export function storageSensorLabel(sensors: SensorState, sensor: HardwareSensor): string {
+  const component = Object.entries(sensors.storageComponents)
+    .find(([id, c]) => !isSmartStorageComponentId(id) && c.sensors?.some(s => s.id === sensor.id))?.[1];
+  const mount = sensor.parent?.name ?? '';
+  const base = component?.name || mount;
+  if (!base) return sensor.name;
+  const drive = mount && !base.includes(mount) ? `${base} (${mount})` : base;
+  return `${drive} ${sensor.name}`;
+}
+
+/** Name a sensor's caption/option is derived from: drive-qualified for storage, the plain name elsewhere. */
+export function sensorCaptionName(device: DeviceKey, sensors: SensorState, sensor: HardwareSensor | undefined): string | undefined {
+  if (!sensor) return undefined;
+  return device === 'storage' ? storageSensorLabel(sensors, sensor) : sensor.name;
+}
+
 /** Flattened sensors from every smart/*-keyed storage component. */
 export function smartStorageSensors(sensors: SensorState): HardwareSensor[] {
   return Object.entries(sensors.storageComponents)
     .filter(([id]) => isSmartStorageComponentId(id))
     .flatMap(([, component]) => component.sensors ?? []);
+}
+
+/** The name an iCUE LINK QX probe carried before it was a fan sensor, as its current one; any other text unchanged. */
+export function currentFanProbeName(name: string): string {
+  const match = /^iCUE LINK QX RGB probe \((.*)\)$/.exec(name);
+  return match ? `QX fan (${match[1]})` : name;
+}
+
+/**
+ * Fan probes were saved under 'cooler' before they had a category of their own. A saved cooler key
+ * (id, or the old name) that names one resolves through 'fanSensors'; no data migration.
+ * Returns the category to read the key from.
+ */
+export function fanProbeAlias(device: DeviceKey, sensorKey: string, extras: SensorExtras): DeviceKey {
+  if (device !== 'cooler' || !sensorKey) return device;
+  const fans = extras.fanSensors.flatMap(c => c.sensors ?? []);
+  const current = currentFanProbeName(sensorKey);
+  return fans.some(s => s.id === sensorKey || s.name === current) ? 'fanSensors' : device;
 }
 
 /** Flattened sensors for one extras-topic device category; [] for any other device. */
@@ -99,6 +141,7 @@ export function extrasSensorsForDevice(device: DeviceKey, extras: SensorExtras):
     case 'memoryModule': return extras.memoryModules.flatMap(c => c.sensors ?? []);
     case 'battery': return extras.batteries.flatMap(c => c.sensors ?? []);
     case 'cooler': return extras.coolers.flatMap(c => c.sensors ?? []);
+    case 'fanSensors': return extras.fanSensors.flatMap(c => c.sensors ?? []);
     case 'psu': return extras.psus.flatMap(c => c.sensors ?? []);
     case 'embeddedController': return extras.embeddedControllers.flatMap(c => c.sensors ?? []);
     default: return [];

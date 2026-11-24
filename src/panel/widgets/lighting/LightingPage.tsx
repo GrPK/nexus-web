@@ -1,29 +1,36 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCheck, Eye, EyeOff, ExternalLink, Gamepad2, Lightbulb, Maximize2, Music, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
+import { Ban, CheckCheck, ListChecks, Eye, EyeOff, Lightbulb, Maximize2, Pause, SprayCan, Play, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
-  startAnimate, startStatic, startScreenMirror, stopLighting, startGameSync,
+  startAnimate, setAnimateSimple, startStatic, startScreenMirror, stopLighting,
   fetchStaticSettings,
   fetchLightingDevices, fetchAnimateSettings, saveAnimateTemplates,
   fetchAnimateDefaults, cachedAnimateDefaults,
-  fetchMusicReactive, setMusicReactive, setLightingDevicePower, setLightingDeviceControlled,
+  setLightingDevicePower, setLightingDeviceControlled,
   renameLightingDevice, saveLightingGroups, saveLightingStacks, saveDeviceLayout,
   fetchScreenEffect, setScreenEffect, fetchMediaEffect, setMediaEffect, fetchLedMap,
-  fetchCurrentSync, fetchAvailableMappings, fetchGameSyncState, fetchGameSyncGames,
-  steamArtworkUrl, resolveActiveGame, setLightingPaused,
+  fetchCurrentSync, fetchAvailableMappings,
+  setLightingPaused,
   resetDeviceLayouts, applyDeviceLayouts, setActiveLayoutPreset, updateLayoutPreset, identifyLightingDevice,
   fetchLightingColorAdjust,
-  type LightingDevice, type LightingColorAdjust, type LedMapEntry, type Pin, type PostProcessSettings, type GameSyncDevice,
-  type GameSyncGame, type DeviceLayoutDto, type PresetApp,
+  type LightingDevice, type LightingColorAdjust, type LedMapEntry, type Pin, type PostProcessSettings,
+  type DeviceLayoutDto, type PresetApp,
 } from '../../../api/lighting';
 import { groupNamesOf, type DeviceGroup } from '../../../lib/deviceGroups';
 import { matchesAllWords } from '../../../search/match';
 import { takeLightingEffect } from '../../../lib/lightingIntent';
+import { lightingDeviceAnchor } from '../../../lib/pageAnchors';
 import { RailSearchButton, RailSearchField, useRailSearch } from '../../../components/common/RailSearch/RailSearch';
 import { useUndoRedo } from '../../../hooks/useUndoRedo';
+import { useShaderParams } from '../../../hooks/useShaderParams';
+import { SensorSignalProvider } from '../../../hooks/SensorSignalProvider';
 import { useLayoutPresets, devicesToLayouts, devicesToPower } from './page/useLayoutPresets';
 import { mediaIdle, playCurrentOrFirstMedia } from '../../../api/mediaLibrary';
 import { getLianLiLighting, isLianLiHubId, setLianLiLighting } from '../../../api/lianli';
-import { getLianLiWirelessLighting, setLianLiWirelessChainLighting } from '../../../api/lianli-wireless';
+import { getLianLiWirelessLighting, getLianLiWirelessState, setLianLiWirelessChainLighting, type LianLiWirelessFan } from '../../../api/lianli-wireless';
+import { deviceTypeKey, lianLiWirelessDeviceAnchor } from '../../../components/views/DevicePage/LianLiWirelessFansTab';
+import { unboundWirelessCards, unboundWirelessFans } from './page/unboundWireless';
+import { LIANLI_FLEX_CHANNEL_PREFIX, lianLiFlexLightingApi } from '../../../api/lianli-flex';
+import { WIRELESS_DEVICE_PREFIX, presetDeviceIds, presetTarget } from './page/firmwareChains';
 import { getHydroShift2Lighting, setHydroShift2Lighting } from '../../../api/hydroshift2';
 import { getGalahad2Lighting, setGalahad2Lighting } from '../../../api/lianli-aio';
 import { getStrimerLighting, setStrimerLighting } from '../../../api/strimer';
@@ -33,9 +40,11 @@ import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
 import type { ServiceState } from '../../../hooks/useServiceState';
 import type { ConnectionState } from '../../../hooks/useServiceStatus';
 import type { DashboardSectionNavigate } from '../../engine/panelLayoutHelpers';
+import { isColorAdjusted } from './page/colorTuning';
 import { buildDeviceBlocks, sortZonesWithinDevice, type ZoneBlock } from './page/deviceBlocks';
 import { usePins } from './page/usePins';
 import { canStack, isStackedSet, setStackLayout, stackDevices, stackOf, unstackDevices, withStacked, type DeviceStack } from './page/deviceStacks';
+import { hiddenCardIds, reconcileDeviceOrder } from '../../../lib/lightingVisibility';
 import { controlGroupOf } from './page/controlGroupOf';
 import { stackLayoutOf, type StackLayout } from '../../../lib/stackSlots';
 import { useTranslation } from '../../../lib/i18n';
@@ -45,6 +54,7 @@ import { pluralKey } from '../../../lib/pluralKey';
 import { Badge } from '../../../components/common/Badge/Badge';
 import { EmptyState } from '../../../components/common/EmptyState/EmptyState';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
+import { useOnboardingHint } from '../../../hooks/useOnboardingHint';
 import { ViewHeader } from '../../../components/common/ViewHeader/ViewHeader';
 import { AdvancedModeCta } from '../../../components/common/AdvancedModeCta/AdvancedModeCta';
 import { CollapsibleSection } from '../../../components/common/CollapsibleSection/CollapsibleSection';
@@ -53,18 +63,27 @@ import { usePageModeMenu } from '../../../components/common/ModeMenu/usePageMode
 import { DeviceCountSummary } from '../../../components/common/DeviceCountSummary/DeviceCountSummary';
 import { Notice } from '../../../components/common/Notice/Notice';
 import { SectionHeader } from '../../../components/common/SectionHeader/SectionHeader';
-import { useUiSettings } from '../../../hooks/useUiSettings';
+import { useConflictAutoKillExclusions, useUiSettings } from '../../../hooks/useUiSettings';
+import { useConflictApps } from '../../../hooks/useConflictApps';
+import { useDevices } from '../../../hooks/useDevices';
+import { HYTE_NEXUS2_CONFLICT_ID } from '../../../api/conflicts';
+import { ConflictWarningModal } from '../../../components/common/Sidebar/ConflictWarning';
+import { FixLightingModal } from '../../../components/common/FixLightingModal/FixLightingModal';
+import { Coachmark } from '../../../components/common/Coachmark/Coachmark';
 import { ServiceRequired } from '../../../components/views/ServiceRequired';
 import { DeviceCanvas } from '../../../components/common/DeviceCanvas/DeviceCanvas';
 import { canvasLabelName } from '../../../lib/canvasLabelName';
+import { effectiveView3d } from '../../../lib/viewPreference';
 import { SCENE_3D } from '../../../lib/scene/sceneFeature';
 import { useLightingScene } from './scene/useLightingScene';
-import { ChipGroup } from '../../../components/common/ChipGroup/ChipGroup';
+import { ViewSwitch } from '../../../components/common/ViewSwitch/ViewSwitch';
 import { SearchInput } from '../../../components/common/SearchInput/SearchInput';
-import { usePersistentState } from '../../../hooks/usePersistentState';
+import { usePersistentState, usePersistentIdSet } from '../../../hooks/usePersistentState';
 import {
   staticLookPin, colorPin, animatePin, MIRROR_PIN, MEDIA_PIN, pinGridKey, pinHex, pinSignature, type Pins,
   pickerMarks, pinMode, pinnedNamesByEffect, pinModeTargetLabel, pinTargetLabel, pressReach, engineReaches, selectAllEligible, tabPressChangesNothing, clearLegacyLightingKeys,
+  SELECTED_DEVICES_STORAGE_KEY, PRIMARY_DEVICE_STORAGE_KEY, selectionWithoutUnpinned,
+  SELECTION_TAB_STORAGE_KEY, SELECTION_TAB_BASE_STORAGE_KEY, reconcileSelectionTab,
 } from './pins';
 import { usePanelBackgroundUsage } from '../../../hooks/usePanelBackgroundUsage';
 import {
@@ -81,9 +100,13 @@ import {
 } from '../../../types/lightingPalette';
 import { defaultTemplatesFor, mergeTemplates, slotMatchesDefault, slotThumbSignature } from '../../../types/lightingTemplates';
 import { AnimateGrid } from './page/AnimateGrid';
+import { effectEditEnabled } from './page/effectEdit';
 import { StaticPalette } from './page/StaticPalette';
 import { SimpleAnimationRow } from './page/SimpleAnimationRow';
-import { isSimpleAnimation, simpleAnimationLabelKey, simpleAnimationState } from './simpleAnimations';
+import {
+  SIMPLE_SLOT, canonicalSimpleKey, isSimpleAnimation, isSimpleReversed, simpleAnimationLabelKey, simpleAnimationState,
+} from './simpleAnimations';
+import { useLightingRecents } from './useLightingRecents';
 import { StaticPickerCanvas } from './page/StaticPickerCanvas';
 import { PICKER_FIELD_SVG, PICKER_SEGMENTED_SVG, snapToSegment, pickerHexAt, pickerPointFor } from './page/staticPickerField';
 import { useColorWriteQueue } from './page/useColorWriteQueue';
@@ -92,12 +115,12 @@ import { FullscreenShader } from './page/FullscreenShader';
 import { ModeControls } from './page/ModeControls';
 import { MediaCanvasNotice } from './page/MediaCanvasNotice';
 import { MediaBackdrop } from './page/MediaBackdrop';
+import { MirrorBackdrop } from './page/MirrorBackdrop';
 import { DevicePanel } from './page/DevicePanel';
+import { useZoneSizeDeviceIds } from '../../../hooks/useZoneSizeDeviceIds';
 import { type DiscoveryState } from './page/DeviceDiscoveryCard';
-import { zoneCardSelectable, zoneCardSelectionHoldable, zoneCardUnavailable } from './page/ZoneCard';
+import { LIGHTING_PIN_HINT_ID, zoneCardSelectable, zoneCardSelectionHoldable, zoneCardUnavailable } from './page/ZoneCard';
 import { Button } from '../../../components/common/Button/Button';
-import { GAME_SYNC_GUIDE_URL } from '../../../lib/externalLinks';
-import { GameSyncLeftPane } from './page/GameSyncLeftPane';
 import { LedMapEditor } from './page/LedMapEditor';
 import { ColorTuningModal } from './page/ColorTuningModal';
 import { useGlobalColor } from './page/useGlobalColor';
@@ -111,8 +134,9 @@ import { PresetAppsModal } from './page/PresetAppsModal';
 import { EffectTab, type PostProcessState } from './page/EffectTab';
 import { useThrottle } from '../../../hooks/cadence';
 import { useAudioState } from '../../../hooks/useAudioState';
+import { MusicReactiveControl } from './page/MusicReactiveControl';
 import { useLightingAudioOutput } from '../../../hooks/useLightingAudioOutput';
-import { Select } from '../../../components/common/Select/Select';
+import { useMusicReactive } from '../../../hooks/useMusicReactive';
 import styles from './LightingPage.module.scss';
 
 /**
@@ -144,7 +168,9 @@ interface LayoutHistorySnapshot {
   powerIds: string[];
 }
 
-// The modes a tab press can pin selected cards to; Off and Game Sync always change the global mode.
+const PIN_HINT_SELECTOR = `[data-coachmark="${LIGHTING_PIN_HINT_ID}"]`;
+
+// The modes a tab press can pin selected cards to; Off always changes the global mode.
 const PINNABLE_MODES: ReadonlySet<string> = new Set(['static', 'animate', 'screen', 'gif']);
 
 /** The selected cards a press on `mode` pins: cards already pinned to that mode keep their own looks. */
@@ -169,29 +195,35 @@ const layoutHistoryStore = {
 
 // How long the rail keeps saying a scan is running when none was ever reported.
 const DISCOVERY_GRACE_MS = 4000;
+// A selected device that stays off the list this long is dropped from the stored selection.
+const SELECTION_ABSENT_GRACE_MS = 60_000;
+// One refresh counts at most this much toward the grace window, so a sleep or a stalled
+// page between two refreshes cannot expire an absent device.
+const SELECTION_ABSENT_STEP_CAP_MS = 15_000;
 const DEVICE_ORDER_KEY = 'lighting.deviceOrder';
 
-/** Devices that play their own effect unless set to `lightingPageMode`, keyed by their cards' deviceIds. */
+/** Devices that play their own effect unless set to `lightingPageMode`, matched by their cards' deviceIds. */
 const OWN_EFFECT_DEVICES: readonly {
-  deviceIds: readonly string[];
+  matches: (deviceId: string) => boolean;
   lightingPageMode: string;
   getMode: () => Promise<string | null>;
   setMode: (mode: string) => Promise<unknown>;
 }[] = [
   {
-    deviceIds: ['lianli-hydroshift2'],
+    matches: id => id === 'lianli-hydroshift2',
     lightingPageMode: 'canvas',
     getMode: () => getHydroShift2Lighting().then(l => l?.mode ?? null),
     setMode: mode => setHydroShift2Lighting({ mode }),
   },
   {
-    deviceIds: ['lianli-aio'],
+    matches: id => id === 'lianli-aio',
     lightingPageMode: 'canvas',
     getMode: () => getGalahad2Lighting().then(l => l?.mode ?? null),
     setMode: mode => setGalahad2Lighting({ mode }),
   },
   {
-    deviceIds: ['strimer:atx', 'strimer:gpu'],
+    // Further controllers carry strimer:<n>:atx and strimer:<n>:gpu.
+    matches: id => /^strimer:(\d+:)?(atx|gpu)$/.test(id),
     lightingPageMode: 'custom',
     getMode: () => getStrimerLighting().then(l => l?.mode ?? null),
     setMode: mode => setStrimerLighting({ mode }),
@@ -207,17 +239,20 @@ function loadDeviceOrder(): string[] {
   return [];
 }
 
-// three.js loads only when someone turns the 3D view on.
-const LightingScene3D = lazy(() => import('./scene/LightingScene3D'));
+// three.js loads only when someone turns the 3D view on. Dev-tools only: the raw defines fold in this module, so a distribution build drops the chunk; a shared const does not fold across modules.
+const LightingScene3D = (import.meta.env.DEV || __DEV_TOOLS__)
+  ? lazy(() => import('./scene/LightingScene3D'))
+  : null;
 const ShaderStudio = lazy(() => import('./studio/ShaderStudio').then(m => ({ default: m.ShaderStudio })));
 const SavedEffectSections = lazy(() => import('./studio/CustomEffectsGrid').then(m => ({ default: m.SavedEffectSections })));
-const VIEW_2D = '2d';
-const VIEW_3D = '3d';
+const VIEW_2D = '2d' as const;
+const VIEW_3D = '3d' as const;
 export function LightingPage({ serviceOnline, serviceState, connectionState, activeProfileId, platform = '', onSectionNavigate, accountUsername = null }: LightingViewProps) {
   const { t, language } = useTranslation();
   const { mode, setMode, rawSync, setRawSync, synced, paused: syncedPaused } = useLightingSync(serviceOnline, activeProfileId);
-  // gpuCanSwitch comes from the same enumeration the Settings picker gates on,
-  // so the shortcut never lands on a tab with no GPU control. Offered only for a
+  // gpuCanSwitch is true whenever the Settings picker has something to choose
+  // (a second card, or CPU rendering offered), so the shortcut never lands on
+  // a tab with no GPU control. Offered only for a
   // card that failed: while initializing, the picker restarts the service and
   // discards the context the notice is waiting for.
   const canPickRenderGpu = (serviceState.lighting?.gpuCanSwitch ?? false)
@@ -225,11 +260,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const handlePickRenderGpu = useCallback(() => {
     onSectionNavigate?.('settings', { settingsTab: 'lighting-cooling', settingsAnchor: 'set-render-gpu' });
   }, [onSectionNavigate]);
-  // Game Sync requires the Windows Chroma capture shim; hide it on non-Windows
-  // (empty platform = ping not yet resolved, keep hidden to avoid a flash).
   const isWindows = platform === 'windows';
-  const effectiveMode: LightingMode = (mode === 'gamesync' && !isWindows) ? 'none' : mode;
   const { settings: uiSettings, update: updateUiSettings } = useUiSettings();
+  const { recordColor, recordAnimation } = useLightingRecents();
   const simpleDashboard = uiSettings.lightingDashboardMode === 'simple';
   // Off / simple / advanced live behind the first tab (see modeTabs). The
   // popover anchors on the tab row, which is why the ref sits on the element
@@ -237,9 +270,12 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
   const modeMenuAnchorRef = useRef<HTMLDivElement | null>(null);
   const closeModeMenu = useCallback(() => setModeMenuOpen(false), []);
+  // A running effect keeps the mapping it was started with, so a user's mode switch updates only that flag.
+  const reapplyMappingRef = useRef<(toSimple: boolean) => void>(() => {});
   const setDashboardMode = useCallback((next: 'simple' | 'advanced') => {
     updateUiSettings({ lightingDashboardMode: next });
-  }, [updateUiSettings]);
+    if ((next === 'simple') !== simpleDashboard) reapplyMappingRef.current(next === 'simple');
+  }, [updateUiSettings, simpleDashboard]);
   // Keeps the output socket open; the canvas paints its frames from ledFrameStore.
   const lightingStream = useLightingFrames();
   // Read RGB running/scanning off useServiceState (already subscribed
@@ -270,13 +306,38 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // pick lands on. `primaryDeviceId` is the one device a Static pick lands on
   // and the member a stacked frame's label names; every focused frame shows
   // its LED dots.
-  // Not persisted: a restored selection would silently turn the next pick into a
-  // pin, so every visit starts at "All devices".
-  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(() => {
-    clearLegacyLightingKeys();
-    return new Set();
-  });
-  const [primaryDeviceId, setPrimaryDeviceId] = useState<string | null>(null);
+  useState(clearLegacyLightingKeys);
+  const [storedSelectionIds, setStoredSelection] = usePersistentIdSet(SELECTED_DEVICES_STORAGE_KEY);
+  const [storedPrimaryId, setPrimaryDeviceId] = usePersistentState<string | null>(PRIMARY_DEVICE_STORAGE_KEY, null);
+  // The stored selection can name a device that is off the list for the moment
+  // (a wireless chain re-pairing). Everything reads the effective selection,
+  // the stored one cut to the cards a click can select now, so an absent id
+  // never reaches a pin or the canvas. An empty result means "nothing selected".
+  const selectionHoldableIds = useMemo(
+    () => new Set(visibleCards(devices).filter(zoneCardSelectionHoldable).map(d => d.id)),
+    [devices],
+  );
+  const selectedDeviceIds = useMemo(
+    () => (storedSelectionIds.size === 0 || [...storedSelectionIds].every(id => selectionHoldableIds.has(id))
+      ? storedSelectionIds
+      : new Set([...storedSelectionIds].filter(id => selectionHoldableIds.has(id)))),
+    [storedSelectionIds, selectionHoldableIds],
+  );
+  const primaryDeviceId = storedPrimaryId && selectionHoldableIds.has(storedPrimaryId) ? storedPrimaryId : null;
+  // Every edit writes through here: a stored id that is absent right now (still
+  // inside its grace window) rides along, so toggling a card during a dropout
+  // does not forget the device that dropped. Any edit that leaves nothing selected
+  // (select none, or toggling off the last visible card) clears them all.
+  const holdableRef = useRef(selectionHoldableIds);
+  holdableRef.current = selectionHoldableIds;
+  const setSelectedDeviceIds = useCallback((update: SetStateAction<Set<string>>) => {
+    setStoredSelection(prev => {
+      const next = typeof update === 'function' ? update(prev) : update;
+      if (next.size === 0) return next;
+      const absent = [...prev].filter(id => !holdableRef.current.has(id) && !next.has(id));
+      return absent.length === 0 ? next : new Set([...next, ...absent]);
+    });
+  }, [setStoredSelection]);
   // Canvas focus: which of the drawn frames take the frame-level edits (drag,
   // resize, rotate, power, LED dots). Kept apart from the list selection so a
   // click on empty canvas recedes the frames instead of clearing the canvas.
@@ -296,6 +357,19 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     setCanvasFocus(id ? withStacked(deviceStacksRef.current, [id]) : new Set());
     setPrimaryDeviceId(id);
   }, [setPrimaryDeviceId]);
+  // A click on a device in the 3D scene selects it as a click on its row does (a lone selection stays, it does not toggle off), then brings the row into view.
+  const handleSelectFromScene = useCallback((id: string | null) => {
+    if (!id) {
+      handleFocusDevice(null);
+      return;
+    }
+    handleSetSelection(new Set(withStacked(deviceStacksRef.current, [id])), id);
+    const anchor = lightingDeviceAnchor(id);
+    requestAnimationFrame(() => {
+      const row = [...document.querySelectorAll('[data-search-anchor]')].find(el => el.getAttribute('data-search-anchor') === anchor);
+      row?.scrollIntoView?.({ block: 'nearest' });
+    });
+  }, [handleFocusDevice, handleSetSelection]);
   const handleSetFocus = useCallback((ids: Set<string>, primary: string | null) => {
     setCanvasFocus(withStacked(deviceStacksRef.current, ids));
     setPrimaryDeviceId(primary);
@@ -339,22 +413,55 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Device ids of wireless chains playing an uploaded animation instead of the engine's frames.
   const [wirelessPresetIds, setWirelessPresetIds] = useState<ReadonlySet<string>>(() => new Set());
   const refreshWirelessPresets = useCallback(async () => {
-    const data = await getLianLiWirelessLighting();
-    if (!data) return;
-    setWirelessPresetIds(new Set(
-      data.chains.filter(c => c.mode !== 'custom').map(c => `lianli-wireless:${c.mac}`),
-    ));
+    const hasFlex = devicesRef.current.some(d => d.id.startsWith(LIANLI_FLEX_CHANNEL_PREFIX));
+    const [wireless, flex] = await Promise.all([
+      getLianLiWirelessLighting().catch(() => null),
+      hasFlex ? lianLiFlexLightingApi.get().catch(() => null) : Promise.resolve(null),
+    ]);
+    if (!wireless && !flex) return;
+    // A source that failed to answer keeps the ids it had; one with no hardware has none.
+    setWirelessPresetIds(prev => {
+      const keep = (prefix: string, fresh: readonly string[] | null) => fresh ?? [...prev].filter(id => id.startsWith(prefix));
+      return new Set([
+        ...keep(WIRELESS_DEVICE_PREFIX, wireless && presetDeviceIds(WIRELESS_DEVICE_PREFIX, wireless.chains)),
+        ...keep(LIANLI_FLEX_CHANNEL_PREFIX, !hasFlex ? [] : flex && presetDeviceIds(LIANLI_FLEX_CHANNEL_PREFIX, flex.chains)),
+      ]);
+    });
   }, []);
+  // Wireless devices on the air but bound to no controller: no lighting card exists for them until bound.
+  const [unboundWireless, setUnboundWireless] = useState<LianLiWirelessFan[]>([]);
+  const unboundSeq = useRef(0);
+  const refreshUnboundWireless = useCallback(async () => {
+    const seq = ++unboundSeq.current;
+    const state = await getLianLiWirelessState().catch(() => null);
+    if (seq === unboundSeq.current) setUnboundWireless(unboundWirelessFans(state));
+  }, []);
+  useEffect(() => {
+    if (!serviceOnline) { unboundSeq.current++; setUnboundWireless([]); }
+  }, [serviceOnline]);
+  const unboundWirelessDevices = useMemo(
+    () => unboundWirelessCards(unboundWireless, f => t(`devices.lianli-wireless.${deviceTypeKey(f.devType, f.fanType)}` as Parameters<typeof t>[0])),
+    [unboundWireless, t],
+  );
+  const hasFlexDevice = devices.some(d => d.id.startsWith(LIANLI_FLEX_CHANNEL_PREFIX));
+  useEffect(() => {
+    if (hasFlexDevice) void refreshWirelessPresets();
+  }, [hasFlexDevice, refreshWirelessPresets]);
   const handleWirelessTakeControl = useCallback(async (deviceId: string) => {
-    const mac = deviceId.slice('lianli-wireless:'.length);
+    const target = presetTarget(deviceId);
+    if (!target) return;
     setWirelessPresetIds(prev => new Set([...prev].filter(id => id !== deviceId)));
-    if (!await setLianLiWirelessChainLighting(mac, { mode: 'custom' })) void refreshWirelessPresets();
+    const ok = target.family === 'flex'
+      ? await lianLiFlexLightingApi.set(target.mac, { mode: 'custom' })
+      : await setLianLiWirelessChainLighting(target.mac, { mode: 'custom' });
+    if (!ok) void refreshWirelessPresets();
   }, [refreshWirelessPresets]);
 
   // Device ids of OWN_EFFECT_DEVICES not following the Lighting page; only present devices are read.
   const [ownEffectIds, setOwnEffectIds] = useState<ReadonlySet<string>>(() => new Set());
+  // The matched ids themselves, so a further controller appearing re-reads the mode.
   const ownEffectPresent = useMemo(
-    () => OWN_EFFECT_DEVICES.map(e => e.deviceIds.some(id => devices.some(d => d.deviceId === id)) ? '1' : '0').join(''),
+    () => OWN_EFFECT_DEVICES.map(e => devices.flatMap(d => d.deviceId && e.matches(d.deviceId) ? [d.deviceId] : []).sort().join(',')).join('|'),
     [devices],
   );
   // Only the newest read applies, so one started before a Take control cannot restore the old state.
@@ -362,26 +469,28 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // A device whose read fails keeps its last known state.
   const refreshOwnEffects = useCallback(async () => {
     const seq = ++ownEffectSeq.current;
+    const present = ownEffectPresent.split('|');
     const modes = await Promise.all(OWN_EFFECT_DEVICES.map((e, i) =>
-      ownEffectPresent[i] === '1' ? e.getMode().catch(() => null) : Promise.resolve(null)));
+      present[i] !== '' ? e.getMode().catch(() => null) : Promise.resolve(null)));
     if (seq !== ownEffectSeq.current) return;
     setOwnEffectIds(prev => {
       const next = new Set<string>();
       OWN_EFFECT_DEVICES.forEach((e, i) => {
-        if (ownEffectPresent[i] !== '1') return;
+        if (present[i] === '') return;
         const mode = modes[i];
-        if (mode === null ? e.deviceIds.some(id => prev.has(id)) : mode !== e.lightingPageMode) {
-          e.deviceIds.forEach(id => next.add(id));
+        const ids = devicesRef.current.flatMap(d => d.deviceId && e.matches(d.deviceId) ? [d.deviceId] : []);
+        if (mode === null ? ids.some(id => prev.has(id)) : mode !== e.lightingPageMode) {
+          ids.forEach(id => next.add(id));
         }
       });
       return next;
     });
   }, [ownEffectPresent]);
   const handleOwnEffectTakeControl = useCallback(async (deviceId: string) => {
-    const entry = OWN_EFFECT_DEVICES.find(e => e.deviceIds.includes(deviceId));
+    const entry = OWN_EFFECT_DEVICES.find(e => e.matches(deviceId));
     if (!entry) return;
     ownEffectSeq.current++;
-    setOwnEffectIds(prev => new Set([...prev].filter(id => !entry.deviceIds.includes(id))));
+    setOwnEffectIds(prev => new Set([...prev].filter(id => !entry.matches(id))));
     if (!await entry.setMode(entry.lightingPageMode)) void refreshOwnEffects();
   }, [refreshOwnEffects]);
   const firmwareDeviceIds = useMemo(
@@ -391,7 +500,18 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
 
   // Pinned devices, keyed by device id. The service owns them; this is its
   // copy plus the optimistic edits made here, re-read on every lighting frame.
-  const { pins, refresh: refreshPins, applyPins, recordPins } = usePins();
+  const { pins, loaded: pinsLoaded, refresh: refreshPins, applyPins: writePins, recordPins } = usePins();
+  // First-pin coachmark: the devices a pin the user made this session went to.
+  // Pins restored from the service or set elsewhere never reach it.
+  const pinHint = useOnboardingHint(LIGHTING_PIN_HINT_ID);
+  const [pinHintIds, setPinHintIds] = useState<ReadonlySet<string> | null>(null);
+  // The card the bubble points at, reported by the rail; its pin names the title.
+  const [pinHintTargetId, setPinHintTargetId] = useState<string | null>(null);
+  const applyPins = useCallback(async (ids: readonly string[], pin: Pin | null, record?: boolean): Promise<boolean> => {
+    const ok = await writePins(ids, pin, record);
+    if (ok && pin && ids.length > 0) setPinHintIds(prev => prev ?? new Set(ids));
+    return ok;
+  }, [writePins]);
   // Collapsing the effect dock hands its space to the canvas and the browser.
   // The preset toolbar keeps its width either way - it lives in row 1, which
   // sizes itself.
@@ -410,6 +530,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // drive the same template state through different start endpoints.
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  // Lets handlers declared before handleModeChange restart lighting from Off.
+  const resumeLightingRef = useRef<(m: LightingMode, effectKey?: string) => Promise<void>>(async () => {});
   // Static keeps its own last-selected key, so switching modes returns to what
   // each one was showing rather than carrying the other's effect across.
   const staticEffectRef = useRef<string>(DEFAULT_STATIC_EFFECT);
@@ -431,8 +553,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const [studioTarget, setStudioTarget] = useState<{ id: string | null } | null>(null);
   const [effectQuery, setEffectQuery] = useState('');
   const sceneApi = useLightingScene(SCENE_3D);
-  const [sceneEditorOpen, setSceneEditorOpen] = useState(false);
-  const scene3d = SCENE_3D && !!sceneApi.scene?.view.enabled;
+  // The scene answers once loaded; until then the stored choice stands, so a page that last used 3D opens on 3D without a 2D frame first.
+  const scene3d = effectiveView3d(sceneApi.scene ? sceneApi.scene.view.enabled : uiSettings.lightingView3d, SCENE_3D);
   // Canvas hides the frame for any device whose LEDs are off. The device
   // list is always mounted now, so there is no tab state to hide it behind.
   // Cards whose LEDs are all user-disabled disappear from the listing and
@@ -440,9 +562,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // fully parked device shows one card with its zero-enabled badge so it
   // stays selectable and its LED map editor remains reachable.
   const visibleDevices = useMemo(() => visibleCards(devices), [devices]);
-  // The list selection, which is what the canvas frames, also shrinks without
-  // passing through those handlers: the prune drops devices which stopped
-  // being selectable (unplugged, or their LEDs switched off). A focus id for a
+  // The effective list selection, which is what the canvas frames, also shrinks
+  // without passing through those handlers: it loses devices which stopped
+  // being selectable (unplugged, or off the list). A focus id for a
   // frame the canvas no longer draws would keep the group-drag branch armed
   // on a one-frame canvas, so drop it here.
   useEffect(() => {
@@ -503,6 +625,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const handleCompositionChanged = useCallback(async (hubId: string) => {
     const data = await fetchLightingDevices();
     if (!data) return;
+    hiddenDeviceIdsRef.current = hiddenCardIds(data);
     setDeviceGroups(data.groups ?? []);
     setDeviceStacks(data.stacks ?? []);
     const next = (data.devices ?? []).map(d => ({
@@ -577,12 +700,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
   }, [canvasFocusIds, deviceStacks, editorTarget, activeProfileId]);
 
-  const [musicReactive, setMusicReactiveState] = useState(false);
-  const audioRef = useAudioState(musicReactive && mode === 'animate');
-  // Windows only: the macOS capture takes the whole system mix, so there is no
-  // output to name or switch.
-  const showAudioOutput = musicReactive && isWindows && mode === 'animate';
-  const audioOutput = useLightingAudioOutput(showAudioOutput);
+  const { enabled: musicReactive, toggle: handleMusicReactiveToggle, refresh: refreshMusicReactive } = useMusicReactive(serviceOnline);
 
   // Optimistic local mirror of useLightingSync().paused, reconciled whenever
   // the server value changes (multiplex refetch, mode switch resetting it).
@@ -633,9 +751,21 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const throttleAnimate = useThrottle();
   const throttlePostProcess = useThrottle();
   const localAnimateEditUntilRef = useRef(0);
+  // Bumped whenever simple mode saves or loads templates itself, and counting its
+  // saves in flight, so an older hydrate never overwrites them.
+  const templateGenerationRef = useRef(0);
+  const templateSavesRef = useRef(0);
   const activeProfileKey = activeProfileId ?? 'default';
   const activeProfileKeyRef = useRef(activeProfileKey);
   activeProfileKeyRef.current = activeProfileKey;
+  // Applying a profile can change Music Reactive, and the topic frame that would
+  // say so does not exist without a multiplex connection.
+  const musicProfileKeyRef = useRef(activeProfileKey);
+  useEffect(() => {
+    if (musicProfileKeyRef.current === activeProfileKey) return;
+    musicProfileKeyRef.current = activeProfileKey;
+    if (serviceOnline) refreshMusicReactive();
+  }, [activeProfileKey, serviceOnline, refreshMusicReactive]);
   const [loadedProfileLighting, setLoadedProfileLighting] = useState<{ profileKey: string; sync: string } | null>(null);
 
   const effectTemplatesRef = useRef(effectTemplates);
@@ -649,7 +779,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     keepSelection = false,
   ) => {
     if (!data) return;
+    const generation = templateGenerationRef.current;
     const defaults = await fetchAnimateDefaults();
+    // A simple-mode tap saved templates since this payload was read: applying it
+    // would put the older selection back.
+    if (generation !== templateGenerationRef.current || templateSavesRef.current > 0) return;
     setAnimateDefaults(defaults);
     const merged: Record<string, EffectTemplateBundle> = {};
     const savedTemplates = data.templates ?? {};
@@ -736,13 +870,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     Promise.all([
       safe(fetchCurrentSync()),
       safe(fetchAnimateSettings()),
-      safe(fetchMusicReactive()),
       safe(fetchScreenEffect()),
       safe(fetchMediaEffect()),
     ]).then(async ([
       currentSync,
       animateSettings,
-      musicSettings,
       screenEffect,
       mediaEffect,
     ]) => {
@@ -757,9 +889,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         // pre-hydrate {}) or the restored effect starts with the base look.
         await hydrateAnimateSettings(animateSettings, normalizeSync(sync) === 'static');
         if (cancelled) return;
-      }
-      if (musicSettings) {
-        setMusicReactiveState(!!musicSettings.enabled);
       }
       if (screenEffect) {
         setScreenPP(normalizePP(screenEffect));
@@ -801,19 +930,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           setActiveEffect(data.effect);
         }
       });
-    } else if (isSimpleAnimation(rawSync)) {
-      // Started from simple mode, the widget or another client: a sweep has no
-      // cell in the advanced grid, so leaving the last catalogue key selected
-      // would mark that cell and draw its shader over a canvas running this.
-      setActiveEffect('');
-    } else if (EFFECTS.some(e => e.key === rawSync) || isCustomEffectKey(rawSync)) {
-      setActiveEffect(rawSync);
+    } else if (EFFECTS.some(e => e.key === canonicalSimpleKey(rawSync)) || isCustomEffectKey(rawSync)) {
+      // A key retired from simple mode (older service, cached state) shows as
+      // the effect that replaced it.
+      setActiveEffect(canonicalSimpleKey(rawSync));
       fetchAnimateSettings().then(data => {
         if (cancelled || !data) return;
         hydrateAnimateSettings(data);
-      });
-      fetchMusicReactive().then(data => {
-        if (!cancelled && data) setMusicReactiveState(!!data.enabled);
       });
     } else if (rawSync === 'screen') {
       fetchScreenEffect().then(data => {
@@ -840,6 +963,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     });
     return () => { cancelled = true; };
   }, [serviceOnline, mode, hydrateAnimateSettings]);
+
+  const zoneSizeDeviceIds = useZoneSizeDeviceIds(serviceOnline, devices);
 
   // Push-driven refresh: every /lighting/* mutation publishes a 'lighting'
   // frame on the multiplex hub. Each branch refetches the resource it owns.
@@ -878,55 +1003,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     }
   });
 
-  const handleMusicReactiveToggle = useCallback(async () => {
-    const next = !musicReactive;
-    setMusicReactiveState(next);
-    try {
-      await setMusicReactive(next);
-    } catch {
-      setMusicReactiveState(!next);
-    }
-  }, [musicReactive]);
-
-  const [gameSyncState, setGameSyncState] = useState<{
-    devices: GameSyncDevice[];
-    lastFrameAt: number | null;
-    activeApp: string | null;
-    isReceiving: boolean;
-    vendorConflict: boolean;
-  }>({ devices: [], lastFrameAt: null, activeApp: null, isReceiving: false, vendorConflict: false });
-
-  useEffect(() => {
-    if (effectiveMode !== 'gamesync' || !serviceOnline) return;
-    let cancelled = false;
-    const poll = async () => {
-      const data = await fetchGameSyncState().catch(() => null);
-      if (cancelled || !data) return;
-      const lastFrameAt = data.lastFrameAt ?? null;
-      setGameSyncState({
-        devices: data.devices ?? [],
-        lastFrameAt,
-        activeApp: data.activeApp ?? null,
-        isReceiving: lastFrameAt != null && (Date.now() - lastFrameAt) < 2000,
-        vendorConflict: data.synapseConflict === true,
-      });
-    };
-    void poll();
-    const id = window.setInterval(() => { void poll(); }, 1500);
-    return () => { cancelled = true; window.clearInterval(id); };
-  }, [effectiveMode, serviceOnline]);
-
-  const [gameSyncGames, setGameSyncGames] = useState<GameSyncGame[]>([]);
-
-  useEffect(() => {
-    if (effectiveMode !== 'gamesync' || !serviceOnline) return;
-    let cancelled = false;
-    fetchGameSyncGames().then(data => {
-      if (!cancelled && data) setGameSyncGames(data.games ?? []);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [effectiveMode, serviceOnline]);
-
   // The Marketplace's "Open in Lighting" effect, taken on mount so it never fires on a later visit.
   // Kept when StrictMode's second mount finds nothing left to take.
   const openIntentRef = useRef<string | null>(null);
@@ -953,7 +1029,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       if (EFFECTS.some(e => e.key === sync) || isCustomEffectKey(sync)) {
         const state = stateFor(sync);
         await startAnimate(sync, state.speed, state.intensity, state.hue,
-          state.colorize, state.saturation, state.contrast, state.params, false);
+          state.colorize, state.saturation, state.contrast, state.params, false, state.sensors, simpleDashboard);
       } else if (sync === 'screen') {
         await startScreenMirror(screenPP.saturation, screenPP.contrast, undefined, screenPP.hue, screenPP.colorize);
       } else if (sync === 'media' || sync === 'gif') {
@@ -969,6 +1045,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     screenPP.contrast,
     screenPP.hue,
     screenPP.colorize,
+    simpleDashboard,
   ]);
 
   // Settles the static start still waiting on the throttle; any newer call drops
@@ -1007,7 +1084,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       done();
       startAnimate(
         effect, state.speed, state.intensity, state.hue, state.colorize,
-        state.saturation, state.contrast, state.params, persist,
+        state.saturation, state.contrast, state.params, persist, state.sensors,
       ).catch(() => {});
     });
   }, [setGlobalColor, throttleAnimate]);
@@ -1044,23 +1121,24 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const selectionIds = useMemo(() => [...selectedDeviceIds], [selectedDeviceIds]);
   // The tab a press opened for a selection, null for the global mode's tab. Selecting and
   // deselecting cards never moves it.
-  const [selectionTab, setSelectionTab] = useState<LightingMode | null>(null);
-  const [tabBaseMode, setTabBaseMode] = useState(effectiveMode);
-  if (tabBaseMode !== effectiveMode) {
+  const [selectionTab, setSelectionTab] = usePersistentState<LightingMode | null>(SELECTION_TAB_STORAGE_KEY, null);
+  const [tabBaseMode, setTabBaseMode] = usePersistentState<LightingMode | null>(SELECTION_TAB_BASE_STORAGE_KEY, null);
+  const reconciledTab = reconcileSelectionTab(selectionTab, tabBaseMode, mode, synced);
+  if (reconciledTab.base !== tabBaseMode || reconciledTab.tab !== selectionTab) {
     // A global mode change from anywhere (a press, Off, simple mode, another client) reopens the global tab.
-    setTabBaseMode(effectiveMode);
-    setSelectionTab(null);
+    setTabBaseMode(reconciledTab.base);
+    setSelectionTab(reconciledTab.tab);
   }
-  const viewMode: LightingMode = selectionTab ?? effectiveMode;
+  const viewMode: LightingMode = selectionTab ?? mode;
   // Nothing selected on a tab other than the running mode: its picks reach no card until a
   // selection gives them one (or a press of the tab starts the mode), so they flash the scope chip.
-  const detachedTab = selectedDeviceIds.size === 0 && viewMode !== effectiveMode;
+  const detachedTab = selectedDeviceIds.size === 0 && viewMode !== mode;
   const [scopeFlash, setScopeFlash] = useState(0);
   const flashScope = useCallback(() => setScopeFlash(n => n + 1), []);
   const cardMode = useCallback((id: string): LightingMode => {
     const p = pins[id];
-    return p ? pinMode(p.kind) : effectiveMode;
-  }, [pins, effectiveMode]);
+    return p ? pinMode(p.kind) : mode;
+  }, [pins, mode]);
   const scoped: ScopedTarget = useMemo(() => {
     // A detached tab reaches outside the running mode just as a selection can.
     if (selectionIds.length === 0) return detachedTab ? { kind: 'mixed' } : { kind: 'none' };
@@ -1097,6 +1175,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     // wore; the running effect is untouched. Unselected pinned devices are
     // never reached.
     const ids = [...selectedDeviceIds];
+    // Off has stopped the engine, and a pin does not restart it: a pick starts the mode globally.
+    if (modeRef.current === 'none') {
+      const startMode = viewMode === 'static' ? 'static' : 'animate';
+      const valid = startMode === 'static' ? isStaticEffect(key) : ANIMATE_EFFECTS.some(e => e.key === key) || isCustomEffectKey(key);
+      setSelectionTab(null);
+      void resumeLightingRef.current(startMode, valid ? key : undefined);
+      return;
+    }
     if (detachedTab) { flashScope(); return; }
     if (ids.length > 0 && (viewMode === 'animate' || viewMode === 'static')) {
       if (viewMode === 'static') {
@@ -1123,18 +1209,29 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       rawSync: selectMode === 'static' ? 'static' : key,
       effect: key,
     });
-  }, [activeEffect, applyAnimate, applyPins, viewMode, pinStaticLook, selectedDeviceIds, setGlobalColor, slotOf, stateFor, detachedTab, flashScope]);
+  }, [activeEffect, applyAnimate, applyPins, viewMode, pinStaticLook, selectedDeviceIds, setGlobalColor, slotOf, stateFor, detachedTab, flashScope, setSelectionTab]);
 
   // Paces the pin writes a color drag produces; the local copy is recorded
   // per move, the write follows when the previous one lands.
   const queueColorWrite = useColorWriteQueue(useCallback((ids: string[], pin: Pin) => applyPins(ids, pin, false), [applyPins]));
 
   const handleCustomSelect = useCallback((hex: string) => {
+    // Off: a pin would not restart the stopped engine, so the color starts Static globally.
+    if (modeRef.current === 'none') {
+      setCustomStaticColor(hex);
+      setSelectionTab(null);
+      recordColor(hex);
+      void resumeLightingRef.current('static').then(() => {
+        setGlobalColor(hex, startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, hex));
+      });
+      return;
+    }
     if (detachedTab) { flashScope(); return; }
     setCustomStaticColor(hex);
     const ids = [...selectedDeviceIds];
     // Nothing selected: the color is the exact global flat color.
     if (ids.length === 0) {
+      recordColor(hex);
       setGlobalColor(hex, startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, hex));
       return;
     }
@@ -1143,11 +1240,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const pin = colorPin(hex);
     recordPins(ids, pin);
     queueColorWrite(pin, ids);
-  }, [queueColorWrite, recordPins, selectedDeviceIds, setCustomStaticColor, setGlobalColor, detachedTab, flashScope]);
+  }, [queueColorWrite, recordPins, selectedDeviceIds, setCustomStaticColor, setGlobalColor, detachedTab, flashScope, recordColor, setSelectionTab]);
 
   // Records as well as writes: the marks and the device cards read the pin, so
   // a drag has to move them with the pointer, not on release.
   const handleCustomPreview = useCallback((hex: string) => {
+    // Off: the commit starts Static globally, so a drag must not pin the selection.
+    if (modeRef.current === 'none') return;
     const ids = [...selectedDeviceIds];
     if (ids.length === 0) return;
     const pin = colorPin(hex);
@@ -1201,6 +1300,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // A selection reaching outside the open tab shows no effect: the running one may belong to another mode.
   const previewEffect = scoped.kind === 'mixed' ? '' : pinTarget && !isPaletteKey(dockEffect) ? dockEffect : activeEffect;
   const previewShaderState = pinTarget && !isPaletteKey(dockEffect) ? dockState : previewState;
+  // Sensors are subscribed only while the shown shader has a sensor uniform.
+  const previewUsesSensors = useShaderParams(previewEffect || null).sensors.length > 0;
   // The slot strip highlights what the dock edits, so a scoped bundle carries
   // the pin's slot rather than the effect's shared pointer.
   const dockBundle: EffectTemplateBundle | null = dockEffect
@@ -1258,6 +1359,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const clamped = Math.min(Math.max(idx, 0), bundle.slots.length - 1);
     const nextBundle: EffectTemplateBundle = { ...bundle, selected: clamped };
     const nextTemplates = { ...effectTemplates, [target]: nextBundle };
+    if (viewMode === 'animate') recordAnimation(target, clamped);
     writeTemplates(nextTemplates, target === activeEffect ? target : null, true);
     // Selection is instant and the slot's params are unchanged, so the committed
     // snapshot can advance immediately (no save race).
@@ -1274,7 +1376,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       templateIndex: clamped,
       effectState: nextBundle.slots[clamped],
     });
-  }, [activeEffect, effectTemplates, pinStaticLook, pinTarget, focusIds, stateOf, writeTemplates]);
+  }, [activeEffect, effectTemplates, pinStaticLook, pinTarget, focusIds, recordAnimation, stateOf, viewMode, writeTemplates]);
 
   const handleStatePatch = useCallback((patch: Partial<EffectState>, commit = false) => {
     if (!dockEffect || !dockState) return;
@@ -1519,15 +1621,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     try { localStorage.setItem(DEVICE_ORDER_KEY, JSON.stringify(deviceOrder)); } catch { /* persist best-effort */ }
   }, [deviceOrder]);
   // Reconcile the saved order against the live devices list: drop ids for
-  // devices that no longer exist, append new ones. Without this, the saved
-  // order would accumulate dead ids across USB unplugs / OpenRGB rescans.
+  // devices that no longer exist (hidden OpenRGB cards still exist), append
+  // new ones. Without this, the saved order would accumulate dead ids across
+  // USB unplugs / OpenRGB rescans.
   useEffect(() => {
     if (devices.length === 0) return;
     setDeviceOrder(prev => {
-      const ids = devices.map(d => d.id);
-      const kept = prev.filter(id => ids.includes(id));
-      for (const id of ids) if (!kept.includes(id)) kept.push(id);
-      return kept.length === prev.length && kept.every((id, i) => id === prev[i]) ? prev : kept;
+      const next = reconcileDeviceOrder(prev, devices.map(d => d.id), hiddenDeviceIdsRef.current);
+      return next.length === prev.length && next.every((id, i) => id === prev[i]) ? prev : next;
     });
   }, [devices]);
   const orderedDevices = useMemo(() => {
@@ -1587,16 +1688,36 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     [orderedDevices, hideUncontrolled, railSearch.query, railSearchFields],
   );
 
+  // Running apps that compete for a card's hardware, named in its footer strip.
+  const { conflicts: runningApps, ready: runningAppsReady } = useConflictApps(serviceOnline);
+  const { devices: curatedDevices } = useDevices(serviceOnline && runningApps.length > 0);
+  const curatedControl = useMemo(
+    () => new Map(curatedDevices.flatMap(d => (d.conflictAppId
+      ? [[d.id, { appId: d.conflictAppId, enabled: d.nexusControlEnabled !== false }] as const]
+      : []))),
+    [curatedDevices],
+  );
+  const [appStripIds, setAppStripIds] = useState<readonly string[] | null>(null);
+  // Open flag plus the card that opened it; null name means the page link opened it.
+  const [fixLighting, setFixLighting] = useState<{ deviceName: string | null } | null>(null);
+  const conflictExclusions = useConflictAutoKillExclusions();
+  // Nexus 2 is never whitelisted: the service ends it whatever the list says.
+  const conflictWhitelisted = useMemo(
+    () => new Set(conflictExclusions.filter(id => id !== HYTE_NEXUS2_CONFLICT_ID)),
+    [conflictExclusions],
+  );
+  const appStripConflicts = useMemo(
+    () => (appStripIds ? runningApps.filter(c => appStripIds.includes(c.id)) : []),
+    [appStripIds, runningApps],
+  );
+
   const selectableIds = useMemo(
     () => orderedDevices.filter(zoneCardSelectable).map(d => d.id),
     [orderedDevices],
   );
   // Cards a SELECTION can hold, which is wider: a click lands on a dark or
   // un-driven card too, since selecting it is how its menu gets opened.
-  const selectionKeepIds = useMemo(
-    () => orderedDevices.filter(zoneCardSelectionHoldable).map(d => d.id),
-    [orderedDevices],
-  );
+  const hiddenDeviceIdsRef = useRef<ReadonlySet<string>>(new Set());
   // Select all takes dark cards too, but skips Nexus Control off ones, which the
   // eye can hide - so it never builds a selection the user cannot see. A search
   // narrows it to the matches for the same reason.
@@ -1629,7 +1750,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Brightness counts: it is one of the modal's controls, and Reset restores it
   // with the rest.
   const colorTunedIds = useMemo(
-    () => new Set(devices.filter(d => colorAdjusts[d.id] || (d.brightness ?? 100) < 100).map(d => d.id)),
+    () => new Set(devices.filter(d => isColorAdjusted(colorAdjusts[d.id]) || (d.brightness ?? 100) < 100).map(d => d.id)),
     [devices, colorAdjusts],
   );
   // Key reactions. The service lists every per-key keyboard card it can react
@@ -1677,11 +1798,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const sawScanRef = useRef(false);
   useEffect(() => {
     if (!synced) return;
-    const off = effectiveMode === 'none';
+    const off = mode === 'none';
     if (wasOffRef.current === null) { wasOffRef.current = off; return; }
     if (off) { wasOffRef.current = true; sawScanRef.current = false; setLeftOff(false); return; }
     if (wasOffRef.current) { wasOffRef.current = false; sawScanRef.current = false; setLeftOff(true); }
-  }, [effectiveMode, synced]);
+  }, [mode, synced]);
   useEffect(() => {
     if (!leftOff) return undefined;
     if (rgb.scanning) { sawScanRef.current = true; return undefined; }
@@ -1693,24 +1814,49 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     const timer = setTimeout(() => setLeftOff(false), DISCOVERY_GRACE_MS);
     return () => clearTimeout(timer);
   }, [leftOff, rgb.scanning]);
-  const discovery: DiscoveryState | undefined = effectiveMode === 'none'
+  const discovery: DiscoveryState | undefined = mode === 'none'
     ? 'off'
     : (leftOff ? 'detecting' : undefined);
 
-  // A restored selection can name devices that are gone (unplugged between
-  // visits). Drop those once the list has loaded. Judged against what a click
-  // can select, NOT the pick targets: this effect re-runs on every device
-  // poll, so pruning to the narrower set would quietly undo the selection of a
-  // card the user picked precisely because its lights were off.
+  // A stored selection can name devices that are gone for good (unplugged
+  // between visits). Each id gets SELECTION_ABSENT_GRACE_MS off the list before
+  // it is dropped, so a device that drops for a moment, or one OpenRGB has not
+  // enumerated yet, keeps its selection. Time counts only across consecutive
+  // refreshes, each capped, so a sleep between two refreshes adds one step, not
+  // the whole sleep. Reappearing resets the clock. Judged against what a click
+  // can select, NOT the pick targets, so a card picked while its lights were
+  // off stays selected. Checked on each devices refresh.
+  const absentMsRef = useRef(new Map<string, number>());
+  const lastRefreshAtRef = useRef<number | null>(null);
+  const storedSelectionRef = useRef(storedSelectionIds);
+  storedSelectionRef.current = storedSelectionIds;
+  const storedPrimaryRef = useRef(storedPrimaryId);
+  storedPrimaryRef.current = storedPrimaryId;
   useEffect(() => {
-    if (orderedDevices.length === 0) return;
-    const keep = new Set(selectionKeepIds);
-    setSelectedDeviceIds(prev => {
-      if ([...prev].every(id => keep.has(id))) return prev;
-      return new Set([...prev].filter(id => keep.has(id)));
-    });
-    setPrimaryDeviceId(prev => (prev && !keep.has(prev) ? null : prev));
-  }, [orderedDevices, selectionKeepIds, setSelectedDeviceIds, setPrimaryDeviceId]);
+    const absentMs = absentMsRef.current;
+    const now = Date.now();
+    const step = lastRefreshAtRef.current === null ? 0 : Math.min(Math.max(0, now - lastRefreshAtRef.current), SELECTION_ABSENT_STEP_CAP_MS);
+    lastRefreshAtRef.current = now;
+    if (devices.length === 0) { absentMs.clear(); return; }
+    // Hidden OpenRGB cards come back with the daemon, so their ids stay selected.
+    const present = (id: string) => selectionHoldableIds.has(id) || hiddenDeviceIdsRef.current.has(id);
+    const expired = new Set<string>();
+    const tracked = new Set(storedSelectionRef.current);
+    if (storedPrimaryRef.current) tracked.add(storedPrimaryRef.current);
+    for (const id of tracked) {
+      if (present(id)) { absentMs.delete(id); continue; }
+      const total = (absentMs.get(id) ?? 0) + (absentMs.has(id) ? step : 0);
+      absentMs.set(id, total);
+      if (total >= SELECTION_ABSENT_GRACE_MS) expired.add(id);
+    }
+    for (const id of [...absentMs.keys()]) if (!tracked.has(id)) absentMs.delete(id);
+    if (expired.size === 0) return;
+    for (const id of expired) absentMs.delete(id);
+    setStoredSelection(prev => (
+      [...prev].some(id => expired.has(id)) ? new Set([...prev].filter(id => !expired.has(id))) : prev
+    ));
+    setPrimaryDeviceId(prev => (prev && expired.has(prev) ? null : prev));
+  }, [devices, selectionHoldableIds, setStoredSelection, setPrimaryDeviceId]);
 
   // Devices list: fetch on entry + profile change, then refresh push-driven.
   // The `lighting` topic fires on every /lighting mutation (layout edits,
@@ -1720,6 +1866,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const refreshDevices = useCallback(async () => {
     const data = await fetchLightingDevices();
     if (!data || deviceDraggingRef.current) return;
+    hiddenDeviceIdsRef.current = hiddenCardIds(data);
     const devices = (data.devices ?? []).map(d => ({
       ...d,
       canvasW: Math.max(60, d.canvasW),
@@ -1742,22 +1889,25 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     if (!serviceOnline) return;
     void refreshLianLiModes();
     void refreshWirelessPresets();
+    void refreshUnboundWireless();
     void refreshOwnEffects();
-  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets, refreshOwnEffects]);
+  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets, refreshUnboundWireless, refreshOwnEffects]);
 
   useEffect(() => {
     const onFocus = () => {
       if (!serviceOnline) return;
       void refreshLianLiModes();
       void refreshWirelessPresets();
+      void refreshUnboundWireless();
       void refreshOwnEffects();
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets, refreshOwnEffects]);
+  }, [serviceOnline, refreshLianLiModes, refreshWirelessPresets, refreshUnboundWireless, refreshOwnEffects]);
 
   useTopicCallback('devices', serviceOnline, () => {
     void refreshDevices();
+    void refreshUnboundWireless();
   });
 
   const prevScanningRef = useRef(rgb.scanning);
@@ -2017,12 +2167,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           setActiveEffect(key);
           setRawSync(key);
           const state = stateFor(key);
-          await startAnimate(key, state.speed, state.intensity, state.hue, state.colorize, state.saturation, state.contrast, state.params);
+          await startAnimate(key, state.speed, state.intensity, state.hue, state.colorize, state.saturation, state.contrast, state.params, true, state.sensors, simpleDashboard);
           publishControlSync({ domain: 'lighting', mode: m, rawSync: key, effect: key });
           break;
         }
         case 'static': {
-          const key = isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
+          const key = effectKey && isStaticEffect(effectKey) ? effectKey
+            : (isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current);
           setActiveEffect(key);
           const state = stateFor(key);
           // Entering Static keeps a global flat color: an effect start without one would clear it.
@@ -2042,16 +2193,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           }
           break;
         }
-        case 'gamesync':
-          await startGameSync();
-          break;
         case 'none': await stopLighting(); break;
       }
       if (m !== 'animate') {
         publishControlSync({ domain: 'lighting', mode: m, rawSync: m });
       }
     } catch { /* best-effort; backend state becomes source of truth */ }
-  }, [activeEffect, globalColor, rawSync, setMode, setRawSync, screenPP, stateFor, setPausedState]);
+  }, [activeEffect, globalColor, rawSync, setMode, setRawSync, screenPP, stateFor, setPausedState, simpleDashboard]);
+
+  resumeLightingRef.current = handleModeChange;
 
   // Once the profile's lighting has loaded, the requested effect becomes the Animation effect.
   useEffect(() => {
@@ -2064,17 +2214,23 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // Simple mode has no device rail, so a color is the exact global flat color.
   // Static has to own the output first.
   const handleSimplePaletteSelect = useCallback(async (color: PaletteColor) => {
-    if (effectiveMode !== 'static') await handleModeChange('static');
+    recordColor(color.hex);
+    if (mode !== 'static') await handleModeChange('static');
     setGlobalColor(color.hex, startStatic(DEFAULT_STATIC_EFFECT, 1, 0, 0, 1, 1, {}, true, color.hex));
-  }, [effectiveMode, handleModeChange, setGlobalColor]);
+  }, [mode, handleModeChange, setGlobalColor, recordColor]);
 
   // Simple mode has no per-device toggle, so a device left un-driven or dark on
   // the advanced page would sit black here with nothing on the page saying why.
   // Claimed when the user asks for something, not on arrival: switching the
-  // view is not a decision about which devices Nexus drives.
-  const claimAllDevices = useCallback((): string[] => {
+  // view is not a decision about which devices Nexus drives. A pick passes
+  // takeControl false: a device the user turned Nexus control off for stays
+  // that way until Control all.
+  const claimAllDevices = useCallback((takeControl = true): string[] => {
     for (const d of devices.filter(d => d.devicePageReason === undefined)) {
-      if (d.controlled === false) handleSetControlled(d.id, true);
+      if (d.controlled === false) {
+        if (!takeControl) continue;
+        handleSetControlled(d.id, true);
+      }
       if (!d.ledsOn) handleSetPower(d.id, true);
     }
     return orderedDevices.filter(zoneCardSelectionHoldable).map(d => d.id);
@@ -2084,7 +2240,84 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const unpinAll = useCallback(() => {
     const ids = Object.keys(pins);
     if (ids.length > 0) void applyPins(ids, null);
-  }, [applyPins, pins]);
+    // An empty selection means all devices, so the next pick pins none of them again.
+    setSelectedDeviceIds(new Set());
+    setPrimaryDeviceId(null);
+    setCanvasFocus(null);
+  }, [applyPins, pins, setSelectedDeviceIds, setPrimaryDeviceId, setCanvasFocus]);
+
+  // Over visibleDevices, which the show-uncontrolled filter does not touch, so
+  // hidden uncontrolled cards count; zero-LED and device-page cards do not.
+  const anyUncontrolled = useMemo(
+    () => visibleDevices.some(d => d.controlled === false && zoneCardSelectionHoldable(d)),
+    [visibleDevices],
+  );
+  // The Advanced rail also holds the Presets toolbar, which a labeled button
+  // would push off-screen, so the label drops when the row cannot fit both.
+  // Every input is independent of the toggle (sibling widths, the toolbar's
+  // natural width, the label's width measured while shown), so it cannot flap.
+  const controlAllRef = useRef<HTMLSpanElement>(null);
+  const controlAllFullWidth = useRef<{ label: string; width: number } | null>(null);
+  const [controlAllCompact, setControlAllCompact] = useState(false);
+  // Bumped when web fonts finish loading, which invalidates every measured width.
+  const [fontEpoch, setFontEpoch] = useState(0);
+  useEffect(() => {
+    let live = true;
+    void document.fonts?.ready.then(() => {
+      if (!live) return;
+      controlAllFullWidth.current = null;
+      setControlAllCompact(false);
+      setFontEpoch(e => e + 1);
+    });
+    return () => { live = false; };
+  }, []);
+  const controlAllLabel = t('lighting.controlAllDevices');
+  const controlAllIconOnly = !simpleDashboard && controlAllCompact;
+  useLayoutEffect(() => {
+    const wrap = controlAllRef.current;
+    const rail = wrap?.parentElement;
+    const row = rail?.parentElement;
+    const toolbar = wrap?.nextElementSibling;
+    const button = wrap?.firstElementChild as HTMLElement | null | undefined;
+    if (!wrap || !button || !rail || !row || !toolbar || simpleDashboard) return;
+    if (!controlAllCompact) {
+      controlAllFullWidth.current = { label: controlAllLabel, width: button.offsetWidth };
+    } else if (controlAllFullWidth.current?.label !== controlAllLabel) {
+      setControlAllCompact(false);
+      return;
+    }
+    const measure = () => {
+      const full = controlAllFullWidth.current;
+      const toolbarWidth = parseFloat(getComputedStyle(toolbar).getPropertyValue('--preset-rail-width'));
+      if (!full || Number.isNaN(toolbarWidth)) return;
+      const siblings = [...row.children].filter(c => c !== rail) as HTMLElement[];
+      const rowGap = parseFloat(getComputedStyle(row).columnGap) || 0;
+      const railGap = parseFloat(getComputedStyle(rail).columnGap) || 0;
+      const used = siblings.reduce((sum, c) => sum + c.offsetWidth + rowGap, 0);
+      setControlAllCompact(row.clientWidth - used < toolbarWidth + railGap + full.width);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    for (const c of row.children) if (c !== rail) observer.observe(c);
+    if (!controlAllCompact) observer.observe(button);
+    return () => observer.disconnect();
+  }, [anyUncontrolled, simpleDashboard, controlAllLabel, controlAllCompact, fontEpoch]);
+  const controlAllDevicesButton = anyUncontrolled ? (
+    <span ref={controlAllRef} className={styles.controlAll}>
+      <Button
+        size="sm"
+        pill
+        icon={controlAllIconOnly ? <ListChecks /> : undefined}
+        aria-label={controlAllIconOnly ? controlAllLabel : undefined}
+        title={controlAllIconOnly ? controlAllLabel : undefined}
+        onClick={() => { claimAllDevices(); if (simpleDashboard) unpinAll(); }}
+      >
+        {controlAllIconOnly ? undefined : controlAllLabel}
+      </Button>
+    </span>
+  ) : undefined;
 
   // Counted over the devices the claim can actually reach. A zone with no LEDs
   // cannot be lit, and a device-page card is set on its own page, so including
@@ -2102,103 +2335,187 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     [claimableDevices, pins],
   );
 
-  // The switch holds a browser-local preference, but the direction the hardware
-  // is running is the stored speed sign - conform to it once per sweep so a
-  // second browser does not show the switch the wrong way round.
+  // The switch holds a browser-local preference for the next pick; the
+  // direction the hardware is running is the stored speed sign, so conform to
+  // it once per animation and a second browser does not show the switch the
+  // wrong way round.
   const reverseReadFor = useRef<string | null>(null);
 
-  // A sweep is one shared shader for every device, so starting Animate is the
-  // whole assignment - there is no per-device write to make. activeEffect is
-  // cleared because a sweep has no cell in the advanced grid: leaving the last
-  // catalogue key there marks that cell selected and draws its shader on the
-  // canvas while the hardware runs this one.
+  // Last tap wins: every simple-mode action takes a number and gives up when a
+  // newer one (or an unmount) has taken over while it was awaiting.
+  const simpleSeqRef = useRef(0);
+  useEffect(() => () => { simpleSeqRef.current += 1; }, []);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const simpleReversedRef = useRef(simpleReversed);
+  simpleReversedRef.current = simpleReversed;
+
+  // Simple mode runs the first preset of a regular effect: this moves the
+  // effect's selection there (saved, and awaited, only when it was elsewhere,
+  // because the service re-applies the selected preset on that save and would
+  // overwrite a reversed start sent before it lands) and returns the preset's
+  // resolved look. Resolves null while the stock defaults or this effect's
+  // templates cannot be loaded, when the selection could not be saved (the
+  // prior state stays), or when a newer action took over: starting then would
+  // persist a wrong look.
+  const selectSimpleSlot = useCallback(async (key: string, seq: number): Promise<EffectState | null> => {
+    const current = () => seq === simpleSeqRef.current;
+    let templates = effectTemplatesRef.current;
+    if (!animateDefaults || !templates[key]) {
+      const [data, defaults] = await Promise.all([fetchAnimateSettings(), fetchAnimateDefaults()]);
+      if (!current() || !data || !defaults) return null;
+      templateGenerationRef.current += 1;
+      setAnimateDefaults(defaults);
+      const loaded: Record<string, EffectTemplateBundle> = {};
+      for (const fx of EFFECTS) loaded[fx.key] = mergeTemplates(fx.key, data.templates?.[fx.key], defaults);
+      for (const k of Object.keys(data.templates ?? {})) {
+        if (isCustomEffectKey(k)) loaded[k] = mergeTemplates(k, data.templates?.[k], defaults);
+      }
+      templates = loaded;
+      effectTemplatesRef.current = loaded;
+      setEffectTemplates(loaded);
+      setCommittedTemplates(loaded);
+    }
+    const bundle = templates[key];
+    if (!bundle) return null;
+    if (bundle.selected !== SIMPLE_SLOT) {
+      localAnimateEditUntilRef.current = Date.now() + 1500;
+      const next = { ...templates, [key]: { ...bundle, selected: SIMPLE_SLOT } };
+      templateGenerationRef.current += 1;
+      templateSavesRef.current += 1;
+      let saved: unknown = null;
+      try { saved = await saveAnimateTemplates(next); } catch { /* left null: not saved */ } finally { templateSavesRef.current -= 1; }
+      templateGenerationRef.current += 1;
+      // A refused save keeps the prior selection locally too.
+      if (!saved || !current()) return null;
+      effectTemplatesRef.current = next;
+      setEffectTemplates(next);
+      setCommittedTemplates(next);
+    }
+    return bundle.slots[SIMPLE_SLOT];
+  }, [animateDefaults]);
+
+  // One shared shader for every device, so starting Animate is the whole
+  // assignment - there is no per-device write to make.
   const handleSimpleAnimationSelect = useCallback(async (key: string) => {
-    claimAllDevices();
+    const seq = ++simpleSeqRef.current;
+    const slot0 = await selectSimpleSlot(key, seq);
+    if (!slot0 || seq !== simpleSeqRef.current) return;
+    recordAnimation(key, SIMPLE_SLOT);
+    claimAllDevices(false);
     unpinAll();
-    setActiveEffect('');
+    setActiveEffect(key);
     // This IS the direction now, so the conform read below must not run for
     // this key: rawSync goes optimistic, and the stored sign is still the old
     // one until the start persists.
     reverseReadFor.current = key;
     setMode('animate');
     setRawSync(key);
-    const state = simpleAnimationState(simpleReversed);
+    const state = simpleAnimationState(slot0, simpleReversedRef.current);
     try {
-      // Re-picking the running sweep reuses the live shader, and that path
+      // Re-picking the running effect reuses the live shader, and that path
       // never clears the engine's hold, so a paused engine has to be released
       // explicitly or the tile lights up over frozen LEDs.
-      if (paused) { setPausedState(false); await setLightingPaused(false); }
-      await startAnimate(key, state.speed, state.intensity, state.hue, state.colorize, state.saturation, state.contrast, state.params);
+      if (pausedRef.current) {
+        setPausedState(false);
+        await setLightingPaused(false);
+        if (seq !== simpleSeqRef.current) return;
+      }
+      await startAnimate(key, state.speed, state.intensity, state.hue, state.colorize, state.saturation, state.contrast, state.params, true, state.sensors, true);
+      if (seq !== simpleSeqRef.current) return;
       publishControlSync({ domain: 'lighting', mode: 'animate', rawSync: key, effect: key });
     } catch { /* the sync poll reconciles */ }
-  }, [claimAllDevices, paused, setMode, setPausedState, setRawSync, simpleReversed, unpinAll]);
+  }, [claimAllDevices, selectSimpleSlot, setMode, setPausedState, setRawSync, unpinAll, recordAnimation]);
 
-  // The running sweep, which is also what marks a tile.
-  const simpleAnimation = synced && effectiveMode === 'animate' && isSimpleAnimation(rawSync)
-    ? rawSync
+  // The running simple-mode animation, which is also what marks a tile. Only
+  // the first preset counts: the same effect on another preset is a custom
+  // setup that simple mode neither marks nor reverses.
+  const simpleAnimation = synced && mode === 'animate' && isSimpleAnimation(rawSync)
+    && slotOf(canonicalSimpleKey(rawSync)) === SIMPLE_SLOT
+    ? canonicalSimpleKey(rawSync)
     : null;
+  // Only the mapping flag changes: the running look, unsaved edits included, stays on the LEDs and nothing is committed.
+  reapplyMappingRef.current = (toSimple: boolean) => {
+    if (mode !== 'animate') return;
+    void setAnimateSimple(toSimple && simpleAnimation !== null).catch(() => {});
+  };
 
-  // Turning the row around restarts the running sweep with the other sign.
+  // Turning the row around restarts the running animation with the preset's
+  // speed negated. The sign lives in the running state only, never in the slot.
   const handleSimpleReverse = useCallback(async (next: boolean) => {
     setSimpleReversed(next);
     if (!simpleAnimation) return;
-    const state = simpleAnimationState(next);
+    const seq = ++simpleSeqRef.current;
+    const slot0 = await selectSimpleSlot(simpleAnimation, seq);
+    if (!slot0 || seq !== simpleSeqRef.current) return;
+    const state = simpleAnimationState(slot0, next);
     try {
       // Same in-place uniform path a re-pick takes, which never clears the
       // engine's hold, so a paused engine has to be released explicitly.
-      if (paused) { setPausedState(false); await setLightingPaused(false); }
-      await startAnimate(simpleAnimation, state.speed, state.intensity, state.hue, state.colorize, state.saturation, state.contrast, state.params);
+      if (pausedRef.current) {
+        setPausedState(false);
+        await setLightingPaused(false);
+        if (seq !== simpleSeqRef.current) return;
+      }
+      await startAnimate(simpleAnimation, state.speed, state.intensity, state.hue, state.colorize, state.saturation, state.contrast, state.params, true, state.sensors, true);
+      if (seq !== simpleSeqRef.current) return;
       publishControlSync({ domain: 'lighting', mode: 'animate', rawSync: simpleAnimation, effect: simpleAnimation });
     } catch { /* the sync poll reconciles */ }
-  }, [paused, setPausedState, simpleAnimation, setSimpleReversed]);
+  }, [selectSimpleSlot, setPausedState, simpleAnimation, setSimpleReversed]);
 
   useEffect(() => {
     if (!simpleAnimation || reverseReadFor.current === simpleAnimation) return;
     reverseReadFor.current = simpleAnimation;
     let cancelled = false;
-    fetchAnimateSettings().then(data => {
-      const speed = data?.states?.[simpleAnimation]?.speed;
-      if (!cancelled && typeof speed === 'number') setSimpleReversed(speed < 0);
+    Promise.all([fetchAnimateSettings(), fetchAnimateDefaults()]).then(([data, defaults]) => {
+      if (cancelled || !data) return;
+      // The service drops a running state equal to the selected preset, so a
+      // missing one is the forward direction. A retired key may still hold it.
+      const speed = data.states?.[rawSync]?.speed ?? data.states?.[simpleAnimation]?.speed;
+      if (typeof speed !== 'number') { setSimpleReversed(false); return; }
+      const slot0 = mergeTemplates(simpleAnimation, data.templates?.[simpleAnimation], defaults).slots[SIMPLE_SLOT];
+      setSimpleReversed(isSimpleReversed(speed, slot0.speed));
     }).catch(() => { /* keep the local value */ });
     return () => { cancelled = true; };
-  }, [simpleAnimation, setSimpleReversed]);
+  }, [simpleAnimation, rawSync, setSimpleReversed]);
 
   // The swatch simple mode marks active: the exact global color, when it is
   // one of the palette's.
   const simplePaletteId = useMemo(() => {
-    if (effectiveMode !== 'static' || !globalColor) return null;
+    if (mode !== 'static' || !globalColor) return null;
     return PALETTE.find(c => c.hex.toLowerCase() === globalColor.toLowerCase())?.id ?? null;
-  }, [effectiveMode, globalColor]);
+  }, [mode, globalColor]);
 
   // The simple page can only show Off or one palette swatch; anything else
   // leaves nothing marked active. `synced` gates it: an unsynced mode is a guess.
-  const simpleCustomActive = synced && effectiveMode !== 'none' && !simpleAnimation
+  const simpleCustomActive = synced && mode !== 'none' && !simpleAnimation
     && selectableIds.length > 0 && simplePaletteId === null;
 
   // A press or pick pulses the cards it changed; a new seq replays it.
   const [pulse, setPulse] = useState<{ ids: ReadonlySet<string>; seq: number }>({ ids: new Set(), seq: 0 });
   const pulseCards = useCallback((ids: ReadonlySet<string>) => setPulse(s => ({ ids, seq: s.seq + 1 })), []);
-  const pulsePick = () => pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds));
+  const pulsePick = () => pulseCards(pressReach(
+    visibleDevices,
+    pins,
+    mode === 'none' && (viewMode === 'animate' || viewMode === 'static') ? new Set() : selectedDeviceIds,
+  ));
   // Pause/freeze applies to the three modes that drive a continuous output
   // (animate shader, media playback, screen mirror) - Off has nothing to
-  // freeze and Game Sync is driven by the foreground game, not us.
+  // freeze.
   // Off is not a tab any more: it shares the first tab with the simple /
   // advanced swap, which the tab opens as a menu instead of switching mode.
   const modeMenu = usePageModeMenu({
     mode: simpleDashboard ? 'simple' : 'advanced',
-    off: synced && effectiveMode === 'none',
+    off: synced && mode === 'none',
     offIcon: LIGHTING_MODE_ICONS.none,
     offLabel: t('lighting.mode.off'),
     offDescription: t('lighting.modeMenu.offDesc'),
     simpleDescription: t('lighting.modeMenu.simpleDesc'),
     advancedDescription: t('lighting.modeMenu.advancedDesc'),
-    // Simple mode never shows the device list, so Off claims what it can reach
-    // first - the same claim the palette runs, so the page's counts agree.
     onOff: () => {
-      // Already off: asking again would re-run the claim and re-issue the stop.
-      if (synced && effectiveMode === 'none') return;
+      // Already off: asking again would re-issue the stop.
+      if (synced && mode === 'none') return;
       pulseCards(pressReach(visibleDevices, pins, selectedDeviceIds, true));
-      if (simpleDashboard) claimAllDevices();
       void handleModeChange('none');
     },
     onModeChange: setDashboardMode,
@@ -2213,14 +2530,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   };
   const modeTabs = [modeMenuTab, ...MODES
     .filter(m => m.key !== 'none')
-    .filter(m => m.key !== 'gamesync' || isWindows)
     .map(m => {
       const Icon = LIGHTING_MODE_ICONS[m.key];
-      const showPauseToggle = synced && m.key === effectiveMode
+      const showPauseToggle = synced && m.key === mode
         && (m.key === 'animate' || m.key === 'gif' || m.key === 'screen');
       return {
         key: m.key,
         label: t(m.labelKey),
+        tooltip: serviceOnline ? t(`${m.labelKey}.desc`) : undefined,
         icon: <Icon size={14} />,
         trailing: showPauseToggle ? (
           <HoverTooltip body={t(paused ? 'lighting.resume' : 'lighting.pause')} side="top">
@@ -2248,25 +2565,26 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           </HoverTooltip>
         ) : undefined,
       };
-    })];
+    }),
+  ];
   // The strip marks the mode tab while lighting is off - it is the tab Off now
   // lives on. Every other mode still marks its own tab.
   const activeTabKey = !synced ? undefined
     : (viewMode === 'none' ? MODE_MENU_TAB_KEY : viewMode);
   const globalTabKey = !synced ? undefined
-    : (effectiveMode === 'none' ? MODE_MENU_TAB_KEY : effectiveMode);
+    : (mode === 'none' ? MODE_MENU_TAB_KEY : mode);
   // What a tab press gives the selected cards: that mode's global look, or the
-  // one shared Mirror or Media. Game Sync and Off cannot be pinned, so they
-  // always change everything.
+  // one shared Mirror or Media. Off cannot be pinned, so it
+  // always changes everything.
   const tabPinFor = (m: LightingMode): Pin | null => {
     switch (m) {
       case 'static': {
         if (globalColor) return colorPin(globalColor);
-        const key = effectiveMode === 'static' && isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
+        const key = mode === 'static' && isStaticEffect(activeEffect) ? activeEffect : staticEffectRef.current;
         return staticLookPin(key, slotOf(key), stateOf(key, slotOf(key)));
       }
       case 'animate':
-        return animatePin((effectiveMode === 'animate' ? (simpleAnimation ?? activeEffect) : '') || animateEffectRef.current);
+        return animatePin((mode === 'animate' ? (simpleAnimation ?? activeEffect) : '') || animateEffectRef.current);
       case 'screen': return MIRROR_PIN;
       case 'gif': return MEDIA_PIN;
       default: return null;
@@ -2289,14 +2607,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   // The cards a press on `key` changes, outlined on hover and pulsed on press: with a selection
   // and a pinnable mode, the cards it pins; otherwise the global reach.
   const tabPressReach = useCallback((key: string): Set<string> | undefined => {
+    // Off: the press starts the mode for every card, whatever is selected.
+    if (mode === 'none' && key !== 'none') return pressReach(visibleDevices, pins, new Set());
     if (selectedDeviceIds.size > 0 && PINNABLE_MODES.has(key)) {
       const ids = tabPressPins(pins, selectedDeviceIds, key);
       return ids.length ? pressReach(visibleDevices, pins, new Set(ids)) : undefined;
     }
     // With nothing selected a press changes the running mode, which a detached open tab is not.
     if (tabPressChangesNothing(key, detachedTab ? globalTabKey : activeTabKey, selectedDeviceIds.size, false)) return undefined;
-    return pressReach(visibleDevices, pins, selectedDeviceIds, key === 'gamesync');
-  }, [activeTabKey, globalTabKey, detachedTab, pins, selectedDeviceIds, visibleDevices]);
+    return pressReach(visibleDevices, pins, selectedDeviceIds);
+  }, [mode, activeTabKey, globalTabKey, detachedTab, pins, selectedDeviceIds, visibleDevices]);
   // A tab press either opens the mode menu or applies a mode: to the selected
   // cards when there are any, else to every unpinned one. A mode switch also
   // drops the menu, which the tab row keeps "inside" its anchor.
@@ -2309,7 +2629,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     closeModeMenu();
     const reach = tabPressReach(key);
     if (reach) pulseCards(reach);
-    const pin = selectedDeviceIds.size > 0 ? tabPinFor(key as LightingMode) : null;
+    // Off: a pin would not restart the stopped engine, so the press starts the mode globally.
+    const pin = selectedDeviceIds.size > 0 && mode !== 'none' ? tabPinFor(key as LightingMode) : null;
     if (pin) {
       setSelectionTab(key as LightingMode);
       const ids = tabPressPins(pins, selectedDeviceIds, key);
@@ -2321,14 +2642,16 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   };
 
   const shaderMode = viewMode === 'animate' || viewMode === 'static';
-  // The cards a hovered press or pick reaches, outlined. Off and Game Sync have no picks.
+  // The cards a hovered press or pick reaches, outlined.
   const pickTargetIds = useMemo(() => {
     if (scopeHovered || pickHovered) {
-      return viewMode === 'none' || viewMode === 'gamesync' || detachedTab ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
+      // Off with an effect or color picker open: a pick starts the mode for every card. Media and Screen keep the engine stopped.
+      if (mode === 'none' && (viewMode === 'animate' || viewMode === 'static')) return pressReach(visibleDevices, pins, new Set());
+      return viewMode === 'none' || detachedTab ? undefined : pressReach(visibleDevices, pins, selectedDeviceIds);
     }
     if (!hoveredTab || hoveredTab === MODE_MENU_TAB_KEY) return undefined;
     return tabPressReach(hoveredTab);
-  }, [scopeHovered, pickHovered, viewMode, detachedTab, hoveredTab, tabPressReach, pins, selectedDeviceIds, visibleDevices]);
+  }, [scopeHovered, pickHovered, mode, viewMode, detachedTab, hoveredTab, tabPressReach, pins, selectedDeviceIds, visibleDevices]);
   const pinnedNames = useMemo(() => visibleDevices.filter(d => d.id in pins).map(canvasLabelName), [visibleDevices, pins]);
   // How many cards the next pick changes; with none, the way to reach any is a selection.
   const reachCount = detachedTab ? 0 : pressReach(visibleDevices, pins, selectedDeviceIds).size;
@@ -2341,7 +2664,6 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     <Badge
       label={previewBadgeLabel}
       compact
-      uppercase
       color={selectedDeviceIds.size > 0 ? 'var(--accent-glow)' : 'var(--text-dim)'}
     />
   );
@@ -2368,8 +2690,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     : (scoped.kind === 'mixed' || (scoped.kind === 'none' && viewMode === 'static' && globalColor) ? '' : activeEffect);
   // With nothing selected, re-picking the running tile changes no card, so it
   // pulses none. A selection's re-pick can move a static pin to the current slot.
+  const toggleDock = useCallback(() => setDockCollapsed(c => !c), [setDockCollapsed]);
   const handleEffectPick = (key: string) => {
     if (!(key === gridEffect && selectedDeviceIds.size === 0)) pulsePick();
+    if (viewMode === 'animate') recordAnimation(key, gridSlotFor(key));
     handleEffectSelect(key);
   };
   // The colour the selection wears, which is where its dots sit on the field.
@@ -2381,8 +2705,17 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   const mixedSelection = scoped.kind === 'mixed' && viewMode !== 'screen' && viewMode !== 'gif';
   const allSelected = selectAllIds.length > 0 && selectAllIds.every(id => selectedDeviceIds.has(id));
   // The canvas previews the shared effect canvas, which Static does not sample
-  // and Off has nothing to show on. Game Sync substitutes its own activity block.
-  const showCanvas = viewMode !== 'static' && viewMode !== 'none' && viewMode !== 'gamesync';
+  // and Off has nothing to show on.
+  const showCanvas = viewMode !== 'static' && viewMode !== 'none';
+  // The music button shows for the visible effect, not the service's running
+  // mode, so audio capture and the source picker follow the same condition.
+  const showMusicButton = shaderMode && !!dockEffect && !!dockState && !mixedSelection
+    && !!(EFFECTS.find(e => e.key === dockEffect)?.audio || dockCustom?.audio);
+  const audioRef = useAudioState(musicReactive && showMusicButton);
+  // Windows only: the macOS capture takes the whole system mix, so there is no
+  // source to name or switch.
+  const showAudioOutput = musicReactive && isWindows && showMusicButton;
+  const audioOutput = useLightingAudioOutput(showAudioOutput);
   // The device list is the canvas filter: the canvas draws exactly what the
   // list has selected. Which of those frames is focused is the canvas's own
   // state (`canvasFocusIds`), so a canvas click never removes a frame.
@@ -2435,15 +2768,15 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
 
   // What a press on a following card's pin pins it to: the current global
   // source. Static pins the global color or static look, Animate the running
-  // shader, Mirror and Media the one shared source. Game Sync and Off cannot
-  // be pinned to.
+  // shader, Mirror and Media the one shared source. Off cannot be
+  // pinned to.
   const effectLabel = useCallback((key: string) => {
     const def = EFFECTS.find(e => e.key === key);
     return def ? t(def.labelKey) : key;
   }, [t]);
   const globalPin: { pin: Pin; name: string } | null = useMemo(() => {
     if (!synced) return null;
-    if (effectiveMode === 'static') {
+    if (mode === 'static') {
       // A pick with nothing selected sets the global color and leaves the
       // pattern alone, so the color is what following cards wear.
       if (globalColor) {
@@ -2452,24 +2785,65 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       }
       return activeEffect ? { pin: staticLookPin(activeEffect, slotOf(activeEffect), stateOf(activeEffect, slotOf(activeEffect))), name: effectLabel(activeEffect) } : null;
     }
-    if (effectiveMode === 'animate') {
+    if (mode === 'animate') {
       const key = simpleAnimation ?? activeEffect;
       return key ? { pin: animatePin(key), name: simpleAnimation ? t(simpleAnimationLabelKey(simpleAnimation)) : effectLabel(key) } : null;
     }
-    if (effectiveMode === 'screen') return { pin: MIRROR_PIN, name: t('lighting.mode.screen') };
-    if (effectiveMode === 'gif') return { pin: MEDIA_PIN, name: t('lighting.mode.gif') };
+    if (mode === 'screen') return { pin: MIRROR_PIN, name: t('lighting.mode.screen') };
+    if (mode === 'gif') return { pin: MEDIA_PIN, name: t('lighting.mode.gif') };
     return null;
-  }, [activeEffect, effectLabel, effectiveMode, globalColor, simpleAnimation, slotOf, stateOf, synced, t]);
+  }, [activeEffect, effectLabel, mode, globalColor, simpleAnimation, slotOf, stateOf, synced, t]);
   const pinDisabledReason = globalPin ? undefined : t(
-    effectiveMode === 'gamesync' ? 'lighting.pin.disabledGameSync'
-        : effectiveMode === 'none' ? 'lighting.pin.disabledOff'
-          : 'lighting.pin.disabledUnavailable',
+    mode === 'none' ? 'lighting.pin.disabledOff'
+      : 'lighting.pin.disabledUnavailable',
   );
   const pinTargetName = useCallback((pin: Pin): string => pinModeTargetLabel(pin, t), [t]);
+  const { dismissed: pinHintDismissed, dismiss: dismissPinHint } = pinHint;
+  // Pins already there when the page first loads them mean the user knows
+  // pins, or has seen the hint on another client.
+  const pinsCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!pinsLoaded || pinHintDismissed === null || pinsCheckedRef.current) return;
+    pinsCheckedRef.current = true;
+    if (pinHintDismissed === false && !pinHintIds && Object.keys(pins).length > 0) dismissPinHint();
+  }, [pinsLoaded, pinHintDismissed, pinHintIds, pins, dismissPinHint]);
+  // Unpinned by any path, the hint has nothing left to point at.
+  useEffect(() => {
+    if (pinHintDismissed === false && pinHintIds && ![...pinHintIds].some(id => pins[id])) dismissPinHint();
+  }, [pinHintDismissed, pinHintIds, pins, dismissPinHint]);
+  const hintPin = pinHintTargetId ? pins[pinHintTargetId] : undefined;
+  const pinHintName = hintPin ? pinTargetName(hintPin) : '';
+  const pinHintActive = !simpleDashboard && pinHintDismissed === false && pinHintIds !== null && !modeMenuOpen;
+  // The bubble waits for the rail to name its target, so it never announces a blank title.
+  const showPinHint = pinHintActive && pinHintName !== '';
+  // The bubble may not cover the tab row, so it stays inside the content below it.
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const topRowRef = useRef<HTMLDivElement | null>(null);
+  const contentBelowTabs = useCallback(() => {
+    const body = bodyRef.current?.getBoundingClientRect();
+    const tabs = topRowRef.current?.getBoundingClientRect();
+    return body && tabs ? new DOMRect(body.left, tabs.bottom, body.width, body.bottom - tabs.bottom) : null;
+  }, []);
   const handleSetPin = useCallback((ids: string[], pinned: boolean) => {
-    if (!pinned) { void applyPins(ids, null); return; }
+    if (!pinned) {
+      void applyPins(ids, null);
+      // A stacked card moves with its stack, so the whole stack leaves the selection.
+      const left = selectionWithoutUnpinned(
+        selectedDeviceIds, primaryDeviceId, [...withStacked(deviceStacksRef.current, ids)], orderedDevices.map(d => d.id),
+      );
+      if (left) {
+        setSelectedDeviceIds(left.ids);
+        setPrimaryDeviceId(left.primary);
+        // An explicit canvas focus drops the devices that left the selection; null follows the selection.
+        setCanvasFocus(prev => {
+          const kept = prev && new Set([...prev].filter(id => left.ids.has(id)));
+          return kept && kept.size > 0 ? kept : null;
+        });
+      }
+      return;
+    }
     if (globalPin) void applyPins(ids, globalPin.pin);
-  }, [applyPins, globalPin]);
+  }, [applyPins, globalPin, selectedDeviceIds, primaryDeviceId, orderedDevices, setSelectedDeviceIds, setPrimaryDeviceId, setCanvasFocus]);
   // A Mirror or Media pick with cards selected gives just them the shared source.
   const handleSelectionPick = useMemo(() => {
     if (selectedDeviceIds.size === 0 || (viewMode !== 'screen' && viewMode !== 'gif')) return undefined;
@@ -2485,13 +2859,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     for (const d of visibleDevices) {
       if (!engineReaches(d)) continue;
       const pin = pins[d.id];
-      if (pin ? pin.kind === kind : effectiveMode === viewMode) reach.add(d.id);
+      if (pin ? pin.kind === kind : mode === viewMode) reach.add(d.id);
     }
     pulseCards(reach);
     handleSelectionPick?.();
-  }, [viewMode, visibleDevices, pins, selectedDeviceIds, effectiveMode, pulseCards, handleSelectionPick]);
+  }, [viewMode, visibleDevices, pins, selectedDeviceIds, mode, pulseCards, handleSelectionPick]);
 
-  const simpleOff = synced && effectiveMode === 'none';
+  const simpleOff = synced && mode === 'none';
   // The mode tab leads the strip in both dashboard modes; simple mode carries
   // nothing after it, so its header is the mode tab alone.
   const simpleTabs = [modeMenuTab];
@@ -2536,6 +2910,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               tabs={simpleTabs}
               activeTab={activeTabKey}
               onTabChange={handleTabChange}
+              actions={controlAllDevicesButton}
               /* Off states what it did; every other mode carries both counts,
                  so a device the advanced page left un-driven is visible here
                  without a device list. Same line either way. The action runs
@@ -2550,7 +2925,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                       controlled: controlledCount,
                       total: claimableDevices.length,
                     })}
-                  action={!simpleOff && controlledCount < claimableDevices.length ? (
+                  action={!simpleOff && !anyUncontrolled && controlledCount < claimableDevices.length ? (
                     <Button size="sm" pill onClick={() => { claimAllDevices(); unpinAll(); }}>
                       {t('lighting.simple.controlAll')}
                     </Button>
@@ -2564,13 +2939,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             <SectionHeader className={styles.simpleSectionHeader}>{t('lighting.mode.static')}</SectionHeader>
             <StaticPalette
               selectedId={simplePaletteId}
-              onSelect={color => { claimAllDevices(); unpinAll(); void handleSimplePaletteSelect(color); }}
+              onSelect={color => { claimAllDevices(false); unpinAll(); void handleSimplePaletteSelect(color); }}
             />
           </div>
           <div className={styles.simpleSection}>
             <SectionHeader className={styles.simpleSectionHeader}>{t('lighting.mode.animate')}</SectionHeader>
             <SimpleAnimationRow
               activeKey={simpleAnimation}
+              versionFor={key => versionForSlot(key, SIMPLE_SLOT)}
               reversed={simpleReversed}
               gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
               onSelect={key => { void handleSimpleAnimationSelect(key); }}
@@ -2592,13 +2968,14 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
   }
 
   return (
+    <SensorSignalProvider enabled={previewUsesSensors}>
     <div className={styles.lighting}>
       {/* Three columns: the device rail, the mode tabs + their content, and the
           always-mounted effect dock. Both side columns span the tab row so they
           rise to the very top of the page. Capped at --page-max (pageBody) so
           the page matches every other view's width. */}
-      <div className={`${styles.body} ${dockCollapsed ? styles.bodyDockCollapsed : ''} pageBody`}>
-        <div className={styles.topRow}>
+      <div ref={bodyRef} className={`${styles.body} ${dockCollapsed ? styles.bodyDockCollapsed : ''} pageBody`}>
+        <div ref={topRowRef} className={styles.topRow}>
           <div className={`${styles.tabsCell} ${styles.tabsAnchor}`} ref={modeMenuAnchorRef}>
             <ViewHeader
               title={t('lighting.title')}
@@ -2607,6 +2984,10 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               onTabChange={handleTabChange}
               onTabHover={setHoveredTab}
               tabActions={(
+                <>
+                {/* Left of the toolbar: the rail is right-aligned, so the
+                    toolbar keeps its position when the button comes and goes. */}
+                {controlAllDevicesButton}
                 <PresetToolbar
                   rail
                   presets={presetOptions}
@@ -2628,6 +3009,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
                   onUndo={handleUndoLayout}
                   onRedo={handleRedoLayout}
                 />
+                </>
               )}
             />
             {modeMenuNode}
@@ -2686,33 +3068,33 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         <div className={`${styles.paneHeader} ${styles.headerCenter}`}>
           <span className={styles.paneTitle}>{t('lighting.pane.effects')}</span>
           {visibleDevices.length > 0 && scopeChip}
-          {SCENE_3D && showCanvas && (
-            <ChipGroup
-              className={styles.sceneViewSwitch}
-              ariaLabel={t('lighting.scene.viewSwitch')}
-              options={[{ key: VIEW_2D, label: t('lighting.scene.view.2d') }, { key: VIEW_3D, label: t('lighting.scene.view.3d') }]}
-              activeKey={scene3d ? VIEW_3D : VIEW_2D}
-              onChange={next => {
-                const firstTime = next === VIEW_3D && (sceneApi.scene?.bindings.length ?? 0) === 0;
-                void sceneApi.setEnabled(next === VIEW_3D);
-                if (firstTime) setSceneEditorOpen(true);
-              }}
-            />
-          )}
-          {dockCollapsed && (
-            <HoverTooltip body={t('lighting.effectDock.expand')} side="bottom">
-              <Button
-                tone="ghost"
-                size="sm"
-                icon={<PanelRightOpen />}
-                aria-label={t('lighting.effectDock.expand')}
-                className={styles.dockToggle}
-                onClick={() => setDockCollapsed(false)}
-              >
-                {t('lighting.rightPane.effect')}
-              </Button>
-            </HoverTooltip>
-          )}
+          <span className={styles.headerEnd}>
+            {SCENE_3D && showCanvas && (
+              <ViewSwitch
+                ariaLabel={t('lighting.scene.viewSwitch')}
+                value={scene3d ? VIEW_3D : VIEW_2D}
+                labels={{ '2d': t('lighting.view.layout'), '3d': t('lighting.view.desk') }}
+                onChange={next => {
+                  void sceneApi.setEnabled(next === VIEW_3D);
+                  updateUiSettings({ lightingView3d: next === VIEW_3D });
+                }}
+              />
+            )}
+            {dockCollapsed && (
+              <HoverTooltip body={t('lighting.effectDock.expand')} side="bottom">
+                <Button
+                  tone="ghost"
+                  size="sm"
+                  icon={<PanelRightOpen />}
+                  aria-label={t('lighting.effectDock.expand')}
+                  className={styles.dockToggle}
+                  onClick={() => setDockCollapsed(false)}
+                >
+                  {t('lighting.rightPane.effect')}
+                </Button>
+              </HoverTooltip>
+            )}
+          </span>
         </div>
         {!dockCollapsed && (
           <div className={`${styles.paneHeader} ${styles.headerRight}`}>
@@ -2753,6 +3135,9 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             pinDisabledReason={pinDisabledReason}
             pinTargetName={pinTargetName}
             onSetPin={handleSetPin}
+            pinHintIds={pinHintActive ? pinHintIds : undefined}
+            onPinHintPress={dismissPinHint}
+            onPinHintTarget={setPinHintTargetId}
             pickTargetIds={pickTargetIds}
             pulse={pulse}
             selectedIds={selectedDeviceIds}
@@ -2761,7 +3146,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             onSetPower={handleSetPower}
             onToggleControlled={handleToggleControlled}
             onSetControlled={handleSetControlled}
-            lightingOff={effectiveMode === 'none'}
+            lightingOff={mode === 'none'}
             onOpenSettings={handleOpenSettings}
             onOpenColorTuning={handleOpenColorTuning}
             colorTunedIds={colorTunedIds}
@@ -2783,9 +3168,18 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
               void (ownEffectIds.has(id) ? handleOwnEffectTakeControl(id) : handleWirelessTakeControl(id));
             }}
             onOpenDevicePage={deviceKey => onSectionNavigate?.('device', { deviceKey })}
+            unboundWireless={unboundWirelessDevices}
+            onOpenWirelessBinding={onSectionNavigate ? mac => onSectionNavigate('device', { deviceKey: 'curated-lianli-wireless', scrollAnchors: [lianLiWirelessDeviceAnchor(mac)] }) : undefined}
+            zoneSizeDeviceIds={zoneSizeDeviceIds}
+            onOpenZoneSizes={() => onSectionNavigate?.('devices', { tab: 'available' })}
             onOpenSmartLights={() => onSectionNavigate?.('smart-lights')}
             discovery={discovery}
             rgbRunning={rgb.running}
+            runningApps={runningApps}
+            curatedControl={curatedControl}
+            onOpenAppStrip={setAppStripIds}
+            onOpenFixLighting={deviceName => setFixLighting({ deviceName })}
+            onOpenFixLightingLink={showCanvas || viewMode === 'static' ? () => setFixLighting({ deviceName: null }) : undefined}
           />
         </div>
         <div
@@ -2793,180 +3187,142 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           onPointerOver={e => { if (e.pointerType === 'mouse') setPickHovered(!!(e.target as Element).closest('[data-pick]')); }}
           onPointerLeave={e => { if (e.pointerType === 'mouse') setPickHovered(false); }}
         >
-          {viewMode === 'gamesync' ? (
-            <>
-              <div className={styles.canvasArea}>
-                <GameSyncActivityBlock
-                  isReceiving={gameSyncState.isReceiving}
-                  activeApp={gameSyncState.activeApp}
-                  vendorConflict={gameSyncState.vendorConflict}
-                  games={gameSyncGames}
+          {viewMode === 'static' && (
+          <div className={styles.canvasArea}>
+            <StaticPickerCanvas
+              devices={pickerDevices}
+              implied={selectedDeviceIds.size === 0}
+              hex={scopedHex}
+              segmented={pickerSegmented}
+              patternEffect={staticPattern?.key ?? null}
+              patternSlot={staticPattern?.slot ?? 0}
+              patternVersion={staticPattern ? versionForSlot(staticPattern.key, staticPattern.slot) : '0'}
+              gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
+              onPreview={handleCustomPreview}
+              onCommit={hex => { pulsePick(); handleCustomSelect(hex); }}
+            />
+          </div>
+          )}
+          {showCanvas && (
+          <div className={styles.canvasArea}>
+            {scene3d && LightingScene3D ? (
+              <Suspense fallback={<div className={styles.scenePlaceholder} />}>
+                <LightingScene3D
+                  api={sceneApi}
+                  devices={visibleDevices}
+                  selectedDeviceId={primaryDeviceId}
+                  onSelectDevice={handleSelectFromScene}
+                  shaderEffect={shaderMode ? previewEffect : null}
+                  shaderState={shaderMode ? previewShaderState : null}
+                  shaderPaused={paused}
+                  audioRef={audioRef}
+                  onIdentify={id => { identifyLightingDevice(id).catch(() => { /* silent */ }); }}
+                  onLayoutCommit={handleLayoutCommit}
                 />
-              </div>
-              <div className={styles.controls}>
-                <GameSyncLeftPane />
-              </div>
-            </>
-          ) : (
+              </Suspense>
+            ) : (
+              <DeviceCanvas backdrop={viewMode === 'gif' && mode !== 'gif' ? <MediaBackdrop /> : viewMode === 'screen' && mode !== 'screen' ? <MirrorBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} foreignFrames={foreignFrames} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
+            )}
+            {viewMode === 'gif' && <MediaCanvasNotice />}
+            {shaderMode && dockEffect && dockState && !mixedSelection && (
+              <>
+                {showMusicButton && (
+                  <MusicReactiveControl active={musicReactive} onToggle={handleMusicReactiveToggle} output={showAudioOutput ? audioOutput : undefined} />
+                )}
+                <HoverTooltip body={t('lighting.fullscreen')} side="left">
+                  <button type="button" className={styles.fullscreenBtn} onClick={() => setFullscreenOpen(true)} aria-label={t('lighting.fullscreen')}>
+                    <Maximize2 size={14} strokeWidth={1.5} />
+                  </button>
+                </HoverTooltip>
+              </>
+            )}
+          </div>
+          )}
+          {/* Off renders no picker at all; Static and Animation each own an
+              effect pool; Screen and Media get their source controls. */}
+          {(viewMode === 'animate' || viewMode === 'static') ? (
             <>
-              {viewMode === 'static' && (
-              <div className={styles.canvasArea}>
-                <StaticPickerCanvas
-                  devices={pickerDevices}
-                  implied={selectedDeviceIds.size === 0}
-                  hex={scopedHex}
-                  segmented={pickerSegmented}
-                  patternEffect={staticPattern?.key ?? null}
-                  patternSlot={staticPattern?.slot ?? 0}
-                  patternVersion={staticPattern ? versionForSlot(staticPattern.key, staticPattern.slot) : '0'}
-                  gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
-                  onPreview={handleCustomPreview}
-                  onCommit={hex => { pulsePick(); handleCustomSelect(hex); }}
-                />
-              </div>
+            <div className={styles.effectToolbar}>
+              <SearchInput
+                className={styles.effectSearch}
+                value={effectQuery}
+                onChange={setEffectQuery}
+                placeholder={t('lighting.effects.search')}
+                ariaLabel={t('lighting.effects.search')}
+              />
+              {viewMode === 'animate' && (
+                <Button size="sm" icon={<SprayCan size={14} />} onClick={() => setStudioTarget({ id: activeCustom?.id ?? null })}>
+                  {t('lighting.studio.title')}
+                </Button>
               )}
-              {showCanvas && (
-              <div className={styles.canvasArea}>
-                {scene3d ? (
-                  <Suspense fallback={<div className={styles.scenePlaceholder} />}>
-                    <LightingScene3D
-                      api={sceneApi}
-                      devices={visibleDevices}
-                      selectedDeviceId={primaryDeviceId}
-                      onSelectDevice={handleFocusDevice}
-                      shaderEffect={shaderMode ? previewEffect : null}
-                      shaderState={shaderMode ? previewShaderState : null}
-                      shaderPaused={paused}
-                      audioRef={audioRef}
-                      editorOpen={sceneEditorOpen}
-                      onEditorOpenChange={setSceneEditorOpen}
-                      onIdentify={id => { identifyLightingDevice(id).catch(() => { /* silent */ }); }}
-                      onLayoutCommit={handleLayoutCommit}
+            </div>
+            <div className={styles.browserWrap}>
+            <AnimateGrid
+              effect={gridEffect}
+              onSelect={handleEffectPick}
+              onEdit={toggleDock}
+              editorOpen={!dockCollapsed && effectEditEnabled(true, gridEffect, selectedDeviceIds.size > 0, mode !== 'none' && !detachedTab)}
+              editEnabled={effectEditEnabled(dockCollapsed, gridEffect, selectedDeviceIds.size > 0, mode !== 'none' && !detachedTab)}
+              effects={viewMode === 'static' ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
+              query={effectQuery}
+              frozen={viewMode === 'static'}
+              slotFor={gridSlotFor}
+              versionFor={gridVersionFor}
+              panelEffects={panelUsage.effects}
+              pinnedDevices={pinnedDevices}
+              gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
+              leadingMatches={savedMatch}
+              leading={viewMode === 'animate' ? (
+                <Suspense fallback={null}>
+                  <SavedEffectSections
+                    effect={gridEffect}
+                    query={effectQuery}
+                    username={accountUsername}
+                    gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
+                    onSelect={handleEffectPick}
+                  />
+                </Suspense>
+              ) : viewMode === 'static' ? (
+                <CollapsibleSection
+                  compact
+                  title={t('lighting.static.pickerGroup')}
+                  open={paletteOpen}
+                  onToggle={() => setPaletteOpen(o => !o)}
+                >
+                  <div data-pick className={styles.animateGridSection}>
+                    <EffectCard
+                      overlay
+                      label={t('lighting.static.pickerSegmented')}
+                      thumbUrl={PICKER_SEGMENTED_SVG}
+                      active={colorScoped && pickerSegmented}
+                      onClick={() => { pulsePick(); handlePickerSelect(true); }}
                     />
-                  </Suspense>
-                ) : (
-                  <DeviceCanvas backdrop={viewMode === 'gif' && effectiveMode !== 'gif' ? <MediaBackdrop /> : undefined} devices={canvasDevices} hideFrames={selectedDeviceIds.size === 0} selectedIds={canvasFocusIds} primaryDeviceId={primaryDeviceId} onSelectDevice={handleFocusDevice} onSetSelection={handleSetFocus} shaderEffect={shaderMode ? previewEffect : null} shaderState={shaderMode ? previewShaderState : null} shaderPaused={paused} audioRef={audioRef} hiddenFrameIds={hiddenFrameIds} foreignFrames={foreignFrames} selectedDeviceLeds={selectedDeviceLeds} onOpenSettings={handleOpenSettings} keyReactiveIds={keyReactiveIds} onOpenKeyReactions={setKeyReactionsId} onDragActiveChange={handleDragActiveChange} onBeforeLayoutSave={handleBeforeLayoutSave} onLayoutCommit={handleLayoutCommit} onSetDevicesPower={handleSetDevicesPower} stacks={deviceStacks} stackActionsFor={stackActionsFor} gpuAvailable={serviceState.lighting?.gpuAvailable ?? true} gpuState={serviceState.lighting?.gpuState} onPickRenderGpu={canPickRenderGpu ? handlePickRenderGpu : undefined} />
-                )}
-                {viewMode === 'gif' && <MediaCanvasNotice />}
-                {shaderMode && dockEffect && dockState && !mixedSelection && (
-                  <>
-                    {(EFFECTS.find(e => e.key === dockEffect)?.audio || dockCustom?.audio) && (
-                      <div className={styles.musicReactive}>
-                        <HoverTooltip body={t('lighting.musicReactive')} side="left">
-                          <button
-                            type="button"
-                            className={`${styles.musicReactiveBtn} ${musicReactive ? styles.musicReactiveBtnOn : ''}`}
-                            onClick={handleMusicReactiveToggle}
-                            aria-label={t('lighting.musicReactive')}
-                          >
-                            <Music size={14} strokeWidth={1.5} />
-                          </button>
-                        </HoverTooltip>
-                        {showAudioOutput && (
-                          <Select
-                            className={styles.musicReactiveOutput}
-                            value={audioOutput.value}
-                            options={audioOutput.options}
-                            onChange={audioOutput.select}
-                            ariaLabel={t('lighting.audioOutput.label')}
-                            height={26}
-                          />
-                        )}
-                      </div>
-                    )}
-                    <HoverTooltip body={t('lighting.fullscreen')} side="left">
-                      <button type="button" className={styles.fullscreenBtn} onClick={() => setFullscreenOpen(true)} aria-label={t('lighting.fullscreen')}>
-                        <Maximize2 size={14} strokeWidth={1.5} />
-                      </button>
-                    </HoverTooltip>
-                  </>
-                )}
-              </div>
-              )}
-              {/* Off renders no picker at all; Static and Animation each own an
-                  effect pool; Screen and Media get their source controls. */}
-              {(viewMode === 'animate' || viewMode === 'static') ? (
-                <>
-                <div className={styles.effectToolbar}>
-                  <SearchInput
-                    className={styles.effectSearch}
-                    value={effectQuery}
-                    onChange={setEffectQuery}
-                    placeholder={t('lighting.effects.search')}
-                    ariaLabel={t('lighting.effects.search')}
-                  />
-                  {viewMode === 'animate' && (
-                    <Button size="sm" icon={<SprayCan size={14} />} onClick={() => setStudioTarget({ id: activeCustom?.id ?? null })}>
-                      {t('lighting.studio.title')}
-                    </Button>
-                  )}
-                </div>
-                <div className={styles.browserWrap}>
-                <AnimateGrid
-                  effect={gridEffect}
-                  onSelect={handleEffectPick}
-                  effects={viewMode === 'static' ? STATIC_PATTERN_EFFECTS : ANIMATE_EFFECTS}
-                  query={effectQuery}
-                  frozen={viewMode === 'static'}
-                  slotFor={gridSlotFor}
-                  versionFor={gridVersionFor}
-                  panelEffects={panelUsage.effects}
-                  pinnedDevices={pinnedDevices}
-                  gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
-                  leadingMatches={savedMatch}
-                  leading={viewMode === 'animate' ? (
-                    <Suspense fallback={null}>
-                      <SavedEffectSections
-                        effect={gridEffect}
-                        query={effectQuery}
-                        username={accountUsername}
-                        gpuAvailable={serviceState.lighting?.gpuAvailable ?? true}
-                        onSelect={handleEffectPick}
-                      />
-                    </Suspense>
-                  ) : viewMode === 'static' ? (
-                    <CollapsibleSection
-                      compact
-                      title={t('lighting.static.pickerGroup')}
-                      open={paletteOpen}
-                      onToggle={() => setPaletteOpen(o => !o)}
-                    >
-                      <div data-pick className={styles.animateGridSection}>
-                        <EffectCard
-                          overlay
-                          label={t('lighting.static.pickerSegmented')}
-                          thumbUrl={PICKER_SEGMENTED_SVG}
-                          active={colorScoped && pickerSegmented}
-                          onClick={() => { pulsePick(); handlePickerSelect(true); }}
-                        />
-                        <EffectCard
-                          overlay
-                          label={t('lighting.static.picker')}
-                          thumbUrl={PICKER_FIELD_SVG}
-                          active={colorScoped && !pickerSegmented}
-                          onClick={() => { pulsePick(); handlePickerSelect(false); }}
-                        />
-                      </div>
-                    </CollapsibleSection>
-                  ) : undefined}
-                />
-                </div>
-                </>
-              ) : viewMode === 'none' ? (
-                <EmptyState icon={<Lightbulb />} title={t('lighting.pane.offHint')} />
-              ) : (
-                <div className={`${styles.controls} ${viewMode === 'gif' ? styles.controlsFill : ''}`}>
-                  <ModeControls
-                    mode={viewMode}
-                    screenPP={screenPP}
-                    onScreenPPChange={setScreenPP}
-                    keepMode={viewMode !== effectiveMode}
-                    onSelectionPick={handleSharedPick}
-                    onBlockedPick={detachedTab ? flashScope : undefined}
-                  />
-                </div>
-              )}
+                    <EffectCard
+                      overlay
+                      label={t('lighting.static.picker')}
+                      thumbUrl={PICKER_FIELD_SVG}
+                      active={colorScoped && !pickerSegmented}
+                      onClick={() => { pulsePick(); handlePickerSelect(false); }}
+                    />
+                  </div>
+                </CollapsibleSection>
+              ) : undefined}
+            />
+            </div>
             </>
+          ) : viewMode === 'none' ? (
+            <EmptyState icon={<Lightbulb />} title={t('lighting.pane.offHint')} />
+          ) : (
+            <div className={`${styles.controls} ${viewMode === 'gif' ? styles.controlsFill : ''}`}>
+              <ModeControls
+                mode={viewMode}
+                screenPP={screenPP}
+                onScreenPPChange={setScreenPP}
+                keepMode={viewMode !== mode}
+                onSelectionPick={handleSharedPick}
+                onBlockedPick={detachedTab ? flashScope : undefined}
+              />
+            </div>
           )}
         </div>
         {!dockCollapsed && (
@@ -3057,7 +3413,19 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           // LED colour picks apply as they are made; the cards read them back on close.
           onClose={() => { setEditorTarget(null); void refreshDevices(); }}
           onCompositionChanged={hubId => { void handleCompositionChanged(hubId); }}
+          onRateCapChanged={() => { void refreshDevices(); }}
           onNavigateToDevicePage={deviceKey => onSectionNavigate?.('device', { deviceKey })}
+        />
+      )}
+      {showPinHint && (
+        <Coachmark
+          hintId={LIGHTING_PIN_HINT_ID}
+          target={PIN_HINT_SELECTOR}
+          boundary={contentBelowTabs}
+          title={t('lighting.pin.pinnedTo', { name: pinHintName })}
+          body={t('lighting.pin.hintBody')}
+          dismissLabel={t('onboarding.hint.dismiss')}
+          onDismiss={dismissPinHint}
         />
       )}
       {colorTuningIds && (
@@ -3079,6 +3447,18 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
           onClose={() => { setKeyReactionsId(null); void refreshKeyReactive(); }}
         />
       )}
+      <FixLightingModal
+        open={fixLighting !== null}
+        onClose={() => setFixLighting(null)}
+        deviceName={fixLighting?.deviceName ?? undefined}
+      />
+      <ConflictWarningModal
+        open={appStripIds !== null}
+        conflicts={appStripConflicts}
+        ready={runningAppsReady}
+        whitelisted={conflictWhitelisted}
+        onClose={() => setAppStripIds(null)}
+      />
       {presetAppsTarget && (
         <PresetAppsModal
           presetName={presetAppsTarget.name}
@@ -3107,79 +3487,7 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
         />
       )}
     </div>
-  );
-}
-
-interface GameSyncActivityBlockProps {
-  isReceiving: boolean;
-  activeApp: string | null;
-  vendorConflict: boolean;
-  games: GameSyncGame[];
-}
-
-function GameSyncActivityBlock({ isReceiving, activeApp, vendorConflict, games }: GameSyncActivityBlockProps) {
-  const { t } = useTranslation();
-  const [imgFailed, setImgFailed] = useState(false);
-
-  const matchedGame = isReceiving && activeApp
-    ? resolveActiveGame(activeApp, games)
-    : null;
-
-  const headerSrc = matchedGame ? steamArtworkUrl(matchedGame.appId, 'header') : null;
-
-  // Reset failure flag when the URL changes so a new game's art gets a fresh attempt.
-  const prevHeaderSrcRef = useRef(headerSrc);
-  if (prevHeaderSrcRef.current !== headerSrc) {
-    prevHeaderSrcRef.current = headerSrc;
-    if (imgFailed) setImgFailed(false);
-  }
-
-  const showImage = headerSrc !== null && !imgFailed;
-
-  return (
-    <div className={styles.gameSyncActivity}>
-      {showImage ? (
-        <img
-          src={headerSrc}
-          alt=""
-          aria-hidden
-          className={styles.gameSyncActivityArt}
-          onError={() => setImgFailed(true)}
-        />
-      ) : (
-        <Gamepad2
-          size={36}
-          className={`${styles.gameSyncActivityIcon} ${isReceiving ? styles.gameSyncActivityIconActive : ''}`}
-          aria-hidden
-        />
-      )}
-      <span className={`${styles.gameSyncActivityLabel} ${showImage ? styles.gameSyncActivityLabelOverArt : ''}`}>
-        {isReceiving
-          ? (activeApp
-              ? t('lighting.gameSync.signal.receiving', { activeApp })
-              : t('lighting.gameSync.signal.receivingUnknown'))
-          : t('lighting.gameSync.signal.idle')}
-      </span>
-      {/* The service leaves a real vendor SDK (Razer Synapse's, typically) in
-          place rather than replacing it, so games on that interface never reach
-          Nexus. Without this line that reads as an endless "Waiting for a game". */}
-      {!isReceiving && vendorConflict && (
-        <span className={styles.gameSyncActivityNote}>
-          {t('lighting.gameSync.signal.vendorConflict')}
-        </span>
-      )}
-      {/* Anchored to the frame rather than the page: the guide explains what
-          this frame is showing, so it belongs on it. */}
-      <a
-        className={styles.gameSyncGuideLink}
-        href={GAME_SYNC_GUIDE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <ExternalLink size={12} aria-hidden />
-        {t('lighting.gameSync.guideLink')}
-      </a>
-    </div>
+    </SensorSignalProvider>
   );
 }
 

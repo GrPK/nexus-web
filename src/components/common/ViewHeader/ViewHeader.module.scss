@@ -44,8 +44,9 @@
 .viewHeaderTabs {
   margin-bottom: 0.75rem;
   // Never below the tab labels: shrink pressure has to land on the actions,
-  // whose rail carries a floor of its own (PresetToolbar .toolbarRail).
-  flex: 0 0 auto;
+  // whose rail carries a floor of its own (PresetToolbar .toolbarRail). When
+  // the tabs themselves cannot fit they absorb the shrink first and scroll.
+  flex: 0 100 auto;
 }
 
 // Right rail of the tab row (tabActions, then actions): an in-flow flex item

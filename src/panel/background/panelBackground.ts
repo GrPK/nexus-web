@@ -14,7 +14,10 @@ import { cachedAnimateDefaults } from '../../api/lighting';
 import { getInstallDefaults } from '../../api/installDefaultsCache';
 import { PANEL_WIDGET_PADDING_DEFAULT_PERCENT } from '../engine/grid';
 
-export type PanelBackgroundMode = 'solid' | 'shader' | 'media';
+// 'skin' is stored as 'skin', 'skin:<mode>' or 'skin:<mode>:<backdrop>:<frost>:<opacity>': what the Skin background replaced,
+// to restore when it is left. The service keeps the mode as a plain string.
+export type PanelBackgroundMode = 'solid' | 'shader' | 'media' | 'skin';
+export type PanelBackgroundBase = Exclude<PanelBackgroundMode, 'skin'>;
 
 // Frost strength, percent 0-100; 0 renders no frost pass at all.
 export const DEFAULT_PANEL_BACKGROUND_FROST = 0;
@@ -41,7 +44,7 @@ export function defaultBackgroundOpacityForMode(mode: PanelBackgroundMode): numb
 // the install-defaults cache. Read through the cache for one source of truth
 // (as defaultLayout.ts does). The literals below are only the bootstrap-race
 // fallback before the cache fills, and must match the JSON.
-const WIDGET_OPACITY_FALLBACK = 0.7;
+const WIDGET_OPACITY_FALLBACK = 1;
 const WIDGET_LABELS_FALLBACK = false;
 
 export const defaultPanelWidgetOpacity = (): number =>
@@ -62,17 +65,48 @@ const PANEL_BACKGROUND_HIDDEN_CATEGORIES: ReadonlySet<EffectCategory> =
 
 /** Browse pool for the background Animations tab: gradients plus every
  *  animated category. Audio-reactive effects are gated on the flag rather than
- *  the category so an effect with no category entry cannot slip into the pool
- *  and then be rejected as unrenderable. */
-export const PANEL_BACKGROUND_EFFECTS: EffectDef[] = EFFECTS.filter(
-  effect => !effect.audio && !PANEL_BACKGROUND_HIDDEN_CATEGORIES.has(categoryOf(effect.key)),
-);
+ *  the category so an effect with no category entry cannot slip into the pool.
+ *  `audioAllowed` is panelAudioReactiveAllowed for the surface being edited. */
+export function panelBackgroundEffects(audioAllowed: boolean): EffectDef[] {
+  return EFFECTS.filter(
+    effect => (audioAllowed || !effect.audio) && !PANEL_BACKGROUND_HIDDEN_CATEGORIES.has(categoryOf(effect.key)),
+  );
+}
+
+export const PANEL_BACKGROUND_EFFECTS: EffectDef[] = panelBackgroundEffects(false);
+export const PANEL_BACKGROUND_EFFECTS_WITH_AUDIO: EffectDef[] = panelBackgroundEffects(true);
 
 // Renderable is wider than browsable: a panel that already stores a hidden
 // effect keeps rendering it rather than jumping to the default behind the
-// user's back. Only the audio set is genuinely unrenderable here.
+// user's back. Whether an audio effect actually draws is a per-surface call,
+// see resolveBackgroundEffectForSurface.
 const PANEL_BACKGROUND_RENDERABLE: ReadonlySet<string> =
-  new Set(EFFECTS.filter(effect => !effect.audio).map(effect => effect.key));
+  new Set(EFFECTS.map(effect => effect.key));
+const PANEL_BACKGROUND_AUDIO_KEYS: ReadonlySet<string> =
+  new Set(EFFECTS.filter(effect => effect.audio).map(effect => effect.key));
+
+export function isAudioBackgroundEffect(key: string): boolean {
+  return PANEL_BACKGROUND_AUDIO_KEYS.has(key);
+}
+
+/** The effect a surface draws. The stored value is never rewritten: a layout
+ *  shared with a surface that cannot take audio shows the default there while
+ *  the audio effect stays selected on the surface that can. */
+export function resolveBackgroundEffectForSurface(effect: string, audioAllowed: boolean): string {
+  return !audioAllowed && isAudioBackgroundEffect(effect) ? DEFAULT_PANEL_BACKGROUND_EFFECT : effect;
+}
+
+/** What a surface draws for a stored background: when the effect is substituted, the stored template and render state belong to the original effect and are dropped. */
+export function resolveBackgroundDrawing(
+  effect: string,
+  template: number,
+  effectState: EffectState | undefined,
+  audioAllowed: boolean,
+): { effect: string; template: number; effectState: EffectState | undefined } {
+  const drawn = resolveBackgroundEffectForSurface(effect, audioAllowed);
+  if (drawn === effect) return { effect, template, effectState };
+  return { effect: drawn, template: DEFAULT_PANEL_BACKGROUND_TEMPLATE, effectState: undefined };
+}
 
 // Paired preset sets: index i in DARK is the dark counterpart of index i in
 // LIGHT. Two rows of ten hue families (violet, purple, pink, red, orange,
@@ -177,10 +211,50 @@ export function resolvePanelBackdrop(
   return normalizePanelBackdrop(stored) ?? 'wallpaper';
 }
 
+// A stored mode may carry the pre-skin hold after a colon (see encodeSkinBackgroundMode); the first part is the live mode.
 export function normalizePanelBackgroundMode(value: string | null | undefined): PanelBackgroundMode {
-  if (value === 'shader') return 'shader';
-  if (value === 'media') return 'media';
+  const live = value?.split(':')[0];
+  if (live === 'skin' || live === 'shader' || live === 'media') return live;
   return 'solid';
+}
+
+// What the background was before any skin: the backdrop, frost and opacity the user had set, and the effect.
+export interface SkinBackgroundHeld {
+  backdrop: PanelBackdrop;
+  frost: number;
+  opacity: number;
+  effect?: string;
+}
+
+// The mode a skin falls back to once it is removed.
+export function backgroundModeBeforeSkin(value: string | null | undefined): PanelBackgroundBase {
+  const parts = (value ?? '').split(':');
+  const mode = normalizePanelBackgroundMode(parts.length > 1 ? parts[1] : parts[0]);
+  return mode === 'skin' ? 'solid' : mode;
+}
+
+// The pre-skin backdrop, frost, opacity and effect; null when none were stored.
+export function skinBackgroundHeld(value: string | null | undefined): SkinBackgroundHeld | null {
+  const [, , backdrop, frost, opacity, effect] = (value ?? '').split(':');
+  const parsedBackdrop = normalizePanelBackdrop(backdrop);
+  if (!parsedBackdrop || frost === undefined || opacity === undefined) return null;
+  const f = Number(frost);
+  const o = Number(opacity);
+  if (!Number.isFinite(f) || !Number.isFinite(o)) return null;
+  const held: SkinBackgroundHeld = { backdrop: parsedBackdrop, frost: normalizePanelBackgroundFrost(f), opacity: normalizePanelBackgroundOpacity(o) };
+  if (effect && PANEL_BACKGROUND_RENDERABLE.has(effect)) held.effect = effect;
+  return held;
+}
+
+// Stands in for the held values of a record that stored only its pre-skin mode, so a non-skin live mode still carries that mode.
+const NEUTRAL_SKIN_HELD: SkinBackgroundHeld = { backdrop: 'theme', frost: DEFAULT_PANEL_BACKGROUND_FROST, opacity: DEFAULT_OVERLAY_BACKGROUND_OPACITY };
+
+// `<live>:<before>:<backdrop>:<frost>:<opacity>[:<effect>]` while a skin is active, so the pre-skin background survives any mode the skin shows.
+export function encodeSkinBackgroundMode(live: PanelBackgroundMode, before: PanelBackgroundBase, held?: SkinBackgroundHeld | null): string {
+  const kept = held ?? (live === 'skin' ? null : NEUTRAL_SKIN_HELD);
+  if (!kept) return `skin:${before}`;
+  const parts = [live, before, kept.backdrop, kept.frost, kept.opacity];
+  return (kept.effect ? [...parts, kept.effect] : parts).join(':');
 }
 
 export function normalizePanelBackgroundEffect(value: string | null | undefined): string {

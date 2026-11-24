@@ -13,9 +13,14 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { usePortalRoot } from '../ThemeScope/ThemeScope';
 import { useTranslation } from '../../../lib/i18n';
+import { useHasMousePointer } from '../../../lib/pointerKind';
 import classNames from 'classnames';
+import { Spinner } from '../Spinner/Spinner';
+import buttonStyles from '../Button/Button.module.scss';
 import styles from './Select.module.scss';
+import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 
 /**
  * Themed select. Renders a button trigger and, when open, a listbox portaled to
@@ -25,8 +30,8 @@ import styles from './Select.module.scss';
  * same everywhere.
  *
  * Accepts a flat `options` array or `<option>` children (value + text, with a
- * per-option `className`/`disabled` carried through). optgroups are unsupported,
- * unused in this codebase.
+ * per-option `className`/`disabled` carried through). optgroups are unsupported;
+ * group a flat list with `header` rows instead.
  *
  * A long dropdown grows an in-menu search field: on a device that has a fine
  * pointer and hover (mouse/keyboard desktop; not touch phones or the touch
@@ -48,10 +53,48 @@ export interface SelectOption {
   // CSS font-family the menu row draws its label in, enlarged, so a font
   // picker previews each face; the trigger keeps the control's own font.
   fontFamily?: string;
+  // Dim second line under the label in the menu row only (e.g. a caveat about
+  // the choice); a newline inside it breaks to a further line. The trigger
+  // shows the label alone.
+  description?: string;
   // Renders a thin rule instead of a selectable row, grouping the options above
   // and below it. Non-navigable and removed from the a11y tree; value/label are
   // ignored.
   divider?: boolean;
+  // Renders `label` as a section heading for the options that follow, up to the
+  // next header. Not selectable or focusable and skipped by keyboard nav; while
+  // searching it shows only if one of its options matches. value is ignored.
+  header?: boolean;
+  // Makes the row an action instead of a choice: activating it (click, Enter,
+  // Space) runs this and leaves the menu open without committing any value or
+  // moving the selection. The row may change in place afterwards (an async
+  // "load more" that swaps itself for the loaded options).
+  onAction?: () => void;
+  // Action rows only: a request is in flight; the row shows aria-busy and
+  // ignores activation.
+  busy?: boolean;
+  // Action rows only: accessible name while busy. The visible label stays in
+  // layout, hidden, so the button keeps its idle size under the spinner.
+  busyLabel?: string;
+  // Action rows only: draws the row as the continuation of the option above it,
+  // with no gap between them, and shares that option's selection tint when it is
+  // the chosen one (e.g. a Resync beside the current item). Rows attached in a
+  // run all follow the first non-attached option.
+  attached?: boolean;
+  // Action rows only: tooltip on the row's button.
+  hint?: string;
+  // Grid mode only (SelectProps.grid): the option's values for the columns after
+  // the label, in order; an absent one leaves its column empty.
+  cells?: readonly (string | undefined)[];
+  // Grid mode only: one line across every column after the label, for an option
+  // with nothing to put in them (e.g. an empty draft). Wins over `cells`.
+  note?: string;
+  // Grid mode only: drawn after the label (e.g. a status chip).
+  badge?: ReactNode;
+  // Choice rows only: a small icon button at the row's trailing edge (inside the action column in grid mode) that runs
+  // `onSelect` and closes the menu, returning focus to the trigger, without choosing the row. Not drawn on a disabled row.
+  // Pointer only (hidden from assistive tech, which reaches the same action elsewhere on the page).
+  rowAction?: { icon: ReactNode; label: string; onSelect: () => void };
 }
 
 export interface SelectProps {
@@ -78,6 +121,27 @@ export interface SelectProps {
    *  menu is unchanged (icon + label rows). The selected label moves to the
    *  trigger's title since the text is no longer visible. */
   triggerIconOnly?: boolean;
+  /** A control drawn inside the box, left of the value, as a sibling of the
+   *  trigger so it can be a real button. Pressing it does not open the menu. */
+  leadingAction?: ReactNode;
+  /** A control drawn inside the box, immediately left of the chevron, as a
+   *  sibling after the trigger so it can be a real button. Pressing it does
+   *  not open the menu, and the trigger reserves room so text never runs under it. */
+  trailingAction?: ReactNode;
+  /** Draws the trigger's content for the selected option in place of its icon
+   *  and label (e.g. a larger name followed by a status chip). Not called when
+   *  no option is selected, where the placeholder shows. The menu is unchanged.
+   *  Ignored in grid mode, where the trigger draws the option's grid cells. */
+  renderValue?: (option: SelectOption) => ReactNode;
+  /** Draws the trigger as a full-width bar and the menu at the same width, both
+   *  laid out on one column grid so each option's `cells` line up under the bar
+   *  and under the faint `headings` row (the first heading names the label
+   *  column). `columns` is the CSS grid-template-columns of the label column and
+   *  one per cell; the control adds a last column of its own that holds the
+   *  chevron and attached actions.
+   *  Text that does not fit ellipsizes with the full text in a HoverTooltip.
+   *  On a phone the columns collapse and the cells stack under the label. */
+  grid?: { headings: readonly string[]; columns: string };
 }
 
 // Trigger-to-menu gap and viewport-edge inset, px.
@@ -96,16 +160,6 @@ const TYPEAHEAD_RESET_MS = 700;
 // The in-menu search field appears only from this many entries up; below it a
 // short list is faster to eyeball than to type.
 const SEARCH_MIN_OPTIONS = 8;
-// The search field is a keyboard affordance: only offer it where there is a
-// real keyboard and pointer. `(hover: hover) and (pointer: fine)` is true on a
-// mouse/trackpad desktop and false on touch phones and the touch kiosk, which
-// have no keyboard to type into it.
-function supportsPointerSearch(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-}
-
 function flattenText(node: ReactNode): string {
   if (node == null || typeof node === 'boolean') return '';
   if (typeof node === 'string' || typeof node === 'number') return String(node);
@@ -126,17 +180,49 @@ function optionsFromChildren(children: ReactNode): SelectOption[] {
 }
 
 // Case-insensitive substring filter. An empty query keeps the list intact
-// (dividers included); a non-empty query drops dividers, which only group the
-// full list and read as noise once it is narrowed.
+// (dividers and headers included); a non-empty query drops dividers, which only
+// group the full list and read as noise once it is narrowed, and keeps a header
+// only ahead of a matching option of its group.
 function filterOptions(opts: readonly SelectOption[], raw: string): readonly SelectOption[] {
   const needle = raw.trim().toLowerCase();
   if (!needle) return opts;
-  return opts.filter(o => !o.divider && o.label.toLowerCase().includes(needle));
+  const out: SelectOption[] = [];
+  let pending: SelectOption | null = null;
+  // Whether the option an attached row hangs off (the last non-attached one) survived.
+  let anchorKept = false;
+  for (const o of opts) {
+    if (o.divider) continue;
+    if (o.header) { pending = o; continue; }
+    if (o.attached) {
+      if (!anchorKept) continue;
+    } else {
+      // Action rows stay while searching so the way to load more is never hidden.
+      anchorKept = Boolean(o.onAction) || o.label.toLowerCase().includes(needle);
+      if (!anchorKept) continue;
+    }
+    if (pending) { out.push(pending); pending = null; }
+    out.push(o);
+  }
+  return out;
 }
 
-// Dividers and disabled options are never focusable or selectable.
+// Whether the attached action rows ending at `i` hang off the chosen option.
+function attachedToChosen(opts: readonly SelectOption[], i: number, value: string): boolean {
+  let j = i;
+  while (j > 0 && opts[j].attached) j--;
+  return !opts[j].attached && !opts[j].onAction && opts[j].value === value;
+}
+
+// Whether the option an attached row hangs off is drawn on the grid (as a full-height row) rather than as a plain one.
+function ownerHasCells(opts: readonly SelectOption[], i: number): boolean {
+  let j = i;
+  while (j > 0 && opts[j].attached) j--;
+  return Boolean(opts[j].cells || opts[j].note);
+}
+
+// Dividers, headers and disabled options are never focusable or selectable.
 function selectable(o: SelectOption): boolean {
-  return !o.disabled && !o.divider;
+  return !o.disabled && !o.divider && !o.header;
 }
 function firstEnabled(opts: readonly SelectOption[]): number {
   return opts.findIndex(selectable);
@@ -156,27 +242,72 @@ function nextEnabled(opts: readonly SelectOption[], from: number, dir: 1 | -1): 
   return from;
 }
 
+// Text that ellipsizes in its box, with the full text in a tooltip only while it is cut.
+function TruncText({ text, className, heading }: { text: string; className?: string; heading?: string }) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  const [cut, setCut] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const measure = () => setCut(el.scrollWidth > el.clientWidth + 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [text]);
+  return (
+    <HoverTooltip body={cut ? text : undefined}>
+      <span ref={ref} className={className}>
+        {/* The heading row is hidden from assistive tech, so each cell names its own column. */}
+        {heading && <span className={styles.srOnly}>{`${heading}: `}</span>}
+        {text}
+      </span>
+    </HoverTooltip>
+  );
+}
+
+// One option on the grid: label with its badge, then a cell per column or one note across them.
+function GridCells({ opt, count, headings }: { opt: SelectOption; count: number; headings: readonly string[] }) {
+  return (
+    <>
+      <span className={styles.gridName}>
+        <TruncText text={opt.label} className={styles.gridNameText} />
+        {opt.badge}
+      </span>
+      {opt.note ? <TruncText text={opt.note} className={classNames(styles.gridCell, styles.gridNote)} /> : (
+        Array.from({ length: count }, (_, i) => {
+          const cell = opt.cells?.[i];
+          return cell ? <TruncText key={i} text={cell} className={styles.gridCell} heading={headings[i + 1]} /> : <span key={i} />;
+        })
+      )}
+    </>
+  );
+}
+
 interface MenuCoords { top: number; left: number; width: number; maxHeight: number; scale: number; }
 
 export function Select({
   value, onChange, options, children, disabled,
   ariaLabel, className, accentValue, placeholder, height,
-  triggerIconOnly,
+  triggerIconOnly, leadingAction, trailingAction, renderValue, grid,
 }: SelectProps) {
   const { t } = useTranslation();
   const resolved = options ? options : optionsFromChildren(children);
-  const selectedIndex = resolved.findIndex(o => o.value === value);
+  const selectedIndex = resolved.findIndex(o => !o.header && !o.divider && !o.onAction && o.value === value);
   const selectedLabel = selectedIndex >= 0 ? resolved[selectedIndex].label : '';
   const selectedIcon = selectedIndex >= 0 ? resolved[selectedIndex].icon : undefined;
   const showPlaceholder = selectedIndex < 0 && placeholder != null;
+  const cellCount = grid ? grid.headings.length - 1 : 0;
+  const gridStyle = grid ? ({ '--select-cols': `${grid.columns} var(--select-action-w)` } as React.CSSProperties) : undefined;
 
-  // Offer the search field only on a keyboard/pointer device and once the list
-  // is long enough to be worth typing through. The device class is read once
-  // per mount; it does not change mid-session.
-  const [pointerSearch] = useState(supportsPointerSearch);
+  // Offer the search field only where a mouse is in use (a keyboard goes with it)
+  // and once the list is long enough to be worth typing through.
+  const pointerSearch = useHasMousePointer();
   const searchEnabled =
-    pointerSearch && resolved.filter(o => !o.divider).length >= SEARCH_MIN_OPTIONS;
+    !grid && pointerSearch && resolved.filter(o => !o.divider && !o.header && !o.onAction).length >= SEARCH_MIN_OPTIONS;
 
+  const portalRoot = usePortalRoot();
   const wrapperRef = useRef<HTMLSpanElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   // menuRef is the portaled box (search field + list); listRef is the scrolling
@@ -236,14 +367,23 @@ export function Select({
     // menu sizes to the full widest label, then add a small pad. offsetWidth is
     // the unscaled layout box.
     let width = openWidthRef.current;
-    if (width == null) {
+    if (width == null && grid) {
+      // A grid menu is as wide as its bar, so the columns line up.
+      width = baseWidth;
+      menu.style.width = `${width}px`;
+      openWidthRef.current = width;
+    } else if (width == null) {
       const optionEls = Array.from(list.children) as HTMLElement[];
       for (const o of optionEls) o.style.overflow = 'visible';
+      // Descriptions wrap to the menu width the labels set; they never size it.
+      const descEls = Array.from(list.querySelectorAll<HTMLElement>('[data-option-description]'));
+      for (const d of descEls) d.style.display = 'none';
       menu.style.width = 'max-content';
       menu.style.minWidth = `${baseWidth}px`;
       menu.style.maxWidth = `${maxWidth}px`;
       const measured = menu.offsetWidth;
       for (const o of optionEls) o.style.overflow = '';
+      for (const d of descEls) d.style.display = '';
       width = Math.min(maxWidth, measured + MENU_WIDTH_PAD);
       menu.style.width = `${width}px`;
       menu.style.minWidth = '';
@@ -270,6 +410,8 @@ export function Select({
     const left = Math.max(Math.min(MARGIN, maxLeft), Math.min(r.left, maxLeft));
     const clampedTop = Math.max(MARGIN, Math.min(top, window.innerHeight - visualHeight - MARGIN));
     setCoords({ top: clampedTop, left, width, maxHeight: visualHeight / scale, scale });
+    // grid is fixed for the life of the control; reading it here keeps reposition stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const close = useCallback((refocus = false) => {
@@ -295,6 +437,31 @@ export function Select({
     close(true);
   };
 
+  // Choice rows commit and close; action rows only run their action.
+  const activate = (opt: SelectOption) => {
+    if (opt.onAction) {
+      if (!opt.busy) opt.onAction();
+      return;
+    }
+    commit(opt.value);
+  };
+
+  // Options replaced in place while open (an action row swapped for the loaded
+  // list): re-measure the width and move the active row back to the selected
+  // value, or to none while searching, so Enter cannot commit a row the user
+  // never moved to. Keyed on a content signature so a same-count swap counts.
+  const optionSignature = resolved.map(o => `${o.onAction ? `a${o.label}` : 'o'}${o.header ? 'h' : ''}${o.value}`).join('|');
+  const prevSignature = useRef(optionSignature);
+  useLayoutEffect(() => {
+    if (open && prevSignature.current !== optionSignature) {
+      openWidthRef.current = null;
+      setActiveIndex(query.trim() ? -1 : selectedIndex);
+      reposition();
+    }
+    prevSignature.current = optionSignature;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to the option content only
+  }, [open, optionSignature]);
+
   // Render the menu hidden first so its content size is measurable, then fit
   // width, cap height, and position. Re-fit when the visible count changes so
   // filtering re-clamps the height and flip side.
@@ -316,7 +483,8 @@ export function Select({
     if (!open) return;
     const onPointerDown = (e: PointerEvent) => {
       const t = e.target as Node;
-      if (wrapperRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      const onAction = (t as Element).closest?.(`.${styles.leadingAction}, .${styles.trailingAction}`);
+      if (!onAction && (wrapperRef.current?.contains(t) || menuRef.current?.contains(t))) return;
       close();
     };
     // Capture scroll also fires for the list's own overflow scrolling, which
@@ -372,7 +540,7 @@ export function Select({
       case 'Enter': {
         e.preventDefault();
         const opt = visible[activeIndex];
-        if (opt && selectable(opt)) commit(opt.value);
+        if (opt && selectable(opt)) activate(opt);
         break;
       }
       case 'Escape': e.preventDefault(); close(true); break;
@@ -397,7 +565,7 @@ export function Select({
       case ' ': {
         e.preventDefault();
         const opt = visible[activeIndex];
-        if (opt && selectable(opt)) commit(opt.value);
+        if (opt && selectable(opt)) activate(opt);
         break;
       }
       case 'Escape': e.preventDefault(); close(true); break;
@@ -415,30 +583,41 @@ export function Select({
   };
 
   return (
-    <span ref={wrapperRef} className={classNames(styles.wrapper, triggerIconOnly && styles.iconOnly, className)}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={styles.trigger}
-        style={height != null ? { height } : undefined}
-        disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={open ? listboxId : undefined}
-        aria-label={ariaLabel}
-        title={triggerIconOnly && selectedIcon && selectedLabel ? selectedLabel : undefined}
-        onClick={() => { if (disabled) return; if (open) close(); else openMenu(); }}
-        onKeyDown={onTriggerKeyDown}
-      >
-        <span className={classNames(styles.value, accentValue && styles.accentValue, showPlaceholder && styles.placeholder)}>
-          {!showPlaceholder && selectedIcon && <span className={styles.optionIcon} aria-hidden="true">{selectedIcon}</span>}
-          {showPlaceholder ? placeholder : (triggerIconOnly && selectedIcon ? null : selectedLabel)}
-        </span>
-      </button>
+    <span ref={wrapperRef} className={classNames(styles.wrapper, grid && styles.gridWrapper, triggerIconOnly && styles.iconOnly, !!leadingAction && styles.hasLeading, !!trailingAction && !triggerIconOnly && styles.hasTrailing, className)}>
+      {/* Before the trigger so tab order matches the left-to-right look. */}
+      {!!leadingAction && <span className={styles.leadingAction}>{leadingAction}</span>}
+      <HoverTooltip body={triggerIconOnly && selectedIcon && selectedLabel ? selectedLabel : undefined}>
+        <button
+          ref={triggerRef}
+          type="button"
+          className={classNames(styles.trigger, grid && styles.gridTrigger)}
+          style={height != null ? { height } : undefined}
+          disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={open ? listboxId : undefined}
+          aria-label={ariaLabel}
+          onClick={() => { if (disabled) return; if (open) close(); else openMenu(); }}
+          onKeyDown={onTriggerKeyDown}
+        >
+          <span
+            className={classNames(styles.value, accentValue && styles.accentValue, showPlaceholder && styles.placeholder, grid && selectedIndex >= 0 && styles.gridValue)}
+            style={gridStyle}
+          >
+            {grid && selectedIndex >= 0 ? <GridCells opt={resolved[selectedIndex]} count={cellCount} headings={grid.headings} /> : renderValue && selectedIndex >= 0 ? renderValue(resolved[selectedIndex]) : (
+              <>
+                {!showPlaceholder && selectedIcon && <span className={styles.optionIcon} aria-hidden="true">{selectedIcon}</span>}
+                {showPlaceholder ? placeholder : (triggerIconOnly && selectedIcon ? null : selectedLabel)}
+              </>
+            )}
+          </span>
+        </button>
+      </HoverTooltip>
+      {!!trailingAction && !triggerIconOnly && <span className={styles.trailingAction}>{trailingAction}</span>}
       {!triggerIconOnly && (
         <ChevronDown
           className={styles.chevron}
-          size={14}
+          size={grid ? 16 : 14}
           strokeWidth={2}
           // eslint-disable-next-line i18next/no-literal-string -- decorative-icon aria flag
           aria-hidden="true"
@@ -447,8 +626,11 @@ export function Select({
       {open && createPortal(
         <div
           ref={menuRef}
-          className={styles.menu}
+          className={classNames(styles.menu, grid && styles.gridMenu)}
+          data-select-menu=""
+          data-skin-part="surface"
           style={{
+            ...gridStyle,
             position: 'fixed',
             top: coords?.top ?? 0,
             left: coords?.left ?? 0,
@@ -462,6 +644,12 @@ export function Select({
             visibility: coords ? 'visible' : 'hidden',
           }}
         >
+          {grid && (
+            <div className={styles.gridHead} aria-hidden="true">
+              {grid.headings.map((heading, i) => <span key={i}>{heading}</span>)}
+              <span />
+            </div>
+          )}
           {searchEnabled && (
             <div className={styles.searchRow}>
               <Search
@@ -506,7 +694,9 @@ export function Select({
               // Not an option row - kept out of the listbox a11y semantics.
               <li className={styles.noResults} role="presentation">{t('select.noResults')}</li>
             ) : (
-              visible.map((opt, i) => opt.divider ? (
+              visible.map((opt, i) => opt.header ? (
+                <li key={`${opt.label}-${i}`} role="presentation" className={styles.header}>{opt.label}</li>
+              ) : opt.divider ? (
                 // Structural rule, removed from the a11y tree so it isn't
                 // announced as an empty option.
                 <li key={`${opt.value}-${i}`} className={styles.divider} aria-hidden="true" />
@@ -515,28 +705,72 @@ export function Select({
                   key={`${opt.value}-${i}`}
                   id={optionId(i)}
                   role="option"
-                  aria-selected={opt.value === value}
+                  aria-selected={!opt.onAction && opt.value === value}
                   aria-disabled={opt.disabled || undefined}
+                  aria-busy={opt.busy || undefined}
+                  aria-label={opt.busy && opt.onAction ? (opt.busyLabel ?? opt.label) : undefined}
+                  aria-describedby={opt.onAction ? (opt.hint ? `${optionId(i)}-hint` : undefined) : opt.description ? `${optionId(i)}-desc` : undefined}
                   className={classNames(
                     styles.option,
                     opt.className,
                     i === activeIndex && styles.active,
-                    opt.value === value && styles.selected,
+                    !opt.onAction && opt.value === value && styles.selected,
                     opt.disabled && styles.optionDisabled,
                     opt.fontFamily && styles.fontOption,
+                    opt.onAction && styles.actionOption,
+                    opt.rowAction && !opt.onAction && !opt.disabled && styles.hasRowAction,
+                    opt.attached && styles.attached,
+                    grid && !opt.onAction && (opt.cells || opt.note ? styles.gridOption : styles.gridPlain),
+                    grid && opt.attached && styles.gridAttached,
+                    grid && opt.attached && !ownerHasCells(visible, i) && styles.gridAttachedPlain,
+                    opt.attached && attachedToChosen(visible, i, value) && styles.attachedChosen,
+                    visible[i + 1]?.attached && (opt.attached ? attachedToChosen(visible, i, value) : !opt.onAction && opt.value === value) && styles.hasAttached,
                   )}
                   style={opt.fontFamily ? { fontFamily: opt.fontFamily } : undefined}
                   onPointerEnter={() => { if (!opt.disabled) setActiveIndex(i); }}
-                  onClick={() => { if (!opt.disabled) commit(opt.value); }}
+                  onClick={() => { if (!opt.disabled) activate(opt); }}
                 >
-                  {opt.icon && <span className={styles.optionIcon} aria-hidden="true">{opt.icon}</span>}
-                  {opt.label}
+                  {opt.onAction ? (
+                    // The row stays the listbox option (keyboard and aria); the visual is the
+                    // shared Button look on a span, since a real button cannot nest in an option.
+                    <HoverTooltip body={opt.hint}>
+                      <span className={classNames(buttonStyles.button, buttonStyles[opt.attached ? 'size-sm' : 'size-md'], buttonStyles['tone-neutral'], styles.actionButton, i === activeIndex && styles.actionButtonActive, opt.busy && styles.actionButtonBusy)}>
+                        {opt.busy && <span className={styles.actionSpinner} aria-hidden="true"><Spinner size={14} /></span>}
+                        <span className={styles.actionLabel}>{opt.label}</span>
+                      </span>
+                    </HoverTooltip>
+                  ) : null}
+                  {opt.onAction && opt.hint && <span id={`${optionId(i)}-hint`} className={styles.srOnly} aria-hidden="true">{opt.hint}</span>}
+                  {grid && !opt.onAction && (opt.cells || opt.note) && <GridCells opt={opt} count={cellCount} headings={grid.headings} />}
+                  {!opt.onAction && !(grid && (opt.cells || opt.note)) && opt.icon && <span className={styles.optionIcon} aria-hidden="true">{opt.icon}</span>}
+                  {opt.onAction || (grid && (opt.cells || opt.note)) ? null : opt.description ? (
+                    <span className={styles.optionText}>
+                      <span>{opt.label}</span>
+                      <span id={`${optionId(i)}-desc`} data-option-description="true" className={styles.optionDescription}>{opt.description}</span>
+                    </span>
+                  ) : opt.label}
+                  {opt.rowAction && !opt.onAction && !opt.disabled && (
+                    <HoverTooltip body={opt.rowAction.label}>
+                      <span
+                        className={styles.rowAction}
+                        aria-hidden="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const action = opt.rowAction;
+                          close(true);
+                          action?.onSelect();
+                        }}
+                      >
+                        {opt.rowAction.icon}
+                      </span>
+                    </HoverTooltip>
+                  )}
                 </li>
               ))
             )}
           </ul>
         </div>,
-        document.body,
+        portalRoot,
       )}
     </span>
   );

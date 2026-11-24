@@ -3,13 +3,13 @@
 import type { UpdateChannel, UpdateMode } from '../api/update';
 import { DEFAULT_SMART_POLL_SECONDS } from '../api/smartPoll';
 import {
-  DEFAULT_TEMP_UNIT, DEFAULT_TIME_FORMAT, DEFAULT_NUMBER_FORMAT, DEFAULT_DATE_FORMAT,
+  DEFAULT_TEMP_UNIT, DEFAULT_TIME_FORMAT, DEFAULT_NUMBER_FORMAT, DEFAULT_MONITORING_WHOLE_NUMBERS, DEFAULT_DATE_FORMAT,
   type TempUnit, type TimeFormat, type NumberFormat, type DateFormat,
 } from './units';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-export const LANGUAGES = ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'de', 'nl', 'fr', 'es', 'it', 'pt', 'pt-BR', 'ru', 'tr', 'pl', 'fur'] as const;
+export const LANGUAGES = ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'de', 'nl', 'fr', 'es', 'it', 'pt', 'pt-BR', 'ru', 'tr', 'pl', 'cs', 'fur'] as const;
 export type Language = (typeof LANGUAGES)[number];
 
 export const LANGUAGE_LABELS: Record<Language, string> = {
@@ -28,6 +28,7 @@ export const LANGUAGE_LABELS: Record<Language, string> = {
   ru: 'Русский',
   tr: 'Türkçe',
   pl: 'Polski',
+  cs: 'Čeština',
   fur: 'Furlan',
 };
 
@@ -47,6 +48,7 @@ export const LANGUAGE_FLAGS: Record<Language, string> = {
   ru: '\u{1F1F7}\u{1F1FA}',
   tr: '\u{1F1F9}\u{1F1F7}',
   pl: '\u{1F1F5}\u{1F1F1}',
+  cs: '\u{1F1E8}\u{1F1FF}',
   // Friûl has no Unicode flag emoji. Required by the exhaustive Record type;
   // the value is unused - GeneralTab special-cases fur and renders its flag
   // from an image asset instead.
@@ -56,6 +58,11 @@ export const LANGUAGE_FLAGS: Record<Language, string> = {
 
 export const THEME_MODES = ['system', 'dark', 'light'] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
+
+/** What the Cooling 3D view draws: case and airflow, the case alone, or the airflow alone. */
+export const COOLING_FLOW_MODES = ['both', 'case', 'airflow'] as const;
+export type CoolingFlowMode = (typeof COOLING_FLOW_MODES)[number];
+export const DEFAULT_COOLING_FLOW_MODE: CoolingFlowMode = 'both';
 
 // Dashboard background style. 'glass' = transparent backdrop revealing the
 // native OS frosted-glass material, 'gradient' = flowing accent ribbons,
@@ -145,6 +152,7 @@ export interface GeneralSettings {
   smartPollSeconds: Record<string, number>;
   smartPollDefaultSeconds: number;
   smartPollPerDrive: boolean;
+  liveDriveActivity: boolean;
   monitoringEventKindsHidden: string[];
   showMacStatusBarIcon: boolean;
   showWindowsTrayIcon: boolean;
@@ -179,6 +187,18 @@ export interface GeneralSettings {
   // each seeded from the single pre-split ui.showUncontrolledDevices.
   showUncontrolledLightingDevices: boolean;
   showUncontrolledCoolingDevices: boolean;
+  // Whether the Lighting and Cooling pages open on their 3D view; one per page. Server-mirrored under ui.lightingView3d / ui.coolingView3d.
+  lightingView3d: boolean;
+  coolingView3d: boolean;
+  // What the Cooling 3D view draws: case and airflow, the case alone, or the airflow alone. Server-mirrored under ui.coolingFlowMode.
+  coolingFlowMode: CoolingFlowMode;
+  // Whether the Cooling 3D view draws the solver's collision shapes instead of the case model. Server-mirrored under ui.coolingCollisionShapes.
+  coolingCollisionShapes: boolean;
+  // Sidebar DEVICES row keys the user hid. Server-mirrored under ui.hiddenSidebarDevices.
+  hiddenSidebarDevices: string[];
+  // Lighting widget history, most recent first. Server-mirrored under ui.recentStaticColors / ui.recentAnimations.
+  recentStaticColors: string[];
+  recentAnimations: string[];
   // Display-unit choices. Server-mirrored under the preferences `units` block
   // so they follow the profile. See lib/units.ts for their meaning. The
   // monitoring temperature unit governs in-app hardware temps only; outdoor
@@ -186,6 +206,8 @@ export interface GeneralSettings {
   monitoringTempUnit: TempUnit;
   timeFormat: TimeFormat;
   numberFormat: NumberFormat;
+  // Round monitoring readouts (temperature, power, percent, flow, noise, frequency) to whole numbers.
+  monitoringWholeNumbers: boolean;
   dateFormat: DateFormat;
   updateMode?: UpdateMode;
   updateChannel?: UpdateChannel;
@@ -193,6 +215,12 @@ export interface GeneralSettings {
   // Windows-only: seconds to wait before starting Nexus at system startup.
   // Server-mirrored under the preferences top-level startupDelaySeconds field.
   startupDelaySeconds: number;
+  // Machine-level; server-mirrored under the preferences top-level readRamTemperatures field.
+  readRamTemperatures: boolean;
+  // Machine-level; server-mirrored under the preferences top-level powerMonitorsEnabled field.
+  powerMonitorsEnabled: boolean;
+  // Linux-only; server-mirrored under the preferences top-level amdGpuLighting field.
+  amdGpuLighting: boolean;
   // Global feature switches (default on). Server-mirrored under the
   // preferences `features` block; the localStorage boot mirror is what lets a
   // reload of an already-disabled page render the FeatureDisabled shell on
@@ -235,11 +263,12 @@ export function getDefaultSettings(): NexusSettings {
       smartPollSeconds: {},
       smartPollDefaultSeconds: DEFAULT_SMART_POLL_SECONDS,
       smartPollPerDrive: false,
+      liveDriveActivity: true,
       monitoringEventKindsHidden: [],
       showMacStatusBarIcon: true,
       showWindowsTrayIcon: true,
       rememberLastPage: true,
-      pinnedSidebarApps: ['monitoring', 'lighting', 'cooling', 'diagnostics', 'store'],
+      pinnedSidebarApps: ['monitoring', 'lighting', 'cooling', 'diagnostics'],
       sidebarAppOrder: [],
       sidebarCollapsed: false,
       widgetAdvancedMode: false,
@@ -247,11 +276,22 @@ export function getDefaultSettings(): NexusSettings {
       coolingDashboardMode: 'simple',
       showUncontrolledLightingDevices: true,
       showUncontrolledCoolingDevices: true,
+      lightingView3d: false,
+      coolingView3d: false,
+      coolingFlowMode: 'both',
+      coolingCollisionShapes: false,
+      hiddenSidebarDevices: [],
+      recentStaticColors: [],
+      recentAnimations: [],
       monitoringTempUnit: DEFAULT_TEMP_UNIT,
       timeFormat: DEFAULT_TIME_FORMAT,
       numberFormat: DEFAULT_NUMBER_FORMAT,
+      monitoringWholeNumbers: DEFAULT_MONITORING_WHOLE_NUMBERS,
       dateFormat: DEFAULT_DATE_FORMAT,
       startupDelaySeconds: 0,
+      readRamTemperatures: true,
+      powerMonitorsEnabled: true,
+      amdGpuLighting: false,
       featureLightingEnabled: true,
       featureCoolingEnabled: true,
       featureMonitoringEnabled: true,
@@ -345,9 +385,26 @@ export function cachePreferencesLocally(prefs: {
 
 // ── Theme mode application ───────────────────────────────────────────────────
 
-/** Resolve effective theme: 'dark' or 'light'. */
-export function resolveTheme(mode: ThemeMode): 'dark' | 'light' {
+// The host OS theme published by the service (prefs theme.resolvedThemeMode),
+// used only by applyThemeMode for the dashboard DOM. '' until reported (e.g. a
+// Linux host). Panels never read it: they pass the host theme explicitly.
+let hostThemeMode: '' | 'dark' | 'light' = '';
+
+/** Record the host OS theme; returns true when it changed. */
+export function setHostThemeMode(value: string | undefined): boolean {
+  const next = value === 'dark' || value === 'light' ? value : '';
+  if (next === hostThemeMode) return false;
+  hostThemeMode = next;
+  return true;
+}
+
+/**
+ * Resolve effective theme: 'dark' or 'light'. 'system' follows `host` (the host
+ * OS theme) when given, else this browser's own media query.
+ */
+export function resolveTheme(mode: ThemeMode, host: '' | 'dark' | 'light' = ''): 'dark' | 'light' {
   if (mode === 'system') {
+    if (host) return host;
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   }
   return mode;
@@ -388,9 +445,18 @@ export function applyHtmlChromeTheme(resolved: 'dark' | 'light'): void {
   }
 }
 
+/**
+ * The mode a synced panel follows: the desktop's manual Light/Dark as is; for
+ * the desktop's 'system', the host OS theme the service publishes (not this
+ * device's own media query). Stays 'system' when unpublished.
+ */
+export function syncedAppThemeMode(appThemeMode: ThemeMode, appResolvedThemeMode: '' | 'dark' | 'light'): ThemeMode {
+  return appThemeMode === 'system' && appResolvedThemeMode ? appResolvedThemeMode : appThemeMode;
+}
+
 /** Apply the theme mode by toggling a data attribute on <html>. */
 export function applyThemeMode(mode: ThemeMode): void {
-  applyHtmlChromeTheme(resolveTheme(mode));
+  applyHtmlChromeTheme(resolveTheme(mode, hostThemeMode));
   // Re-derive accent shades for the newly effective theme mode.
   applyAccentColor(currentAccent);
 }

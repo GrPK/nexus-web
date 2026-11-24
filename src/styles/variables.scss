@@ -22,6 +22,9 @@
   --bg-card-hover: #202020;
   --border: #2a2a2a;
   --border-strong: #3a3a3a;
+  // Border of a hovered interactive card or row. Its own token because light's
+  // --border-strong is nearly identical to --border and would not read.
+  --border-hover: #3a3a3a;
   // Single border width, always present so revealing a border on hover never
   // reflows content. Containers stroke transparent (flat at rest); controls and
   // hover-highlighted containers stroke --border-strong.
@@ -93,6 +96,8 @@
   // Text - two ink tiers. rgba, NOT color-mix(): Q60 WebView is Chromium 83.
   // The dim tier is neutral white, deliberately not the --text triplet.
   --text: #f5f5f5;
+  // The BUILD logo's full-contrast ink: pure white on dark, pure black on light.
+  --logo-contrast: #fff;
   --text-dim: rgba(255, 255, 255, 0.6);
   // Separator/divider lines - the text hue at low alpha. The single source for
   // every dividing rule (app + panel). Keep the triplet synced with --text.
@@ -116,6 +121,9 @@
   --good: #10b981;
   --warn: #f59e0b;
   --bad: #ef4444;
+  // Airflow view: air temperature runs --airflow-cool, --airflow-purple, then --bad, in that order. Not the user accent.
+  --airflow-cool: #1e9bff;
+  --airflow-purple: #a53cff;
   // Notice levels (Notice.tsx): soft fills and borders. Fixed rgba, not color-mix (Chromium 83 panels).
   --info-soft: rgba(255, 255, 255, 0.05);
   --warn-soft: rgba(245, 158, 11, 0.12);
@@ -161,6 +169,7 @@
   // `rgb(R G B / var(--alpha-Y))`.
   --alpha-faint: 0.10;     // micro-tints, faint dividers, subtle borders
   --alpha-medium: 0.40;    // panel shadows, focus rings, soft overlays
+  --led-mark: rgb(255 255 255 / var(--alpha-medium)); // an LED's dot fill and its area box line, on the canvas and in the editor
   --alpha-strong: 0.65;    // overlays, scrim, dense backgrounds
 
   // Shadows. 3 rungs: thumb-tiny / card-medium / modal-huge.
@@ -191,8 +200,9 @@
   --z-floating:    20;     // sidebar, in-flow floating chrome
   --z-dropdown:   100;     // popover menus, profile dropdown, context menu
   --z-modal:     1000;     // modal backdrop + chrome
-  --z-tooltip:   1050;     // hover / info tooltips (above modal so in-modal tooltips read)
-  --z-popover:   1100;     // anchored pickers (DatePicker) above tooltips
+  --z-toast:     1040;     // toasts: above modals, below popovers
+  --z-popover:   1050;     // anchored pickers (Select, DatePicker) above modals
+  --z-tooltip:   1100;     // hover / info tooltips, above popovers so a tooltip on a popover row reads
   --z-particles: 1200;     // transient decorative particles (HeartBurst) - pointer-events: none, so sitting above all interactive chrome blocks nothing
 
   // Control size scale (heights). Buttons, chips, inputs, status badges,
@@ -268,6 +278,7 @@
   --bg-card-hover: #f5f5f5;
   --border: #cacaca;
   --border-strong: #c6c6c6;
+  --border-hover: #9e9e9e;
   --surface: rgba(255, 255, 255, 0.6);
   --surface-hover: rgba(255, 255, 255, 0.8);  // hover: a variation of --surface
   --gauge-track: rgba(0, 0, 0, 0.2);
@@ -285,6 +296,7 @@
   --backdrop-tint-c: color-mix(in srgb, var(--accent-glow) 22%, transparent);
 
   --text: #1a1a2e;
+  --logo-contrast: #000;
   // Two ink tiers; the dim tier is neutral black, deliberately not the --text triplet.
   --text-dim: rgba(0, 0, 0, 0.6);
   --separator: rgba(26, 26, 46, 0.12);
@@ -302,6 +314,8 @@
   --good: #059669;
   --warn: #d97706;
   --bad: #dc2626;
+  --airflow-cool: #0070e0;
+  --airflow-purple: #8a24e0;
   // Notice levels (Notice.tsx): soft fills and borders. Fixed rgba, not color-mix (Chromium 83 panels).
   --info-soft: rgba(0, 0, 0, 0.05);
   --warn-soft: rgba(217, 119, 6, 0.1);

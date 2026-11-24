@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { Check, Pencil } from 'lucide-react';
+import { Check, Lock, OctagonMinus, Pencil } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { useCallback, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react';
@@ -9,13 +9,21 @@ import type { DeckEditView } from '../widgets/types';
 import { WidgetCellLabel } from '../widgets/common/WidgetCellLabel';
 import { PanelPreviewProvider } from '../widgets/common/PanelPreviewContext';
 import { ErrorBoundary } from '../../components/common/ErrorBoundary/ErrorBoundary';
+import { MenuArrowButton } from '../../components/common/DeviceCanvas/MenuArrowButton';
+import { EditHint } from '../../components/common/EditHint/EditHint';
+import { BackgroundSplitHint, type BackgroundMenuPoint } from './BackgroundEditHint';
 import { HoverTooltip } from '../../components/common/HoverTooltip/HoverTooltip';
 import { useTranslation } from '../../lib/i18n';
+import { isOwnControl, useLockNotice } from './useLockNotice';
+import { useLongPress } from '../engine/useLongPress';
+import { PANEL_CONTEXT_MENU_TRIGGER_MS } from '../engine/usePanelTouchMode';
+import type { DragActivation } from '../engine/pointerDragSensor';
 import { surfaceSupportsTouch, type PanelLayout, type PanelSurface, type PanelWidget, type PanelConfigValue } from '../types';
 import { findWidgetById, readCellMetrics, type DashboardSectionNavigate } from '../engine/panelLayoutHelpers';
 import type { EditorDockMotion } from '../editor/panelEditorDock';
 import type { ResolvedPanelThemeMode } from '../editor/PanelThemeSettings';
 import styles from '../PanelApp.module.scss';
+import { usePanelSkinAttrs } from '../../components/common/ThemeScope/PanelSkinScope';
 
 // A container React renders into but never places itself, so moving it moves
 // its subtree without remounting it.
@@ -126,6 +134,22 @@ export function EmptyCellDroppable({ pageId, col, row }: { pageId: string; col: 
   );
 }
 
+// A mouse click focuses the badge button too, which would leave it showing after
+// the pointer moved to another widget; only keyboard focus keeps it up.
+function keyboardFocused(el: EventTarget): boolean {
+  try {
+    return el instanceof Element && el.matches(':focus-visible');
+  } catch {
+    return false;
+  }
+}
+
+// Restricted mode: keyboard and synthetic clicks must not reach a blocked widget's controls; Tab still moves past.
+function swallowClick(e: React.MouseEvent) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
 export function PanelTouchCell({
   widget,
   deviceId,
@@ -148,16 +172,25 @@ export function PanelTouchCell({
   onUpdate,
   editorPreview = false,
   movable: movableProp,
+  locked = false,
+  lockActivationFor,
+  onLockDragChange,
   clickthrough = false,
+  inert = false,
+  restricted = false,
   onContextMenu,
   cellPointers,
   onSimulatorClick,
   editHint = false,
+  backgroundSplit,
+  onEditBackground,
+  resizeSelected = false,
   immersiveOnLoad = false,
   previewLayout = null,
   onSectionNavigate,
   onConfigureWidget,
   onEnterImmersiveWidget,
+  moreActions,
 }: {
   widget: PanelWidget;
   deviceId?: string;
@@ -181,16 +214,32 @@ export function PanelTouchCell({
   editorPreview?: boolean;
   // Overrides the touch rule: the device-page preview drags on any multi-widget panel.
   movable?: boolean;
+  // A locked widget registers no drag.
+  locked?: boolean;
+  // How a press starts a move here; a locked widget is pulled the same way.
+  lockActivationFor?: (pointerType: string) => DragActivation;
+  // True while a locked widget is being pulled, so the host keeps delivering input outside its rects.
+  onLockDragChange?: (active: boolean) => void;
   clickthrough?: boolean;
+  // Restricted mode: the widget renders but takes no input; a tap on the cell still reaches the host.
+  inert?: boolean;
+  // Restricted mode on any cell: a hold or drag attempt shows the lock feedback.
+  restricted?: boolean;
   onContextMenu: (e: React.MouseEvent) => void;
   cellPointers: {
     onPointerDown: (e: React.PointerEvent) => void;
     onPointerMove: (e: React.PointerEvent) => void;
     onPointerUp: (e: React.PointerEvent) => void;
     onPointerCancel: (e: React.PointerEvent) => void;
+    onClickCapture?: (e: React.MouseEvent) => void;
   };
   onSimulatorClick?: () => void;
   editHint?: boolean;
+  // Single-widget preview: the hover notice splits into Edit widget and Edit background.
+  backgroundSplit?: 'stacked' | 'side';
+  onEditBackground?: (point: BackgroundMenuPoint) => void;
+  // The tile in resize mode: its drag starts on distance, not a hold.
+  resizeSelected?: boolean;
   // Device-page preview: this is the widget the panel opens immersive on load.
   // Hovering the cell frames it and names the mark.
   immersiveOnLoad?: boolean;
@@ -198,10 +247,15 @@ export function PanelTouchCell({
   onSectionNavigate?: DashboardSectionNavigate;
   onConfigureWidget?: (widget: PanelWidget) => void;
   onEnterImmersiveWidget?: (widget: PanelWidget) => void;
+  // Home dashboard only: a hover corner badge that opens the widget's context
+  // menu at the button. Omitted on every other surface.
+  moreActions?: { open: boolean; onOpen: (x: number, y: number) => void; onClose: () => void };
 }) {
   const { t } = useTranslation();
   const def = lookupApp(widget.type);
   const span = sizeToSpan(widget.size);
+  // A blocked cell reads as locked: a drag attempt pulls it, and a tap, click or key press nudges it, with the same notice.
+  const lockedLook = locked || inert || restricted;
   // dnd-kit must already be tracking pointerdowns when the long-press fires,
   // or a hold+drag can't convert to a sort-drag (it only tracks via its own
   // onPointerDown). Disable only during transitional motion states where a
@@ -211,8 +265,36 @@ export function PanelTouchCell({
     isDragging,
   } = useSortable({
     id: widget.id,
-    disabled: Boolean(editorDockMotion) || Boolean(resizeMotion),
+    disabled: Boolean(editorDockMotion) || Boolean(resizeMotion) || lockedLook,
   });
+
+  // Home dashboard "More actions" badge: shown while the cell is hovered or
+  // focused, centered on the visible card (the .cell surface).
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [cardEl, setCardEl] = useState<HTMLElement | null>(null);
+
+  const lockNotice = useLockNotice(lockedLook, lockActivationFor);
+  // A hold on a cell, not on one of its own controls, nudges it like a drag attempt.
+  const holdPress = useLongPress(() => lockNotice.pulse(), PANEL_CONTEXT_MENU_TRIGGER_MS, { allowMouse: true });
+  const onInertKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Tab' || e.key === 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Enter' || e.key === ' ') lockNotice.pulse();
+  };
+  const onInertClick = (e: React.MouseEvent) => {
+    lockNotice.handlers.onClickCapture(e);
+    const pulled = e.isPropagationStopped();
+    swallowClick(e);
+    if (!pulled) lockNotice.pulse();
+  };
+  const lockDragging = lockNotice.dragging;
+  useEffect(() => {
+    if (!lockDragging) return undefined;
+    onLockDragChange?.(true);
+    return () => onLockDragChange?.(false);
+  }, [lockDragging, onLockDragChange]);
 
   // The cell renders into cellHost and its card + label into contentHost, so
   // the editor dock and the drag overlay move the live widget instead of
@@ -297,6 +379,8 @@ export function PanelTouchCell({
     gridRow,
     '--panel-span-cols': span.cols,
     '--panel-span-rows': span.rows,
+    '--panel-cell-col': widget.col,
+    '--panel-cell-row': widget.row,
     '--panel-editor-dock-cols': span.cols,
     '--panel-editor-dock-rows': span.rows,
     ...editorDockMotion?.style,
@@ -372,10 +456,38 @@ export function PanelTouchCell({
   // delay. Intent (tap / long-press / long-press-then-drag) is disambiguated
   // by which timer fires and whether movement follows.
   const dragMotionActive = Boolean(editorDockMotion) || Boolean(resizeMotion);
-  const composedPointerHandlers = dragMotionActive ? {} : {
+  const composedPointerHandlers = dragMotionActive ? { onClickCapture: inert ? onInertClick : undefined } : {
     ...cellPointers,
+    onPointerMove: (e: React.PointerEvent) => {
+      cellPointers.onPointerMove(e);
+      if (restricted) holdPress.onPointerMove(e);
+      lockNotice.handlers.onPointerMove(e);
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      holdPress.onPointerUp();
+      // A pulled locked widget was dragged, not tapped, and a hold that showed the notice is no tap either.
+      const held = holdPress.firedRef.current;
+      if (lockNotice.handlers.up(e) || held) cellPointers.onPointerCancel(e);
+      else cellPointers.onPointerUp(e);
+    },
+    onPointerCancel: (e: React.PointerEvent) => {
+      holdPress.onPointerCancel();
+      cellPointers.onPointerCancel(e);
+      lockNotice.handlers.end();
+    },
+    onLostPointerCapture: lockNotice.handlers.onLostPointerCapture,
+    onClickCapture: (e: React.MouseEvent) => {
+      cellPointers.onClickCapture?.(e);
+      if (e.isPropagationStopped()) return;
+      if (inert) onInertClick(e);
+      else lockNotice.handlers.onClickCapture(e);
+    },
     onPointerDown: (e: React.PointerEvent) => {
       cellPointers.onPointerDown(e);
+      holdPress.firedRef.current = false;
+      const primaryPress = e.isPrimary !== false && (e.pointerType !== 'mouse' || e.button === 0);
+      if (restricted && primaryPress && !isOwnControl(e.target, e.currentTarget as Element)) holdPress.onPointerDown(e);
+      lockNotice.handlers.onPointerDown(e);
       // Skip dnd-kit activation in scroll regions inside widgets (cellPointers
       // already bails there). Else a 500ms hold inside a scroll list would
       // start a sort-drag.
@@ -395,6 +507,8 @@ export function PanelTouchCell({
       data-cell-state={editorDockMotion ? 'docked' : undefined}
       data-clickthrough={clickthrough && !editorDockMotion ? 'true' : undefined}
       data-edit-hint={editHint ? 'true' : undefined}
+      data-lock-notice={lockNotice.visible ? 'true' : undefined}
+      data-resize-selected={resizeSelected ? 'true' : undefined}
       data-immersive-on-load={immersiveOnLoad ? 'true' : undefined}
       className={`${styles.cellWrap} ${editorDockMotion ? styles.cellEditorDocked : ''} ${resizeMotion ? styles.cellResizeMotion : ''} ${editorDockMotion?.phase === 'closing' ? styles.cellEditorDockClosing : ''} ${dimmed ? styles.cellContextDimmed : ''} ${flash ? styles.cellFlash : ''} ${entrance ? styles.cellEntrance : ''}`}
       style={{
@@ -405,8 +519,8 @@ export function PanelTouchCell({
         // on drop, so the transform snaps to 0 (transition 'none') in the same
         // paint the committed (col,row) lands. Otherwise the base jumps while
         // the stale transform animates back, overshooting (the drag flinch).
-        transform: !dragMotionActive && !isDragging ? previewTransform : undefined,
-        transition: dragMotionActive ? undefined : previewLayout ? previewTransition : 'none',
+        transform: lockNotice.offset ? `translate3d(${lockNotice.offset.x}px, ${lockNotice.offset.y}px, 0)` : !dragMotionActive && !isDragging ? previewTransform : undefined,
+        transition: dragMotionActive ? undefined : previewLayout || lockNotice.settling ? previewTransition : 'none',
         // Hold the z-index bump until rearrange visuals are on. dnd-kit sets
         // isDragging=true at the long-press mark before any movement; popping
         // the cell above the context menu then would fight that menu.
@@ -414,17 +528,24 @@ export function PanelTouchCell({
       }}
       onContextMenu={dragMotionActive ? e => e.preventDefault() : onContextMenu}
       onClick={onSimulatorClick}
+      onKeyDownCapture={inert ? onInertKey : undefined}
+      data-restricted-inert={inert ? 'true' : undefined}
+      onPointerEnter={moreActions ? () => setHovered(true) : undefined}
+      onPointerLeave={moreActions ? () => setHovered(false) : undefined}
+      onFocus={moreActions ? e => setFocused(keyboardFocused(e.target)) : undefined}
+      onBlur={moreActions ? () => setFocused(false) : undefined}
       {...(dragMotionActive ? {} : attributes)}
       {...composedPointerHandlers}
     >
       {hosted(
         <>
           <div
+            ref={setCardEl}
             className={`panel-card ${styles.cell} ${pressHint ? styles.cellPressHint : ''}`}
             data-size={widget.size}
             data-widget-type={widget.type}
           >
-            <div className={styles.cellScaler}>
+            <div className={styles.cellScaler} data-testid={inert ? 'restricted-inert-scaler' : undefined} style={inert ? { pointerEvents: 'none' } : undefined}>
               <Comp
                 widget={widget}
                 deviceId={deviceId}
@@ -441,14 +562,12 @@ export function PanelTouchCell({
                 onEnterImmersive={onEnterImmersiveWidget ? () => onEnterImmersiveWidget(widget) : undefined}
               />
             </div>
-            {editHint && (
-              <div className={styles.cellEditHint} aria-hidden="true">
-                <div className={styles.cellEditHintContent}>
-                  <Pencil className={styles.cellEditHintIcon} />
-                  <span className={styles.cellEditHintLabel}>{t('panel.widget.editWidget')}</span>
-                </div>
-              </div>
-            )}
+            {editHint && backgroundSplit && onEditBackground ? (
+              <BackgroundSplitHint orientation={backgroundSplit} round={widget.size === '2x2round'} widgetHalf onActivate={onEditBackground} />
+            ) : editHint && <EditHint className={styles.cellEditHint} label={t('panel.widget.editWidget')} />}
+            {lockedLook && (restricted
+              ? <EditHint className={styles.cellLockNotice} icon={OctagonMinus} label={t('devices.y70.restrictedMode')} />
+              : <EditHint className={styles.cellLockNotice} icon={Lock} label={t('panel.widget.locked')} />)}
             {immersiveOnLoad && <div className={styles.cellImmersiveFrame} aria-hidden="true" />}
           </div>
           {immersiveOnLoad && (
@@ -457,6 +576,17 @@ export function PanelTouchCell({
           <div className={styles.cellLabelStrip}>
             <WidgetCellLabel label={labelText} />
           </div>
+          {moreActions && (hovered || focused || moreActions.open) && !editorDockMotion && !resizeSelected && !isDragging && (
+            <MenuArrowButton
+              variant="corner"
+              anchor={cardEl}
+              label={t('lighting.devices.moreActions')}
+              tooltip={t('lighting.devices.moreActions')}
+              open={moreActions.open}
+              onOpen={moreActions.onOpen}
+              onClose={moreActions.onClose}
+            />
+          )}
         </>,
       )}
     </div>
@@ -491,8 +621,14 @@ export function PanelCatalogCell({
   onEditAdded,
   onPointerLeave,
   drag,
+  previewStyle,
+  previewScope,
 }: {
   widget: PanelWidget;
+  /** Applied to the preview alone, for a host whose chrome is not drawn in the panel's font. */
+  previewStyle?: CSSProperties;
+  /** Skin attributes and theme vars for the card alone, for a host outside a panel skin scope whose name strip keeps the app look. */
+  previewScope?: { attrs: Readonly<Record<string, string>>; style: CSSProperties };
   surface?: PanelSurface;
   deviceTouch?: boolean;
   label: string;
@@ -541,14 +677,44 @@ export function PanelCatalogCell({
       activate();
     }
   };
+  const cardEl = (
+    <div className={`panel-card ${styles.cell}`} data-size={widget.size} data-widget-type={widget.type}>
+      <div className={styles.cellScaler} style={{ ...previewStyle, pointerEvents: 'none' }}>
+        <ErrorBoundary label={widget.type}>
+          <PanelPreviewProvider value={true}>
+            <Comp widget={widget} surface={surface} deviceTouch={deviceTouch} />
+          </PanelPreviewProvider>
+        </ErrorBoundary>
+      </div>
+      {addedStage && (
+        <div className={styles.cellAdded} data-stage={addedStage} aria-hidden="true">
+          <div className={styles.cellAddedContent}>
+            {addedStage === 'added' ? (
+              <>
+                <Check className={styles.cellAddedIcon} />
+                <span className={styles.cellAddedLabel}>{t('panel.add.added')}</span>
+              </>
+            ) : (
+              <>
+                <Pencil className={styles.cellAddedIcon} />
+                <span className={styles.cellAddedLabel}>{t('panel.widget.editWidget')}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
   const card = (
     <div
       ref={drag?.ref}
       {...drag?.listeners}
       data-panel-widget-id={widget.id}
+      data-panel-catalog=""
       className={[
         styles.cellWrap,
         styles.catalogCell,
+        previewScope ? styles.catalogCellScoped : '',
         selected ? styles.catalogCellSelected : '',
         disabled ? styles.catalogCellDisabled : '',
         drag?.dragging ? styles.catalogCellDragging : '',
@@ -578,32 +744,16 @@ export function PanelCatalogCell({
       onPointerLeave={onPointerLeave}
       onBlur={onPointerLeave}
     >
-      <div className={`panel-card ${styles.cell}`} data-size={widget.size} data-widget-type={widget.type}>
-        <div className={styles.cellScaler} style={{ pointerEvents: 'none' }}>
-          <ErrorBoundary label={widget.type}>
-            <PanelPreviewProvider value={true}>
-              <Comp widget={widget} surface={surface} deviceTouch={deviceTouch} />
-            </PanelPreviewProvider>
-          </ErrorBoundary>
+      {previewScope ? (
+        <div
+          className="panel-root"
+          {...previewScope.attrs}
+          data-preview-skin=""
+          style={{ ...previewScope.style, display: 'contents' }}
+        >
+          {cardEl}
         </div>
-        {addedStage && (
-          <div className={styles.cellAdded} data-stage={addedStage} aria-hidden="true">
-            <div className={styles.cellAddedContent}>
-              {addedStage === 'added' ? (
-                <>
-                  <Check className={styles.cellAddedIcon} />
-                  <span className={styles.cellAddedLabel}>{t('panel.add.added')}</span>
-                </>
-              ) : (
-                <>
-                  <Pencil className={styles.cellAddedIcon} />
-                  <span className={styles.cellAddedLabel}>{t('panel.widget.editWidget')}</span>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      ) : cardEl}
       {showLabel && (
         <div className={styles.cellLabelStrip}>
           <WidgetCellLabel label={label} />
@@ -626,6 +776,7 @@ export function PanelDragOverlayCell({
   fixedWidth,
   fixedHeight,
   showLabels = true,
+  flush = false,
   onSlot,
 }: {
   widget: PanelWidget;
@@ -635,8 +786,11 @@ export function PanelDragOverlayCell({
   fixedWidth?: number;
   fixedHeight?: number;
   showLabels?: boolean;
+  // Widget padding at 0%: the grid's cards are square, so the clone must be too.
+  flush?: boolean;
   onSlot: (slot: HTMLElement, attached: boolean) => void;
 }) {
+  const skinAttrs = usePanelSkinAttrs();
   const slotRef = useCallback((slot: HTMLDivElement) => {
     onSlot(slot, true);
     return () => onSlot(slot, false);
@@ -646,15 +800,18 @@ export function PanelDragOverlayCell({
   return (
     <div
       className={`panel-root ${styles.dragOverlayHost}`}
+      {...skinAttrs}
       data-theme={themeMode}
       data-surface={surface}
       // Portaled to body, so it can't inherit the panel root's labels-off state
       // - mirror it here or the dragged clone shows a label the grid hides.
       data-show-widget-labels={showLabels ? 'true' : 'false'}
+      data-widget-padding={flush ? 'none' : undefined}
       style={themeStyle}
     >
       <div
         ref={slotRef}
+        data-panel-drag-overlay=""
         className={`${styles.cellWrap} ${styles.dragOverlayCell}`}
         style={{
           width: fixedWidth ? `${fixedWidth}px` : undefined,

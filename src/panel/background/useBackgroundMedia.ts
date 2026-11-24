@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchBackgroundMediaLibrary, backgroundMediaThumbnailPath, type BackgroundMediaItem } from '../../api/panelBackgroundMedia';
+import { fetchBackgroundMediaLibrary, backgroundMediaThumbnailPath, onBackgroundMediaChanged, type BackgroundMediaItem } from '../../api/panelBackgroundMedia';
 import { fetchServiceBlob } from '../../api/service';
 
 export function useBackgroundMedia(deviceId: string) {
@@ -13,6 +13,9 @@ export function useBackgroundMedia(deviceId: string) {
   }, [deviceId]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // A commit or delete from any entry point (canvas quick edit, another picker, the panel's own editor) changes this library too.
+  useEffect(() => onBackgroundMediaChanged(deviceId, () => { void refresh(); }), [deviceId, refresh]);
 
   useEffect(() => {
     thumbsRef.current = thumbs;
@@ -49,7 +52,7 @@ export function useBackgroundMedia(deviceId: string) {
     (async () => {
       for (const item of items) {
         if (thumbsRef.current[item.id]) continue;
-        const blob = await fetchServiceBlob(backgroundMediaThumbnailPath(deviceId, item.id));
+        const blob = await fetchServiceBlob(backgroundMediaThumbnailPath(deviceId, item.id), { mayBeCached: true });
         if (cancelled) return;
         if (blob) {
           const url = URL.createObjectURL(blob);

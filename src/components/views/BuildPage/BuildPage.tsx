@@ -7,21 +7,28 @@ import { useUiSettings } from '../../../hooks/useUiSettings';
 import { resolveTheme, currentAccentColor } from '../../../lib/settings';
 import { useSystemSpecs } from '../../../hooks/useSystemSpecs';
 import { useFpsGames } from '../../../hooks/useFpsGames';
-import { buildFpsSignatureParams, primaryGpuModel } from '../../../panel/widgets/frames/fpsSignatureParams';
 import { fetchService, isRemoteOrigin, putService } from '../../../api/service';
+import { PC_SETUP_TOPIC } from '../../../api/pcSetup';
+import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
 import { SCENE_3D } from '../../../lib/scene/sceneFeature';
 import { openExternalUrl } from '../../../sandbox/ui/openExternal';
+import { DEV_TOOLS } from '../../../lib/devTools';
+import { isMacAppShell } from '../../../app/windowActions';
 import { clearBuildFrameHistory, setBuildFrameHistory } from './buildNav';
+import { relayPreviewSave } from './buildPreview';
+import { SYSTEM_CASE_TOPIC } from '../../../api/systemPreview';
 import { relaySceneExport } from './buildScene';
+import { relaySetupGet, relaySetupPush, relaySetupPut } from './buildSetup';
+import { buildMachine, fetchMachineCaseState, fetchMachineDevices, isValidCaseId, layoutKeyOf, type BuildDevice, type BuildMachine } from './buildMachine';
+import { resolveBuildOrigin } from './buildOrigin';
+import { usePreviewSize } from './previewSize';
 import styles from './BuildPage.module.scss';
 
-export const BUILD_ORIGIN = 'https://build.hellonexus.com';
+export const BUILD_ORIGIN = resolveBuildOrigin();
 const DEFAULT_PATH = '/builder';
+const HEADLESS_PATH = '/builder?headless=1';
 const READY_TIMEOUT_MS = 8000;
 const MAX_GAMES = 10;
-// Same rule as the cloud api's device case id: a catalog part id.
-const CASE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
-const BYTES_PER_GIB = 1024 ** 3;
 // Only the iframe's own script/form/same-origin-storage capabilities are
 // granted - no allow-top-navigation, no allow-popups, so the only way out of
 // the frame is the open-external message.
@@ -29,19 +36,6 @@ const IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-forms';
 // The async clipboard API is denied to a cross-origin frame unless the parent
 // delegates clipboard-write; the portal's Share Build copies a permalink.
 const IFRAME_ALLOW = 'clipboard-write';
-
-interface BuildMachine {
-  processor?: string;
-  primaryGpu?: string;
-  memory?: string;
-  motherboard?: string;
-  storage?: string;
-  monitor?: string;
-  res?: string;
-  hz?: number;
-  ramGb?: number;
-  caseId?: string;
-}
 
 interface BuildGame {
   gameKey: string;
@@ -59,10 +53,6 @@ interface FrameMessage {
 function isGlassBackdrop(): boolean {
   const root = document.documentElement;
   return root.classList.contains('nexus-shell-native-glass') && root.getAttribute('data-bg') === 'glass';
-}
-
-function isValidCaseId(value: unknown): value is string | null {
-  return value === null || (typeof value === 'string' && CASE_ID_PATTERN.test(value));
 }
 
 function isFrameMessage(data: unknown): data is FrameMessage {
@@ -95,6 +85,51 @@ export function sanitizeBuildPath(raw: string | null | undefined): string {
   return isSafeBuildPath(decoded) ? decoded : DEFAULT_PATH;
 }
 
+/** What a headless Build posts once the setup record holds the layout it resolved. */
+export interface BuildResolved {
+  rev: number;
+  /** False when the service refused the write. */
+  saved: boolean;
+  hasLayout: boolean;
+  /** The service also holds the case model. */
+  model: boolean;
+}
+
+/** Whether the frame is offered the scene export, which a headless resolve needs to report the case model. */
+export const sceneExportOffered = (): boolean => SCENE_3D && !isRemoteOrigin;
+
+/**
+ * Frames Build out of sight only to have it resolve this PC's layout into the setup record (the same code a visible Build runs). The
+ * machine and its key come from the host, so the first hello already carries the final ones.
+ */
+export interface HeadlessBuild {
+  machine: BuildMachine;
+  layoutKey: string;
+  onResolved: (state: BuildResolved) => void;
+  /** The frame never loaded: offline, or Build did not answer in time. */
+  onUnavailable: () => void;
+  /** Also lets the frame render this PC's case image and store it for the dashboard tile. */
+  preview?: boolean;
+  /** Lets the frame read and write the shared PC setup. Absent means a headless frame never syncs; the visible Build always does. */
+  syncSetup?: boolean;
+  /** Lets the frame read the shared PC setup and refuses every write to it: for a frame that only draws from the record. Ignored when `syncSetup` is set. */
+  readSetup?: boolean;
+}
+
+/** The visible Build always syncs the shared PC setup; a headless frame only when its host opted in. */
+function setupSyncOffered(headless: HeadlessBuild | undefined): boolean {
+  return headless ? headless.syncSetup === true : true;
+}
+
+/** A headless frame that only reads the record: the read is offered, the write never is. */
+function setupReadOnlyOffered(headless: HeadlessBuild | undefined): boolean {
+  return headless !== undefined && headless.syncSetup !== true && headless.readSetup === true;
+}
+
+function isBuildResolved(data: FrameMessage): data is FrameMessage & BuildResolved {
+  return typeof data.rev === 'number' && typeof data.saved === 'boolean' && typeof data.hasLayout === 'boolean' && typeof data.model === 'boolean';
+}
+
 interface BuildPageProps {
   /** URL-encoded portal path (pathname + search), e.g. encodeURIComponent("/upgrade?bench=<id>"). Defaults to "/builder". */
   path?: string | null;
@@ -102,25 +137,52 @@ interface BuildPageProps {
   onOpenBenchmark?: () => void;
   /** Opens the Lighting page after the frame sent the PC there as a 3D scene. */
   onOpenLighting?: () => void;
+  /** Opens the Cooling page; the hello advertises it, with whether Cooling is turned on, so the portal can offer the airflow view of a case Cooling can draw. */
+  onOpenCooling?: () => void;
+  /** The host's ping platform; the dashboard tile shows no preview on macOS, so none is offered there. */
+  platform?: string;
+  /** Out of sight, for the Cooling view: no page chrome, no navigation, nothing the user would see or change. */
+  headless?: HeadlessBuild;
 }
 
 /**
  * Build: a full-height iframe onto build.hellonexus.com, the upgrade
  * advisor portal. nexus-web carries no catalog/affiliate code itself.
  */
-export function BuildPage({ path, onOpenBenchmark, onOpenLighting }: BuildPageProps) {
+export function BuildPage({ path, onOpenBenchmark, onOpenLighting, onOpenCooling, platform, headless }: BuildPageProps) {
+  const headlessRef = useRef(headless);
+  useEffect(() => { headlessRef.current = headless; }, [headless]);
+  const canSyncSetup = setupSyncOffered(headless) && !isRemoteOrigin;
+  const canReadSetup = setupReadOnlyOffered(headless) && !isRemoteOrigin;
+  // A headless frame saves the preview only when its host asked; the host decided it is offered.
+  const canSavePreview = !isRemoteOrigin && (headless ? headless.preview === true : DEV_TOOLS || (platform !== '' && platform !== 'macos' && !isMacAppShell()));
+  const previewSize = usePreviewSize();
   const { t, language } = useTranslation();
-  const { settings } = useUiSettings();
+  const { settings, update: updateUi } = useUiSettings();
   const { specs } = useSystemSpecs(true);
   const { gamesByKey } = useFpsGames();
 
-  const safePath = sanitizeBuildPath(path);
+  // The flag in the URL tells the page it is headless before any hello lands.
+  const safePath = sanitizeBuildPath(headless ? HEADLESS_PATH : path);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const onOpenBenchmarkRef = useRef(onOpenBenchmark);
   useEffect(() => { onOpenBenchmarkRef.current = onOpenBenchmark; }, [onOpenBenchmark]);
+  const canSavePreviewRef = useRef(canSavePreview);
+  useEffect(() => { canSavePreviewRef.current = canSavePreview; }, [canSavePreview]);
   const onOpenLightingRef = useRef(onOpenLighting);
   useEffect(() => { onOpenLightingRef.current = onOpenLighting; }, [onOpenLighting]);
+  const coolingEnabled = settings.featureCoolingEnabled;
+  // Cooling opens on its 3D airflow view, which is the stored choice of that page. Simple mode has no airflow view, so it moves to Advanced.
+  const openCooling = useCallback(() => {
+    if (!onOpenCooling) return;
+    updateUi({ coolingView3d: true, coolingDashboardMode: 'advanced' });
+    onOpenCooling();
+  }, [updateUi, onOpenCooling]);
+  const openCoolingRef = useRef(openCooling);
+  useEffect(() => { openCoolingRef.current = openCooling; }, [openCooling]);
+  const coolingEnabledRef = useRef(coolingEnabled);
+  useEffect(() => { coolingEnabledRef.current = coolingEnabled; }, [coolingEnabled]);
   const [ready, setReady] = useState(false);
   // Bumped on every `ready` message, not just the first: the portal navigates
   // between routes with full page loads inside the iframe, so each new page
@@ -132,27 +194,59 @@ export function BuildPage({ path, onOpenBenchmark, onOpenLighting }: BuildPagePr
   const [frameSrcPath, setFrameSrcPath] = useState(safePath);
   const [lastPath, setLastPath] = useState(safePath);
 
-  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => resolveTheme(settings.themeMode));
+  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => resolveTheme(settings.themeMode, settings.hostThemeMode));
   useEffect(() => {
-    setResolvedTheme(resolveTheme(settings.themeMode));
+    setResolvedTheme(resolveTheme(settings.themeMode, settings.hostThemeMode));
     if (settings.themeMode !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: light)');
-    const handler = () => setResolvedTheme(resolveTheme('system'));
+    const handler = () => setResolvedTheme(resolveTheme('system', settings.hostThemeMode));
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
-  }, [settings.themeMode]);
+  }, [settings.themeMode, settings.hostThemeMode]);
 
   // This machine's case, the one part the app cannot detect: saved by the
   // service (machine-local, mirrored to the signed-in account) and picked in
   // the frame.
   const [caseId, setCaseId] = useState<string | null>(null);
+  const [caseAuto, setCaseAuto] = useState(false);
   const caseTouchedRef = useRef(false);
+  // The answers of the two reads below are in (an answer of none counts): the layout key is only given once the machine is whole.
+  const [caseRead, setCaseRead] = useState(false);
+  const [devicesRead, setDevicesRead] = useState(false);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const res = await fetchService<{ caseId?: string | null }>('/system/case');
-      if (cancelled || caseTouchedRef.current || !res) return;
-      if (typeof res.caseId === 'string' && isValidCaseId(res.caseId)) setCaseId(res.caseId);
+      const state = await fetchMachineCaseState();
+      if (cancelled) return;
+      setCaseRead(true);
+      if (!caseTouchedRef.current && state.caseId) {
+        setCaseId(state.caseId);
+        setCaseAuto(state.auto);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // The service pings this topic when the case changes (a manual pick or the Y70 display auto-assign), so an open page follows it; the hello below re-sends with the new caseId.
+  useTopicCallback(SYSTEM_CASE_TOPIC, !isRemoteOrigin, useCallback(() => {
+    void (async () => {
+      const res = await fetchService<{ caseId?: string | null; auto?: boolean }>('/system/case');
+      if (!res) return;
+      caseTouchedRef.current = true;
+      setCaseId(typeof res.caseId === 'string' && isValidCaseId(res.caseId) ? res.caseId : null);
+      setCaseAuto(res.auto === true);
+    })();
+  }, []));
+
+  // Detected coolers, fans and controllers. An older service answers 404, which just leaves it out.
+  const [devices, setDevices] = useState<BuildDevice[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const list = await fetchMachineDevices();
+      if (cancelled) return;
+      setDevicesRead(true);
+      if (list.length > 0) setDevices(list);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -197,6 +291,22 @@ export function BuildPage({ path, onOpenBenchmark, onOpenLighting }: BuildPagePr
     win.postMessage(message, BUILD_ORIGIN);
   }, []);
 
+  // The newest revision the frame knows of: its own save replies and every push move it forward, so a stale or echoed fetch is dropped.
+  const lastSetupRevRef = useRef(-1);
+  // Settles when no setup write from the frame is waiting for its reply, so a fetch that overtook a reply is compared after it.
+  const setupWritesRef = useRef<Promise<unknown>>(Promise.resolve());
+  const learnSetupRev = useCallback((rev: unknown) => {
+    if (typeof rev === 'number') lastSetupRevRef.current = Math.max(lastSetupRevRef.current, rev);
+  }, []);
+  useTopicCallback(PC_SETUP_TOPIC, ready && canSyncSetup, useCallback(() => {
+    void relaySetupPush().then(async push => {
+      await setupWritesRef.current;
+      if (!push || push.rev <= lastSetupRevRef.current) return;
+      lastSetupRevRef.current = push.rev;
+      post(push.message as FrameMessage);
+    });
+  }, [post]));
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== BUILD_ORIGIN) return;
@@ -216,17 +326,22 @@ export function BuildPage({ path, onOpenBenchmark, onOpenLighting }: BuildPagePr
         }
         case 'nexus-build:open-external': {
           const url = typeof data.url === 'string' ? data.url : null;
-          if (url) void openExternalUrl(url);
+          if (url && !headlessRef.current) void openExternalUrl(url);
           break;
         }
+        case 'nexus-build:resolved':
+          if (headlessRef.current && isBuildResolved(data)) headlessRef.current.onResolved({ rev: data.rev, saved: data.saved, hasLayout: data.hasLayout, model: data.model });
+          break;
         case 'nexus-build:set-case': {
           const next = data.caseId;
-          if (!isValidCaseId(next)) break;
+          if (headlessRef.current || !isValidCaseId(next)) break;
           void (async () => {
             const res = await putService<{ caseId?: string | null; error?: boolean }>('/system/case', { caseId: next });
             if (!res || res.error === true) return;
             caseTouchedRef.current = true;
             setCaseId(typeof res.caseId === 'string' && isValidCaseId(res.caseId) ? res.caseId : null);
+            // A pick through the frame is the user's choice.
+            setCaseAuto(false);
           })();
           break;
         }
@@ -241,10 +356,44 @@ export function BuildPage({ path, onOpenBenchmark, onOpenLighting }: BuildPagePr
             ...(typeof data.requestId === 'string' ? { requestId: data.requestId } : {}),
           }));
           break;
+        case 'nexus-build:setup-get':
+          if (!(setupSyncOffered(headlessRef.current) || setupReadOnlyOffered(headlessRef.current)) || isRemoteOrigin) {
+            // A final refusal (anything but `unreachable`), so the frame stops instead of waiting out its timeout and retrying.
+            post({ type: 'nexus-build:setup', v: 1, error: 'disabled', ...(typeof data.requestId === 'string' ? { requestId: data.requestId } : {}) } as FrameMessage);
+            break;
+          }
+          void relaySetupGet(data).then(reply => {
+            learnSetupRev(reply.rev);
+            post(reply as FrameMessage);
+          });
+          break;
+        case 'nexus-build:setup-put':
+          if (!setupSyncOffered(headlessRef.current) || isRemoteOrigin) {
+            // A final refusal (anything but `unreachable`), so the frame stops instead of waiting out its timeout and retrying.
+            post({ type: 'nexus-build:setup', v: 1, error: 'disabled', ...(typeof data.requestId === 'string' ? { requestId: data.requestId } : {}) } as FrameMessage);
+            break;
+          }
+          setupWritesRef.current = Promise.all([setupWritesRef.current, relaySetupPut(data).then(reply => {
+            learnSetupRev(reply.rev);
+            post(reply as FrameMessage);
+          })]);
+          break;
+        case 'nexus-build:set-preview': {
+          // A missing case id is a PC with no case chosen.
+          const previewCase = data.caseId ?? null;
+          if (!canSavePreviewRef.current || !isValidCaseId(previewCase)) break;
+          void relayPreviewSave(previewCase, data.png);
+          break;
+        }
         case 'nexus-build:open-lighting':
           onOpenLightingRef.current?.();
           break;
+        case 'nexus-build:open-cooling':
+          // A turned-off Cooling never opens from here, whatever the frame believes.
+          if (coolingEnabledRef.current) openCoolingRef.current();
+          break;
         case 'nexus-build:history':
+          if (headlessRef.current) break;
           setBuildFrameHistory({ canGoBack: data.canGoBack === true, canGoForward: data.canGoForward === true });
           break;
         default:
@@ -254,25 +403,13 @@ export function BuildPage({ path, onOpenBenchmark, onOpenLighting }: BuildPagePr
     window.addEventListener('message', handleMessage);
     return () => {
       window.removeEventListener('message', handleMessage);
-      clearBuildFrameHistory();
+      if (!headlessRef.current) clearBuildFrameHistory();
     };
-  }, [post]);
+  }, [post, learnSetupRev]);
 
-  const machine: BuildMachine | undefined = specs ? (() => {
-    const sig = buildFpsSignatureParams(specs);
-    return {
-      processor: specs.processor || undefined,
-      primaryGpu: primaryGpuModel(specs),
-      memory: specs.memory || undefined,
-      motherboard: specs.motherboard || undefined,
-      storage: specs.storage || undefined,
-      monitor: specs.monitor || undefined,
-      res: sig?.res,
-      hz: sig?.hz,
-      ramGb: sig?.ramBytes != null ? Math.round(sig.ramBytes / BYTES_PER_GIB) : undefined,
-      ...(caseId ? { caseId } : {}),
-    };
-  })() : undefined;
+  const machine: BuildMachine | undefined = headless?.machine ?? (specs ? buildMachine(specs, caseId, devices, caseAuto) : undefined);
+  // The key is only given for a whole machine: a hello that carried a partial one would be answered with a layout kept under it.
+  const layoutKey = headless?.layoutKey ?? (machine && caseRead && devicesRead ? layoutKeyOf(machine) : undefined);
 
   const games: BuildGame[] = [...gamesByKey.values()]
     .sort((a, b) => b.focusedSec - a.focusedSec)
@@ -298,10 +435,19 @@ export function BuildPage({ path, onOpenBenchmark, onOpenLighting }: BuildPagePr
       glass: isGlassBackdrop(),
       locale: language,
       host: isRemoteOrigin ? 'web' : 'app',
+      ...(headless ? { headless: true } : {}),
+      ...(layoutKey ? { layoutKey } : {}),
       ...(onOpenBenchmark ? { canOpenBenchmark: true } : {}),
       // A scene lands in this machine's service, so only the desktop app offers it.
-      ...(SCENE_3D && !isRemoteOrigin ? { canExportScene: true } : {}),
+      ...(sceneExportOffered() ? { canExportScene: true } : {}),
+      ...(canSyncSetup ? { canSyncSetup: true } : {}),
+      ...(canReadSetup ? { canReadSetup: true } : {}),
       ...(onOpenLighting ? { canOpenLighting: true } : {}),
+      ...(onOpenCooling ? { canOpenCooling: true, coolingEnabled } : {}),
+      // The preview lands in this machine's service for the dashboard tile; web and release macOS do not offer it.
+      ...(canSavePreview ? { canSavePreview: true } : {}),
+      // How many pixels across the dashboard tile shows the image; the portal draws it at that size. Absent until a tile measured itself.
+      ...(canSavePreview && previewSize !== null ? { previewSize } : {}),
       ...(machine ? { machine } : {}),
       ...(games.length > 0 ? { games } : {}),
     };
@@ -312,7 +458,7 @@ export function BuildPage({ path, onOpenBenchmark, onOpenLighting }: BuildPagePr
     lastHelloSentRef.current = serialized;
     post(payload);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- theme/locale changes post their own delta message below; this only needs to re-run on a new page or on late-arriving machine/games data
-  }, [ready, helloNonce, machineKey, gamesKey, post]);
+  }, [ready, helloNonce, machineKey, layoutKey, gamesKey, canSavePreview, previewSize, coolingEnabled, post]);
 
   const prevThemeRef = useRef(resolvedTheme);
   useEffect(() => {
@@ -368,6 +514,33 @@ export function BuildPage({ path, onOpenBenchmark, onOpenLighting }: BuildPagePr
   }, [lastPath]);
 
   const showFallback = !ready && (offline || timedOut);
+
+  // An out-of-sight frame has no page of its own to show: its host is told it never loaded instead.
+  const onUnavailable = headless?.onUnavailable;
+  useEffect(() => {
+    if (showFallback) onUnavailable?.();
+  }, [showFallback, onUnavailable]);
+
+  if (headless) {
+    return (
+      <div className={styles.headless} aria-hidden="true">
+        {!showFallback && (
+          <iframe
+            key={reloadNonce}
+            ref={iframeRef}
+            src={`${BUILD_ORIGIN}${frameSrcPath}`}
+            className={styles.frame}
+            title={t('panel.widget.build')}
+            tabIndex={-1}
+            allow={IFRAME_ALLOW}
+            sandbox={IFRAME_SANDBOX}
+            referrerPolicy="strict-origin-when-cross-origin"
+            loading="eager"
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.app}>

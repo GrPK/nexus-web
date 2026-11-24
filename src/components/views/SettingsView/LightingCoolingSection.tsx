@@ -1,10 +1,13 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { CircuitBoard, Clock, Cpu, Lock, Moon, RotateCcw, Speaker, Zap } from 'lucide-react';
+import { CircuitBoard, Cpu, Lightbulb, Lock, Moon, RotateCcw, Speaker, Sun, Zap } from 'lucide-react';
 import { Button } from '../../common/Button/Button';
 import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
+import { useToastSafe } from '../../common/Toast/Toast';
+import { Notice } from '../../common/Notice/Notice';
 import { Select } from '../../common/Select/Select';
 import { SettingRow, SettingSelect, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
+import { SOFTWARE_RENDER_VALUE, realCpuName, showRenderGpuPicker, showSoftwareOption } from './renderGpuUi';
 import { BrightnessScheduleModal } from './BrightnessScheduleModal';
 import { ThermalGuardSetting } from './ThermalGuardSetting';
 import {
@@ -12,7 +15,6 @@ import {
   setRenderGpu, setSleepBlackout,
 } from '../../../api/lighting';
 import { useBrightnessSchedule } from '../../../hooks/useBrightnessSchedule';
-import { useIdleDim } from '../../../hooks/useIdleDim';
 import { useLightingAudioOutput } from '../../../hooks/useLightingAudioOutput';
 import { useSensors, type HardwareSensor } from '../../../hooks/useSensors';
 import { useFeatureFlags, useUiSettings } from '../../../hooks/useUiSettings';
@@ -25,7 +27,7 @@ import {
   type NumberFormat, type TempUnit,
 } from '../../../lib/units';
 
-export const LIGHTING_ANCHORS = ['set-render-gpu', 'set-audio-output', 'set-sleep-blackout', 'set-lock-blackout', 'set-brightness-schedule'] as const;
+export const LIGHTING_ANCHORS = ['set-render-gpu', 'set-audio-output', 'set-sleep-blackout', 'set-lock-blackout', 'set-amd-gpu-lighting', 'set-brightness-schedule'] as const;
 
 interface LightingCoolingSectionProps {
   serviceOnline: boolean;
@@ -43,11 +45,14 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   const { t } = useTranslation();
   const { settings, update } = useUiSettings();
   const features = useFeatureFlags();
+  const toast = useToastSafe();
   const sensors = useSensors(serviceOnline);
   const gpus = sensors.gpuComponents;
 
-  const showGpuPicker = (platform === 'windows' || platform === 'linux') && gpus.length > 1;
+  const gpuPlatform = platform === 'windows' || platform === 'linux';
   const [renderGpu, setRenderGpuValue] = useState('auto');
+  const [softwareAvailable, setSoftwareAvailable] = useState(false);
+  const showGpuPicker = showRenderGpuPicker(platform, gpus.length, softwareAvailable);
   const [restartOpen, setRestartOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   // Only Windows notifies the service before the host suspends, which is the
@@ -64,7 +69,6 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   // Master-brightness schedule: every platform, since it lives in the frame
   // writers rather than in any OS hook.
   const brightnessSchedule = useBrightnessSchedule(serviceOnline);
-  const idleDim = useIdleDim(serviceOnline);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   // Only the Windows loopback can target one output; macOS captures the whole
   // system mix.
@@ -79,13 +83,17 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   }, [features.lighting]);
 
   useEffect(() => {
-    if (!showGpuPicker || !serviceOnline) return;
+    if (!gpuPlatform || !serviceOnline) return;
     let cancelled = false;
     fetchRenderGpu()
-      .then(r => { if (!cancelled) setRenderGpuValue(r?.value || 'auto'); })
+      .then(r => {
+        if (cancelled) return;
+        setRenderGpuValue(r?.value || 'auto');
+        setSoftwareAvailable(r?.softwareRenderingAvailable ?? false);
+      })
       .catch(() => { /* keep default */ });
     return () => { cancelled = true; };
-  }, [showGpuPicker, serviceOnline]);
+  }, [gpuPlatform, serviceOnline]);
 
   useEffect(() => {
     if (!showSleepBlackout || !serviceOnline) return;
@@ -111,8 +119,15 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   const gpuDefault = useMemo(() => defaultGpuTempSensor(sensors.gpu), [sensors.gpu]);
 
   const handleGpuChange = async (value: string) => {
+    const previous = renderGpu;
     setRenderGpuValue(value);
-    try { await setRenderGpu(value); } catch { /* persist may retry; UI keeps the pick */ }
+    let res: Awaited<ReturnType<typeof setRenderGpu>> = null;
+    try { res = await setRenderGpu(value); } catch { /* treated as a refusal below */ }
+    if (!res || res.error) {
+      setRenderGpuValue(previous);
+      toast.push({ title: t('lighting.renderGpu.failed') });
+      return;
+    }
     setRestartOpen(true);
   };
   const handleSleepBlackoutChange = async (next: boolean) => {
@@ -139,6 +154,7 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
   // Auto = the OS default offscreen-GL adapter (integrated on a hybrid rig);
   // show its name so the user sees where Auto lands, like the monitoring picker.
   const autoName = gpus.find(g => g.integrated)?.name ?? gpus[0]?.name ?? '';
+  const cpuName = realCpuName(sensors.cpuModel);
   const gpuSelectOptions = [
     {
       value: 'auto',
@@ -149,6 +165,16 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
       value: g.name,
       label: g.integrated ? `${g.name} (${t('monitoring.gpuSelect.integrated')})` : g.name,
     })),
+    ...(showSoftwareOption(softwareAvailable, renderGpu) ? [
+      ...(gpus.length > 0 ? [{ value: '__sep_software__', label: '', divider: true }] : []),
+      {
+        value: SOFTWARE_RENDER_VALUE,
+        label: cpuName
+          ? t('lighting.renderGpu.softwareNamed', { name: cpuName })
+          : t('lighting.renderGpu.softwareFallback'),
+        description: t('lighting.renderGpu.softwareDescription'),
+      },
+    ] : []),
   ];
 
   const resetAction = canReset ? (
@@ -163,13 +189,10 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
     </Button>
   ) : undefined;
 
-  // The row opens both the schedule and idle dimming, so it reads On if either is.
-  const idleDimOn = !!idleDim.state?.enabled && !!idleDim.state.supported;
-  const scheduleState = brightnessSchedule.schedule === null
-    ? undefined
-    : brightnessSchedule.schedule.enabled || idleDimOn
-      ? { label: t('lighting.schedule.row.on'), tone: 'accent' as const }
-      : { label: t('lighting.schedule.row.off'), tone: 'neutral' as const };
+  // The badge names the schedule alone; idle dimming and the multiplier live in the same dialog but do not light it.
+  const scheduleState = brightnessSchedule.schedule?.enabled
+    ? { label: t('lighting.schedule.row.on'), tone: 'accent' as const }
+    : undefined;
 
   return (
     <>
@@ -226,9 +249,24 @@ export function LightingCoolingSection({ serviceOnline, platform }: LightingCool
             disabled={!serviceOnline}
           />
         )}
+        {settings.amdGpuLightingApplicable && (
+          <>
+            <SettingToggle
+              label={t('settings.amdGpuLighting.label')}
+              icon={<Lightbulb />}
+              iconLeading="subtle"
+              anchorId="set-amd-gpu-lighting"
+              description={t('settings.amdGpuLighting.description')}
+              checked={settings.amdGpuLighting}
+              onChange={v => update({ amdGpuLighting: v })}
+              disabled={!serviceOnline}
+            />
+            <Notice tone="warning" role="status">{t('settings.amdGpuLighting.warning')}</Notice>
+          </>
+        )}
         <SettingRow
           label={t('lighting.schedule.row.label')}
-          icon={<Clock />}
+          icon={<Sun />}
           iconLeading="subtle"
           anchorId="set-brightness-schedule"
           description={t('lighting.schedule.row.description')}

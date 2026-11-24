@@ -51,6 +51,12 @@ interface DeckInstanceResponse {
   instance: DeckInstance;
 }
 
+/** Every deck instance by id: `streamdeck:<serial>` for a device, `widget:<id>` for a Deck widget. */
+export async function getDeckInstances(): Promise<Record<string, DeckInstance>> {
+  const res = await fetchService<{ instances?: Record<string, DeckInstance> }>('/deck/instances');
+  return res?.instances ?? {};
+}
+
 export async function getDeckPresets(): Promise<DeckPresetSummary[]> {
   const res = await fetchService<DeckPresetsListResponse>('/deck/presets');
   return res?.presets ?? [];
@@ -68,6 +74,8 @@ export interface CreateDeckPresetBody {
   deck?: DeckConfig;
   templateId?: string;
   copyOfPresetId?: string;
+  /** Starts from the stock deck instead of a blank one. */
+  fresh?: boolean;
 }
 
 /** Null covers both a transport failure and a refused write (duplicate name, cap reached) - the route's 409/4xx body is not distinguishable through fetchService's fail-closed contract (see api/lighting.ts's createLayoutPreset for the same tradeoff). */

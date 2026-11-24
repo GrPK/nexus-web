@@ -1,6 +1,5 @@
 import { normalizeSlideshowInterval, shuffledLap } from '../slideshow/slideshow';
 import { appAvailableForSurface, lookupApp } from '../widgets/registry';
-import { blankApp } from '../widgets/blank';
 import {
   singleWidgetSurfaceSize,
   type PanelConfigValue,
@@ -48,13 +47,14 @@ export function playingPlaylistTypes(
   layout: PanelLayout,
   surface: PanelSurface,
   deviceTouch?: boolean,
+  transposedTile = false,
 ): string[] | null {
   if (singleWidgetSurfaceSize(surface) === undefined) return null;
   const playlist = widgetPlaylistOf(layout);
   if (!playlist.enabled) return null;
   const types = playlist.types.filter(type => {
     const def = lookupApp(type);
-    return !def || appAvailableForSurface(def.meta, surface, { deviceTouch });
+    return !def || appAvailableForSurface(def.meta, surface, { deviceTouch, transposedTile });
   });
   return types.length > 0 ? types : null;
 }
@@ -65,10 +65,10 @@ export function playingPlaylistTypes(
  * stand-in id `playlist:<deviceId>:<type>` is what the service's widget
  * settings routes resolve against the device's SingleWidgetConfigs.
  */
-export function playlistWidget(layout: PanelLayout, type: string, surface: PanelSurface, deviceId = ''): PanelWidget | undefined {
+export function playlistWidget(layout: PanelLayout, type: string, surface: PanelSurface, deviceId = '', transposedTile = false): PanelWidget | undefined {
   const shown = layout.pages[0]?.widgets[0];
   if (shown?.type === type) return shown;
-  const size = singleWidgetSurfaceSize(surface);
+  const size = singleWidgetSurfaceSize(surface, transposedTile);
   if (size === undefined) return undefined;
   const config = layout.singleWidgetConfigs?.[type];
   return {
@@ -102,11 +102,10 @@ export function updateWidgetPlaylist(layout: PanelLayout, patch: Partial<PanelWi
   return { ...layout, widgetPlaylist: { ...widgetPlaylistOf(layout), ...patch } };
 }
 
-/** The first switch-on enables every widget in `catalogTypes` except the blank one. */
+/** The first switch-on enables every widget in `catalogTypes`. */
 export function setWidgetPlaylistEnabled(layout: PanelLayout, enabled: boolean, catalogTypes: readonly string[]): PanelLayout {
   if (enabled && layout.widgetPlaylist === undefined) {
-    const types = catalogTypes.filter(type => type !== blankApp.meta.type);
-    return updateWidgetPlaylist(layout, { enabled, types, order: [...catalogTypes] });
+    return updateWidgetPlaylist(layout, { enabled, types: [...catalogTypes], order: [...catalogTypes] });
   }
   return updateWidgetPlaylist(layout, { enabled });
 }

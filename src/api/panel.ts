@@ -1,7 +1,7 @@
 import { getToken, handleUnauthorized } from './auth';
 import { authFetchWithStatus, deleteService, fetchService, isForceLanMode, isLocalhostUnreachable, isTunnelActive, isRemoteOrigin, loopbackFetchInit, postService, putService, relayRequestWithStatus, RELAY_BOOT_TIMEOUT_MS, resolveHttp } from './service';
 import { deriveDeviceLabel } from '../lib/platform';
-import type { PanelLayout, PanelSurface, PanelWidgetSizeMode } from '../panel/types';
+import { KRAKEN_PANEL_DPI, LEGACY_KRAKEN_SURFACE, NZXT_KRAKEN_FAMILY, type PanelConfigValue, type PanelLayout, type PanelSurface, type PanelWidgetSizeMode } from '../panel/types';
 import type { PresetApp, PresetAppConflict, SetPresetAppsResult } from './lighting';
 
 // Init for the direct localhost fetches below. The phone-session cookie only
@@ -25,6 +25,13 @@ export interface PanelStatus {
 // Per-device record: identity (deviceId), persisted layout, optional
 // per-device theme overrides, last-reported capabilities. Mirrors
 // nexus-service Models/Panel/PanelDeviceDto.cs.
+/** The window size the kiosk on a display-bound record measured, in CSS px. Reported by the kiosk; the topology sync never rewrites it. */
+export interface KioskViewportDto {
+  cssWidth: number;
+  cssHeight: number;
+  dpr: number;
+}
+
 export interface PanelDeviceCapabilitiesDto {
   surface?: PanelSurface;
   grid?: string;
@@ -45,15 +52,36 @@ export interface PanelDeviceCapabilitiesDto {
   // This panel's driver can drive it as a Windows secondary monitor.
   // Absent/false hides the setting entirely.
   supportsSecondaryMonitor?: boolean;
-  // The glass mounts either way up; the record's portrait picks the render shape.
+  // The glass mounts either way up; the record's rotation picks the render shape.
   supportsPortrait?: boolean;
-  // The stream can render below native and scale up; the record's highResolution applies.
-  supportsRenderScale?: boolean;
 }
 
 export interface PanelGaugeGradientStopDto {
   at: number;
   color: string;
+}
+
+// A legacy desktop-widget layout waiting to be placed on this panel's grid
+// (planDesktopImport). Mirrors the service's DesktopImport.
+export interface DesktopImportWidgetDto {
+  id: string;
+  type: string;
+  size: string;
+  // Legacy overlay position in fractional cell units from the display's top-left.
+  col: number;
+  row: number;
+  locked?: boolean;
+  config?: Record<string, PanelConfigValue>;
+}
+
+export interface DesktopImportDto {
+  version: 1;
+  // The legacy cell stride in px; cellUnits says whose px.
+  cellPx: number;
+  cellUnits: 'device' | 'css';
+  // The panel already had widgets: keep its grid and add these beside them.
+  merge: boolean;
+  widgets: DesktopImportWidgetDto[];
 }
 
 export interface PanelDeviceRecord {
@@ -104,32 +132,65 @@ export interface PanelDeviceRecord {
   textColor?: string;
   // Panel font id (panel/theme/panelFont.ts); unknown ids fall back to the default.
   font?: string;
+  // Panel skin id (panel/theme/panelSkin.ts); null or unknown is the stock look.
+  skin?: string | null;
+  // Per-skin accent, font and background mode the user picked, keyed by skin id; omitted when none.
+  skinOverrides?: Record<string, { accent?: string; font?: string; backgroundMode?: string; backgroundEffect?: string }> | null;
   themeSyncWithDesktop?: boolean;
   accentSyncWithDesktop?: boolean;
+  // Device ids last selected on this panel's Lighting view; absent until set.
+  lightingSelection?: string[];
+  // Fan ids last selected on this panel's Cooling view; absent until set.
+  coolingSelection?: string[];
   firstSeenAt: number;
   lastSeenAt: number;
   capabilities?: PanelDeviceCapabilitiesDto;
+  kioskViewport?: KioskViewportDto;
   // Stable display id when this record was created by promoting an OS
   // monitor (POST /displays/{id}/panel). Absent on self-registered panels.
   displayId?: string;
+  // Per-panel "always on top" (display-bound records). Absent/null = on.
+  alwaysOnTop?: boolean;
+  // Generic display panels: no drag, resize or edit on any widget. Absent/null = unlocked.
+  widgetsLocked?: boolean | null;
   // Per-panel "keep panel clear of other windows" (display-bound records).
   reserveMonitor?: boolean;
   // Per-panel "keep the mouse off the panel" (display-bound records). Absent/null = off.
   keepCursorOff?: boolean;
+  // Restricted mode on this panel: only lighting, media and volume work. Absent = off.
+  restrictedMode?: boolean;
+  // Empty space passes clicks through to the desktop; only with the 'desktop'
+  // backdrop. Absent/null = off.
+  clickThrough?: boolean | null;
+  // Short-axis cell count replacing the density-derived one; even, within the grid limits.
+  // Absent/null = the panel's own density.
+  gridSlots?: number | null;
+  // Whether the display hosts the panel when the host honors it; replaces
+  // `enabled` when present. Absent/null = follow `enabled`.
+  hosted?: boolean | null;
+  // Legacy desktop widgets waiting for the panel to place them; cleared by the
+  // PATCH that writes the planned layout.
+  desktopImport?: DesktopImportDto | null;
   // Display-bound panels with a physical orientation sensor (e.g. the Xeneon
   // Edge): true = the sensor drives display rotation, false = the user's
   // orientation picker applies instead. Absent/null = on.
   autoOrient?: boolean;
   // Pushed-frame cooler LCDs: how the glass is mounted. Applied to the bytes in
   // the service transport, so everything else renders upright. Absent/null = off.
+  // Legacy: older services send these instead of rotation.
   flip180?: boolean;
-  mirror?: boolean;
-  // Panels whose capabilities carry supportsPortrait: mounted on the short side,
-  // so the panel renders tall. Absent/null = landscape.
   portrait?: boolean | null;
-  // Panels whose capabilities carry supportsRenderScale: render at native resolution
-  // instead of a lower one. Absent/null = lower (high performance).
-  highResolution?: boolean | null;
+  // Clockwise degrees the glass is mounted at. Absent/null = 0.
+  rotation?: 0 | 90 | 180 | 270 | null;
+  // The rotations this glass accepts, computed by the service.
+  supportedRotations?: number[];
+  // The size the panel renders at after rotation (width and height swap at a quarter turn). Absent on a service that predates it.
+  renderWidth?: number | null;
+  renderHeight?: number | null;
+  mirror?: boolean;
+  // Frame rate cap in fps for this device (streamed session rate, secondary-monitor pacing, or
+  // how often a display-bound panel page draws). Absent/null = the device's own rate.
+  fpsCap?: number | null;
   // Panels offering the Widget size switch (panelWidgetSizeOptions). Absent/null = the
   // panel's default size.
   widgetSize?: PanelWidgetSizeMode | null;
@@ -158,7 +219,10 @@ export interface PanelDeviceRecord {
   secondaryMonitor?: boolean | null;
   // Response-only, route-computed, never persisted: absent/null when
   // secondaryMonitor is off or the panel is not streaming.
-  secondaryMonitorState?: 'starting' | 'active' | 'driver-missing' | 'failed' | null;
+  secondaryMonitorState?: 'starting' | 'active' | 'driver-missing' | 'in-use' | 'failed' | null;
+  // Response-only: the display name of the device holding the one virtual
+  // monitor when secondaryMonitorState is 'in-use'.
+  secondaryMonitorHolder?: string | null;
 }
 
 export interface PanelDevicePatch {
@@ -196,33 +260,67 @@ export interface PanelDevicePatch {
   textColor?: string;
   // Panel font id (panel/theme/panelFont.ts); unknown ids fall back to the default.
   font?: string;
+  // Skin id; an empty string clears.
+  skin?: string;
+  // The whole map replaces the stored one; an empty object clears it.
+  skinOverrides?: Record<string, { accent?: string; font?: string; backgroundMode?: string; backgroundEffect?: string }>;
   themeSyncWithDesktop?: boolean;
   accentSyncWithDesktop?: boolean;
+  // Full list (the client sends the whole selection); empty means none.
+  lightingSelection?: string[];
+  coolingSelection?: string[];
+  // Display-bound records only; ignored for other panels.
+  alwaysOnTop?: boolean;
+  // Display-bound records only; ignored for other panels.
+  widgetsLocked?: boolean;
   // Display-bound records only; ignored for other panels.
   reserveMonitor?: boolean;
   // Display-bound records only; ignored for other panels.
   keepCursorOff?: boolean;
+  restrictedMode?: boolean;
+  // Display-bound records only; ignored for other panels.
+  clickThrough?: boolean;
+  // Even; monitor panels only. Zero clears the record's own density.
+  gridSlots?: number;
+  // Sent with the planned layout once a desktop import is placed.
+  clearDesktopImport?: boolean;
   // Display-bound records with a physical orientation sensor only; ignored
   // for other panels.
   autoOrient?: boolean;
-  // Pushed-frame cooler LCDs only; ignored for other panels.
-  flip180?: boolean;
+  // Pushed-frame cooler LCDs and portrait-capable glass only; ignored for other panels.
+  rotation?: 0 | 90 | 180 | 270;
   mirror?: boolean;
   // Dimmable cooler LCDs only; ignored for other panels.
   lcdBrightness?: number;
   sleepWhenLocked?: boolean;
   // Streamed panels whose driver supports it only; ignored for other panels.
   secondaryMonitor?: boolean;
-  // Panels whose capabilities carry supportsPortrait only; ignored for other panels.
-  portrait?: boolean;
-  // Panels whose capabilities carry supportsRenderScale only; ignored for other panels.
-  highResolution?: boolean;
+  // Frame rate cap in fps; 0 clears it (the device's own rate). The service clamps it.
+  fpsCap?: number;
   widgetSize?: PanelWidgetSizeMode;
+  kioskViewport?: KioskViewportDto;
   capabilities?: PanelDeviceCapabilitiesDto;
 }
 
+// The service persists every Kraken record under the legacy 'kraken' surface; here it
+// reads as lcd-round with the Kraken's family and density (filled when a stored record
+// lacks them), so every consumer sees one shape. Nothing is written back from here.
+export function canonicalPanelRecord<T extends PanelDeviceRecord | null | undefined>(record: T): T {
+  const caps = record?.capabilities;
+  if (!record || !caps || (caps.surface as string | undefined) !== LEGACY_KRAKEN_SURFACE) return record;
+  return {
+    ...record,
+    capabilities: {
+      ...caps,
+      surface: 'lcd-round',
+      family: caps.family ?? NZXT_KRAKEN_FAMILY,
+      dpi: caps.dpi ?? KRAKEN_PANEL_DPI,
+    },
+  };
+}
+
 export const allocatePanelDevice = (capabilities?: PanelDeviceCapabilitiesDto, displayName?: string) =>
-  postService<PanelDeviceRecord>('/panel/devices', { displayName, capabilities });
+  postService<PanelDeviceRecord>('/panel/devices', { displayName, capabilities }).then(canonicalPanelRecord);
 
 export type PanelAllocResult =
   | { ok: true; record: PanelDeviceRecord }
@@ -241,7 +339,7 @@ export async function allocatePanelDeviceWithStatus(
     const { response, status } = await relayRequestWithStatus(
       'POST', '/panel/devices', { displayName, capabilities }, { timeoutMs: RELAY_BOOT_TIMEOUT_MS });
     if (!response || !response.ok) return { ok: false, status };
-    return { ok: true, record: (await response.json()) as PanelDeviceRecord };
+    return { ok: true, record: canonicalPanelRecord((await response.json()) as PanelDeviceRecord) };
   }
   // Remote origin without a usable relay yet ⇒ never hit http://localhost.
   if (isLocalhostUnreachable()) return { ok: false, status: 0 };
@@ -256,7 +354,7 @@ export async function allocatePanelDeviceWithStatus(
       body: JSON.stringify({ displayName, capabilities }),
     });
     if (!res.ok) return { ok: false, status: res.status };
-    const record = (await res.json()) as PanelDeviceRecord;
+    const record = canonicalPanelRecord((await res.json()) as PanelDeviceRecord);
     return { ok: true, record };
   } catch {
     return { ok: false, status: 0 };
@@ -264,18 +362,22 @@ export async function allocatePanelDeviceWithStatus(
 }
 
 export const fetchPanelDevice = (id: string) =>
-  fetchService<PanelDeviceRecord>(`/panel/devices/${encodeURIComponent(id)}`);
+  fetchService<PanelDeviceRecord>(`/panel/devices/${encodeURIComponent(id)}`).then(canonicalPanelRecord);
+
+export const deletePanelDevice = (id: string) =>
+  deleteService<{ error: boolean; msg: string }>(`/panel/devices/${encodeURIComponent(id)}`);
 
 export const fetchPanelDevices = () =>
-  fetchService<{ devices: PanelDeviceRecord[] }>('/panel/devices');
+  fetchService<{ devices: PanelDeviceRecord[] }>('/panel/devices')
+    .then(list => (list ? { ...list, devices: list.devices.map(canonicalPanelRecord) } : list));
 
 export const patchPanelDevice = (id: string, patch: PanelDevicePatch) =>
-  postService<PanelDeviceRecord>(`/panel/devices/${encodeURIComponent(id)}`, patch);
+  postService<PanelDeviceRecord>(`/panel/devices/${encodeURIComponent(id)}`, patch).then(canonicalPanelRecord);
 
 // Personalization reset: clears the record's layout/theme/widget state
 // (defaults reseed on the next read) and deletes its uploaded media.
 export const resetPanelDevice = (id: string) =>
-  postService<PanelDeviceRecord>(`/panel/devices/${encodeURIComponent(id)}/reset`, {});
+  postService<PanelDeviceRecord>(`/panel/devices/${encodeURIComponent(id)}/reset`, {}).then(canonicalPanelRecord);
 
 /** A named snapshot of one panel's layout, theme, background and widget
  *  styling. Loading one first saves the live state into the preset it leaves. */
@@ -295,8 +397,8 @@ const panelPresetsPath = (id: string) => `/panel/devices/${encodeURIComponent(id
 export const fetchPanelPresets = (id: string) =>
   fetchService<PanelPresetsResponse>(panelPresetsPath(id));
 
-export const createPanelPreset = (id: string, name: string) =>
-  postService<PanelPresetsResponse>(panelPresetsPath(id), { name });
+export const createPanelPreset = (id: string, name: string, fresh?: boolean) =>
+  postService<PanelPresetsResponse>(panelPresetsPath(id), fresh ? { name, fresh: true } : { name });
 
 export const renamePanelPreset = (id: string, presetId: string, name: string) =>
   putService<PanelPresetsResponse>(`${panelPresetsPath(id)}/${encodeURIComponent(presetId)}`, { name });
@@ -328,7 +430,7 @@ export async function setPanelPresetApps(id: string, presetId: string, apps: Pre
 // them to the hardware (brightness/orientation/screen, Xeneon DDC picture
 // values, monitor behavior). Personalization is untouched.
 export const resetPanelDeviceHardware = (id: string) =>
-  postService<PanelDeviceRecord>(`/panel/devices/${encodeURIComponent(id)}/reset-hardware`, {});
+  postService<PanelDeviceRecord>(`/panel/devices/${encodeURIComponent(id)}/reset-hardware`, {}).then(canonicalPanelRecord);
 
 /**
  * Factory reset (Q-series only): restores the panel's personalization AND its
@@ -355,7 +457,7 @@ export async function fetchPanelDeviceWithStatus(id: string): Promise<PanelDevic
     // still holding cannot overwrite the stored one.
     const { response, status } = await relayRequestWithStatus(
       'GET', `/panel/devices/${encodeURIComponent(id)}`, undefined, { timeoutMs: RELAY_BOOT_TIMEOUT_MS });
-    if (response && response.ok) return { found: true, record: (await response.json()) as PanelDeviceRecord };
+    if (response && response.ok) return { found: true, record: canonicalPanelRecord((await response.json()) as PanelDeviceRecord) };
     return { found: false, status };
   }
   if (isLocalhostUnreachable()) return { found: false, status: 0 };
@@ -377,7 +479,7 @@ export async function fetchPanelDeviceWithStatus(id: string): Promise<PanelDevic
     }
     if (res.status === 404) return { found: false, status: 404 };
     if (!res.ok) return { found: false, status: res.status };
-    return { found: true, record: (await res.json()) as PanelDeviceRecord };
+    return { found: true, record: canonicalPanelRecord((await res.json()) as PanelDeviceRecord) };
   } catch {
     return { found: false, status: 0 };
   }
@@ -404,7 +506,7 @@ export async function patchPanelDeviceWithStatus(id: string, patch: PanelDeviceP
     const { response, status } = await relayRequestWithStatus(
       'POST', `/panel/devices/${encodeURIComponent(id)}`, patch, { timeoutMs: RELAY_BOOT_TIMEOUT_MS });
     if (!response || !response.ok) return { ok: false, status, msg: await readErrorMsg(response) };
-    return { ok: true, record: (await response.json()) as PanelDeviceRecord };
+    return { ok: true, record: canonicalPanelRecord((await response.json()) as PanelDeviceRecord) };
   }
   if (isLocalhostUnreachable()) return { ok: false, status: 0 };
   try {
@@ -424,7 +526,7 @@ export async function patchPanelDeviceWithStatus(id: string, patch: PanelDeviceP
       }
     }
     if (!res.ok) return { ok: false, status: res.status, msg: await readErrorMsg(res) };
-    return { ok: true, record: (await res.json()) as PanelDeviceRecord };
+    return { ok: true, record: canonicalPanelRecord((await res.json()) as PanelDeviceRecord) };
   } catch {
     return { ok: false, status: 0 };
   }
@@ -443,6 +545,27 @@ export interface PanelPhoneClaimResponse {
   token: string;
   machineName?: string;
   error: string;
+  /** True when the host must approve this device; the claim carries the SAS instead of a token. */
+  needsApproval?: boolean;
+  requestId?: string | null;
+  sas?: string | null;
+  /** Unix-ms expiry of the pending approval request. */
+  expiresAt?: number;
+}
+
+export type PanelPhonePairCodeConfirmStatus =
+  | 'waiting-host'
+  | 'approved'
+  | 'denied'
+  | 'expired'
+  | 'unknown'
+  | 'https-required';
+
+export interface PanelPhonePairCodeConfirmResponse {
+  status: PanelPhonePairCodeConfirmStatus;
+  token?: string;
+  machineName?: string;
+  spkiFingerprint?: string;
 }
 
 export interface PanelPhoneSession {
@@ -635,7 +758,7 @@ export async function claimPanelPhonePairing(pairToken: string, deviceId: string
     const res = await fetch(resolveHttp('/panel/phone/claim'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pairToken, deviceId, deviceName: deriveDeviceLabel() }),
+      body: JSON.stringify({ pairToken, deviceId, deviceName: deriveDeviceLabel(), supportsSasApproval: true }),
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));
     if (!res.ok) {
@@ -643,6 +766,25 @@ export async function claimPanelPhonePairing(pairToken: string, deviceId: string
       catch { return null; }
     }
     return (await res.json()) as PanelPhoneClaimResponse;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One poll of the pending QR-claim approval. Same-origin like the claim, so the
+ * session cookie the service sets on approval lands on this origin. Null on a
+ * transport failure so the caller keeps polling until the request's deadline.
+ */
+export async function confirmPanelPhonePairing(requestId: string, approved = true): Promise<PanelPhonePairCodeConfirmResponse | null> {
+  if (isRemoteOrigin) return null;
+  try {
+    const res = await fetch(resolveHttp('/panel/phone/pair-code/confirm'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId, approved }),
+    });
+    return (await res.json()) as PanelPhonePairCodeConfirmResponse;
   } catch {
     return null;
   }
@@ -664,8 +806,9 @@ export async function claimPanelPhonePairingLan(
   try {
     const res = await fetch(`http://${host}:${httpPort}/panel/phone/claim`, {
       method: 'POST',
+      credentials: 'omit',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pairToken, deviceName: deriveDeviceLabel() }),
+      body: JSON.stringify({ pairToken, deviceName: deriveDeviceLabel(), supportsSasApproval: true }),
       signal,
     });
     if (!res.ok) {
@@ -675,6 +818,34 @@ export async function claimPanelPhonePairingLan(
     return (await res.json()) as PanelPhoneClaimResponse;
   } catch {
     // Aborted (timeout) or unreachable host both land here ⇒ LAN unavailable.
+    return null;
+  }
+}
+
+/**
+ * One poll of a pending LAN claim approval, against the same QR-derived
+ * `host`:`httpPort` as {@link claimPanelPhonePairingLan}. Null on a transport
+ * failure so the caller keeps polling until the request's deadline.
+ */
+export async function confirmPanelPhonePairingLan(
+  host: string,
+  httpPort: string,
+  requestId: string,
+  approved = true,
+  signal?: AbortSignal,
+): Promise<PanelPhonePairCodeConfirmResponse | null> {
+  try {
+    // A cross-origin request to the QR's host: no credentials, so nothing this
+    // browser holds for another PC can ride along.
+    const res = await fetch(`http://${host}:${httpPort}/panel/phone/pair-code/confirm`, {
+      method: 'POST',
+      credentials: 'omit',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId, approved }),
+      signal,
+    });
+    return (await res.json()) as PanelPhonePairCodeConfirmResponse;
+  } catch {
     return null;
   }
 }

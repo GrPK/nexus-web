@@ -45,6 +45,31 @@ function firstDevice(record: PanelDeviceRecord) {
   return devices[0];
 }
 
+describe('buildPanelDevices USB device secondary monitor', () => {
+  const streamed: PanelDeviceRecord = {
+    id: 'usb-1', displayName: 'Kraken LCD', firstSeenAt: 0, lastSeenAt: 1, streamed: true, secondaryMonitor: true,
+    capabilities: { surface: 'monitor', family: 'nzxt-kraken', cssWidth: 640, cssHeight: 640 },
+  };
+  // Leftover record bound to the virtual monitor; the service reports it detached.
+  const leftover: PanelDeviceRecord = { ...xeneonRecord('Kraken LCD'), id: 'rec-virtual', displayAttached: false };
+
+  it('lists one entry for the USB device and none for its virtual display', () => {
+    const devices = buildPanelDevices({
+      curatedDevices: [], phoneSessions: [], records: [streamed, leftover], status: null, simulatedPanels: [], labels: LABELS,
+    });
+    expect(devices.map(d => d.id)).toEqual(['stream:usb-1']);
+    expect(devices[0].secondaryMonitor).toBe(true);
+  });
+
+  it('is not resurrected by the turned-off plain monitor path', () => {
+    expect(isTurnedOffPlainMonitor({ ...leftover, enabled: false, capabilities: { surface: 'monitor' } })).toBe(false);
+    const devices = buildPanelDevices({
+      curatedDevices: [], phoneSessions: [], records: [streamed, { ...leftover, enabled: false }], status: null, simulatedPanels: [], labels: LABELS,
+    });
+    expect(devices).toHaveLength(1);
+  });
+});
+
 describe('buildPanelDevices promoted-monitor branding', () => {
   it('replaces the Windows PnP-identity default name with the family name', () => {
     const device = firstDevice(xeneonRecord('CRX ED00'));
@@ -71,6 +96,17 @@ describe('buildPanelDevices promoted-monitor branding', () => {
 
   it('carries the record touch capability onto the device entry', () => {
     expect(firstDevice(xeneonRecord('CRX ED00')).capabilities.touch).toBe(true);
+  });
+
+  it('brands the HYTE Y60 display from either default name and the HYTE icon', () => {
+    for (const raw of ['RTK BC32', 'RTK FHD HDR']) {
+      const record = xeneonRecord(raw);
+      record.capabilities = { ...record.capabilities, family: 'hyte-y60', touch: false };
+      const device = firstDevice(record);
+      expect(device.name).toBe('HYTE Y60 Display');
+      expect(device.iconSrc).toBe('/assets/devices/hyte.svg');
+      expect(device.experimental).toBeUndefined();
+    }
   });
 
   it('brands the iCUE LINK 5" LCD from its PnP identity, as a TITAN II LCD when that pump is on the hub', () => {
@@ -169,7 +205,7 @@ describe('buildPanelDevices streamed panels', () => {
       firstSeenAt: 0,
       lastSeenAt: 1,
       streamed: true,
-      capabilities: { surface: 'kraken', family: 'nzxt-kraken', touch: false, cssWidth: 640, cssHeight: 640, dpr: 1 },
+      capabilities: { surface: 'lcd-round', family: 'nzxt-kraken', touch: false, cssWidth: 640, cssHeight: 640, dpr: 1 },
     };
   }
 
@@ -178,7 +214,7 @@ describe('buildPanelDevices streamed panels', () => {
 
     expect(device.id).toBe('stream:rec-lcd');
     expect(device.panelRecordId).toBe('rec-lcd');
-    expect(device.runtimeSurface).toBe('kraken');
+    expect(device.runtimeSurface).toBe('lcd-round');
     expect(device.iconSrc).toBe('/assets/devices/nzxt.svg');
     expect(device.modalKind).toBe('panel-editor');
     expect(device.capabilities.layout).toBe(true);
@@ -186,6 +222,10 @@ describe('buildPanelDevices streamed panels', () => {
     expect(device.capabilities.launchClose).toBe(false);
     expect(device.capabilities.displayControls).toBe(false);
     expect(device.capabilities.touch).toBe(false);
+  });
+
+  it('stamps the record family so the page knows it on first paint', () => {
+    expect(firstDevice(krakenRecord()).family).toBe('nzxt-kraken');
   });
 
   it('brands a Lian Li cooler LCD by its family', () => {
@@ -270,5 +310,38 @@ describe('buildPanelDevices streamed panels', () => {
       simulatedPanels: [],
       labels: LABELS,
     })).toHaveLength(0);
+  });
+});
+
+describe('buildPanelDevices simulator beside a real Y70', () => {
+  const realY70 = { id: 'y70', name: 'HYTE Y70 Touch', category: 'display', connected: true, firmwareVersion: '' };
+  const sim = { id: 'y70', name: 'HYTE Y70 Touch 2.5K', surface: 'y70' as const, width: 682, height: 2560, dpi: 337 };
+
+  it('lists both, under distinct ids, with the simulator keeping its own source id', () => {
+    const devices = buildPanelDevices({
+      curatedDevices: [realY70],
+      phoneSessions: [],
+      records: [],
+      status: null,
+      simulatedPanels: [sim],
+      labels: LABELS,
+    });
+
+    expect(devices.map(d => d.id)).toEqual(['device:y70', 'simulated:y70']);
+    expect(devices[1]).toMatchObject({ connectionKind: 'simulated', sourceId: 'y70', runtimeSurface: 'y70' });
+    expect(devices[0].connectionKind).not.toBe('simulated');
+  });
+
+  it('gives the simulator no hardware controls, so it cannot write to the real Y70', () => {
+    const [, simulated] = buildPanelDevices({
+      curatedDevices: [realY70],
+      phoneSessions: [],
+      records: [],
+      status: null,
+      simulatedPanels: [sim],
+      labels: LABELS,
+    });
+
+    expect(simulated.capabilities).toMatchObject({ displayControls: false, launchClose: false, layout: true, touch: true });
   });
 });

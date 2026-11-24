@@ -6,11 +6,17 @@ vi.mock('../../../../api/lightingScene', () => ({
   fetchSceneModel: vi.fn(),
   putLightingScene: vi.fn(),
   putSceneView: vi.fn(),
-  deleteSceneImport: vi.fn(),
 }));
+vi.mock('../../../../api/pcSetup', async () => {
+  const actual = await vi.importActual<typeof import('../../../../api/pcSetup')>('../../../../api/pcSetup');
+  return { ...actual, fetchPcSetup: vi.fn() };
+});
 vi.mock('../../../../api/lighting', () => ({ fetchLedMap: vi.fn() }));
 
 import { fetchLightingScene, putLightingScene, putSceneView, type LightingScene } from '../../../../api/lightingScene';
+import { fetchPcSetup, type PcSetup, type PcSetupRecord } from '../../../../api/pcSetup';
+import type { SceneObject } from '../../../../api/lightingScene';
+import fixture from '../../../../lib/cooling/__fixtures__/y70-case-layout.json';
 import { useLightingScene } from './useLightingScene';
 
 const cam = (x: number) => ({ position: [x, 0, 1000] as [number, number, number], target: [0, 0, 0] as [number, number, number], fov: 40 });
@@ -22,11 +28,21 @@ async function mounted() {
   return hook;
 }
 
+const obj = (id: string, kind: string, x: number, z: number, yaw = 0): SceneObject => ({
+  id, kind, source: 'build', position: [x, 5, z], yaw, size: [100, 10, 100], anchors: [],
+});
+const emptySetup = (): PcSetup => ({ version: 1, case: {}, items: [], resolved: { objects: [] } });
+const record = (rev: number, objects: SceneObject[], itemIds: string[]): PcSetupRecord => ({
+  rev,
+  setup: { ...emptySetup(), items: itemIds.map(id => ({ id, kind: 'keyboard', owned: true })), resolved: { objects } },
+});
+
 describe('useLightingScene', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(fetchLightingScene).mockResolvedValue(baseScene());
     vi.mocked(putLightingScene).mockResolvedValue(baseScene());
+    vi.mocked(fetchPcSetup).mockResolvedValue({ rev: 0, setup: emptySetup() });
   });
 
   it('sends view requests one at a time with rising sequence numbers, the commit after its drafts', async () => {
@@ -56,12 +72,12 @@ describe('useLightingScene', () => {
 
   it('keeps a pending local edit when a refresh arrives, taking only the view', async () => {
     const { result } = await mounted();
-    act(() => { result.current.update(s => ({ ...s, objects: [{ id: 'kb', kind: 'keyboard', source: 'user', position: [0, 0, 0], yaw: 0, size: [1, 1, 1], anchors: [] }] })); });
+    act(() => { result.current.update(s => ({ ...s, bindings: [{ deviceId: 'kb', targets: [{ objectId: 'o', anchorId: 'a' }], rotation: 0, flip: false }] })); });
     vi.mocked(fetchLightingScene).mockResolvedValue({ ...baseScene(), view: { enabled: false, camera: cam(5) } });
 
     await act(async () => { await result.current.refreshView(); });
 
-    expect(result.current.scene!.objects.map(o => o.id)).toEqual(['kb']);
+    expect(result.current.scene!.bindings.map(b => b.deviceId)).toEqual(['kb']);
     expect(result.current.scene!.view.enabled).toBe(false);
   });
 
@@ -94,6 +110,14 @@ describe('useLightingScene', () => {
     expect(putLightingScene).toHaveBeenCalledWith(expect.objectContaining({ bindings: [expect.objectContaining({ deviceId: 'd' })] }));
   });
 
+  it('saves a placement by itself after a short quiet spell, with no confirm step', async () => {
+    const { result } = await mounted();
+    act(() => { result.current.update(s => ({ ...s, bindings: [{ deviceId: 'd', targets: [{ objectId: 'o', anchorId: 'a' }], rotation: 0, flip: false }] })); });
+    expect(putLightingScene).not.toHaveBeenCalled();
+    await waitFor(() => expect(putLightingScene).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(putLightingScene).mock.calls[0][0].bindings).toEqual([expect.objectContaining({ deviceId: 'd' })]);
+  });
+
   it('puts the switch back when turning the view on fails', async () => {
     vi.mocked(fetchLightingScene).mockResolvedValue({ ...baseScene(), view: { enabled: false, camera: cam(0) } });
     vi.mocked(putSceneView).mockResolvedValue(null);
@@ -102,5 +126,75 @@ describe('useLightingScene', () => {
     await act(async () => { await result.current.setEnabled(true); });
 
     expect(result.current.scene!.view.enabled).toBe(false);
+  });
+  describe('shared PC setup', () => {
+    const kb = obj('kb-1', 'keyboard', 10, 20);
+    const pc = obj('case-x', 'case', 0, 0, 90);
+    const withRecord = (rev: number, objects: SceneObject[], ids: string[]) => {
+      vi.mocked(fetchLightingScene).mockResolvedValue({ ...baseScene(), objects });
+      vi.mocked(fetchPcSetup).mockResolvedValue(record(rev, objects, ids));
+    };
+
+    it('hands out Build\'s case scene from the record\'s layout, and none without one', async () => {
+      const none = await mounted();
+      expect(none.result.current.caseScene).toBeNull();
+      none.unmount();
+
+      const withLayout = record(2, [pc, kb], ['kb-1']);
+      withLayout.setup.resolved.caseLayout = fixture;
+      vi.mocked(fetchLightingScene).mockResolvedValue({ ...baseScene(), objects: [pc, kb] });
+      vi.mocked(fetchPcSetup).mockResolvedValue(withLayout);
+      const { result } = await mounted();
+      await waitFor(() => expect(result.current.caseScene).not.toBeNull());
+      const first = result.current.caseScene!;
+      expect(first.layout.size).toEqual(fixture.size);
+      await act(async () => { await result.current.refreshView(); });
+      expect(result.current.caseScene).toBe(first);
+    });
+
+    it('sends bindings only once a record owns the objects, and keeps hand-placed objects riding along before one', async () => {
+      withRecord(2, [pc, kb], ['kb-1']);
+      const owned = await mounted();
+      act(() => { owned.result.current.update(s => ({ ...s, bindings: [{ deviceId: 'd', targets: [{ objectId: 'kb-1', anchorId: 'top' }], rotation: 0, flip: false }] })); });
+      owned.unmount();
+      expect(putLightingScene).toHaveBeenLastCalledWith({ bindings: [expect.objectContaining({ deviceId: 'd' })] });
+
+      vi.mocked(fetchPcSetup).mockResolvedValue({ rev: 0, setup: emptySetup() });
+      vi.mocked(fetchLightingScene).mockResolvedValue({ ...baseScene(), objects: [kb] });
+      const legacy = await mounted();
+      act(() => { legacy.result.current.update(s => ({ ...s, bindings: [{ deviceId: 'd', targets: [{ objectId: 'kb-1', anchorId: 'top' }], rotation: 0, flip: false }] })); });
+      legacy.unmount();
+      expect(putLightingScene).toHaveBeenLastCalledWith(expect.objectContaining({ objects: [kb] }));
+    });
+  });
+
+  describe('a binding left on a gone object id', () => {
+    const withTop = (id: string, kind: string): SceneObject => ({ ...obj(id, kind, 0, 0), anchors: [{ id: 'top', kind: 'surface', center: [0, 0, 0], right: [1, 0, 0], up: [0, 1, 0], width: 1, height: 1, shape: 'rect' }] });
+    const bound = (objectId: string) => ({ deviceId: 'dev', targets: [{ objectId, anchorId: 'top' }], rotation: 0, flip: false });
+
+    it('reads healed, writes nothing by itself, and a later edit saves the healed bindings', async () => {
+      vi.mocked(fetchLightingScene).mockResolvedValue({ ...baseScene(), objects: [withTop('p-mouse-1', 'mouse')], bindings: [bound('mouse-1')] });
+      const { result } = await mounted();
+      expect(result.current.scene!.bindings[0].targets[0].objectId).toBe('p-mouse-1');
+      await new Promise(resolve => { setTimeout(resolve, 400); });
+      expect(putLightingScene).not.toHaveBeenCalled();
+      act(() => { result.current.update(s => ({ ...s, bindings: [...s.bindings, { deviceId: 'other', targets: [], rotation: 0, flip: false }] })); });
+      await waitFor(() => expect(putLightingScene).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(putLightingScene).mock.calls[0][0].bindings![0].targets[0].objectId).toBe('p-mouse-1');
+    });
+
+    it('stays as it is when two objects share the kind', async () => {
+      vi.mocked(fetchLightingScene).mockResolvedValue({ ...baseScene(), objects: [withTop('kb-a', 'keyboard'), withTop('kb-b', 'keyboard')], bindings: [bound('keyboard-1')] });
+      const { result } = await mounted();
+      expect(result.current.scene!.bindings[0].targets[0].objectId).toBe('keyboard-1');
+    });
+
+    it('is untouched when its object exists', async () => {
+      const scene = { ...baseScene(), objects: [withTop('p-mouse-1', 'mouse')], bindings: [bound('p-mouse-1')] };
+      vi.mocked(fetchLightingScene).mockResolvedValue(scene);
+      const { result } = await mounted();
+      expect(result.current.scene!.bindings).toEqual(scene.bindings);
+      expect(putLightingScene).not.toHaveBeenCalled();
+    });
   });
 });

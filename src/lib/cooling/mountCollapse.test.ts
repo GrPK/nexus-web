@@ -1,0 +1,174 @@
+import { describe, expect, it } from 'vitest';
+import t1Layout5080 from './__fixtures__/t1-y70-5080-case-layout.json';
+import { channelOfSlot, collapseMounts, normalizeBindings, parseCaseLayout, linkChannelToSlot, type CaseLayout } from './caseLayout';
+import { Y70_FAN_SLOTS, Y70_SIZE } from './y70Slots.fixture';
+
+const layout = parseCaseLayout({ size: Y70_SIZE, boxes: [], fanSlots: Y70_FAN_SLOTS }) as CaseLayout;
+// The bindings T1 held when the doubled fans were reported.
+const T1_BINDINGS = [
+  { channelId: '/lpc/it8696e/0/control/1', slotKeys: ['right:120:1'] },
+  { channelId: '/lpc/it8696e/0/control/0', slotKeys: ['right:120:2'] },
+  { channelId: '/gpu-nvidia/0/control/1', slotKeys: ['top:140:0'] },
+  { channelId: '/gpu-nvidia/0/control/2', slotKeys: ['top:120:2'] },
+  { channelId: '/lpc/it8696e/0/control/2', slotKeys: ['top:120:0', 'bottom:120:0', 'bottom:120:1', 'top:120:1'] },
+];
+const boundOf = (b: typeof T1_BINDINGS) => b.flatMap(x => x.slotKeys);
+const fans = (l: CaseLayout) => l.fanSlots.filter(s => s.taken === 'fan');
+
+describe('the Y70 slot data', () => {
+  it('has 16 empty slots with 120 and 140 mm alternatives overlapping at the same mounts', () => {
+    expect(layout.fanSlots).toHaveLength(16);
+    expect(layout.fanSlots.every(s => s.taken === null)).toBe(true);
+    const a = layout.fanSlots.find(s => s.key === 'top:120:1')!.box!;
+    const b = layout.fanSlots.find(s => s.key === 'top:140:0')!.box!;
+    expect(a.min[0] < b.min[0] + b.size[0] && b.min[0] < a.min[0] + a.size[0]).toBe(true);
+  });
+});
+
+const perFace = (l: CaseLayout) => {
+  const out: Record<string, number> = {};
+  for (const s of l.fanSlots) out[s.position] = (out[s.position] ?? 0) + 1;
+  return out;
+};
+
+function noOverlaps(l: CaseLayout) {
+  for (let i = 0; i < l.fanSlots.length; i++) for (let j = i + 1; j < l.fanSlots.length; j++) {
+    const a = l.fanSlots[i], b = l.fanSlots[j];
+    if (a.position !== b.position) continue;
+    const axis = a.box!.size.indexOf(Math.min(...a.box!.size));
+    const span = [0, 1, 2].filter(k => k !== axis).map(k => Math.min(a.box!.min[k] + a.box!.size[k], b.box!.min[k] + b.box!.size[k]) - Math.max(a.box!.min[k], b.box!.min[k]));
+    expect(span.every(v => v > 0.05)).toBe(false);
+  }
+}
+
+describe('collapseMounts on the Y70', () => {
+  // The Y70 holds two 140 mm or three 120 mm fans on top and on the right, two 140 mm (or two 120 mm) on the bottom, and one on the rear.
+  it('with nothing installed or bound, defaults every mount to 120 mm where supported', () => {
+    const { layout: out } = collapseMounts(layout, []);
+    expect(out.fanSlots.map(s => s.key).sort()).toEqual(['bottom:120:0', 'bottom:120:1', 'rear:120:0', 'right:120:0', 'right:120:1', 'right:120:2', 'top:120:0', 'top:120:1', 'top:120:2']);
+    expect(fans(out)).toHaveLength(0);
+    noOverlaps(out);
+  });
+
+  it('with the T1 bindings, draws 2 top, 3 right, 2 bottom, 1 rear, six of them fans, and no two overlap', () => {
+    const { layout: out, canonOf } = collapseMounts(layout, boundOf(T1_BINDINGS));
+    expect(perFace(out)).toEqual({ top: 2, right: 3, bottom: 2, rear: 1 });
+    expect(fans(out).map(s => s.key).sort()).toEqual(['bottom:120:0', 'bottom:120:1', 'right:120:1', 'right:120:2', 'top:120:2', 'top:140:0']);
+    expect(canonOf('top:120:1')).toBe('top:140:0');
+    expect(canonOf('top:120:0')).toBe('top:140:0');
+    noOverlaps(out);
+  });
+
+  it('hides both 120 mm slots a 140 mm one overlaps, and maps each to it', () => {
+    const { layout: out, canonOf } = collapseMounts(layout, ['top:140:0']);
+    const keys = out.fanSlots.filter(s => s.position === 'top').map(s => s.key);
+    expect(keys).toContain('top:140:0');
+    expect(keys).not.toContain('top:120:0');
+    expect(keys).not.toContain('top:120:1');
+    expect(canonOf('top:120:0')).toBe('top:140:0');
+    expect(canonOf('top:120:1')).toBe('top:140:0');
+  });
+
+  it('keeps an installed fan over a bigger alternative at the same mount', () => {
+    const installed = { ...layout, fanSlots: layout.fanSlots.map(s => (s.key === 'top:120:1' ? { ...s, taken: 'fan' as const } : s)) };
+    const { layout: out } = collapseMounts(installed, ['top:140:0']);
+    const keys = out.fanSlots.map(s => s.key);
+    expect(keys).toContain('top:120:1');
+    expect(keys).not.toContain('top:140:0');
+    noOverlaps(out);
+  });
+});
+
+describe('binding a device', () => {
+  it('links the drawn fan and adds no fan or slot', () => {
+    const before = collapseMounts(layout, boundOf(T1_BINDINGS));
+    const next = linkChannelToSlot(normalizeBindings(T1_BINDINGS, before.canonOf), '/lpc/it8696e/0/control/4', 'right:120:1');
+    const after = collapseMounts(layout, next.flatMap(b => b.slotKeys));
+    expect(after.layout.fanSlots.length).toBe(before.layout.fanSlots.length);
+    expect(fans(after.layout).length).toBe(fans(before.layout).length);
+    expect(channelOfSlot(normalizeBindings(next, after.canonOf), 'right:120:1')).not.toBeNull();
+  });
+
+  it('pointed at an alternative size of a drawn mount, lands on the drawn slot', () => {
+    const before = collapseMounts(layout, boundOf(T1_BINDINGS));
+    const hidden = layout.fanSlots.find(s => s.key === 'top:120:1')!.key;
+    expect(before.canonOf(hidden)).toBe('top:140:0');
+    const next = linkChannelToSlot(normalizeBindings(T1_BINDINGS, before.canonOf), '/lpc/it8696e/0/control/4', hidden);
+    const after = collapseMounts(layout, next.flatMap(b => b.slotKeys));
+    expect(fans(after.layout).length).toBe(fans(before.layout).length);
+  });
+
+  it('merges a binding that named two alternatives of one mount into one drawn slot', () => {
+    const { canonOf } = collapseMounts(layout, boundOf(T1_BINDINGS));
+    const n = normalizeBindings([{ channelId: 'c', slotKeys: ['top:120:1', 'top:140:0'] }], canonOf);
+    expect(n[0].slotKeys).toEqual(['top:140:0']);
+  });
+});
+
+describe('graphics card fans on the real T1 layout (RTX 5080, three fans)', () => {
+  const t1 = parseCaseLayout(t1Layout5080) as CaseLayout;
+  const gpuKeys = (l: CaseLayout) => l.fanSlots.filter(s => s.position === 'gpu').map(s => s.key);
+
+  it('parses all three card fans, their frames overlapping by the padding', () => {
+    expect(gpuKeys(t1)).toEqual(['gpu:fan:0', 'gpu:fan:1', 'gpu:fan:2']);
+    const [a, b] = t1.fanSlots.filter(s => s.position === 'gpu').map(s => s.box!);
+    expect(a.min[0] < b.min[0] + b.size[0]).toBe(true);
+  });
+
+  it('keeps every card fan drawn, each standing for itself', () => {
+    const c = collapseMounts(t1, []);
+    expect(gpuKeys(c.layout)).toEqual(['gpu:fan:0', 'gpu:fan:1', 'gpu:fan:2']);
+    expect(['gpu:fan:0', 'gpu:fan:1', 'gpu:fan:2'].map(c.canonOf)).toEqual(['gpu:fan:0', 'gpu:fan:1', 'gpu:fan:2']);
+  });
+});
+
+// Synthetic Y50 and X50 style mounts: a 120 and a 140 alternative at one spot, plus a rear mount that only takes 140.
+const slot = (position: string, size: number, index: number, x: number) => ({
+  key: `${position}:${size}:${index}`, position, size, index, taken: null,
+  box: { min: [x, 10, 0], size: [size, 25, size] }, axis: [0, -1, 0],
+});
+const caseWith = (...slots: ReturnType<typeof slot>[]) => parseCaseLayout({ size: [400, 300, 400], boxes: [], fanSlots: slots }) as CaseLayout;
+
+describe('default fan size per mount', () => {
+  it('defaults a mount offering 120 and 140 to 120', () => {
+    const out = collapseMounts(caseWith(slot('top', 140, 0, 0), slot('top', 120, 0, 0), slot('top', 120, 1, 120)), []).layout;
+    expect(out.fanSlots.map(s => s.key).sort()).toEqual(['top:120:0', 'top:120:1']);
+  });
+
+  it('defaults a two-face case to 120 on both faces', () => {
+    const out = collapseMounts(caseWith(slot('top', 140, 0, 0), slot('top', 120, 0, 0), slot('front', 140, 0, 0), slot('front', 120, 0, 0)), []).layout;
+    expect(out.fanSlots.map(s => s.key).sort()).toEqual(['front:120:0', 'top:120:0']);
+  });
+
+  it('keeps a stored 140 choice', () => {
+    const l = caseWith(slot('top', 140, 0, 0), slot('top', 120, 0, 0));
+    const out = collapseMounts(l, ['top:140:0']).layout;
+    expect(out.fanSlots.map(s => s.key)).toEqual(['top:140:0']);
+    const installed = caseWith(slot('top', 140, 0, 0), slot('top', 120, 0, 0));
+    installed.fanSlots[0].taken = 'fan';
+    expect(collapseMounts(installed, []).layout.fanSlots.map(s => s.key)).toEqual(['top:140:0']);
+  });
+
+  it('keeps a 140-only mount at 140', () => {
+    const out = collapseMounts(caseWith(slot('rear', 140, 0, 0)), []).layout;
+    expect(out.fanSlots.map(s => s.key)).toEqual(['rear:140:0']);
+  });
+
+  it('an installed 140 keeps the rest of its face at 140 while other faces stay 120', () => {
+    const l = caseWith(slot('top', 140, 0, 0), slot('top', 120, 0, 0), slot('top', 140, 1, 200), slot('top', 120, 2, 200), slot('bottom', 140, 0, 0), slot('bottom', 120, 0, 0));
+    l.fanSlots[0].taken = 'fan';
+    expect(collapseMounts(l, []).layout.fanSlots.map(s => s.key).sort()).toEqual(['bottom:120:0', 'top:140:0', 'top:140:1']);
+  });
+
+  it('a bound 140 keeps the rest of its face at 140 while other faces stay 120', () => {
+    const l = caseWith(slot('bottom', 140, 0, 0), slot('bottom', 120, 0, 0), slot('bottom', 140, 1, 200), slot('bottom', 120, 2, 200), slot('top', 140, 0, 0), slot('top', 120, 0, 0));
+    expect(collapseMounts(l, ['bottom:140:0']).layout.fanSlots.map(s => s.key).sort()).toEqual(['bottom:140:0', 'bottom:140:1', 'top:120:0']);
+  });
+
+  it('installed sizes take precedence over bound ones on a face', () => {
+    const l = caseWith(slot('top', 120, 0, 0), slot('top', 140, 0, 0), slot('top', 120, 1, 200), slot('top', 140, 1, 200), slot('top', 120, 2, 400), slot('top', 140, 2, 400));
+    l.fanSlots[0].taken = 'fan';
+    const keys = collapseMounts(l, ['top:140:2']).layout.fanSlots.map(s => s.key).sort();
+    expect(keys).toEqual(['top:120:0', 'top:120:1', 'top:140:2']);
+  });
+});

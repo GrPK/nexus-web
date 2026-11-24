@@ -5,12 +5,19 @@ vi.mock('../api/service', () => ({
   authFetchWithStatus: (...a: unknown[]) => postService(...a),
 }));
 
-const recoverNow = vi.fn(async () => false);
-vi.mock('../lib/staleChunkRecovery', async (orig) => ({
-  ...(await orig<typeof import('../lib/staleChunkRecovery')>()),
-  recoverFromStaleChunkNow: () => recoverNow(),
+const reloading = vi.hoisted(() => ({ value: false }));
+vi.mock('../lib/buildReloadWatcher', async (orig) => ({
+  ...(await orig<typeof import('../lib/buildReloadWatcher')>()),
+  isReloadingForBuild: () => reloading.value,
 }));
 
+const recoverNow = vi.fn<(message?: string) => Promise<string>>(async () => 'noop');
+vi.mock('../lib/staleChunkRecovery', async (orig) => ({
+  ...(await orig<typeof import('../lib/staleChunkRecovery')>()),
+  recoverFromStaleChunkNow: (message?: string) => recoverNow(message),
+}));
+
+import { runInNewContext } from 'node:vm';
 import {
   droppedErrorCount,
   fingerprintOf,
@@ -175,6 +182,55 @@ describe('reportError', () => {
     expect(postService).not.toHaveBeenCalled();
   });
 
+  it('appends the Error cause chain to message and stack', async () => {
+    const inner = new TypeError('inner boom');
+    inner.stack = 'TypeError: inner boom\n    at inner.js:1:1';
+    const mid = new Error('mid', { cause: inner });
+    const outer = new Error('outer', { cause: mid });
+    reportError(outer, 'render');
+    await vi.advanceTimersByTimeAsync(5000);
+    const r = sent()[0].errors[0];
+    expect(r.message).toBe('outer cause: Error: mid cause: TypeError: inner boom');
+    expect(r.stack as string).toContain('cause: TypeError: inner boom\n    at inner.js:1:1');
+  });
+
+  it('survives cause cycles, non-Error causes and deep chains', async () => {
+    const a = new Error('a');
+    const b = new Error('b', { cause: a });
+    a.cause = b;
+    let deep: Error = new Error('e0');
+    for (let i = 1; i <= 6; i++) deep = new Error(`e${i}`, { cause: deep });
+    reportError(a, 'render');
+    reportError(new Error('x', { cause: { secret: 'token' } }), 'render');
+    reportError(deep, 'render');
+    await vi.advanceTimersByTimeAsync(5000);
+    const messages = sent()[0].errors.map((e) => e.message);
+    expect(messages).toEqual([
+      'a cause: Error: b',
+      'x',
+      'e6 cause: Error: e5 cause: Error: e4 cause: Error: e3',
+    ]);
+  });
+
+  it('keeps the cause stack under the stack cap', async () => {
+    const e = new Error('o', { cause: new Error('c') });
+    e.stack = 's'.repeat(5000);
+    (e.cause as Error).stack = 'cause-frame';
+    reportError(e, 'render');
+    await vi.advanceTimersByTimeAsync(5000);
+    const r = sent()[0].errors[0];
+    expect((r.stack as string).length).toBeLessThanOrEqual(2000);
+    expect(r.stack as string).toContain('cause: cause-frame');
+  });
+
+  it('keeps cause text in message when the outer message is huge', async () => {
+    reportError(new Error('m'.repeat(5000), { cause: new Error('root') }), 'render');
+    await vi.advanceTimersByTimeAsync(5000);
+    const r = sent()[0].errors[0];
+    expect((r.message as string).length).toBe(1000);
+    expect(r.message as string).toMatch(/ cause: Error: root$/);
+  });
+
   it('describes non-Error values by shape only', async () => {
     reportError({ status: 500, body: 'secret-token' }, 'unhandled-rejection');
     reportError(function leaky() { return 'secret-source'; }, 'unhandled-rejection');
@@ -260,17 +316,116 @@ describe('stale chunk errors', () => {
 
   const stale = () => new TypeError('Failed to fetch dynamically imported module: http://localhost:9400/assets/DevicesPage-Bc.js');
 
+  it('ignores a stale chunk message that is only in the cause chain', async () => {
+    recoverNow.mockClear();
+    reportError(new Error('wrapper', { cause: stale() }), 'unhandled-rejection');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(recoverNow).not.toHaveBeenCalled();
+    expect(sent()).toHaveLength(1);
+  });
+
+  it('hand their message to the recovery so it can probe the failed asset', async () => {
+    reportError(stale(), 'unhandled-rejection');
+    expect(recoverNow).toHaveBeenCalledWith(expect.stringMatching(/Failed to fetch dynamically imported module|Unable to preload CSS/));
+  });
+
   it('are swallowed when the reload guard allowed a reload', async () => {
-    recoverNow.mockResolvedValueOnce(true);
+    recoverNow.mockResolvedValueOnce('reloaded');
     reportError(stale(), 'unhandled-rejection');
     await vi.advanceTimersByTimeAsync(5000);
     expect(postService).not.toHaveBeenCalled();
   });
 
   it('are still reported when the guard blocked the reload', async () => {
-    recoverNow.mockResolvedValueOnce(false);
+    recoverNow.mockResolvedValueOnce('loop-guard');
     reportError(stale(), 'unhandled-rejection');
     await vi.advanceTimersByTimeAsync(5000);
     expect(sent()).toHaveLength(1);
+    expect(sent()[0].errors[0].context).toMatch(/^no-reload:loop-guard /);
+  });
+
+  it('reports a held stale chunk error once from pagehide, with keepalive', async () => {
+    recoverNow.mockReturnValueOnce(new Promise<string>(() => {}));
+    reportError(stale(), 'unhandled-rejection');
+    window.dispatchEvent(new Event('pagehide'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(postService).toHaveBeenCalledTimes(1);
+    expect((postService.mock.calls[0][1] as { keepalive?: boolean }).keepalive).toBe(true);
+    expect(sent()[0].errors[0].context).toMatch(/^no-reload:unload /);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(postService).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips held errors when a build reload caused the pagehide', async () => {
+    recoverNow.mockReturnValueOnce(new Promise<string>(() => {}));
+    reportError(stale(), 'unhandled-rejection');
+    reloading.value = true;
+    window.dispatchEvent(new Event('pagehide'));
+    await vi.advanceTimersByTimeAsync(5000);
+    reloading.value = false;
+    expect(postService).not.toHaveBeenCalled();
+  });
+
+  it('does not report again when the recovery settles after pagehide', async () => {
+    let settle: (v: string) => void = () => {};
+    recoverNow.mockReturnValueOnce(new Promise<string>((resolve) => { settle = resolve; }));
+    reportError(stale(), 'unhandled-rejection');
+    window.dispatchEvent(new Event('pagehide'));
+    await vi.advanceTimersByTimeAsync(0);
+    settle('noop');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(sent().flatMap((b) => b.errors)).toHaveLength(1);
+  });
+});
+
+describe('non-Error reasons', () => {
+  const reportedOne = async (reason: unknown) => {
+    reportError(reason, 'unhandled-rejection');
+    await vi.advanceTimersByTimeAsync(5000);
+    return sent()[0].errors[0];
+  };
+
+  it('keeps the message and stack of an Error from another realm', async () => {
+    const foreign: unknown = runInNewContext('new TypeError("denied")');
+    expect(foreign instanceof Error).toBe(false);
+    const r = await reportedOne(foreign);
+    expect(r.type).toBe('TypeError');
+    expect(r.message).toBe('denied');
+    expect(r.stack as string).toContain('TypeError: denied');
+  });
+
+  it('caps an oversized foreign message and stack', async () => {
+    const foreign = runInNewContext('const e = new Error("m".repeat(40000)); e.stack = "s".repeat(40000); e') as unknown;
+    const r = await reportedOne(foreign);
+    expect((r.message as string).length).toBe(1000);
+    expect((r.stack as string).length).toBe(2000);
+  });
+
+  it('reads a DOMException-tagged reason from another realm', async () => {
+    const foreign: unknown = runInNewContext('({ name: "AbortError", message: "gone", [Symbol.toStringTag]: "DOMException" })');
+    const r = await reportedOne(foreign);
+    expect(r.type).toBe('AbortError');
+    expect(r.message).toBe('gone');
+  });
+
+  it('survives a throwing getter on an Error-tagged reason', async () => {
+    const hostile = {
+      [Symbol.toStringTag]: 'Error',
+      get name(): string { throw new Error('trap'); },
+      get message(): string { throw new Error('trap'); },
+      get stack(): string { throw new Error('trap'); },
+    };
+    const r = await reportedOne(hostile);
+    expect(r.type).toBe('Error');
+    expect(r.message).toBe('');
+  });
+
+  it('names non-enumerable own properties, never values', async () => {
+    function Error() {}
+    const odd = Object.create(Error.prototype) as object;
+    Object.defineProperty(odd, 'detail', { value: 'secret', enumerable: false });
+    const r = await reportedOne(odd);
+    expect(r.type).toBe('Error');
+    expect(r.message).toBe('Error{detail}');
   });
 });

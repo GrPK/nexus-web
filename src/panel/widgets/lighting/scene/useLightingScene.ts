@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchLedMap, type LedMapEntry, type LightingDevice } from '../../../../api/lighting';
 import {
-  deleteSceneImport,
   fetchLightingScene,
   fetchSceneModel,
   putLightingScene,
@@ -12,6 +11,11 @@ import {
   type SceneObject,
   type SceneView,
 } from '../../../../api/lightingScene';
+import { fetchPcSetup, PC_SETUP_TOPIC, type PcSetupRecord } from '../../../../api/pcSetup';
+import { useTopicCallback } from '../../../../hooks/useMultiplexSocket';
+import { parseCaseLayout, sceneLayout } from '../../../../lib/cooling/caseLayout';
+import type { CaseScene } from '../../../../lib/scene/sceneRenderer';
+import { healBindings } from '../../../../lib/scene/pickDevice';
 import { presetCamera } from '../../../../lib/scene/scenePresets';
 
 // Edits land locally at once and reach the service after a short quiet spell, so a burst of clicks is one write.
@@ -38,11 +42,12 @@ export interface SceneEdit {
 export interface LightingSceneApi {
   scene: LightingScene | null;
   model: ArrayBuffer | null;
+  /** Build's case layout from the shared PC setup, as its scene draws it; null until Build saves one. */
+  caseScene: CaseScene | null;
   update: (mutate: (current: SceneEdit) => SceneEdit) => void;
   setEnabled: (enabled: boolean) => Promise<void>;
   /** Resolves once a final camera is saved, so a preset snapshot taken after it sees the new view. */
   setCamera: (camera: SceneCamera, final: boolean) => Promise<void>;
-  removeImport: () => Promise<void>;
   /** Re-reads the view (and the scene when no local edit is waiting), after a preset or another client changed it. */
   refreshView: () => Promise<void>;
 }
@@ -50,8 +55,23 @@ export interface LightingSceneApi {
 export function useLightingScene(active: boolean): LightingSceneApi {
   const [scene, setScene] = useState<LightingScene | null>(null);
   const [model, setModel] = useState<ArrayBuffer | null>(null);
+  // Readers see bindings left on a gone desk item's id pointed at its successor; nothing is written until a user edit saves them.
+  const viewScene = useMemo(() => {
+    if (!scene) return null;
+    const bindings = healBindings(scene.objects, scene.bindings);
+    return bindings === scene.bindings ? scene : { ...scene, bindings };
+  }, [scene]);
   const sceneRef = useRef<LightingScene | null>(null);
-  sceneRef.current = scene;
+  sceneRef.current = viewScene;
+  const [setup, setSetup] = useState<PcSetupRecord | null>(null);
+  const setupRef = useRef<PcSetupRecord | null>(null);
+  setupRef.current = setup;
+  // Parsed once per distinct layout: a setup ping that changes nothing here keeps the same object, so the renderer does not rebuild the case.
+  const layoutText = JSON.stringify(setup?.setup.resolved.caseLayout ?? null);
+  const caseScene = useMemo<CaseScene | null>(() => {
+    const layout = parseCaseLayout(JSON.parse(layoutText));
+    return layout ? { layout: sceneLayout(layout), windowRight: layout.windowRight === true } : null;
+  }, [layoutText]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Saves still on the wire: until they land, a refresh must not put the older server copy back.
   const saving = useRef(0);
@@ -77,8 +97,9 @@ export function useLightingScene(active: boolean): LightingSceneApi {
   }, []);
 
   const refreshView = useCallback(async () => {
-    const next = await fetchLightingScene();
+    const [next, record] = await Promise.all([fetchLightingScene(), fetchPcSetup()]);
     if (!next) return;
+    if (record) setSetup(cur => same(cur, record));
     setScene(s => {
       if (!s) return next;
       const editsPending = !!saveTimer.current || saving.current > 0;
@@ -114,11 +135,20 @@ export function useLightingScene(active: boolean): LightingSceneApi {
     const current = sceneRef.current;
     if (!current) return;
     saving.current++;
-    void putLightingScene({ objects: current.objects, bindings: current.bindings }).then(saved => {
+    // A saved record owns the objects and the service ignores them here; without one the legacy objects ride along unchanged.
+    const record = setupRef.current;
+    const ownsObjects = !!record && record.rev > 0 && record.setup.resolved.objects.length > 0;
+    void putLightingScene({ bindings: current.bindings, ...(ownsObjects ? {} : { objects: current.objects }) }).then(saved => {
       // Only the server-owned fields come back; local edits made meanwhile stay.
       if (saved) setScene(s => (s ? { ...s, modelRev: saved.modelRev, caseId: saved.caseId } : s));
     }).finally(() => { saving.current--; });
   }, []);
+
+  useTopicCallback(PC_SETUP_TOPIC, active, useCallback((frame: unknown) => {
+    const rev = (frame as { rev?: unknown } | null)?.rev;
+    if (typeof rev === 'number' && rev === setupRef.current?.rev) return;
+    void refreshView();
+  }, [refreshView]));
 
   // An edit still waiting when the page goes away (Edit in Build navigates at once) is sent, not dropped.
   useEffect(() => () => {
@@ -129,8 +159,8 @@ export function useLightingScene(active: boolean): LightingSceneApi {
   const update = useCallback((mutate: (current: SceneEdit) => SceneEdit) => {
     setScene(s => {
       if (!s) return s;
-      const next = mutate({ objects: s.objects, bindings: s.bindings });
-      return { ...s, objects: next.objects, bindings: next.bindings };
+      const next = mutate({ objects: s.objects, bindings: healBindings(s.objects, s.bindings) });
+      return { ...s, bindings: next.bindings };
     });
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
@@ -171,12 +201,7 @@ export function useLightingScene(active: boolean): LightingSceneApi {
     draftTimer.current = setTimeout(sendDraft, wait);
   }, [sendView, sendDraft]);
 
-  const removeImport = useCallback(async () => {
-    const next = await deleteSceneImport();
-    if (next) setScene(next);
-  }, []);
-
-  return { scene, model, update, setEnabled, setCamera, removeImport, refreshView };
+  return { scene: viewScene, model, caseScene, update, setEnabled, setCamera, refreshView };
 }
 
 /** LED maps of the placed devices, refetched when a device's LED count changes. */

@@ -1,15 +1,21 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_MICRO_ALIGN,
+  MICRO_ALIGN_KEYS,
+  MICRO_DESIGN_KEYS,
   MICRO_MAX_COUNT,
   MICRO_MIN_COUNT,
   MICRO_WIDE_COUNTS,
   defaultSlotCountForSize,
   defaultSlotDesign,
+  newWidgetSlotDesigns,
   isExtrasBackedDevice,
   isMicroLayout,
   isTwoColumnMicro,
   isWideMicroCount,
+  microAlignOf,
+  microDesignOf,
   microSupportsSize,
   resolvedSlotCountForSize,
   slotCountOptionsForSize,
@@ -32,6 +38,23 @@ import {
 import { FRAME_FILLING_DESIGNS, GAUGE_DESIGN_KEYS } from './gauges';
 
 describe('perfSlots', () => {
+  describe('Micro simple design', () => {
+    it('is offered alongside the bar designs', () => {
+      expect(MICRO_DESIGN_KEYS).toEqual(['bar', 'fill', 'backdrop', 'simple']);
+    });
+    it('microDesignOf falls back to bar for unknown or missing values', () => {
+      expect(microDesignOf(undefined)).toBe('bar');
+      expect(microDesignOf({ micro_design: 'sparkline' })).toBe('bar');
+      for (const k of MICRO_DESIGN_KEYS) expect(microDesignOf({ micro_design: k })).toBe(k);
+    });
+    it('microAlignOf defaults to left and ignores unknown values', () => {
+      expect(DEFAULT_MICRO_ALIGN).toBe('left');
+      expect(microAlignOf(undefined)).toBe('left');
+      expect(microAlignOf({ micro_align: 'sideways' })).toBe('left');
+      for (const k of MICRO_ALIGN_KEYS) expect(microAlignOf({ micro_align: k })).toBe(k);
+    });
+  });
+
   describe('slotCountOptionsForSize', () => {
     it('exposes both Micro counts on 2x2 alongside the single-sensor option', () => {
       expect(slotCountOptionsForSize('2x2')).toEqual([1, MICRO_MIN_COUNT, MICRO_MAX_COUNT]);
@@ -381,6 +404,27 @@ describe('perfSlots', () => {
     it('leaves an allowed design alone', () => {
       expect(resolveSlotDesign('4x4', { count: 4, hero: false }, 0, 'sparkline')).toBe('sparkline');
       expect(resolveSlotDesign('2x2round', { count: 1, hero: false }, 0, 'caterpillar')).toBe('caterpillar');
+    });
+  });
+
+  describe('newWidgetSlotDesigns', () => {
+    it('stamps Backdrop on the CPU slots and Ring on memory for a new widget', () => {
+      expect(newWidgetSlotDesigns('4x4')).toEqual({ slot0_design: 'backdrop', slot1_design: 'caterpillar', slot2_design: 'backdrop' });
+      expect(newWidgetSlotDesigns('2x2')).toEqual({ slot0_design: 'backdrop' });
+    });
+
+    it('leaves the round glass on its own default', () => {
+      expect(newWidgetSlotDesigns('2x2round')).toEqual({});
+    });
+
+    it('does not change what a saved config without a design renders', () => {
+      expect(defaultSlotDesign('4x4', 0)).toBe('sparkline');
+      expect(defaultSlotDesign('4x4', 1)).toBe('halfgauge');
+      expect(defaultSlotDesign('4x4', 2)).toBe('sparkline');
+    });
+
+    it('never turns adaptive numbers on', () => {
+      expect(newWidgetSlotDesigns('4x4')).not.toHaveProperty('adaptiveNumbers');
     });
   });
 

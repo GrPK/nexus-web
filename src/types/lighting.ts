@@ -1,4 +1,5 @@
 import type { LightingMode } from '../hooks/useLightingSync';
+import type { SensorBinding } from '../lib/sensorBinding';
 
 export type { LightingMode };
 
@@ -14,6 +15,11 @@ export interface EffectState {
   saturation: number;    // 0 = grayscale, 1 = unchanged, 2 = oversaturated
   contrast: number;      // 0 = flat, 1 = unchanged, 2 = hard contrast
   params: Record<string, number>;
+  /**
+   * The user's sensor picks, keyed by sensor uniform name. A missing key means
+   * the shader's own default binding; only uniforms the user changed are here.
+   */
+  sensors?: Record<string, SensorBinding>;
 }
 
 /**
@@ -27,6 +33,10 @@ export interface EffectParamDef {
   labelKey?: string; // i18n key; when present the UI calls t(labelKey) instead of using label directly
   /** When present the control renders as a segmented choice; value is still a float. */
   options?: { value: number; labelKey: string }[];
+  /** An on/off parameter (0 or 1), shown as the app's switch instead of a two-option select. */
+  toggle?: boolean;
+  /** Shown right under the color wheel instead of in the parameter list. */
+  underWheel?: boolean;
   /** Render the slider with a centre zero tick (bipolar look, like Speed). */
   zeroMarker?: boolean;
 }
@@ -40,13 +50,15 @@ export type EffectCategory =
   | 'cosmic'
   | 'organic'
   | 'geometric'
-  | 'pattern';
+  | 'pattern'
+  | 'sensor';
 
-// Section order for the effect listing: simple fills first, then organic and
-// pattern, then the rest, with the audio-reactive set last.
+// Section order for the effect listing: patterns first (they lead with the
+// simple-mode animations), then the simple fills, organic and the rest, with the
+// audio-reactive set last.
 export const EFFECT_CATEGORIES: EffectCategory[] = [
-  'simple', 'gradient', 'twotone', 'spectrum',
-  'organic', 'pattern', 'cosmic', 'geometric', 'audio',
+  'pattern', 'simple', 'gradient', 'twotone', 'spectrum',
+  'organic', 'cosmic', 'geometric', 'audio', 'sensor',
 ];
 
 // The "simple" family: one cheap solid-fill shader (simple.frag) reused for
@@ -65,11 +77,18 @@ export const SIMPLE_EFFECT_KEYS = [
  * default HSV comes from those uniforms' hint_range annotations.
  */
 export interface EffectColorSlot {
-  id: 'a' | 'b' | 'c' | 'd';
+  id: 'a' | 'b' | 'c' | 'd' | 'fill_bg';
   labelKey: string;
   /** The wheel picks a hue range (u_<id>Span, share of the wheel) the effect
    *  steps through instead of a single hue. */
   range?: boolean;
+}
+
+/** Names a sensor uniform for the effect controls; the uniform itself comes from the shader's annotation. */
+export interface EffectSensorDef {
+  name: string;
+  label: string;
+  labelKey?: string;
 }
 
 export interface EffectDef {
@@ -77,9 +96,13 @@ export interface EffectDef {
   labelKey: string;
   /** The effect owns these colours instead of using the global tint. */
   colors?: EffectColorSlot[];
+  /** The colour of the unlit area, picked alongside the global wheel rather than replacing it. */
+  background?: EffectColorSlot;
   /** Computed via {@link categoryOf} - the EFFECT_CATEGORY map below is the source of truth. */
   category?: EffectCategory;
   params: EffectParamDef[];
+  /** Labels for the effect's sensor uniforms; an unlisted one shows under the generic sensor label. */
+  sensors?: EffectSensorDef[];
   showIntensity?: boolean;
   audio?: boolean;
   /** When true, the Speed slider is hidden for this effect. */
@@ -132,7 +155,7 @@ export const EFFECT_CATEGORY: Record<string, EffectCategory> = {
   ringtunnel: 'geometric', vortextunnel: 'geometric', helixtunnel: 'geometric',
   boxtunnel: 'geometric', harlequin: 'geometric', mosaic: 'geometric',
   cybertunnel: 'geometric',
-  // Pattern: waves, gradients, abstract graphic shapes (22).
+  // Pattern: waves, gradients, abstract graphic shapes.
   rainbow: 'pattern', matrix: 'pattern', ripple: 'pattern', wave: 'pattern',
   gradientwave: 'pattern', ball: 'pattern', radar: 'pattern', pulse: 'pattern',
   interference: 'pattern', domainwarp: 'pattern', dotmatrix: 'pattern',
@@ -140,6 +163,10 @@ export const EFFECT_CATEGORY: Record<string, EffectCategory> = {
   tide: 'pattern', ridgeline: 'pattern', chevron: 'pattern', terrace: 'pattern',
   sharplines: 'pattern', synthwave: 'pattern', retropetals: 'pattern',
   breathing: 'pattern', clockfill: 'pattern',
+  sweepcycle: 'pattern', sweepbrush: 'pattern', sweepliquid: 'pattern', sweepcomet: 'pattern',
+  // Sensor-driven fills and color shifts: a hardware reading moves them.
+  sensorbar: 'sensor', sensorclock: 'sensor', sensorsegments: 'sensor', sensorliquid: 'sensor',
+  sensorcenter: 'sensor', sensorshift: 'sensor', sensorheat: 'sensor',
 };
 
 export const BASE_DEFAULTS: Omit<EffectState, 'params'> = {
@@ -152,7 +179,6 @@ export const MODES: { key: LightingMode; labelKey: string }[] = [
   { key: 'animate', labelKey: 'lighting.mode.animate' },
   { key: 'gif', labelKey: 'lighting.mode.gif' },
   { key: 'screen', labelKey: 'lighting.mode.screen' },
-  { key: 'gamesync', labelKey: 'lighting.mode.gamesync' },
 ];
 
 // Simple fills expose a bipolar hue nudge and a colour-temperature (warmth)
@@ -166,6 +192,12 @@ const SIMPLE_COLOR_PARAMS: EffectParamDef[] = [
 const SIMPLE_WHITE_PARAMS: EffectParamDef[] = [
   { name: 'u_warmth', label: 'Warmth', labelKey: 'lighting.controls.param.warmth', zeroMarker: true },
 ];
+
+const SENSOR_LEVEL_SENSORS: EffectSensorDef[] = [{ name: 'u_fill_level_s', label: 'Fill level', labelKey: 'lighting.sensor.level' }];
+// The fill blocks' Studio uid is `fill`, so this reads u_fill_bgHue / u_fill_bgSat / u_fill_bgVal.
+const SENSOR_FILL_BACKGROUND: EffectColorSlot = { id: 'fill_bg', labelKey: 'lighting.controls.fillBackground' };
+const SENSOR_SHIFT_SENSORS: EffectSensorDef[] = [{ name: 'u_hot_level_s', label: 'Color', labelKey: 'lighting.sensor.color' }];
+const SENSOR_HEAT_SENSORS: EffectSensorDef[] = [{ name: 'u_col_low_s', label: 'Color', labelKey: 'lighting.sensor.color' }];
 
 export const EFFECTS: EffectDef[] = [
   // Simple solid-colour fills lead the list. A flat swatch with a slight
@@ -267,11 +299,16 @@ export const EFFECTS: EffectDef[] = [
       { name: 'u_zoom', label: 'Zoom', labelKey: 'lighting.controls.param.zoom' },
   ]},
   { key: 'fire',         labelKey: 'lighting.controls.fire',         params: [{ name: 'u_turbulence', label: 'Turbulence', labelKey: 'lighting.controls.param.turbulence' }] },
+  // The simple-mode animations lead the patterns. Simple mode runs the first
+  // preset of each, so editing that preset here changes it there. The browser
+  // lists patterns in this order.
   { key: 'rainbow',     labelKey: 'lighting.controls.rainbow',     params: [
       { name: 'u_density',  label: 'Density', labelKey: 'lighting.controls.param.density' },
       { name: 'u_rotation', label: 'Rotation', labelKey: 'lighting.controls.param.rotation' },
+      { name: 'u_tempo',    label: 'Tempo', labelKey: 'lighting.controls.param.tempo' },
+      { name: 'u_aspect',   label: 'Match aspect ratio', labelKey: 'lighting.controls.param.aspect', toggle: true },
   ]},
-  // Brushstrokes' hard-edged sibling: flat hue bars with black between them.
+  // Rainbow's hard-edged sibling: flat hue bars with black between them.
   // Position slides the colour/black split inside each bar, so it thickens the
   // gaps the way splitsharp's Position grows one side of the frame.
   { key: 'sharplines',  labelKey: 'lighting.controls.sharplines',  params: [
@@ -282,6 +319,27 @@ export const EFFECTS: EffectDef[] = [
   { key: 'breathing',    labelKey: 'lighting.controls.breathing',
      colors: [{ id: 'a', labelKey: 'lighting.controls.color1', range: true }, { id: 'b', labelKey: 'lighting.controls.color2', range: true }], params: [
       { name: 'u_sharpness', label: 'Sharpness', labelKey: 'lighting.controls.param.sharpness' },
+  ]},
+  { key: 'sweepcycle',   labelKey: 'lighting.controls.sweepcycle',  params: [
+      { name: 'u_span', label: 'Span', labelKey: 'lighting.controls.param.span' },
+      { name: 'u_dip',  label: 'Dip', labelKey: 'lighting.controls.param.dip' },
+  ]},
+  { key: 'sweepbrush',   labelKey: 'lighting.controls.sweepbrush',  params: [
+      { name: 'u_strokes', label: 'Strokes', labelKey: 'lighting.controls.param.strokes' },
+      { name: 'u_feather', label: 'Feather', labelKey: 'lighting.controls.param.feather' },
+      { name: 'u_fill',    label: 'Fill', labelKey: 'lighting.controls.param.fill' },
+      { name: 'u_rotation', label: 'Rotation', labelKey: 'lighting.controls.param.rotation' },
+      { name: 'u_wash',    label: 'Watercolor', labelKey: 'lighting.controls.param.wash' },
+  ]},
+  { key: 'sweepliquid',  labelKey: 'lighting.controls.sweepliquid', params: [
+      { name: 'u_warp',  label: 'Warp', labelKey: 'lighting.controls.param.warp' },
+      { name: 'u_scale', label: 'Scale', labelKey: 'lighting.controls.param.scale' },
+  ]},
+  { key: 'sweepcomet',   labelKey: 'lighting.controls.sweepcomet',  params: [
+      { name: 'u_comets', label: 'Comets', labelKey: 'lighting.controls.param.comets' },
+      { name: 'u_tail',   label: 'Tail', labelKey: 'lighting.controls.param.tail' },
+      { name: 'u_color',  label: 'Color', labelKey: 'lighting.controls.param.color' },
+      { name: 'u_head',   label: 'Head', labelKey: 'lighting.controls.param.head' },
   ]},
   // Sweeps around like a clock hand, the two colors taking turns, for fans and rings.
   { key: 'clockfill',    labelKey: 'lighting.controls.clockfill',
@@ -321,10 +379,13 @@ export const EFFECTS: EffectDef[] = [
       { name: 'u_count', label: 'Count', labelKey: 'lighting.controls.param.count' },
       { name: 'u_glow',  label: 'Glow', labelKey: 'lighting.controls.param.glow' },
   ]},
-  { key: 'aurora',       labelKey: 'lighting.controls.aurora',       params: [
+  { key: 'aurora',       labelKey: 'lighting.controls.aurora',
+     colors: [{ id: 'a', labelKey: 'lighting.controls.color1', range: true }], params: [
       { name: 'u_curtains', label: 'Curtains', labelKey: 'lighting.controls.param.curtains' },
       { name: 'u_height',   label: 'Height', labelKey: 'lighting.controls.param.height' },
       { name: 'u_shimmer',  label: 'Shimmer', labelKey: 'lighting.controls.param.shimmer' },
+      { name: 'u_rays',     label: 'Rays', labelKey: 'lighting.controls.param.rays' },
+      { name: 'u_bgLevel',  label: 'Background Brightness', labelKey: 'lighting.controls.param.backgroundBrightness' },
   ]},
   { key: 'lavalamp',     labelKey: 'lighting.controls.lavalamp',     params: [
       { name: 'u_count',     label: 'Blobs', labelKey: 'lighting.controls.param.blobs' },
@@ -344,7 +405,6 @@ export const EFFECTS: EffectDef[] = [
   { key: 'neonrain',     labelKey: 'lighting.controls.neonrain',     params: [
       { name: 'u_density', label: 'Density', labelKey: 'lighting.controls.param.density' },
       { name: 'u_length',  label: 'Length', labelKey: 'lighting.controls.param.length' },
-      { name: 'u_splash',  label: 'Splash', labelKey: 'lighting.controls.param.splash' },
   ]},
   { key: 'nebula',        labelKey: 'lighting.controls.nebula',       params: [
       { name: 'u_density', label: 'Density', labelKey: 'lighting.controls.param.density' },
@@ -627,23 +687,12 @@ export const EFFECTS: EffectDef[] = [
       { name: 'u_centerGain',  labelKey: 'lighting.controls.bb.centerGain',  label: 'Gain' },
       { name: 'u_centerFloor', labelKey: 'lighting.controls.bb.centerFloor', label: 'Noise Gate' },
       { name: 'u_centerSize',  labelKey: 'lighting.controls.bb.centerSize',  label: 'Size' },
-      { name: 'u_topMeters', labelKey: 'lighting.controls.bb.topMeters', label: 'Top Meters',
-        options: [
-          { value: 0, labelKey: 'lighting.controls.bb.opt.off' },
-          { value: 1, labelKey: 'lighting.controls.bb.opt.on' },
-        ] },
-      { name: 'u_cornerFills', labelKey: 'lighting.controls.bb.cornerFills', label: 'Corner Fills',
-        options: [
-          { value: 0, labelKey: 'lighting.controls.bb.opt.off' },
-          { value: 1, labelKey: 'lighting.controls.bb.opt.on' },
-        ] },
+      { name: 'u_topMeters', labelKey: 'lighting.controls.bb.topMeters', label: 'Top Meters', toggle: true },
+      { name: 'u_cornerFills', labelKey: 'lighting.controls.bb.cornerFills', label: 'Corner Fills', toggle: true },
       { name: 'u_topHeight',  labelKey: 'lighting.controls.bb.topHeight',  label: 'Top Height' },
-      { name: 'u_bottomBars', labelKey: 'lighting.controls.bb.bottomBars', label: 'Bottom Bars',
-        options: [
-          { value: 0, labelKey: 'lighting.controls.bb.opt.off' },
-          { value: 1, labelKey: 'lighting.controls.bb.opt.on' },
-        ] },
+      { name: 'u_bottomBars', labelKey: 'lighting.controls.bb.bottomBars', label: 'Bottom Bars', toggle: true },
       { name: 'u_bottomScale', labelKey: 'lighting.controls.bb.bottomScale', label: 'Bottom Height' },
+      { name: 'u_stereo', labelKey: 'lighting.controls.bb.stereo', label: 'Stereo split', toggle: true },
       { name: 'u_bgLevel',    labelKey: 'lighting.controls.bb.bgLevel',    label: 'Background' },
       { name: 'u_beatColor',  labelKey: 'lighting.controls.bb.beatColor',  label: 'Beat Color' },
       { name: 'u_flash',      labelKey: 'lighting.controls.bb.flash',      label: 'Beat Flash' },
@@ -736,6 +785,44 @@ export const EFFECTS: EffectDef[] = [
       { name: 'u_glow',       label: 'Glow', labelKey: 'lighting.controls.param.glow' },
       { name: 'u_audioBoost', label: 'Audio Intensity', labelKey: 'lighting.controls.param.audioIntensity' },
   ]},
+// ── Sensor ─────────────────────────────────────────────────────────────────
+// Baked Shader Studio recipes (studioSensorPremades.ts): block uids are fixed, so the
+// uniform names below are stable. The sensor uniform (`_s`) comes from the shader's own
+// annotation; `sensors` only names it. Angle and flip turn and reverse the fill.
+  { key: 'sensorbar', labelKey: 'lighting.controls.sensorbar', hideSpeed: true, sensors: SENSOR_LEVEL_SENSORS, background: SENSOR_FILL_BACKGROUND, params: [
+    { name: 'u_col_reverse', label: 'Reverse colors', labelKey: 'lighting.controls.param.reverseColors', toggle: true, underWheel: true },
+    { name: 'u_fill_angle', label: 'Rotation', labelKey: 'lighting.controls.param.rotation' },
+    { name: 'u_fill_flip', label: 'Flip', labelKey: 'lighting.controls.param.flip', toggle: true },
+  ]},
+  { key: 'sensorclock', labelKey: 'lighting.controls.sensorclock', hideSpeed: true, sensors: SENSOR_LEVEL_SENSORS, background: SENSOR_FILL_BACKGROUND, params: [
+    { name: 'u_col_reverse', label: 'Reverse colors', labelKey: 'lighting.controls.param.reverseColors', toggle: true, underWheel: true },
+    { name: 'u_fill_angle', label: 'Rotation', labelKey: 'lighting.controls.param.rotation' },
+    { name: 'u_fill_flip', label: 'Flip', labelKey: 'lighting.controls.param.flip', toggle: true },
+  ]},
+  { key: 'sensorsegments', labelKey: 'lighting.controls.sensorsegments', hideSpeed: true, sensors: SENSOR_LEVEL_SENSORS, background: SENSOR_FILL_BACKGROUND, params: [
+    { name: 'u_col_reverse', label: 'Reverse colors', labelKey: 'lighting.controls.param.reverseColors', toggle: true, underWheel: true },
+    { name: 'u_fill_angle', label: 'Rotation', labelKey: 'lighting.controls.param.rotation' },
+    { name: 'u_fill_flip', label: 'Flip', labelKey: 'lighting.controls.param.flip', toggle: true },
+    { name: 'u_fill_count', label: 'Count', labelKey: 'lighting.controls.param.count' },
+  ]},
+  { key: 'sensorliquid', labelKey: 'lighting.controls.sensorliquid', sensors: SENSOR_LEVEL_SENSORS, background: SENSOR_FILL_BACKGROUND, params: [
+    { name: 'u_col_reverse', label: 'Reverse colors', labelKey: 'lighting.controls.param.reverseColors', toggle: true, underWheel: true },
+    { name: 'u_fill_angle', label: 'Rotation', labelKey: 'lighting.controls.param.rotation' },
+    { name: 'u_fill_flip', label: 'Flip', labelKey: 'lighting.controls.param.flip', toggle: true },
+    { name: 'u_fill_wave', label: 'Waves', labelKey: 'lighting.controls.param.waves' },
+  ]},
+  { key: 'sensorcenter', labelKey: 'lighting.controls.sensorcenter', hideSpeed: true, sensors: SENSOR_LEVEL_SENSORS, background: SENSOR_FILL_BACKGROUND, params: [
+    { name: 'u_col_reverse', label: 'Reverse colors', labelKey: 'lighting.controls.param.reverseColors', toggle: true, underWheel: true },
+    { name: 'u_fill_angle', label: 'Rotation', labelKey: 'lighting.controls.param.rotation' },
+    { name: 'u_fill_flip', label: 'Flip', labelKey: 'lighting.controls.param.flip', toggle: true },
+  ]},
+  { key: 'sensorshift', labelKey: 'lighting.controls.sensorshift', hideSpeed: true, sensors: SENSOR_SHIFT_SENSORS, params: [
+    { name: 'u_col_reverse', label: 'Reverse colors', labelKey: 'lighting.controls.param.reverseColors', toggle: true, underWheel: true },
+  ]},
+  { key: 'sensorheat', labelKey: 'lighting.controls.sensorheat', hideSpeed: true, sensors: SENSOR_HEAT_SENSORS, params: [
+    { name: 'u_col_reverse', label: 'Reverse colors', labelKey: 'lighting.controls.param.reverseColors', toggle: true, underWheel: true },
+    { name: 'u_grad_angle', label: 'Rotation', labelKey: 'lighting.controls.param.rotation' },
+  ]},
 ];
 
 /**
@@ -779,7 +866,11 @@ export const DEFAULT_STATIC_EFFECT = 'gradientlinear';
  * purpose-built for a held frame - the patterns have no clock to run - so they
  * must not appear here or Animation can select one and sit motionless.
  */
-export const ANIMATE_EFFECTS: EffectDef[] = EFFECTS.filter(e => !STATIC_KEY_SET.has(e.key));
+export const ANIMATE_EFFECTS: EffectDef[] = EFFECTS
+  .filter(e => !STATIC_KEY_SET.has(e.key))
+  // Category order, then catalogue order within a category (the sort is stable),
+  // so flat lists such as a dropdown lead with the Patterns like the browser does.
+  .sort((a, b) => EFFECT_CATEGORIES.indexOf(categoryOf(a.key)) - EFFECT_CATEGORIES.indexOf(categoryOf(b.key)));
 
 /**
  * Simple-mode browse pool: the flat colours, rendered as

@@ -17,7 +17,7 @@ const SCALABLE_DESIGNS = new Set<GaugeDesignKey>([
 // number and `microbars` renders per-sample without a Y domain, so neither
 // takes a range.
 const FILL_DESIGNS = new Set<GaugeDesignKey>([
-  'waterLevel', 'caterpillar', 'bar', 'fill', 'hbar', 'dotgrid', 'halfgauge',
+  'waterLevel', 'caterpillar', 'squareRing', 'bar', 'fill', 'hbar', 'dotgrid', 'halfgauge',
   'numberfill', 'thermo', 'arc270', 'wedge', 'battery', 'segments', 'dial', 'tickring',
 ]);
 
@@ -88,7 +88,7 @@ const NETWORK_FIXED_DEFAULT_MAX_BPS = 125_000_000;
 // the same type-aware scaling motherboard already uses - SSD SMART and every
 // extras-topic device group are the same shape of mixed bag.
 const HETEROGENEOUS_TYPE_DEVICES = new Set<DeviceKey>([
-  'motherboard', 'smart', 'memoryModule', 'battery', 'cooler', 'psu', 'embeddedController',
+  'motherboard', 'smart', 'memoryModule', 'battery', 'cooler', 'fanSensors', 'psu', 'embeddedController',
 ]);
 
 export function isHeterogeneousTypeDevice(device: DeviceKey): boolean {

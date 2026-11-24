@@ -238,6 +238,7 @@ const extrasState = {
   coolers: [] as ExtrasComponentMock[],
   psus: [] as ExtrasComponentMock[],
   nvmeStorage: [] as ExtrasComponentMock[],
+  fanSensors: [],
   embeddedControllers: [] as ExtrasComponentMock[],
   memoryModules: [
     { id: '/memory/dimm/0', name: 'Corsair - CMK16GX4M2B3200C16 (#0)', sensors: [
@@ -581,6 +582,28 @@ describe('MonitoringPage', () => {
     // Click toggles collapse and persists the section id through useUiSettings.
     fireEvent.click(cpuHeader);
     expect(updateMock).toHaveBeenCalledWith({ monitoringDetailedCollapsed: ['cpu'] });
+  });
+
+  it('filters the Detailed tab as the query is typed and shows the empty state', () => {
+    collapsedState = [];
+    render(<MonitoringPage serviceOnline={true} connectionState="online" tab="detailed" onTabChange={vi.fn()} />);
+    const box = screen.getByPlaceholderText('monitoring.detailed.searchPlaceholder');
+
+    fireEvent.change(box, { target: { value: 'dimm' } });
+    expect(screen.getByText('DIMM #0')).toBeInTheDocument();
+    expect(screen.queryByText('CPU Total')).toBeNull();
+
+    // A space makes each word its own match, across section and sensor.
+    fireEvent.change(box, { target: { value: 'cpu total' } });
+    expect(screen.getByText('CPU Total')).toBeInTheDocument();
+    expect(screen.queryByText('DIMM #0')).toBeNull();
+
+    fireEvent.change(box, { target: { value: 'zzzz' } });
+    expect(screen.getByText('monitoring.detailed.noMatches')).toBeInTheDocument();
+
+    fireEvent.change(box, { target: { value: '' } });
+    expect(screen.getByText('CPU Total')).toBeInTheDocument();
+    expect(screen.queryByText('monitoring.detailed.noMatches')).toBeNull();
   });
 
   it('boxes each family section (CollapsibleSection boxed) but not its nested sensor-type group', () => {

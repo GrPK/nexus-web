@@ -84,8 +84,8 @@ const STREAMED_PANEL_CAPABILITIES: PanelDeviceCapabilities = {
 // Simulated presets whose real counterpart is not an ordinary widget panel.
 // Anything absent falls back to WIDGET_PANEL_CAPABILITIES.
 const SIMULATED_SURFACE_CAPABILITIES: Partial<Record<PanelSurface, PanelDeviceCapabilities>> = {
-  y70: Y70_CAPABILITIES,
-  kraken: STREAMED_PANEL_CAPABILITIES,
+  // No hardware behind it: brightness, rotation and kiosk controls would write to a real Y70 beside it.
+  y70: { ...Y70_CAPABILITIES, displayControls: false, launchClose: false },
   'lcd-round': STREAMED_PANEL_CAPABILITIES,
   'lcd-wide': STREAMED_PANEL_CAPABILITIES,
   'lcd-square': STREAMED_PANEL_CAPABILITIES,
@@ -96,10 +96,13 @@ const SIMULATED_SURFACE_CAPABILITIES: Partial<Record<PanelSurface, PanelDeviceCa
 export const STREAMED_FAMILY_ICONS: Partial<Record<string, string>> = {
   'nzxt-kraken': '/assets/devices/nzxt.svg',
   'asus-ryujin-lcd': '/assets/devices/asus.svg',
+  'asus-slc4-lcd': '/assets/devices/asus.svg',
+  'asus-glacial-lcd': '/assets/devices/asus.svg',
   'lianli-galahad2-lcd': '/assets/devices/lianli.svg',
   'lianli-hydroshift-lcd': '/assets/devices/lianli.svg',
   'lianli-tl-lcd': '/assets/devices/lianli.svg',
   'lianli-wireless-lcd': '/assets/devices/lianli.svg',
+  'lianli-flex-lcd': '/assets/devices/lianli.svg',
   'lianli-hydroshift2': '/assets/devices/lianli.svg',
   'lianli-hydroshift2-curve': '/assets/devices/lianli.svg',
   'corsair-link-lcd': '/assets/devices/corsair.svg',
@@ -107,6 +110,8 @@ export const STREAMED_FAMILY_ICONS: Partial<Record<string, string>> = {
   'corsair-capellix-lcd': '/assets/devices/corsair.svg',
   'lianli-screen88': '/assets/devices/lianli.svg',
   'zmatrices-lcd': PANEL_MONITOR_ICON,
+  'zmatrices-max-e87': PANEL_MONITOR_ICON,
+  'steelseries-apex-oled': '/assets/devices/keyboard.svg',
 };
 
 const WIDGET_PANEL_PROFILES: Partial<Record<string, {
@@ -135,7 +140,14 @@ const WIDGET_PANEL_IDS = new Set(Object.keys(WIDGET_PANEL_PROFILES));
 const PROMOTED_FAMILY_BRANDING: Partial<Record<string, { name: string; icon: string; defaultNames: readonly string[]; experimental?: boolean }>> = {
   'xeneon-edge': { name: 'Corsair Xeneon Edge', icon: '/assets/devices/corsair.svg', defaultNames: ['crx ed00', 'xeneon edge'] },
   'icue-link-lcd5': { name: 'Corsair iCUE LINK 5" LCD', icon: '/assets/devices/corsair.svg', defaultNames: ['xmd 00ea', "icue link 5''"], experimental: true },
+  'hyte-y60': { name: 'HYTE Y60 Display', icon: '/assets/devices/hyte.svg', defaultNames: ['rtk bc32', 'rtk fhd hdr'] },
 };
+
+export function simulatedPanelIcon(panel: Pick<SimulatedPanelDefinition, 'id' | 'family'>): string {
+  const family = panel.family;
+  return (family ? STREAMED_FAMILY_ICONS[family] ?? PROMOTED_FAMILY_BRANDING[family]?.icon : undefined)
+    ?? panelIconForSource(panel.id);
+}
 
 // The 5" LCD is a TITAN II's screen when that pump is on the LINK hub; sold on its own
 // it can sit on another cooler. The hub reports no radiator size, so neither does this.
@@ -213,6 +225,13 @@ export function usePanelDevices(
   // topic also rides on phone-presence subscribe/unsubscribe via the service
   // hub, so a phone connecting/disconnecting bumps the count without a poll.
   useTopicCallback('panel/device', enabled, () => {
+    void refresh();
+  });
+
+  // A promoted monitor's displayAttached is stamped per request, and an
+  // unplug changes no record, so panel/device stays silent: the display
+  // topology push is the only signal that its row must leave or return.
+  useTopicCallback('displays', enabled, () => {
     void refresh();
   });
 
@@ -315,7 +334,6 @@ export function buildPanelDevices({
   }
 
   for (const panel of simulatedDefinitions) {
-    if (connectedWidgetPanels.some(d => d.id === panel.id)) continue;
     const capacity = getSimulatedPanelGridCapacity(panel);
     const physical = getSimulatedPanelPhysicalSize(panel);
     devices.push({
@@ -334,10 +352,14 @@ export function buildPanelDevices({
       runtimeSurface: panel.surface,
       previewSize: { width: panel.width, height: panel.height },
       previewDpi: panel.dpi,
-      iconSrc: panelIconForSource(panel.id),
-      // A simulated panel claims the capabilities its real counterpart has:
-      // the Kraken's round glass is driven host-side with no digitizer.
-      capabilities: SIMULATED_SURFACE_CAPABILITIES[panel.surface] ?? WIDGET_PANEL_CAPABILITIES,
+      iconSrc: simulatedPanelIcon(panel),
+      family: panel.family,
+      // Input and layout follow the real counterpart (the Kraken's round glass has no
+      // digitizer); display controls and kiosk launch stay off, there is no hardware.
+      capabilities: {
+        ...(SIMULATED_SURFACE_CAPABILITIES[panel.surface] ?? WIDGET_PANEL_CAPABILITIES),
+        ...(panel.touch === undefined ? {} : { touch: panel.touch }),
+      },
       modalKind: panel.surface === 'y70' ? 'y70-compat' : 'panel-editor',
     });
   }
@@ -355,8 +377,9 @@ export function buildPanelDevices({
   // kiosk to launch, no display to control, and no touch digitizer.
   for (const record of records) {
     if (!record.streamed) continue;
-    const cssWidth = record.capabilities?.cssWidth ?? 0;
-    const cssHeight = record.capabilities?.cssHeight ?? 0;
+    // A rotated glass renders at the swapped size, which the service states; an older service sends none.
+    const cssWidth = record.renderWidth || (record.capabilities?.cssWidth ?? 0);
+    const cssHeight = record.renderHeight || (record.capabilities?.cssHeight ?? 0);
     const surface = record.capabilities?.surface as PanelSurface | undefined;
     // The family is the handler id, which is also the curated device row's id. Claiming
     // that row merges the two into one sidebar entry, the way the Q60 carries its cooler.
@@ -379,11 +402,13 @@ export function buildPanelDevices({
       managementMode: 'managed',
       surfaceProfileKey: `stream-${record.id}`,
       runtimeSurface: surface,
+      family,
       previewSize: cssWidth > 0 && cssHeight > 0 ? { width: cssWidth, height: cssHeight } : undefined,
       previewDpr: record.capabilities?.dpr,
       iconSrc: (family ? STREAMED_FAMILY_ICONS[family] : undefined) ?? PANEL_MONITOR_ICON,
       capabilities: STREAMED_PANEL_CAPABILITIES,
       modalKind: 'panel-editor',
+      secondaryMonitor: record.secondaryMonitor === true,
     });
   }
 
@@ -406,6 +431,7 @@ export function buildPanelDevices({
       id: promotedMonitorDeviceId(record),
       panelRecordId: record.id,
       displayId: record.displayId,
+      genericDisplay: !family,
       name: isDefaultName ? (family && familyNames[family]) || branding.name : record.displayName,
       subtitle: !linkEnabled
         ? labels.linkOff

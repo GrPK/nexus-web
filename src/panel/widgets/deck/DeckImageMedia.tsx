@@ -1,0 +1,28 @@
+import { kickPlay } from '../../../lib/kickPlay';
+import styles from './DeckImageMedia.module.scss';
+
+interface DeckImageMediaProps {
+  url: string;
+  isVideo: boolean;
+  className?: string;
+}
+
+/** A stored deck key image: video loops muted inline, everything else (including GIF) is an img. */
+export function DeckImageMedia({ url, isVideo, className }: DeckImageMediaProps) {
+  if (isVideo) {
+    return (
+      <video
+        ref={kickPlay}
+        src={url}
+        className={className ? `${className} ${styles.videoWakeLockPad}` : styles.videoWakeLockPad}
+        data-wakelock-pad
+        autoPlay
+        loop
+        muted
+        playsInline
+        aria-hidden="true"
+      />
+    );
+  }
+  return <img src={url} className={className} alt="" />;
+}

@@ -46,6 +46,12 @@ The TS shape lives in `src/widgets/types.ts`.
   // the nearest one that is when its layout next loads with the app known.
   "grid_sizes": ["4x4"],
 
+  // Optional, default false: besides "sizes", lets the user drag a corner of
+  // the tile to any span whose width and height are both at least 4 cells,
+  // as far as the panel's grid reaches. The widget must lay out
+  // correctly at every span, since it can end up at any ratio.
+  "freeform": false,
+
   // OEM bake-in: treat this app as active on a fresh profile (sidebar auto-pins
   // its page, no user "add" step needed).
   "preinstalled": false,
@@ -53,6 +59,14 @@ The TS shape lives in `src/widgets/types.ts`.
   // "device" places the app under DEVICES in the sidebar and renders its page
   // inside device-page chrome (the same chrome as Cooling, Lighting, etc.).
   "category": "device",
+
+  // Optional: renderer modules the app ships for <Canvas> (built from
+  // renderer.ts by `nexus-app build`). `nexus-app validate` checks each exists.
+  // Packing is the job of the shared app-publish workflow, which must add every
+  // listed entry to the .nexus-app archive; the CLI only builds the files. The
+  // host does not check this list at runtime. `__NEXUS_APP_ENV_*__` placeholders
+  // are filled in widget.mjs only, not in renderer modules.
+  "renderers": ["renderer.mjs"],
 
   "capabilities": {
     // Sensor families the app may read via useSensor / sensors.read.
@@ -319,6 +333,16 @@ const res = await request('https://api.open-meteo.com/v1/...');
 const data = await res.json();
 ```
 
+The `Response` offers `ok`, `status`, `headers`, `text()`, `json()` and
+`arrayBuffer()`. A binary content type (anything but text, JSON, XML or
+script) arrives byte-exact through `arrayBuffer()`; a binary body is capped at
+4 MiB (text and JSON at 1 MiB), and the proxy allows 300 requests per minute
+per app, with at most a few in flight at once. The 4 MiB figure holds when the
+panel talks to the service directly. A panel connected through the relay
+receives at most about 750 KB of binary body, and one on a WebRTC data channel
+about 190 KB (base64 inflates the body by a third); a larger response fails
+with HTTP 413 there.
+
 ### `useDispatch()`
 
 Returns a stable dispatch function. Use it for control writes or host-action
@@ -549,9 +573,10 @@ duration (`app_page_closed`) is recorded in dev-tools builds.
 
 **Availability.** Recording is wired in dev-tools Nexus builds only for now;
 every other build drops the call silently. In dev-tools builds, Tools > App
-telemetry lists the events as they arrive and whether they are being sent to
-PostHog. A host older than this function has no `track` in its shared runtime,
-the import is `undefined` there and calling it throws, so guard the call:
+telemetry lists the events as they arrive and whether they are being sent to the
+Nexus telemetry service (nexus-api). A host older than this function has no
+`track` in its shared runtime, the import is `undefined` there and calling it
+throws, so guard the call:
 
 ```tsx
 if (typeof track === 'function') track('level_done', { level: 3, won: true });
@@ -851,9 +876,11 @@ A range input. Host renders `src/components/common/Slider/Slider.tsx`.
 | `min` | `number` | |
 | `max` | `number` | |
 | `step` | `number` | |
-| `tone` | `UiTone` | |
+| `tone` | `UiTone` | colors the filled part of the track; omit for the accent |
 | `label` | `string` | |
-| `disabled` | `boolean` | |
+| `disabled` | `boolean` | a slider with `tone` or `thumbIcon` is not dimmed while disabled |
+| `marks` | `{ value, label, detail?, tone?, side?, large? }[]` | labelled points on the scale: under the track pointing up at the value, or `side: 'above'` over it; kept inside the track, labels shift apart when they collide; `bare` and `stacked` layouts |
+| `thumbIcon` | `string` | icon name drawn on the track at the value in place of the knob, tinted by `tone` |
 | `trackFill` | `boolean \| number` | `true` auto-fills from start to thumb; a number (0..100) sets the fill end explicitly; omit for no fill |
 | `orientation` | `'inline' \| 'stacked' \| 'bare'` | `'inline'` = label+track+value on one row; `'stacked'` = label above, full-width track; `'bare'` = track only |
 | `onInput` | `(value: number) => void` | fires continuously during drag |
@@ -1022,25 +1049,76 @@ The full day/night world map + scrollable city cards. Self-ticking.
 |---|---|
 | `highlightTz` | `string` (IANA tz to highlight on the map) |
 
-#### `Avatar`
-A first-party 3D character (three.js) rendered host-side from a pack the app
-ships. In a tile it is inert; a tap opens the panel's fullscreen immersive
-view, where pointer orbit/zoom lives. Everything around the character (a
-controls bar, a stream, stickers) is the app's to build from the primitives
-below; the composite carries only the character.
+#### `Canvas`
+A GPU canvas drawn by a renderer module the app ships. The host runs the module
+in its own worker, hands it an `OffscreenCanvas`, and shows the result inside the
+widget. The widget keeps all logic and state; the renderer only draws. Nexus
+carries no engine: three.js or any WebGL code is bundled into the app's own
+`renderer.mjs`.
+
+Widget side (`@hello-nexus/sdk/ui`):
 
 | Prop | Type | Notes |
 |---|---|---|
-| `pack` | `string` | URL to a pack directory or an encrypted `.nxpack` container (app-asset route) |
-| `dance` / `listening` | `boolean` | signal levels forwarded to the pack's bridge |
-| `energy` | `number` | 0..1 |
-| `reaction` | `string` | one-shot `"Trigger#seq"`; bump `seq` to re-fire |
-| `intro` | `boolean` | walk-in + camera push-in once on mount |
-| `interactive` | `boolean` | orbit/zoom in the immersive view (default true) |
-| `demo` | `boolean` | loops the authored reaction showcase |
-| `zoom` | `number` | camera depth as 0..1 of the deepest closeup; omit to leave the camera to its own gestures |
-| `onZoom` | `(fraction: number) => void` | the depth after a wheel or pinch on the canvas, so a control can track it |
-| `onInteraction` | `() => void` | throttled, on any pointer or wheel activity on the stage (idle timers) |
+| `renderer` | `string` | bundle-relative path of the renderer module, e.g. `"renderer.mjs"`; list it in the manifest `renderers` |
+| `props` | `object` | JSON-serializable data handed to the renderer on start and on every change (it crosses the widget worker boundary and changes are detected by serializing) |
+| `share` | `string` | mounts of this app with the same `renderer` and `share` key share ONE worker and canvas (tile and immersive), moved to the newest mount; omit for one renderer per mount |
+| `interactive` | `boolean` | forward pointer and wheel input, only while this mount holds the canvas; when the Canvas sits inside a `Layer`, input is also held back while one of that layer's `Manipulable` gestures is live |
+| `onMessage` | `(data: unknown) => void` | structured-clone data the renderer posts |
+
+Renderer side (`@hello-nexus/sdk/renderer`, inlined into `renderer.mjs`):
+
+```ts
+import { defineRenderer } from '@hello-nexus/sdk/renderer';
+
+defineRenderer((ctx) => {
+  const gl = ctx.canvas.getContext('webgl')!;
+  ctx.onFrame(() => { gl.clear(gl.COLOR_BUFFER_BIT); });
+  ctx.ready();
+});
+```
+
+```ts
+interface RendererContext {
+  canvas: OffscreenCanvas;
+  size: { width: number; height: number; pixelRatio: number }; // CSS px + capped ratio
+  props: Record<string, unknown>;      // latest props of the mount holding the canvas
+  readAsset(path: string): Promise<ArrayBuffer>; // bundle files of an allowed type only; optional ?query kept
+  post(data: unknown): void;           // structured-clone data, to the holding mount's onMessage
+  onProps(cb: (props) => void): void;
+  onResize(cb: (size) => void): void;  // backing store already resized
+  onPointer(cb: (e: CanvasPointerEvent) => void): void;
+  onFrame(cb: (dt: number, now: number) => void): void; // only while visible, paced to the panel; dt capped
+  onVisibility(cb: (visible: boolean) => void): void;
+  ready(): void;                       // first frame drawn: the host reveals the canvas
+}
+interface CanvasPointerEvent {
+  type: 'down' | 'move' | 'up' | 'cancel' | 'wheel'; pointerId: number; pointerType: string;
+  x: number; y: number; buttons: number; deltaY?: number; deltaMode?: number; // x/y canvas-relative CSS px
+}
+```
+
+The renderer worker has `OffscreenCanvas`, WebGL, `createImageBitmap`,
+`WebAssembly` and `requestAnimationFrame`. Its `fetch` serves `blob:` and
+`data:` URLs (so engines can decode embedded images) and GET requests to
+`https` hosts listed in `capabilities.net.fetch`, relayed through the same
+host proxy as `request` (`arrayBuffer()` returns binary bodies byte-exact, up
+to the proxy's 4 MiB binary cap, or about 750 KB through the relay and 190 KB
+over WebRTC; a request to an unlisted host, a body cut at the cap, or a host
+older than this feature rejects with a `TypeError`, and an aborted request
+rejects with `AbortError` and cancels the host request). Every other URL is
+rejected, and there is no other network. `readAsset` is the way to load bundle files and is
+scoped to this app. It goes through the app asset route, which serves only
+`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.ico`, `.svg`, `.nxpack` and `.key`
+files; any other extension (a `.json`, `.glb` or `.bin`) is refused, so ship
+data inside a `.nxpack` or one of the image types. The canvas resizes after a `resize` message; the renderer
+must redraw in `onResize`, since a hidden renderer gets no frames. `onFrame`
+runs at most 60 times a second, and at about the panel's refresh or exactly a
+streamed panel's frame rate when either is lower; `dt` spans the skipped
+ticks. On a worker
+fault the host respawns the renderer once, then shows a load error. Build with
+`nexus-app build`, which bundles `renderer.ts` next to
+`index.tsx` into `renderer.mjs` (self-contained, no react).
 
 #### `Manipulable`
 A freely placed, transformable child of a `Layer`. With the layer's

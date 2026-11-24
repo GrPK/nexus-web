@@ -36,10 +36,11 @@ vi.mock('../../../hooks/useSensors', () => ({
   useSensors: () => mockSensors,
 }));
 
-vi.mock('../../../hooks/useNetworkMonitor', () => ({
-  useNetworkMonitor: () => ({
-    series: [], sampleCount: 0, totalRate: 0, totalRateIn: 0, totalRateOut: 0, entries: [],
-  }),
+const mockExtras = {
+  batteries: [], nics: [], coolers: [], psus: [], nvmeStorage: [], fanSensors: [], embeddedControllers: [], memoryModules: [],
+};
+vi.mock('../../../hooks/useSensorExtras', () => ({
+  useSensorExtras: () => mockExtras,
 }));
 
 const mockGetTryxStatus = vi.fn();
@@ -188,7 +189,7 @@ describe('TryxDevicePage - overlay editor', () => {
     await renderPage();
     const drag = screen.getByRole('button', { name: 'devices.tryx.overlayDragAria:{"stat":"CPU Package"}' });
     expect(drag).toBeInTheDocument();
-    expect(drag).toHaveTextContent('45°C');
+    expect(drag).toHaveTextContent('45.0°C');
     expect(drag).toHaveTextContent('CPU Package');
     expect(drag.style.left).toBe('4%');
     expect(drag.style.top).toBe('38%');
@@ -350,6 +351,19 @@ describe('TryxDevicePage - overlay editor', () => {
     expect(mockSetTryxOverlay).toHaveBeenCalledTimes(1);
     const call = mockSetTryxOverlay.mock.calls[0][0];
     expect(call.items[0]).toEqual({ sensorId: 'fps/current', device: 'fps', label: 'FPS', x: 0.04, y: 0.38 });
+  });
+
+  it('picking the Date & Time group seeds the time item, and the date sensor can be chosen', async () => {
+    await renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'devices.tryx.overlayDeviceAria:{"n":1}' }));
+    fireEvent.click(screen.getByRole('option', { name: 'devices.tryx.deviceClock' }));
+    await act(async () => { vi.advanceTimersByTime(150); });
+    expect(mockSetTryxOverlay.mock.calls[0][0].items[0]).toEqual({ sensorId: 'time', device: 'clock', label: '', x: 0.04, y: 0.38 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'devices.tryx.overlaySensorAria:{"n":1}' }));
+    fireEvent.click(screen.getByRole('option', { name: 'devices.tryx.clockDate' }));
+    await act(async () => { vi.advanceTimersByTime(150); });
+    expect(mockSetTryxOverlay.mock.calls[1][0].items[0]).toEqual({ sensorId: 'date', device: 'clock', label: '', x: 0.04, y: 0.38 });
   });
 
   it('enabling a never-configured slot auto-picks its default device\'s first sensor', async () => {

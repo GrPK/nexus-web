@@ -3,7 +3,7 @@
 // the iframe renders and echoes user actions back as 'layout-changed'. Mirrors
 // the real device: layout lives outside the kiosk, which is told what to draw.
 
-import type { PanelLayout, PanelSurface } from '../types';
+import type { ChromeGrid, PanelLayout, PanelSurface } from '../types';
 import type { PanelThemeSettingsState } from '../editor/PanelThemeSettings';
 
 export type SimulatorTheme = PanelThemeSettingsState;
@@ -26,15 +26,20 @@ export interface SimulatorInitMessage {
   dpi?: number;
   // Short-axis slot count Widget size forces on the grid (see panelShortSideSlots).
   shortSideSlots?: number;
+  // The single-widget tile has its axes swapped (a quarter-turn render).
+  transposedTile?: boolean;
+  // The Large-size grid that sizes floating chrome, so chrome ignores the Widget size.
+  chromeGrid?: ChromeGrid;
   // True when the record is display-bound (promoted OS monitor, displayId
   // set). The desktop see-through gate (supportsDesktopWallpaper) needs it,
   // or a 'monitor' preview never renders the wallpaper layer.
   displayBound?: boolean;
+  // The editor's classification, so the preview matches the kiosk for known devices.
+  genericDisplay?: boolean;
   layout: PanelLayout;
   theme: SimulatorTheme;
   themeMode: 'dark' | 'light';
   selectedWidgetId: string | null;
-  brightness: number;
   screenOn: boolean;
   showPanel: boolean;
   deviceId?: string;
@@ -44,7 +49,6 @@ export interface SimulatorInitMessage {
 
 export interface SimulatorSetDisplayMessage {
   type: 'simulator/set-display';
-  brightness: number;
   screenOn: boolean;
   showPanel: boolean;
 }
@@ -60,6 +64,8 @@ export interface SimulatorSetGridMessage {
   type: 'simulator/set-grid';
   dpi?: number;
   shortSideSlots?: number;
+  transposedTile?: boolean;
+  chromeGrid?: ChromeGrid;
 }
 
 // The parent transform-scales the whole iframe to fit its preview column, so
@@ -83,6 +89,7 @@ export interface SimulatorSetTouchMessage {
 export interface SimulatorSetDisplayBoundMessage {
   type: 'simulator/set-display-bound';
   displayBound?: boolean;
+  genericDisplay?: boolean;
 }
 
 export interface SimulatorSetThemeMessage {
@@ -118,6 +125,19 @@ export interface SimulatorBackgroundClickedMessage {
   type: 'simulator/background-clicked';
 }
 
+// A click on the free background of the preview, in the iframe's own client pixels.
+export interface SimulatorBackgroundMenuMessage {
+  type: 'simulator/background-menu';
+  x: number;
+  y: number;
+}
+
+// Whether an opaque single widget currently hides the background (PanelApp's `backgroundCovered`).
+export interface SimulatorBackgroundCoveredMessage {
+  type: 'simulator/background-covered';
+  covered: boolean;
+}
+
 // The widget type the playlist rotation shows; null when no playlist drives the preview.
 export interface SimulatorPlaylistShownMessage {
   type: 'simulator/playlist-shown';
@@ -141,6 +161,8 @@ export type SimulatorChildToParent =
   | SimulatorLayoutChangedMessage
   | SimulatorWidgetClickedMessage
   | SimulatorBackgroundClickedMessage
+  | SimulatorBackgroundMenuMessage
+  | SimulatorBackgroundCoveredMessage
   | SimulatorPlaylistShownMessage;
 
 export type SimulatorMessage = SimulatorParentToChild | SimulatorChildToParent;

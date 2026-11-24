@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from 'vitest';
-import { isSingleWidgetSurface, PANEL_SURFACES, singleWidgetSurfaceSize, surfaceSupportsTouch } from '../types';
+import { isSingleWidgetSurface, surfaceSupportsTouch } from '../types';
 import {
   sizesForSurface,
   APP_REGISTRY,
@@ -67,6 +67,18 @@ describe('appAvailableForSurface', () => {
     expect(appAvailableForSurface(lighting.meta, 'y70')).toBe(true);
     expect(appAvailableForSurface(lighting.meta, 'phone')).toBe(true);
     expect(appAvailableForSurface(lighting.meta, 'q60')).toBe(false);
+  });
+
+  it('leaves the portrait-only games out of generic display panels only', () => {
+    const portraitOnly = Object.entries(APP_REGISTRY).filter(([, a]) => a.meta.portraitOnly).map(([k]) => k).sort();
+    expect(portraitOnly).toEqual(['blocks', 'snake']);
+    for (const key of portraitOnly) {
+      const { meta } = APP_REGISTRY[key];
+      expect(appAvailableForSurface(meta, 'monitor', { deviceTouch: true, displayBound: true, genericDisplay: true })).toBe(false);
+      expect(appAvailableForSurface(meta, 'monitor', { deviceTouch: true, displayBound: true })).toBe(true);
+      expect(appAvailableForSurface(meta, 'y70')).toBe(true);
+      expect(appAvailableForSurface(meta, 'phone')).toBe(true);
+    }
   });
 
   it('shows non-touch widgets on every surface that fits a size', () => {
@@ -202,14 +214,10 @@ describe('appAvailableForSurface', () => {
   });
 });
 
-describe('blank widget', () => {
-  it('is offered on every single-widget surface at its locked size, and nowhere else', () => {
-    const blank = APP_REGISTRY.blank;
-    for (const surface of PANEL_SURFACES) {
-      const single = singleWidgetSurfaceSize(surface);
-      expect(appAvailableForSurface(blank.meta, surface), surface).toBe(single !== undefined);
-      if (single) expect(sizesForSurface(blank.meta, surface), surface).toEqual([single]);
-    }
+describe('removed blank widget', () => {
+  it('is gone from the registry and the catalog', () => {
+    expect(APP_REGISTRY.blank).toBeUndefined();
+    expect(getCatalogEntries().map(([type]) => type)).not.toContain('blank');
   });
 });
 
@@ -381,15 +389,24 @@ describe('marketplace listing derives from the preinstalled + page signal', () =
     expect(appAvailableForSurface(meta, 'y70')).toBe(true);
   });
 
+  it('keeps an app whose manifest names only the retired kraken surface on round glass and off the rest', () => {
+    _seedMarketplaceRegistryForTests([
+      listing({ id: 'com.hellonexus.kraken-only', name: 'K', source: 'user', sizes: ['2x2round'], surfaces: ['kraken'] }),
+    ]);
+    const meta = lookupApp(typeForMarketplace('com.hellonexus.kraken-only'))!.meta;
+    expect(meta.surfaces).toEqual(['lcd-round']);
+    expect(appAvailableForSurface(meta, 'lcd-round')).toBe(true);
+    expect(appAvailableForSurface(meta, 'lcd-square')).toBe(false);
+    expect(appAvailableForSurface(meta, 'y70')).toBe(false);
+  });
+
   it('accepts 2x2round (round glass) and offers it only on the surfaces that use it', () => {
     _seedMarketplaceRegistryForTests([
       listing({ id: 'com.hellonexus.aquarium', name: 'Aquarium', source: 'user', sizes: ['2x2round'] }),
     ]);
     const meta = lookupApp(typeForMarketplace('com.hellonexus.aquarium'))!.meta;
     expect(meta.sizes).toEqual(['2x2round']);
-    // kraken and lcd-round both lock to the round tile.
-    expect(appAvailableForSurface(meta, 'kraken')).toBe(true);
-    expect(sizesForSurface(meta, 'kraken')).toEqual(['2x2round']);
+    // lcd-round locks to the round tile.
     expect(appAvailableForSurface(meta, 'lcd-round')).toBe(true);
     expect(sizesForSurface(meta, 'lcd-round')).toEqual(['2x2round']);
     // 2x2round is reserved off every multi-widget surface, same as q60's 2x4.

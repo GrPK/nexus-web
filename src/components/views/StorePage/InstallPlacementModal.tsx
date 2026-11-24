@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { Check, LayoutGrid, Plus, Replace } from 'lucide-react';
+import { Check, LayoutDashboard, Plus, Replace } from 'lucide-react';
 import classNames from 'classnames';
 import { Overlay } from '../../common/Overlay/Overlay';
 import { Button } from '../../common/Button/Button';
@@ -25,7 +25,7 @@ const STAGE = { width: 216, height: 236 };
 const LENS_ASPECT = 0.4;
 // The magnified tile keeps the tile's own aspect inside this box.
 const LENS_BOX = { width: 120, height: 120 };
-const ROUND_SURFACES = new Set(['kraken', 'lcd-round']);
+const ROUND_SURFACES = new Set(['lcd-round']);
 
 function fit(aspect: number, box: { width: number; height: number }) {
   return aspect >= box.width / box.height
@@ -140,7 +140,7 @@ function PlacementPreview({ plan, screenshot, iconSrc }: {
 }
 
 function TargetIcon({ iconSrc }: { iconSrc: string | null }) {
-  if (!iconSrc) return <span className={styles.targetIcon}><LayoutGrid size={22} /></span>;
+  if (!iconSrc) return <span className={styles.targetIcon}><LayoutDashboard size={22} /></span>;
   return (
     <span className={styles.targetIcon}>
       <span className={styles.deviceGlyph} style={{ ['--device-icon' as string]: `url(${iconSrc})` }} />
@@ -290,8 +290,8 @@ export function InstallPlacementModal({ app, iconSrc, devices, dashboardColumns,
       </div>
 
       <footer className={styles.footer}>
-        <span className={styles.count}>{t('store.place.selected', { selected: selected.size, total: plans.length })}</span>
         <Button tone="neutral" size="lg" onClick={skip} disabled={committing}>{t('store.place.skip')}</Button>
+        <span className={styles.count}>{t('store.place.selected', { selected: selected.size, total: plans.length })}</span>
         <Button
           tone="accent"
           size="lg"

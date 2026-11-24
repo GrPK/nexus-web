@@ -10,6 +10,7 @@ import { SearchInput } from '../../../components/common/SearchInput/SearchInput'
 import { withMediaFetchSlot as withIconSlot } from '../../../lib/mediaFetchSlot';
 import { useTopicCallback } from '../../../hooks/useMultiplexSocket';
 import styles from './AppPicker.module.scss';
+import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
 
 interface Shortcut {
   id: string;
@@ -258,7 +259,7 @@ function AppRow({ app, selected, unavailable, title, onSelect }: {
       loadedRef.current = true;
       void withIconSlot(async () => {
         if (cancelled) return;
-        const blob = await fetchServiceBlob(app.iconPath);
+        const blob = await fetchServiceBlob(app.iconPath, { mayBeCached: true });
         if (!cancelled && blob && blob.size > 0) {
           const url = URL.createObjectURL(blob);
           revoke = url;
@@ -278,20 +279,21 @@ function AppRow({ app, selected, unavailable, title, onSelect }: {
   }, [app.iconPath]);
 
   return (
-    <button
-      ref={rowRef}
-      type="button"
-      className={`${styles.appRow} ${selected ? styles.appRowSelected : ''} ${unavailable ? styles.appRowTaken : ''}`}
-      onClick={onSelect}
-      title={unavailable ?? title}
-      aria-disabled={unavailable ? true : undefined}
-    >
-      {iconUrl
-        ? <img src={iconUrl} className={styles.rowIcon} alt="" />
-        : <AppWindow size={20} className={styles.rowIconFallback} />
-      }
-      <span className={styles.rowName}>{app.name}</span>
-    </button>
+    <HoverTooltip body={unavailable ?? title}>
+      <button
+        ref={rowRef}
+        type="button"
+        className={`${styles.appRow} ${selected ? styles.appRowSelected : ''} ${unavailable ? styles.appRowTaken : ''}`}
+        onClick={onSelect}
+        aria-disabled={unavailable ? true : undefined}
+      >
+        {iconUrl
+          ? <img src={iconUrl} className={styles.rowIcon} alt="" />
+          : <AppWindow size={20} className={styles.rowIconFallback} />
+        }
+        <span className={styles.rowName}>{app.name}</span>
+      </button>
+    </HoverTooltip>
   );
 }
 
@@ -329,7 +331,7 @@ export function useAppIcon(appId: string | undefined): string | null {
     const attempt = async () => {
       const retry = await withIconSlot(async () => {
         if (cancelled) return false;
-        const { blob, status } = await fetchServiceBlobWithStatus(`/shortcuts/icon?targetId=${encodeURIComponent(appId)}`);
+        const { blob, status } = await fetchServiceBlobWithStatus(`/shortcuts/icon?targetId=${encodeURIComponent(appId)}`, { mayBeCached: true });
         if (cancelled) return false;
         if (blob && blob.size > 0) {
           const url = URL.createObjectURL(blob);

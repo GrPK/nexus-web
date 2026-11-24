@@ -1,4 +1,5 @@
 @use '../../../styles/interactions' as *;
+@use '../../../styles/text' as *;
 @use '../../styles/flexGap' as *;
 // Two-column shape (mirrors LightingPage): main pane on the left holds the
 // trend chart + curves list; the right sidebar holds the fan cards. The
@@ -27,7 +28,7 @@
   font-weight: var(--weight-body);
   cursor: default;
 }
-.offStatusLabel { letter-spacing: 0.02em; }
+.offStatusLabel { letter-spacing: calc(0.02em + var(--small-tracking, 0em)); }
 // The desktop page's placement: right end of the Curves header, capped at the
 // same control height as the fan header's buttons so the two headers keep one
 // row height whether or not the notice is showing.
@@ -105,6 +106,9 @@
 }
 
 .headerLeft { grid-column: 1; }
+
+// The 2D / 3D switch sits at the right end of the canvas header.
+.viewSwitch { margin-left: auto; }
 // min-width lets the title ellipsize instead of pushing the badge and the
 // action out of the column, the same way the fan header's title group does.
 .headerRight {
@@ -243,7 +247,7 @@
   border-radius: var(--radius-sm);
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em + var(--small-tracking, 0em));
   color: var(--text-dim);
 }
 .deviceGroupName {
@@ -255,30 +259,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-// The Disconnected group renders as a button so the whole header strip is
-// clickable to expand. Same shape as the other group headers; just nukes
-// the default button chrome.
-.disconnectedHeader {
-  width: 100%;
-  background: none;
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-  color: inherit;
-  transition: background var(--ease-fast);
-  // Same hover fill as the sidebar nav tabs.
-  &:hover {
-    background: color-mix(in srgb, var(--surface) 50%, transparent);
-  }
-  // A collapsed group wears the hover fill; hover lifts it to the full surface.
-  &[aria-expanded='false'] {
-    background: color-mix(in srgb, var(--surface) 50%, transparent);
-    &:hover {
-      background: var(--surface);
-    }
-  }
-}
 .disconnectedChevron {
   display: inline-block;
   width: 0.75rem;
@@ -422,18 +402,18 @@
 .calRange { color: var(--text-dim); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--type-mini); }
 .calBadge, .calBadgeSmall {
   padding: 0.1rem 0.45rem; border-radius: var(--radius-sm); font-size: 0.65rem;
-  font-weight: var(--weight-strong); text-transform: uppercase; letter-spacing: 0.04em;
+  font-weight: var(--weight-strong); text-transform: uppercase; letter-spacing: calc(0.04em + var(--small-tracking, 0em));
   white-space: nowrap;
 }
 .calBadge { font-size: 0.7rem; }
-.calUnresponsive { background: rgba(107, 114, 128, 0.15); color: var(--text-dim); }
+.calUnresponsive { display: inline-flex; align-items: center; gap: 4px; background: rgba(107, 114, 128, 0.15); color: var(--text-dim); }
 
 // ── Fan Card ───────────────────────────────────────────────────────────────
 // Styled like the lighting device card: snug padding, full-width in the
 // sidebar column, name on top, RPM meta + duty bar + dropdown beneath.
 .fanCard {
   position: relative;
-  // Row, matching the lighting rail: the select box sits centred against the
+  // Row, matching the lighting rail: the select box sits centered against the
   // full card height and the fan's own stack sits beside it.
   display: flex; align-items: center; gap: 0.6rem;
   padding: 0.6rem 0.75rem;
@@ -443,7 +423,7 @@
   // including while the pointer is down, matching .deviceCard exactly.
   cursor: pointer;
   transition: border-color var(--ease-fast) ease, background var(--ease-fast) ease, opacity var(--ease-fast) ease;
-  &:hover { border-color: var(--border-strong); }
+  @include interactive-hover;
 }
 
 .fanModeRow {
@@ -455,10 +435,40 @@
   > :first-child { flex: 1 1 auto; min-width: 0; }
 }
 
-// Stands in for the dropdown's pin icon on the rows that have no dropdown.
 .fanPinGlyph {
   color: var(--text-dim);
   flex: 0 0 auto;
+}
+
+// The pin button: inside the mode dropdown's box, or beside the state badge on
+// the rows that have no dropdown.
+.fanPinBtn {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--text);
+  }
+}
+
+// Hover (and keyboard focus) swaps the pin for the crossed pin: a press unpins.
+.fanPinOff,
+.fanPinBtn:hover .fanPinOn,
+.fanPinBtn:focus-visible .fanPinOn {
+  display: none;
+}
+
+.fanPinBtn:hover .fanPinOff,
+.fanPinBtn:focus-visible .fanPinOff {
+  display: inline;
 }
 
 // The role picker is an inline <Popover>, so it paints inside this card's
@@ -470,7 +480,7 @@
   z-index: var(--z-dropdown);
 }
 
-.fanCardTarget {
+.fanCard.fanCardTarget {
   border-color: var(--accent);
 }
 
@@ -492,9 +502,8 @@
   }
 }
 
-.fanCardSelected {
-  border-color: var(--accent);
-  background: var(--surface-selected, color-mix(in srgb, var(--accent) 12%, transparent));
+.fanCard.fanCardSelected {
+  @include interactive-selected;
 }
 
 .fanCardBody {
@@ -689,14 +698,20 @@
   border: none;
   border-radius: var(--radius-sm);
   color: var(--text-dim);
+  font: inherit;
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em + var(--small-tracking, 0em));
   font-weight: var(--weight-strong);
   cursor: pointer;
   text-align: left;
   transition: background var(--ease-fast);
-  &:hover { background: rgba(255, 255, 255, 0.04); }
+  &:hover { background: var(--devices-row-hover); }
+  // A collapsed group wears the row wash; hover firms it up.
+  &[aria-expanded='false'] {
+    background: var(--devices-row-alt);
+    &:hover { background: var(--devices-row-hover); }
+  }
   &:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
@@ -804,7 +819,7 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.7rem;
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   padding: 0.2rem 0.45rem;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
@@ -956,7 +971,7 @@
 .mixSectionLabel {
   font-size: var(--type-small);
   color: var(--text-dim);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   font-weight: var(--weight-body);
   text-transform: none;
   white-space: nowrap;
@@ -1117,7 +1132,28 @@
 .gridLine { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4; }
 // Dashed ceiling line (e.g. the turbo-off duty cap on the Q-series curves).
 .curveLimitLine { stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.85; }
+.curveMarkerLine { stroke: var(--text-dim); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.7; }
+// Labels ride the top of the chart; pointer events pass through to the handles.
+.curveMarkers { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
+.curveMarker {
+  position: absolute;
+  top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px;
+  transform: translateX(-50%);
+  @include text-caption;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  background: var(--bg);
+  border-radius: var(--radius);
+  &[data-edge='start'] { transform: none; }
+  &[data-edge='end'] { transform: translateX(-100%); }
+}
 .curvePoint { fill: var(--accent); stroke: #fff; stroke-width: 2; }
+.curvePointStatic { fill: var(--accent); pointer-events: none; }
 
 // Live temperature indicator overlaid on the graph: vertical line from the
 // x-axis up through the curve so the user can see where the current reading
@@ -1140,7 +1176,7 @@
   font-variant-numeric: tabular-nums;
   font-size: 9px;
   font-weight: var(--weight-strong);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
 }
 // Dot where the temperature line meets the curve.
 .tempDot {

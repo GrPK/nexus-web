@@ -1,21 +1,22 @@
 @use '../../../styles/flexGap' as *;
 
 .dial {
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
   width: 100%;
   padding: 6px 6px 8px;
-
-  @include vgap(6px);
 }
 
+// The graphic sits behind the centered readout, as in the tick ring.
 .svgWrap {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -24,8 +25,6 @@
 .svg {
   width: 100%;
   height: 100%;
-  transform: scale(var(--gauge-figure-scale, 1));
-  transform-origin: 50% 50%;
 }
 
 .tickOn,
@@ -42,17 +41,9 @@
   stroke: var(--gauge-track);
 }
 
-.needle {
-  stroke: var(--panel-accent);
-  stroke-width: 3;
-  stroke-linecap: round;
-}
-
-.hub {
-  fill: var(--panel-accent);
-}
-
 .info {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -64,7 +55,7 @@
 }
 
 .value {
-  font-size: 1.4em;
+  font-size: 1.6em;
   font-weight: var(--weight-display);
   letter-spacing: -0.02em;
   line-height: 1;
@@ -75,8 +66,7 @@
   font-size: var(--type-gauge-caption);
   font-weight: var(--weight-strong);
   color: var(--text-dim);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: calc(0.04em + var(--small-tracking, 0em));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

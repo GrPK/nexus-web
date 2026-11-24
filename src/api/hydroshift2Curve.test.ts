@@ -9,9 +9,21 @@ vi.mock('./service', () => ({
   postServiceForm: (...a: unknown[]) => postForm(...a),
 }));
 
-import { hydroShift2CurveMediaPreviewUrl, uploadHydroShift2CurveMedia } from './hydroshift2Curve';
+import {
+  HYDROSHIFT2_CURVE_LIGHTING_API, getHydroShift2CurveLighting, hydroShift2CurveMediaPreviewUrl, uploadHydroShift2CurveMedia,
+} from './hydroshift2Curve';
+import { fetchService, putService } from './service';
 
 beforeEach(() => postForm.mockReset());
+
+describe('HydroShift II Curve edge lighting', () => {
+  it('reads and writes the edge lighting at its own path', async () => {
+    await getHydroShift2CurveLighting();
+    expect(fetchService).toHaveBeenCalledWith('/devices/lianli-hydroshift2-curve/lighting');
+    await HYDROSHIFT2_CURVE_LIGHTING_API.set({ mode: 'canvas' });
+    expect(putService).toHaveBeenCalledWith('/devices/lianli-hydroshift2-curve/lighting', { mode: 'canvas' });
+  });
+});
 
 describe('uploadHydroShift2CurveMedia', () => {
   it('posts the file and the serialized crop as multipart', async () => {

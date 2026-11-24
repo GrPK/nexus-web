@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Lock, SatelliteDish } from 'lucide-react';
+import { Lock, Plus, SatelliteDish } from 'lucide-react';
 import {
-  DndContext, DragOverlay, MeasuringStrategy, PointerSensor,
+  DndContext, DragOverlay, MeasuringStrategy, PointerSensor, type PointerSensorOptions,
   useSensor, useSensors,
   type DragMoveEvent,
   type DragOverEvent,
@@ -9,7 +9,9 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, type SortingStrategy } from '@dnd-kit/sortable';
 import { backdropHintFromUrl } from './background/panelBackground';
-import { PanelDisplayBoundProvider } from './widgets/common/PanelDisplayBoundContext';
+import { PanelDigitizerProvider, PanelDisplayBoundProvider, PanelGenericDisplayProvider } from './widgets/common/PanelDisplayBoundContext';
+import { usePanelFpsCap } from './engine/usePanelFpsCap';
+import { streamFrameCap } from '../lib/framePacer';
 import { INERT_PANEL_RECORD, usePanelRecord, type PanelRecordState } from './engine/usePanelRecord';
 import { usePanelLayout } from './engine/usePanelLayout';
 import { useOemAppSeed } from './engine/useOemAppSeed';
@@ -35,8 +37,8 @@ import { TouchViaPointerContext, useTouchViaPointer } from './engine/touchViaPoi
 import { useLongPress } from './engine/useLongPress';
 import { usePanelTextSelectionGuard } from './engine/usePanelTextSelectionGuard';
 import { usePanelViewportLock } from './engine/usePanelViewportLock';
-import { panelWidgetPaddingRatio, sizeToSpan } from './engine/grid';
-import { layoutRowExtent, overflowLayout, repaginatePanelLayout, restoreOverflowPositions, type PaginateCapacity } from './engine/paginate';
+import { panelWidgetPaddingRatio, sizeToSpan, type GridSpan } from './engine/grid';
+import { firstPageView, foldIntoFirstPage, heldPages, layoutRowExtent, overflowLayout, repaginatePanelLayout, restoreOverflowPositions, withHeldPages, type PaginateCapacity } from './engine/paginate';
 import {
   BLANK_PAGE_ID,
   allCellsForPage,
@@ -49,6 +51,13 @@ import {
   tryResizeWidget,
 } from './engine/panelLayoutOps';
 import { useWidgetResizeMotion } from './engine/useWidgetResizeMotion';
+import { AdaptivePointerSensor, DRAG_DISTANCE_PX, DRAG_HOLD_TOLERANCE_PX, dragActivationFor } from './engine/pointerDragSensor';
+import { resolveWidgetsLocked } from './engine/widgetLock';
+import { useDesktopImport } from './engine/useDesktopImport';
+import { editTargetGone, latestOr, useSyncLatestLayout } from './engine/latestLayout';
+import { useDisplayTargets } from './engine/useDisplayTargets';
+import { panelHostKeys, usePanelActivatable, usePanelFrost, usePanelHitTest, usePanelRaise } from './device/usePanelHostSync';
+import { panelHostAvailable, panelHitTestBound } from './device/panelHostBridge';
 import { PanelPager } from './chrome/PanelPager';
 import { PanelPageIndicator } from './chrome/PanelPageIndicator';
 import { PanelActionsTray } from './chrome/PanelActionsTray';
@@ -57,6 +66,8 @@ import { PanelScreenSleep } from './chrome/PanelScreenSleep';
 import { PanelSwipeHint } from './chrome/PanelSwipeHint';
 import { hasTouchInput, usePanelSwipeOnboarding } from './engine/usePanelSwipeOnboarding';
 import { PanelImmersiveOverlay } from './overlays/PanelImmersiveOverlay';
+import { webViewHost } from './webview/webViewHost';
+import { webViewSuppressedBy } from './webview/webViewVisibility';
 import {
   canMarkImmersiveOnLoad,
   immersiveOnLoadResolvable,
@@ -71,17 +82,26 @@ import type { DeckEditView } from './widgets/types';
 import { WidgetContextMenu } from './widgets/common/WidgetContextMenu';
 import { useDeckInstance, DeckInstanceProvider } from './widgets/deck/useDeckInstance';
 import { innerGridForSize } from './widgets/deck/deckLayout';
+import { PanelSkinScope, type PanelSkinScopeValue } from '../components/common/ThemeScope/PanelSkinScope';
+import { panelFontAttrs, panelSkinScopeAttrs } from './theme/panelSkin';
+import { useSkinStyles } from './skins/skinLoader';
 import { PanelGaugeGradientProvider, type PanelGaugeGradientValue } from './widgets/common/PanelGaugeGradientContext';
+import { PanelDeviceIdProvider } from './widgets/common/PanelDeviceIdContext';
 import { PanelImmersiveOpenProvider } from './widgets/common/PanelImmersiveContext';
+import { PanelOpenWidgetProvider } from './widgets/common/PanelOpenWidgetContext';
+import { HoverTooltip } from '../components/common/HoverTooltip/HoverTooltip';
 import { PanelOpaqueProvider } from './widgets/common/PanelOpaqueContext';
 import { resolveGaugeGradient } from './theme/gaugeGradient';
 import { useDashboardGaugeGradient } from './engine/useDashboardGaugeGradient';
-import { createOverlayWidget, deleteOverlayWidget, listOverlayWidgets } from '../api/overlay';
+import { savePreferences } from '../api/profiles';
 import { ErrorBoundary } from '../components/common/ErrorBoundary/ErrorBoundary';
 import { ConfirmModal } from '../components/common/ConfirmModal/ConfirmModal';
-import { useMultiplex, useTopic, useTopicCallback } from '../hooks/useMultiplexSocket';
-import { useServiceStatus, HOST_DISPLAY_OFFLINE_GRACE_MS } from '../hooks/useServiceStatus';
-import { usesTouchPanelChrome, supportsDesktopWallpaper, wiredPanelClass } from './device/wiredPanel';
+import { useMultiplex, useTopic } from '../hooks/useMultiplexSocket';
+import { useRestrictedMode } from '../hooks/useRestrictedMode';
+import { restrictedAllowsWidget } from './engine/restrictedMode';
+import { PanelRestrictedProvider } from './engine/PanelRestrictedContext';
+import { useServiceStatus } from '../hooks/useServiceStatus';
+import { usesTouchPanelChrome, supportsDesktopWallpaper, wiredPanelClass, panelOfflineGrace } from './device/wiredPanel';
 import { useUiSettings } from '../hooks/useUiSettings';
 import {
   isPinnableAppKey,
@@ -92,9 +112,11 @@ import { PanelOfflineOverlay } from './overlays/PanelOfflineOverlay';
 import { isInsecureBrowserPanel } from './overlays/PanelInsecureBanner';
 import { PanelSentry } from './overlays/PanelSentry';
 import { useTranslation } from '../lib/i18n';
-import { DEFAULT_ACCENT, applyHtmlChromeTheme } from '../lib/settings';
+import { DEFAULT_ACCENT, applyHtmlChromeTheme, syncedAppThemeMode } from '../lib/settings';
+import { openAppAt } from '../api/displays';
 import { patchPanelDevice, type PanelDeviceCapabilitiesDto } from '../api/panel';
-import { isRemotePaired, isTunnelActive } from '../api/service';
+import { isRemotePaired, isTunnelActive, postService } from '../api/service';
+import { webViewOpenUrl } from './widgets/web-view/webViewUrl';
 import { createUuid } from '../lib/uuid';
 import { spawnDropRing } from '../lib/dropRing';
 import {
@@ -103,13 +125,23 @@ import {
   type PanelSurface,
   type PanelWidget,
   type PanelWidgetSize,
+  type ForcedGrid,
+  type ChromeGrid,
 } from './types';
-import { isSingleWidgetSurface, panelCanvasEditable, panelLayoutDpi, forcedGridOf, panelLayoutSurface, panelShortSideSlots, surfaceAllowsPages, surfaceSupportsTouch } from './types';
+import { recordWidgetSizeOf } from './engine/recordWidgetSize';
+import { kioskViewportSettled, recordCanvasOf } from './engine/recordCanvas';
+import { kioskViewportReporter } from './engine/kioskViewportReport';
+import { largeChromeGrid, isSingleWidgetSurface, surfaceDisplayShape, cellInputOf, widgetInputOf, panelCanvasEditable, panelLayoutDpi, forcedGridOf, panelLayoutSurface, panelShortSideSlots, surfaceAllowsPages, surfaceSupportsTouch, isGenericDisplayPanel, genericSinglePage } from './types';
 import { PanelGlassSurfaceProvider } from './widgets/common/PanelGlassSurfaceContext';
 import { q60OfflineClockPages } from './engine/q60OfflineClock';
+import { tileTransposed } from './engine/tileOrientation';
+import { resolveRecordRotation } from '../components/views/DevicePage/panelRotation';
 import { inferSurfaceFromViewport } from './device/inferSurface';
+import { isLocalPanelClient } from './background/panelAudio';
+import { panelSystemFontsAvailable, splitPanelFontStyle } from './theme/panelFont';
 import { PanelBackgroundShader } from './background/PanelBackgroundShader';
 import { PanelBackgroundMedia } from './background/PanelBackgroundMedia';
+import { PanelBackgroundSolid } from './background/PanelBackgroundSolid';
 import { PanelBackgroundSlideshow } from './background/PanelBackgroundSlideshow';
 import { PanelBackgroundDesktop } from './background/PanelBackgroundDesktop';
 import { customTextVars, DEFAULT_CUSTOM_TEXT_COLOR, useAutoTextColor } from './theme/textColor';
@@ -123,15 +155,22 @@ import {
   type DragGestureState,
   PANEL_DRAG_START_THRESHOLD_PX,
   buildPanelCollisionDetection,
+  findWidgetById,
   isDashboardClickthroughType,
+  isPanelBackgroundTarget,
+  clickOpensBackgroundMenu,
+  widgetOpenTab,
+  appRouteForWidget,
   noopCellPointers,
   parseDragTarget,
+  showWidgetMoreActions,
 } from './engine/panelLayoutHelpers';
 import {
   DEFAULT_SURFACE_DPI,
   DESKTOP_ACTION_TRAY_HEIGHT,
   MAX_PANEL_PAGES,
   PHONE_WIDGET_REFERENCE_CELL,
+  cssPxPerMm,
   densityShortSideSlots,
   estimateRuntimePanelDpi,
   runtimeDensityShortSideSlots,
@@ -140,8 +179,11 @@ import {
   useViewportLandscape,
   usePanelPageScrollLock,
 } from './engine/panelGrid';
+import { CONTROL_CENTER_ENGAGE_MM } from './engine/controlCenterGesture';
+import { TRAY_ENGAGE_TRAVEL_MM } from './engine/gestureThresholds';
 import {
   useIsLandscape,
+  useIsWideLcd,
   usePhoneContentScale,
   usePhonePanelManifest,
 } from './device/panelPhone';
@@ -165,6 +207,10 @@ import {
 } from './theme/panelTheme';
 import { useFocusStaticBackground, withStaticBackground } from './background/focusStaticBackground';
 import { PanelEditorSheet, type SheetMode } from './editor/PanelEditorSheet';
+import { OverlayScaleContext } from '../components/common/Overlay/overlayScale';
+import { Overlay } from '../components/common/Overlay/Overlay';
+import { IncomingPairCard } from '../app/IncomingPairModal';
+import { usePairApprovalRequest } from '../hooks/usePairApprovalRequest';
 import type { PanelThemeSettingsSection } from './editor/PanelThemeSettings';
 import {
   DragTargetHighlight,
@@ -172,6 +218,14 @@ import {
   PanelDragOverlayCell,
   PanelTouchCell,
 } from './dnd/PanelDragCells';
+import { BackgroundHoverLayer, BackgroundSplitHint, type BackgroundMenuPoint } from './dnd/BackgroundEditHint';
+import { isRoomyFreeRect, largestFreeRect, splitOrientation, type HintRect } from './engine/hintGeometry';
+import { useBackgroundHoverIntent } from './engine/useBackgroundHoverIntent';
+import { FreeformResizeFrame } from './dnd/FreeformResizeFrame';
+import { useFreeformResize } from './engine/useFreeformResize';
+import { clampFreeformSize, cornerRoom, freeformSnapSpans, spanToSize, type FreeformRect } from './engine/freeformResize';
+import { hoverResizeAllowed, hoverTargetId } from './engine/hoverResize';
+import { deckKeyAt } from './widgets/deck/deckKeyAt';
 
 // Window during which the closing keyframe (or hand-driven swipe glide) plays
 // before the editor sheet unmounts. Matches the SETTLE_MS / settling transition
@@ -179,6 +233,43 @@ import {
 // is removed.
 const EDITOR_EXIT_MS = 240;
 const WIDGET_RESIZE_MOTION_MS = 220;
+const NO_SPANS: readonly GridSpan[] = [];
+const EMPTY_IMPORT_LAYOUT: PanelLayout = { layoutSchemaVersion: 2, surface: 'monitor', pages: [{ id: 'page-1', widgets: [] }] };
+const NO_ROOM = { tl: false, tr: false, bl: false, br: false };
+
+// Corners snap to a widget's declared sizes that fit; opted-in widgets also get every span of at least 4x4 beyond the declared sizes.
+function resizeSpansForType(
+  type: string,
+  surface: PanelSurface,
+  deviceTouch: boolean | undefined,
+  forcedGrid: ForcedGrid | undefined,
+  bounds: { cols: number; rows: number },
+): GridSpan[] {
+  const meta = lookupApp(type)?.meta;
+  if (!meta || isSingleWidgetSurface(surface)) return [];
+  const declared = sizesForSurface(meta, surface, deviceTouch, forcedGrid).filter(size => size !== '2x2round');
+  return freeformSnapSpans(declared, bounds, Boolean(meta.freeform));
+}
+// A press that stays this close and ends within a hold is a tap, not the start of a drag.
+const FREEFORM_TAP_SLOP_PX = 4;
+const FREEFORM_TAP_MAX_MS = PANEL_CONTEXT_MENU_TRIGGER_MS;
+// Waits before a failed background media is tried again; the last step repeats.
+const MEDIA_RETRY_MS = [5_000, 15_000, 60_000] as const;
+
+// Both drag sensors register on every cell and dnd-kit lets the last-registered activator take a press, which in resize mode is this one.
+// Presses on any other tile never reach it: the capture-phase swallow ends the mode first.
+const onResizeTile = (event: Event) => event.target instanceof Element && event.target.closest('[data-resize-selected="true"]') !== null;
+const pointerActivator = (accept: (event: PointerEvent) => boolean) => [{
+  eventName: 'onPointerDown' as const,
+  handler: ({ nativeEvent: event }: { nativeEvent: PointerEvent }, { onActivation }: PointerSensorOptions) => {
+    if (!event.isPrimary || event.button !== 0 || !accept(event)) return false;
+    onActivation?.({ event });
+    return true;
+  },
+}];
+class ResizeTilePointerSensor extends PointerSensor {
+  static activators = pointerActivator(onResizeTile);
+}
 
 export interface PanelLayoutState {
   layout: PanelLayout;
@@ -203,29 +294,56 @@ export default function PanelApp({ deviceId }: { deviceId: string }) {
   // The record's own capabilities where it has them; a viewport inference
   // keeps the panel mounting when the server has no record for this id.
   const caps = record?.capabilities;
+  const viewportWidth = record?.kioskViewport?.cssWidth;
+  const viewportHeight = record?.kioskViewport?.cssHeight;
+  const viewportDpr = record?.kioskViewport?.dpr;
   const resolved = useMemo(() => {
+    const kioskViewport = viewportWidth && viewportHeight ? { cssWidth: viewportWidth, cssHeight: viewportHeight, dpr: viewportDpr ?? 1 } : undefined;
+    const canvas = recordCanvasOf({ kioskViewport, renderWidth: record?.renderWidth, renderHeight: record?.renderHeight, capabilities: { cssWidth: caps?.cssWidth, cssHeight: caps?.cssHeight, dpr: caps?.dpr } });
     const glassSurface = (caps?.surface ?? inferSurfaceFromViewport(false)) as PanelSurface;
-    const surface = panelLayoutSurface(glassSurface, caps?.family, record?.widgetSize);
+    const widgetSize = recordWidgetSizeOf(
+      { widgetSize: record?.widgetSize, gridSlots: record?.gridSlots, displayId: record?.displayId, kioskViewport, capabilities: { family: caps?.family, cssWidth: caps?.cssWidth, cssHeight: caps?.cssHeight, dpr: caps?.dpr, dpi: caps?.dpi } },
+      glassSurface,
+    );
+    const surface = panelLayoutSurface(glassSurface, caps?.family, widgetSize);
+    const rotation = resolveRecordRotation({ rotation: record?.rotation, flip180: record?.flip180, portrait: record?.portrait });
     const relaid = surface !== glassSurface;
-    const dpi = panelLayoutDpi(glassSurface, caps?.family, record?.widgetSize, caps?.dpi, DEFAULT_SURFACE_DPI);
+    const dpi = panelLayoutDpi(glassSurface, caps?.family, widgetSize, caps?.dpi, DEFAULT_SURFACE_DPI);
     // A kiosk fills its monitor, so the record's size is the canvas the runtime grid
     // measures; it follows a resolution change.
-    const densitySlots = caps?.cssWidth && caps.cssHeight
-      ? densityShortSideSlots(caps.cssWidth, caps.cssHeight, caps.dpr || 1, dpi ?? estimateRuntimePanelDpi(surface))
+    const densitySlots = canvas
+      ? densityShortSideSlots(canvas.width, canvas.height, canvas.dpr, dpi ?? estimateRuntimePanelDpi(surface))
       : runtimeDensityShortSideSlots(surface, dpi);
+    // A quarter-turn render swaps the single tile's axes to follow the effective size.
+    const transposedTile = tileTransposed(surface, rotation, canvas);
     return {
       surface,
       glassSurface,
+      transposedTile,
       // Touch and density belong to the glass, whichever surface it lays out as.
       touch: relaid ? surfaceSupportsTouch(glassSurface, caps?.touch) : caps?.touch,
       dpi,
-      shortSideSlots: panelShortSideSlots(glassSurface, caps?.family, record?.widgetSize, densitySlots),
+      shortSideSlots: panelShortSideSlots(glassSurface, caps?.family, widgetSize, densitySlots),
+      densitySlots,
+      chromeGrid: largeChromeGrid(glassSurface, caps?.family, caps?.dpi, DEFAULT_SURFACE_DPI, densitySlots),
+      widgetSize,
       displayBound: !!record?.displayId,
     };
-  }, [caps?.surface, caps?.family, caps?.touch, caps?.dpi, caps?.cssWidth, caps?.cssHeight, caps?.dpr, record?.widgetSize, record?.displayId]);
+  }, [caps?.surface, caps?.family, caps?.touch, caps?.dpi, caps?.cssWidth, caps?.cssHeight, caps?.dpr, viewportWidth, viewportHeight, viewportDpr, record?.widgetSize, record?.gridSlots, record?.displayId, record?.rotation, record?.flip180, record?.portrait, record?.renderWidth, record?.renderHeight]);
+  // The size a retired grid density stood for is written once; the stored density is left in place.
+  const migratedSizeRef = useRef('');
+  const migrateId = record?.id;
+  const migrateSize = !record?.widgetSize && record?.gridSlots ? resolved.widgetSize : undefined;
+  useEffect(() => {
+    if (!migrateId || !migrateSize || migratedSizeRef.current === migrateId) return;
+    migratedSizeRef.current = migrateId;
+    void patchPanelDevice(migrateId, { widgetSize: migrateSize });
+  }, [migrateId, migrateSize]);
   const recordCapsRef = useRef<PanelDeviceCapabilitiesDto | null>(null);
   const hasCaps = !!caps;
   useEffect(() => { recordCapsRef.current = caps ?? null; }, [caps]);
+  // The device record's frame cap limits every draw loop on this page (see lib/framePacer).
+  usePanelFpsCap(record?.fpsCap);
   // The host's URL hint also covers the window before the record lands, which
   // is exactly when it matters; PanelContent takes the class over from here.
   useEffect(() => {
@@ -245,6 +363,16 @@ export default function PanelApp({ deviceId }: { deviceId: string }) {
   }, [connected, refetch]);
   useAppsChangedSync(refetch);
 
+  // Only a host-launched kiosk on a display-bound record knows its real window, so it reports that for the editor preview.
+  const kioskViewportRef = useRef<{ cssWidth: number; cssHeight: number; dpr: number } | null>(null);
+  kioskViewportRef.current = viewportWidth && viewportHeight ? { cssWidth: viewportWidth, cssHeight: viewportHeight, dpr: viewportDpr ?? 1 } : null;
+  const reportsViewport = !!record?.displayId && resolved.glassSurface === 'monitor';
+  useEffect(() => {
+    if (!reportsViewport) return undefined;
+    return kioskViewportReporter(window, deviceId, () => kioskViewportRef.current, (id, viewport) => {
+      void patchPanelDevice(id, { kioskViewport: viewport });
+    });
+  }, [reportsViewport, deviceId]);
   // Keep the record's viewport facts truthful across a display rotation. The
   // Y70 record is not display-bound, so the promoted-monitor topology sync
   // never rewrites it - this kiosk is the only writer - and the device page
@@ -309,6 +437,8 @@ export default function PanelApp({ deviceId }: { deviceId: string }) {
       deviceTouch={resolved.touch}
       deviceDpi={resolved.dpi}
       shortSideSlots={resolved.shortSideSlots}
+      transposedTile={resolved.transposedTile}
+      chromeGrid={resolved.chromeGrid}
       displayBound={resolved.displayBound}
     />
   );
@@ -339,20 +469,22 @@ export function PanelEmbeddedContent({ layoutState, openCatalogSignal = 0, appAc
   );
 }
 
-function PanelKioskContent({ recordState, deviceId, surface, glassSurface, deviceTouch, deviceDpi, shortSideSlots, displayBound }: { recordState: PanelRecordState; deviceId: string; surface: PanelSurface; glassSurface: PanelSurface; deviceTouch?: boolean; deviceDpi?: number; shortSideSlots?: number; displayBound?: boolean }) {
+function PanelKioskContent({ recordState, deviceId, surface, glassSurface, deviceTouch, deviceDpi, shortSideSlots, transposedTile, chromeGrid, displayBound }: { recordState: PanelRecordState; deviceId: string; surface: PanelSurface; glassSurface: PanelSurface; deviceTouch?: boolean; deviceDpi?: number; shortSideSlots?: number; transposedTile?: boolean; chromeGrid?: ChromeGrid; displayBound?: boolean }) {
   const landscape = useViewportLandscape();
   const forcedGrid = useMemo(() => forcedGridOf(shortSideSlots, landscape), [shortSideSlots, landscape]);
-  const layoutState = usePanelLayout(recordState, deviceId, surface, deviceTouch, forcedGrid);
+  const layoutState = usePanelLayout(recordState, deviceId, surface, widgetInputOf(deviceTouch, !!displayBound), forcedGrid, transposedTile);
   return (
     <ErrorBoundary
       // eslint-disable-next-line i18next/no-literal-string -- crash-boundary diagnostic id
       label="Panel"
     >
+      <PanelDeviceIdProvider value={deviceId}>
       <PanelDisplayBoundProvider value={!!displayBound}>
         <PanelGlassSurfaceProvider value={glassSurface}>
-          <PanelContent recordState={recordState} surface={surface} glassSurface={glassSurface} deviceId={deviceId} deviceTouch={deviceTouch} deviceDpi={deviceDpi} shortSideSlots={shortSideSlots} displayBound={displayBound} layoutState={layoutState} />
+          <PanelContent recordState={recordState} surface={surface} glassSurface={glassSurface} deviceId={deviceId} deviceTouch={deviceTouch} deviceDpi={deviceDpi} shortSideSlots={shortSideSlots} transposedTile={transposedTile} chromeGrid={chromeGrid} displayBound={displayBound} layoutState={layoutState} />
         </PanelGlassSurfaceProvider>
       </PanelDisplayBoundProvider>
+      </PanelDeviceIdProvider>
     </ErrorBoundary>
   );
 }
@@ -365,10 +497,14 @@ export function PanelContent({
   deviceTouch,
   deviceDpi,
   shortSideSlots,
+  transposedTile = false,
+  chromeGrid,
   displayBound = false,
+  genericDisplayOverride,
   layoutState,
   embedded = false,
   simulator = false,
+  hoverResize = false,
   simulatorTheme,
   simulatorThemeMode,
   simulatorSelectedWidgetId,
@@ -376,6 +512,8 @@ export function PanelContent({
   simulatorPreviewScale = 1,
   onSimulatorWidgetClicked,
   onSimulatorBackgroundClicked,
+  onSimulatorBackgroundMenu,
+  onSimulatorBackgroundCovered,
   onSimulatorPlaylistShown,
   openCatalogSignal,
   appAccentColor,
@@ -393,14 +531,22 @@ export function PanelContent({
   deviceDpi?: number;
   // Short-axis slot count Widget size forces on the grid.
   shortSideSlots?: number;
+  // The single-widget tile has its axes swapped (a quarter-turn render).
+  transposedTile?: boolean;
+  // The Large-size grid that sizes floating chrome; absent = the grid in use.
+  chromeGrid?: ChromeGrid;
   // True when the record is display-bound (promoted OS monitor, displayId
   // set). Distinguishes kiosk-hosted 'monitor' panels from streamed ones for
   // the desktop see-through gate.
   displayBound?: boolean;
+  // Simulator only: the editor's classification, since the inert record has no family.
+  genericDisplayOverride?: boolean;
   recordState?: PanelRecordState;
   layoutState: PanelLayoutState;
   embedded?: boolean;
   simulator?: boolean;
+  // Set only by the device page's right-side canvas: a hovering mouse shows resize corners there.
+  hoverResize?: boolean;
   simulatorTheme?: SimulatorTheme;
   simulatorThemeMode?: 'dark' | 'light';
   simulatorSelectedWidgetId?: string | null;
@@ -412,6 +558,9 @@ export function PanelContent({
   simulatorPreviewScale?: number;
   onSimulatorWidgetClicked?: (id: string) => void;
   onSimulatorBackgroundClicked?: () => void;
+  // Device-page preview: a click on free background, in this document's client pixels.
+  onSimulatorBackgroundMenu?: (point: BackgroundMenuPoint) => void;
+  onSimulatorBackgroundCovered?: (covered: boolean) => void;
   onSimulatorPlaylistShown?: (type: string | null) => void;
   openCatalogSignal?: number;
   appAccentColor?: string;
@@ -422,11 +571,22 @@ export function PanelContent({
   // iframe must not duplicate them - a second viewport lock fights the
   // parent's window scroll.
   const kioskBehavior = !embedded && !simulator;
+  // Restricted mode (active while Windows is in OOBE) on a kiosk panel, never the phone app: only lighting, media and volume stay live.
+  const restricted = useRestrictedMode(kioskBehavior && surface !== 'phone', recordState.record?.restrictedMode === true);
   usePanelViewportLock(kioskBehavior);
   usePanelPageScrollLock(kioskBehavior);
   useTopic('panel/phone/presence', kioskBehavior && surface === 'phone');
   usePhonePanelManifest(kioskBehavior && surface === 'phone');
-  const { layout, loaded, saveForbidden, hydrated, setLayout: setStoredLayout } = layoutState;
+  const { layout: fullLayout, loaded, saveForbidden, hydrated, setLayout: setFullLayout } = layoutState;
+  const genericDisplay = genericDisplayOverride ?? isGenericDisplayPanel(glassSurface, recordState.record?.capabilities?.family, displayBound);
+  // A mouse-only generic display renders its first page only; later stored pages are written back untouched.
+  const genericOnePage = genericSinglePage(genericDisplay, surface, deviceTouch);
+  const heldLayoutPages = useMemo(() => (genericOnePage ? heldPages(fullLayout) : []), [genericOnePage, fullLayout]);
+  const layout = useMemo(() => (genericOnePage ? firstPageView(fullLayout) : fullLayout), [genericOnePage, fullLayout]);
+  const setStoredLayout = useCallback(
+    (next: PanelLayout) => setFullLayout(genericOnePage ? withHeldPages(next, heldLayoutPages) : next),
+    [genericOnePage, heldLayoutPages, setFullLayout],
+  );
   const panelTheme = usePanelTheme(recordState, deviceId ?? null, kioskBehavior);
   // Simulator gets its theme from the parent via postMessage (local fetch
   // stays disabled), so effectiveTheme uses the parent-supplied state
@@ -434,18 +594,21 @@ export function PanelContent({
   // shows the default theme (its fetch never runs).
   // Render-time per-surface overrides (persisted theme intact); see
   // resolveEffectivePanelTheme for what each surface forces.
-  const baseTheme = simulator && simulatorTheme ? simulatorTheme : panelTheme.theme;
+  const storedTheme = simulator && simulatorTheme ? simulatorTheme : panelTheme.theme;
+  // The skin applies only once its CSS has loaded; until then (and if the load fails) the panel keeps the stock look.
+  const skinStylesReady = useSkinStyles(embedded ? null : storedTheme.skin);
+  const baseTheme = useMemo(
+    () => (skinStylesReady || !storedTheme.skin ? storedTheme : { ...storedTheme, skin: null }),
+    [skinStylesReady, storedTheme],
+  );
   const focusStaticMode = useFocusStaticBackground(surface, !simulator && !embedded);
   const effectiveTheme = useMemo(() => {
     const theme = resolveEffectivePanelTheme(baseTheme, surface);
     return focusStaticMode ? withStaticBackground(theme) : theme;
   }, [baseTheme, surface, focusStaticMode]);
   usePanelLanguageSync(kioskBehavior, panelTheme.prefs);
-  // In sync mode prefer the desktop's *resolved* theme (concrete dark/light,
-  // tracking the desktop OS); fall back to appThemeMode when unpublished -
-  // 'system' there would re-resolve against THIS device's OS (the wrong OS).
   const effectiveThemeMode = effectiveTheme.themeSyncWithDesktop
-    ? (effectiveTheme.appResolvedThemeMode || effectiveTheme.appThemeMode)
+    ? syncedAppThemeMode(effectiveTheme.appThemeMode, effectiveTheme.appResolvedThemeMode)
     : effectiveTheme.themeMode;
   const panelResolvedThemeMode = useResolvedPanelThemeMode(effectiveThemeMode);
   const desktopResolvedThemeMode = useDocumentResolvedThemeMode(embedded);
@@ -479,12 +642,12 @@ export function PanelContent({
   // A host-display panel (Y70/monitor) is the host's own loopback screen: a real
   // service outage drops its connections at once, so a missed ping is almost
   // always transient and it can ride one out instead of flipping offline and
-  // tearing down an open editor. Cabled surfaces (q60, USB phone) and WiFi/relay
-  // phones keep the instant offline response so a real unplug / signal loss
-  // surfaces right away.
+  // tearing down an open editor. Cabled surfaces (q60, USB phone) keep the
+  // instant offline response so a real unplug surfaces right away.
   const isHostDisplay = wiredPanelClass(glassSurface) === 'host-display';
-  const serviceStatus = useServiceStatus(kioskBehavior, isHostDisplay ? HOST_DISPLAY_OFFLINE_GRACE_MS : 0);
   const multiplex = useMultiplex();
+  const offlineGrace = panelOfflineGrace(glassSurface, multiplex?.connected ? multiplex.transport : null);
+  const serviceStatus = useServiceStatus(kioskBehavior, offlineGrace.graceMs, offlineGrace.hold);
   // The context menu's "Pin to Sidebar" gates on the current pinned-tail
   // (only pinnable types not already pinned). Always inside a
   // UiSettingsProvider - every PanelContent mount wraps one (see
@@ -496,27 +659,8 @@ export function PanelContent({
   // stays null so sidebar pointer tracking never engages. See CrossZoneDrag.
   const { setDraggingPinnableType, dropHandlerRef: sidebarDropHandlerRef } = useCrossZoneDrag();
 
-  // Overlay widgets floating on the desktop, tracked so the context menu can
-  // flip "Add to desktop" / "Remove from desktop" by whether this widget type
-  // already has an overlay instance. Only fetched on the embedded desktop.
-  const [overlayWidgets, setOverlayWidgets] = useState<{ id: string; type: string }[]>([]);
-  const overlayActive = embedded && surface === 'desktop';
-  useEffect(() => {
-    if (!overlayActive) return;
-    let cancelled = false;
-    void listOverlayWidgets().then(list => {
-      if (cancelled) return;
-      setOverlayWidgets(list.map(w => ({ id: w.id, type: w.type })));
-    });
-    return () => { cancelled = true; };
-  }, [overlayActive]);
-  // Overlay create/delete writes broadcast on the 'prefs' topic; refetch on
-  // it so add/remove reflects in the context menu immediately.
-  useTopicCallback('prefs', overlayActive, () => {
-    void listOverlayWidgets().then(list => {
-      setOverlayWidgets(list.map(w => ({ id: w.id, type: w.type })));
-    });
-  });
+  // The dashboard's menu adds a widget to any display panel that is on.
+  const { targets: displayTargets, addToDisplay } = useDisplayTargets(embedded && surface === 'desktop');
   // The HTTP /ping shares the browser's 6-connection pool and the host's CPU
   // with whatever the panel is doing, so a widget that floods the pool (deck
   // app-icon loads) or pegs the box (a benchmark run) can starve the ping past
@@ -614,7 +758,9 @@ export function PanelContent({
   // inside the iframe like on a real touch surface.
   usePanelTextSelectionGuard(rootRef, !embedded || simulator);
   const widgetPaddingRatio = panelWidgetPaddingRatio(effectiveTheme.widgetPadding);
-  const runtimeGrid = useRuntimePanelGrid(surface, rootRef, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots);
+  const runtimeGrid = useRuntimePanelGrid(surface, rootRef, simulator, deviceDpi, widgetPaddingRatio, shortSideSlots, transposedTile);
+  // Floating chrome (menus, sheets, tray) sizes from the Large grid, so a finer Widget size never shrinks it.
+  const chromeRuntimeGrid = useRuntimePanelGrid(chromeGrid?.surface ?? surface, rootRef, simulator, chromeGrid ? chromeGrid.dpi : deviceDpi, widgetPaddingRatio, chromeGrid ? chromeGrid.shortSideSlots : shortSideSlots, transposedTile);
   // The runtime grid already follows the canvas, so its shape gives the forced axis.
   const runtimeLandscape = runtimeGrid.columns > runtimeGrid.rows;
   const forcedGrid = useMemo(() => forcedGridOf(shortSideSlots, runtimeLandscape), [shortSideSlots, runtimeLandscape]);
@@ -649,10 +795,21 @@ export function PanelContent({
   const webkitSafePanelScale = surface !== 'phone'
     ? runtimeGrid.contentScale / PHONE_WIDGET_REFERENCE_CELL
     : null;
+  const webkitSafeChromeScale = surface !== 'phone'
+    ? chromeRuntimeGrid.contentScale / PHONE_WIDGET_REFERENCE_CELL
+    : null;
   const panelThemeVars = useMemo(
     () => embedded ? buildEmbeddedPanelThemeVars(appAccentColor, resolvedThemeMode) : buildPanelThemeVars(effectiveTheme, resolvedThemeMode),
     [appAccentColor, embedded, effectiveTheme, resolvedThemeMode],
   );
+  // Skin attributes for every panel-root mount, mirrored on the portal host.
+  // The embedded desktop deck stays unskinned.
+  const skinScope = useMemo<PanelSkinScopeValue | null>(() => {
+    if (embedded) return null;
+    const skinAttrs = panelSkinScopeAttrs(effectiveTheme);
+    if (!skinAttrs) return null;
+    return { attrs: { ...skinAttrs, 'data-theme': resolvedThemeMode, 'data-surface': surface }, style: panelThemeVars };
+  }, [embedded, effectiveTheme, resolvedThemeMode, surface, panelThemeVars]);
   // The panel backdrop is always the theme's dark/light background; the chosen
   // solid colour, shader, or media sits over it as an opacity-controlled
   // overlay. The embedded desktop deck paints no panel background so the
@@ -681,11 +838,26 @@ export function PanelContent({
   // parent page).
   const editorSheetThemeStyle = useMemo(
     () => (touchPanelChrome && webkitSafePanelScale != null
-      ? { ...panelThemeVars, '--panel-scale': webkitSafePanelScale, '--panel-editor-blur-scale': webkitSafePanelScale } as CSSProperties
+      ? { ...panelThemeVars, '--panel-scale': webkitSafePanelScale, '--panel-chrome-scale': webkitSafeChromeScale ?? webkitSafePanelScale, '--panel-editor-blur-scale': webkitSafePanelScale } as CSSProperties
       : { ...panelThemeVars, '--panel-editor-blur-scale': webkitSafePanelScale ?? 1 } as CSSProperties),
-    [touchPanelChrome, webkitSafePanelScale, panelThemeVars],
+    [touchPanelChrome, webkitSafePanelScale, webkitSafeChromeScale, panelThemeVars],
   );
-  const backdrop = wallpaperBackgroundAvailable && showPanelBackground
+  // Dialogs opened from the sheet (a confirm) portal to <body>, outside the
+  // sheet's zoom; hand them the same scale so they match the panel chrome.
+  const sheetOverlayScale = touchPanelChrome ? (webkitSafeChromeScale ?? webkitSafePanelScale ?? 1) : 1;
+  // Skin background mode replaces the theme layers with the skin backdrop; any other mode draws the skin tiles over the user's background.
+  const fontAttrs = useMemo(() => (embedded ? {} : panelFontAttrs(effectiveTheme)), [embedded, effectiveTheme]);
+  const skinned = skinScope !== null;
+  // A non-default font alone still needs the portal host, so sheets opened outside the panel root draw in it.
+  const portalScope = useMemo<PanelSkinScopeValue | null>(() => {
+    if (skinScope) return skinScope;
+    const { font } = splitPanelFontStyle(panelThemeVars);
+    if (embedded || !font || !fontAttrs['data-panel-font']) return null;
+    return { attrs: { ...fontAttrs, 'data-theme': resolvedThemeMode, 'data-surface': surface }, style: font };
+  }, [skinScope, embedded, panelThemeVars, fontAttrs, resolvedThemeMode, surface]);
+  // A wallpaper or desktop Rendering choice shows instead of the skin's backdrop, like any other source.
+  const skinOwnsBackdrop = skinned && effectiveTheme.backgroundMode === 'skin' && effectiveTheme.backdrop === 'theme';
+  const backdrop = wallpaperBackgroundAvailable && showPanelBackground && !skinOwnsBackdrop
     ? effectiveTheme.backdrop
     : 'theme';
   // Wallpaper redraws the desktop picture in-page; desktop paints nothing at
@@ -693,7 +865,9 @@ export function PanelContent({
   // simulator has no desktop behind its iframe, so it stands in with the
   // wallpaper rather than going transparent over the dashboard.
   const seeThrough = backdrop === 'desktop' && !simulator;
-  const showWallpaperLayer = backdrop === 'wallpaper' || (backdrop === 'desktop' && simulator);
+  // At 0% nothing of the background shows, so no layer mounts: no video decode, no shader.
+  const backgroundVisible = effectiveTheme.backgroundOpacity > 0 && !skinOwnsBackdrop;
+  const showWallpaperLayer = (backdrop === 'wallpaper' || (backdrop === 'desktop' && simulator)) && backgroundVisible;
   // html/body carry the app background from global.scss, so a transparent
   // panel root alone still paints over the desktop the kiosk is showing.
   useEffect(() => {
@@ -701,7 +875,8 @@ export function PanelContent({
     root.classList.toggle('panel-see-through', seeThrough);
     return () => root.classList.remove('panel-see-through');
   }, [seeThrough]);
-  useAutoTextColor(rootRef, effectiveTheme.textColorMode === 'adaptive');
+  // The Skin backdrop is known, so the skin's own ink already fits it: nothing to sample.
+  useAutoTextColor(rootRef, effectiveTheme.textColorMode === 'adaptive' && !skinOwnsBackdrop, resolvedThemeMode === 'dark' ? 'light' : 'dark');
   // Scoped to the widget grids, the editor dock and the drag overlay, so the panel's own sheets and menus keep the theme.
   const customTextStyle = useMemo(
     () => (effectiveTheme.textColorMode === 'custom'
@@ -709,11 +884,27 @@ export function PanelContent({
       : undefined),
     [effectiveTheme.textColorMode, effectiveTheme.textColor],
   );
-  const showBackgroundLayers = showPanelBackground && backdrop === 'theme';
-  // Frosted glass blurs what the page itself painted. Solid mode renders no
-  // frost pass (a blurred solid colour is the colour), and see-through has
-  // nothing in-page to sample.
-  const backgroundFrost = (showWallpaperLayer || (showBackgroundLayers && effectiveTheme.backgroundMode !== 'solid'))
+  const showBackgroundLayers = showPanelBackground && backdrop === 'theme' && backgroundVisible;
+  // A media background that cannot load shows the solid color instead of the bare backdrop,
+  // and retries on a growing delay so a transient error (service not ready, restart) heals.
+  const [failedMediaId, setFailedMediaId] = useState<string | null>(null);
+  const mediaRetryRef = useRef(0);
+  useEffect(() => {
+    if (failedMediaId === null) return;
+    const delay = MEDIA_RETRY_MS[Math.min(mediaRetryRef.current, MEDIA_RETRY_MS.length - 1)];
+    mediaRetryRef.current += 1;
+    const timer = window.setTimeout(() => setFailedMediaId(null), delay);
+    return () => window.clearTimeout(timer);
+  }, [failedMediaId]);
+  const mediaShowsSolid = showBackgroundLayers
+    && effectiveTheme.backgroundMode === 'media'
+    && !effectiveTheme.backgroundSlideshow
+    && (!effectiveTheme.backgroundMediaId || !effectiveTheme.backgroundMediaType
+      || failedMediaId === effectiveTheme.backgroundMediaId);
+  // Frosted glass blurs what the page itself painted. Solid and Skin modes
+  // render no frost pass (a blurred flat colour is the colour), and
+  // see-through has nothing in-page to sample.
+  const backgroundFrost = (showWallpaperLayer || (showBackgroundLayers && effectiveTheme.backgroundMode !== 'solid' && !mediaShowsSolid))
     ? effectiveTheme.backgroundFrost
     : 0;
   const panelSolidColor = useMemo(
@@ -740,7 +931,7 @@ export function PanelContent({
   const panelRootStyle = useMemo(
     () => ({
       ...panelThemeVars,
-      background: themeBackdrop,
+      ...(skinOwnsBackdrop ? { backgroundColor: effectiveTheme.backgroundOpacity >= 1 ? 'var(--skin-backdrop)' : themeBackdrop } as Record<string, string> : { background: themeBackdrop }),
       '--panel-background-solid': panelSolidColor,
       '--panel-columns': gridColumns,
       // Drag collision clamps drop rows to this.
@@ -756,7 +947,7 @@ export function PanelContent({
       // 1 everywhere but the device page's canvas preview.
       '--panel-preview-scale': previewScale,
       '--panel-preview-upscale': 1 / previewScale,
-      ...(webkitSafePanelScale != null ? { '--panel-scale': webkitSafePanelScale } : {}),
+      ...(webkitSafePanelScale != null ? { '--panel-scale': webkitSafePanelScale, '--panel-chrome-scale': webkitSafeChromeScale ?? webkitSafePanelScale } : {}),
       ...(surface === 'desktop' ? {
         '--panel-cell-size': `${runtimeGrid.cellSize}px`,
         '--panel-row-size': `${runtimeGrid.rowSize}px`,
@@ -766,7 +957,10 @@ export function PanelContent({
     }) as CSSProperties,
     [
       panelSolidColor,
+      webkitSafeChromeScale,
       themeBackdrop,
+      skinOwnsBackdrop,
+      effectiveTheme.backgroundOpacity,
       panelThemeVars,
       runtimeGrid.cellSize,
       gridColumns,
@@ -803,16 +997,48 @@ export function PanelContent({
   // ---------- Pagination derived from layout ----------
   // Widgets still get the device's own touch, so a display-only panel's widgets stay
   // non-interactive while its preview is edited by mouse.
-  const dragEditable = panelCanvasEditable(surface, deviceTouch, simulator);
+  // A display-bound panel is edited on its display with the mouse, so it needs no touch digitizer.
+  // A display's mouse reaches widgets that need a pointer, as the legacy desktop overlay's did.
+  const widgetTouch = widgetInputOf(deviceTouch, displayBound);
+  const cellTouch = cellInputOf(deviceTouch, genericDisplay);
+  const dragEditable = panelCanvasEditable(surface, deviceTouch, simulator, displayBound && kioskBehavior);
+  const backgroundMenuEnabled = simulator && Boolean(onSimulatorBackgroundMenu);
+  const singleSurface = isSingleWidgetSurface(surface);
+  const splitOrientationOf = (widget: PanelWidget) => {
+    const span = sizeToSpan(widget.size);
+    return splitOrientation(span.cols, span.rows);
+  };
+  const backgroundHoverTarget = backgroundMenuEnabled && !singleSurface;
+  const backgroundPressRef = useRef<boolean | null>(null);
+  const [backgroundArea, setBackgroundArea] = useState<HintRect | null>(null);
+  const { revealed: backgroundHover, setOver: setBackgroundHover } = useBackgroundHoverIntent(() => setBackgroundArea(measureBackgroundArea()));
+  // Widgets are read from the DOM: their rects already include padding, gaps and the label strip.
+  const measureBackgroundArea = (): HintRect | null => {
+    const root = rootRef.current;
+    if (!root) return null;
+    const canvas = root.getBoundingClientRect();
+    const widgets = Array.from(root.querySelectorAll('[data-panel-widget-id]')).map(el => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left - canvas.left, top: r.top - canvas.top, width: r.width, height: r.height };
+    });
+    const free = largestFreeRect(canvas, widgets);
+    return free && isRoomyFreeRect(free, canvas) ? free : null;
+  };
+  const mouseEditable = kioskBehavior && displayBound && dragEditable && !surfaceSupportsTouch(surface, deviceTouch) && !restricted;
   // An editable canvas hoists the focused widget above the editor's scrim, else
   // the edited widget reads dimmed under it. See .cellEditorDocked rules.
   const editorDockSupported = dragEditable;
   const isLandscape = useIsLandscape(surface);
+  // Control center only: a fixed wide LCD cannot rotate, so the immersive gates keep isLandscape.
+  const wideLcd = useIsWideLcd(surface);
+  const controlCenterLandscape = isLandscape || wideLcd;
   const capacity = useMemo<PaginateCapacity>(
     () => ({ gridCols: gridColumns, pageRows }),
     [gridColumns, pageRows],
   );
+  const latestLayoutRef = useRef<PanelLayout | null>(null);
   const setLayout = useCallback((next: PanelLayout) => {
+    latestLayoutRef.current = next;
     setStoredLayout(fittedLayout !== layout ? restoreOverflowPositions(next, layout, fittedLayout) : next);
   }, [fittedLayout, layout, setStoredLayout]);
 
@@ -827,6 +1053,8 @@ export function PanelContent({
   //                    empty page without creating it first. Persisted only
   //                    if a widget lands on it; cleared on dragEnd/dragCancel.
   const [dragArmedId, setDragArmedId] = useState<string | null>(null);
+  // A locked widget is being pulled against its rubber band; nothing is lifted or persisted.
+  const [lockDragging, setLockDragging] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [dragExtraPageId, setDragExtraPageId] = useState<string | null>(null);
 
@@ -838,6 +1066,154 @@ export function PanelContent({
     () => (fitColumns ? fittedLayout : repaginatePanelLayout(layout, capacity)),
     [fittedLayout, fitColumns, layout, capacity],
   );
+
+  // The dashboard has one page by design; a panel without touch has no way to swipe.
+  const singlePage = (embedded && surface === 'desktop') || !surfaceAllowsPages(surface, deviceTouch, displayBound && kioskBehavior, genericDisplay);
+  // Stored pages fold onto page 1 only from the host kiosk at its reported window size; a held widget is never deleted.
+  const foldPersists = kioskBehavior && displayBound && panelHostAvailable() && kioskViewportSettled(recordState.record?.kioskViewport, window);
+  useEffect(() => {
+    if (!genericOnePage || !hydrated || !foldPersists || fullLayout.pages.length <= 1) return;
+    const folded = foldIntoFirstPage(fullLayout, capacity);
+    if (folded.changed) setFullLayout(folded.layout);
+  }, [capacity, foldPersists, fullLayout, genericOnePage, hydrated, setFullLayout]);
+
+  // Resize mode is entered from the widget context menu.
+  // Hovering a tile with a mouse shows the same corners without the mode.
+  const [freeformId, setFreeformId] = useState<string | null>(null);
+  const [hoverResizeId, setHoverResizeId] = useState<string | null>(null);
+  const resizeGestureRef = useRef(false);
+  const freeformWidget = freeformId ? findWidgetById(paginatedLayout, freeformId) : undefined;
+  const resizeCols = Math.max(1, capacity.gridCols);
+  const resizeRows = Math.max(1, capacity.pageRows);
+  const resizeBounds = useMemo(() => ({ cols: resizeCols, rows: resizeRows }), [resizeCols, resizeRows]);
+  const widgetsLocked = genericDisplay && resolveWidgetsLocked(recordState.record?.widgetsLocked, fullLayout.pages.flatMap(p => p.widgets));
+  const lockedOf = () => widgetsLocked;
+  const canResizeType = (type: string, locked?: boolean) => dragEditable && !restricted && !locked && resizeSpansForType(type, surface, widgetTouch, forcedGrid, resizeBounds).length > 1;
+  const freeformActive = Boolean(freeformWidget && canResizeType(freeformWidget.type, lockedOf()));
+  const hoverWidget = !freeformId && hoverResizeId ? findWidgetById(paginatedLayout, hoverResizeId) : undefined;
+  const hoverActive = Boolean(hoverWidget && canResizeType(hoverWidget.type, lockedOf()));
+  const cornerTarget = freeformActive ? freeformWidget : hoverActive ? hoverWidget : undefined;
+  const cornerTargetId = cornerTarget?.id;
+  const cornerType = cornerTarget?.type;
+  const freeformDef = cornerTarget ? lookupApp(cornerTarget.type) : undefined;
+  const freeformSpans = useMemo(
+    () => (cornerType ? resizeSpansForType(cornerType, surface, widgetTouch, forcedGrid, resizeBounds) : NO_SPANS),
+    [cornerType, surface, widgetTouch, forcedGrid, resizeBounds],
+  );
+  // Computed from the layout the tile stands in (not a gesture's draft) and only for the tile showing corners,
+  // since each corner solves a placement per candidate span.
+  const cornerRooms = useMemo(() => {
+    const widget = cornerTargetId ? findWidgetById(paginatedLayout, cornerTargetId) : undefined;
+    if (!widget) return null;
+    const span = sizeToSpan(clampFreeformSize(widget.size, resizeBounds));
+    const canPlace = (rect: FreeformRect) => tryResizeWidget(
+      paginatedLayout, widget.id, spanToSize(rect), capacity, 1, { col: rect.col, row: rect.row }, { samePage: true },
+    ) !== null;
+    return cornerRoom({ col: widget.col, row: widget.row, cols: span.cols, rows: span.rows }, freeformSpans, resizeBounds, canPlace);
+  }, [paginatedLayout, cornerTargetId, freeformSpans, resizeBounds, capacity]);
+  const handleFreeformReject = useCallback((id: string) => triggerFlash(id), [triggerFlash]);
+  const freeform = useFreeformResize({
+    widgetId: cornerTarget?.id ?? null,
+    layout: paginatedLayout,
+    capacity,
+    snapSpans: freeformSpans,
+    onCommit: setLayout,
+    onReject: handleFreeformReject,
+  });
+  const beginResize = useCallback(() => {
+    resizeGestureRef.current = freeform.begin();
+    return resizeGestureRef.current;
+  }, [freeform]);
+  const endResize = useCallback(() => {
+    resizeGestureRef.current = false;
+    freeform.end();
+  }, [freeform]);
+  const cancelResize = useCallback(() => {
+    resizeGestureRef.current = false;
+    freeform.cancel();
+  }, [freeform]);
+  // Leaving mid-drag keeps what the drag produced.
+  const exitFreeform = useCallback(() => {
+    if (resizeGestureRef.current) endResize();
+    setFreeformId(null);
+  }, [endResize]);
+  // Resize mode ends on a tap of the resized tile, a press anywhere else, or Escape.
+  const freeformTapRef = useRef<{ x: number; y: number; at: number } | null>(null);
+  // Exit waits for the tap's click: that click must still be swallowed while the mode is active, or it would fire a control in the tile.
+  const freeformTapPendingRef = useRef(false);
+  const freeformTapPointers = useMemo(() => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      freeformTapPendingRef.current = false;
+      freeformTapRef.current = { x: e.clientX, y: e.clientY, at: performance.now() };
+    },
+    onPointerMove: () => {},
+    onPointerUp: (e: React.PointerEvent) => {
+      const start = freeformTapRef.current;
+      freeformTapRef.current = null;
+      if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) < FREEFORM_TAP_SLOP_PX && performance.now() - start.at < FREEFORM_TAP_MAX_MS) freeformTapPendingRef.current = true;
+    },
+    onPointerCancel: () => { freeformTapRef.current = null; },
+  }), []);
+  // A press outside the frame and the resized tile ends the mode and goes no further; presses on the tile are its own.
+  const swallowOutsideFreeform = useCallback((e: React.SyntheticEvent) => {
+    if (e.target instanceof Element && e.target.closest('[data-freeform-frame]')) return;
+    if (e.target instanceof Element && freeformId && e.target.closest(`[data-panel-widget-id="${CSS.escape(freeformId)}"]`)) {
+      // The tile's own presses run its drag and tap; a pointer click must not also fire its controls.
+      // A keyboard or programmatic click (no pointer detail) passes through.
+      if (e.type === 'click') {
+        const pointerClick = (e.nativeEvent as MouseEvent).detail > 0;
+        if (pointerClick) e.stopPropagation();
+        if (pointerClick && freeformTapPendingRef.current) exitFreeform();
+        freeformTapPendingRef.current = false;
+      }
+      return;
+    }
+    e.stopPropagation();
+    if (e.type !== 'pointerdown') return;
+    // The release and click completing this press would otherwise reach the widget under it;
+    // the guard lasts until that pointer click, or until the next press or key when none follows.
+    const clearGuards = () => {
+      document.removeEventListener('pointerup', onUp, true);
+      document.removeEventListener('pointercancel', onCancel, true);
+      document.removeEventListener('click', onClick, true);
+      document.removeEventListener('pointerdown', clearGuards, true);
+      document.removeEventListener('keydown', clearGuards, true);
+    };
+    function onUp(ev: Event) {
+      ev.stopPropagation();
+      document.removeEventListener('pointercancel', onCancel, true);
+      document.addEventListener('click', onClick, true);
+      document.addEventListener('pointerdown', clearGuards, true);
+      document.addEventListener('keydown', clearGuards, true);
+    }
+    function onCancel() { clearGuards(); }
+    function onClick(ev: MouseEvent) {
+      // A keyboard or programmatic click carries no pointer detail and passes through.
+      if (ev.detail > 0) ev.stopPropagation();
+      clearGuards();
+    }
+    document.addEventListener('pointerup', onUp, true);
+    document.addEventListener('pointercancel', onCancel, true);
+    exitFreeform();
+  }, [exitFreeform, freeformId]);
+  useEffect(() => {
+    if (!freeformActive) return undefined;
+    const onKeyDown = (e: KeyboardEvent) => {
+      freeformTapPendingRef.current = false;
+      if (e.key === 'Escape') exitFreeform();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    // In the preview a press on the page around the iframe takes focus out of it.
+    if (simulator) window.addEventListener('blur', exitFreeform);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('blur', exitFreeform);
+    };
+  }, [freeformActive, exitFreeform, simulator]);
+  // A mode whose widget is gone reports its exit.
+  useEffect(() => {
+    if (freeformId && !freeformActive) exitFreeform();
+  }, [freeformId, freeformActive, exitFreeform]);
 
   // Places the OEM bake-in app's widget + sidebar pin for a profile that
   // predates the service reporting it - the embedded desktop dashboard is
@@ -875,21 +1251,22 @@ export function PanelContent({
   // empty page (if under MAX_PANEL_PAGES) so the user can drop onto a new
   // page. Outside drag, equals paginatedLayout so persistence is unaffected.
   const dragLayout = useMemo<PanelLayout>(() => {
-    if (!activeDragId || !dragExtraPageId) return paginatedLayout;
-    if (paginatedLayout.pages.length >= MAX_PANEL_PAGES) return paginatedLayout;
+    const shown = freeform.draft ?? paginatedLayout;
+    if (!activeDragId || !dragExtraPageId) return shown;
+    if (shown.pages.length >= MAX_PANEL_PAGES) return shown;
     return {
-      ...paginatedLayout,
-      pages: [...paginatedLayout.pages, { id: dragExtraPageId, widgets: [] }],
+      ...shown,
+      pages: [...shown.pages, { id: dragExtraPageId, widgets: [] }],
     };
-  }, [paginatedLayout, activeDragId, dragExtraPageId]);
+  }, [paginatedLayout, freeform.draft, activeDragId, dragExtraPageId]);
 
   // Widget playlist (single-widget surfaces): render-only like the offline
   // clock below. Held on the edited widget while the device-page editor has
   // one selected, so its settings preview what they change.
   const widgetPlaylist = widgetPlaylistOf(layout);
   const playlistTypes = useMemo(
-    () => playingPlaylistTypes(layout, surface, deviceTouch),
-    [layout, surface, deviceTouch],
+    () => playingPlaylistTypes(layout, surface, deviceTouch, transposedTile),
+    [layout, surface, deviceTouch, transposedTile],
   );
   const playlistType = useWidgetPlaylistRotation(
     playlistTypes,
@@ -903,56 +1280,74 @@ export function PanelContent({
     if (simulator) onSimulatorPlaylistShown?.(playlistType);
   }, [simulator, playlistType, onSimulatorPlaylistShown]);
   const shownPlaylistWidget = useMemo(
-    () => (playlistType ? playlistWidget(dragLayout, playlistType, surface, deviceId) : undefined),
-    [dragLayout, playlistType, surface, deviceId],
+    () => (playlistType ? playlistWidget(dragLayout, playlistType, surface, deviceId, transposedTile) : undefined),
+    [dragLayout, playlistType, surface, deviceId, transposedTile],
   );
 
   // Render-only trailing blank page to swipe onto and add a widget on; never
   // stored (addWidget creates it), though activePageId can point at it so every
   // surface shows the same page. A drag mints its own trailing page.
   const [blankPageId] = useState(createUuid);
-  // The dashboard has one page by design; a panel without touch has no way to swipe.
-  const singlePage = (embedded && surface === 'desktop') || !surfaceAllowsPages(surface, deviceTouch);
-  const blankPageEligible = (layout.activePageId === BLANK_PAGE_ID || (kioskBehavior && surfaceSupportsTouch(surface, deviceTouch)))
+  // A click-through generic display has no input region on an empty page, so a swipe onto it could not swipe back.
+  const blankPageEligible = !(genericDisplay && seeThrough)
+    && (layout.activePageId === BLANK_PAGE_ID || (kioskBehavior && (surfaceSupportsTouch(surface, deviceTouch) || mouseEditable)))
     && !singlePage
     && !isSingleWidgetSurface(surface)
     && !activeDragId
+    && !restricted
     && paginatedLayout.pages.length < MAX_PANEL_PAGES;
 
+  // Only a playlist that has something to play fills an empty base slot.
+  const playlistEnabled = playlistTypes !== null;
   const allFiltered = useMemo(() => {
     // q60 offline failsafe: keep the panel exactly as-is (background animation,
     // theme, chrome) and swap only the rendered widgets for the clock widget.
     // Render-only - paginatedLayout (persistence) is untouched, so the real
     // widgets return on reconnect.
     if (glassSurface === 'q60' && isOffline) {
-      return q60OfflineClockPages(dragLayout.pages, surface);
+      return q60OfflineClockPages(dragLayout.pages, surface, playlistEnabled, transposedTile);
     }
     const pages = shownPlaylistWidget
       ? [{ id: dragLayout.pages[0]?.id ?? '', widgets: [shownPlaylistWidget] }]
       : dragLayout.pages;
+    const fitBounds = { cols: Math.max(1, capacity.gridCols), rows: Math.max(1, capacity.pageRows) };
     const filtered = pages.map(page => ({
       id: page.id,
       widgets: page.widgets
+        // A freeform span wider than this grid renders clamped; the stored size is untouched.
+        .map(w => {
+          const size = clampFreeformSize(w.size, fitBounds);
+          return size === w.size ? w : { ...w, size };
+        })
         .filter(w => {
           const def = lookupApp(w.type);
           if (!def) return true;
-          return appAvailableForSurface(def.meta, surface, { deviceTouch, forcedGrid });
+          // genericDisplay stays out: a stored portrait-only game keeps its tile (shown as unavailable) so it can be removed.
+          return appAvailableForSurface(def.meta, surface, { deviceTouch: widgetTouch, forcedGrid, displayBound, transposedTile });
         })
         .slice()
         // Row-major (col, row) sort so the focus walk and DOM order match the
         // visual layout; placement itself is via inline style, not source order.
         .sort((a, b) => a.row !== b.row ? a.row - b.row : a.col - b.col),
     }));
+    // Restricted mode: a stored empty page (left by a drag or an earlier edit) is not reachable either.
+    if (restricted) {
+      const kept = filtered.filter(page => page.widgets.length > 0);
+      return kept.length > 0 ? kept : filtered.slice(0, 1);
+    }
     const lastPage = filtered[filtered.length - 1];
     return blankPageEligible && lastPage && lastPage.widgets.length > 0
       ? [...filtered, { id: blankPageId, widgets: [] }]
       : filtered;
-  }, [dragLayout.pages, surface, glassSurface, deviceTouch, forcedGrid, isOffline, shownPlaylistWidget, blankPageEligible, blankPageId]);
+  }, [dragLayout.pages, capacity.gridCols, capacity.pageRows, surface, glassSurface, widgetTouch, displayBound, forcedGrid, transposedTile, isOffline, playlistEnabled, shownPlaylistWidget, blankPageEligible, blankPageId, restricted]);
 
   // An opaque tile filling a single-widget panel hides the background, so it
   // stops animating.
   const shownSingleWidget = isSingleWidgetSurface(surface) ? allFiltered[0]?.widgets[0] : undefined;
   const backgroundCovered = shownSingleWidget !== undefined && opaqueWidgetIds.has(shownSingleWidget.id) && !immersiveSeeThrough;
+  useEffect(() => {
+    if (simulator) onSimulatorBackgroundCovered?.(backgroundCovered);
+  }, [simulator, backgroundCovered, onSimulatorBackgroundCovered]);
 
   // Flat list of all visible widget ids. Drives a SINGLE SortableContext over
   // every page so dnd-kit's hover detection works across pages.
@@ -967,6 +1362,7 @@ export function PanelContent({
   // so overIndex stays -1 and the memo doesn't reliably re-fire. Use a no-op
   // strategy and project widgets via React state below.
   const projectedLayoutStrategy = useMemo<SortingStrategy>(() => () => null, []);
+  const restrictedPageIds = useMemo(() => (restricted ? allFiltered.map(p => p.id) : undefined), [restricted, allFiltered]);
   const { activePageIndex, setActivePageIndex, activePageIndexRef, pageCountRef, handlePageChange } = usePageSync({
     // `loaded` flips a render before the stored layout replaces the seed; the
     // boot must read the stored page or the kiosk's first-page reset never runs.
@@ -978,6 +1374,7 @@ export function PanelContent({
     pageCount,
     pageDragging: Boolean(activeDragId || dragArmedId),
     blankPageIndex: allFiltered.findIndex(p => p.id === blankPageId),
+    shownPageIds: restrictedPageIds,
   });
   // Frozen snapshot of the dragged cell's pixel size + runtime CSS vars at
   // drag start. Captured once in onDragStart and reused every overlay render
@@ -1033,6 +1430,7 @@ export function PanelContent({
     setLayout(setImmersiveOnLoadWidgetId(paginatedLayout, on ? widgetId : null));
   }, [paginatedLayout, setLayout]);
 
+  useSyncLatestLayout(latestLayoutRef, paginatedLayout);
   const editingWidget = editingWidgetId ? widgetById(editingWidgetId) ?? null : null;
   const editingWidgetSize = editingWidget?.size;
   // The edited widget's own grid tile (PanelTouchCell, in the page below) and
@@ -1065,32 +1463,54 @@ export function PanelContent({
   // only the remote end (a phone reaching a PC) has other PCs to switch between.
   const pairedPcsAvailable = surface === 'phone';
 
-  const onCellTap = useCallback((w: PanelWidget) => {
-    if (simulator) {
-      // Simulator: a tap opens this widget's settings in the parent modal.
-      onSimulatorWidgetClicked?.(w.id);
-      return;
-    }
+  // What a tap on the widget's cell does on this surface, or null when it does nothing.
+  const cellTapAction = useCallback((w: PanelWidget): (() => void) | null => {
+    // Simulator: a tap opens this widget's settings in the parent modal.
+    if (simulator) return () => onSimulatorWidgetClicked?.(w.id);
     if (embedded) {
       if (surface === 'desktop' && onSectionNavigate && isDashboardClickthroughType(w.type)) {
-        onSectionNavigate(w.type);
+        const tab = widgetOpenTab(w);
+        return () => onSectionNavigate(w.type, tab ? { tab } : undefined);
       }
-      return;
+      return null;
     }
+    // A mouse-only generic display's widgets act only through their own controls; the app opens from the menu's Open.
+    if (genericOnePage) return null;
     const def = lookupApp(w.type);
-    if (!def?.Touch) return;
+    if (!def?.Touch) return null;
+    if (restricted && !restrictedAllowsWidget(w.type)) return null;
+    // A Web View tile that takes the touch itself opens fullscreen from the menu's Immersive mode item instead.
+    if (w.type === 'web-view' && webViewHost.tileTakesTouch(w.id)) return null;
+    // An immersive view closes by touch, so a mouse-only display never opens one.
+    if (!surfaceSupportsTouch(surface, deviceTouch)) return null;
     const orientationKey = isLandscape ? 'landscape' : 'portrait';
-    if (!def.meta.supportsImmersive[orientationKey]) return;
-    enterImmersive(w.id);
-  }, [embedded, enterImmersive, isLandscape, onSectionNavigate, onSimulatorWidgetClicked, simulator, surface]);
+    if (!def.meta.supportsImmersive[orientationKey]) return null;
+    return () => enterImmersive(w.id);
+  }, [deviceTouch, embedded, enterImmersive, genericOnePage, isLandscape, onSectionNavigate, onSimulatorWidgetClicked, restricted, simulator, surface]);
+  const onCellTap = useCallback((w: PanelWidget) => { cellTapAction(w)?.(); }, [cellTapAction]);
   // macOS delivers touchscreen contacts as mouse pointers (see
   // engine/touchViaPointer); only under that flag does a mouse get the
   // touch gesture model.
   const mouseAsTouch = useTouchViaPointer() && surfaceSupportsTouch(surface, deviceTouch);
   // An app may open its own immersive view only where a person could by touch, never from a preview.
   const canEnterImmersive = !embedded && !simulator && surfaceSupportsImmersiveOnLoad(surface, deviceTouch);
-  const touch = usePanelTouchMode({ onCellTap, mouseLongPress: mouseAsTouch });
+  const touch = usePanelTouchMode({ onCellTap, mouseLongPress: mouseAsTouch, menuDisabled: restricted });
   usePanelDragScroll(mouseAsTouch);
+  // Restricted mode can arrive after the panel is up: put away anything it forbids.
+  const restrictedBlockedImmersive = restricted && immersiveWidgetId !== null
+    && !restrictedAllowsWidget(findWidgetById(paginatedLayout, immersiveWidgetId)?.type ?? '');
+  const closeCtxMenuNow = touch.closeCtxMenu;
+  useEffect(() => {
+    if (!restricted) return;
+    setTrayOpen(false);
+    closeCtxMenuNow();
+    if (restrictedBlockedImmersive) handleImmersiveExit();
+  }, [restricted, restrictedBlockedImmersive, closeCtxMenuNow, handleImmersiveExit]);
+  // The overlay unmounts with its widget, so nothing else can clear the id that hides and blocks the panel.
+  const immersiveTargetGone = loaded && immersiveWidgetId !== null && !widgetById(immersiveWidgetId);
+  useEffect(() => {
+    if (immersiveTargetGone) handleImmersiveExit();
+  }, [immersiveTargetGone, handleImmersiveExit]);
   // On the document, not the root: the editor sheet and immersive overlay
   // mount outside the root, and the pointer is the finger there too.
   useEffect(() => {
@@ -1112,6 +1532,59 @@ export function PanelContent({
       || activeDragId
       || immersiveWidgetId,
   );
+  // Any state that moves or covers tiles hides the native web views.
+  const webViewSuppressed = webViewSuppressedBy({
+    sheet: Boolean(sheetMode),
+    tray: trayOpen,
+    controlCenter: controlCenterOpen,
+    contextMenu: Boolean(touch.ctxMenu),
+    rearranging: touch.rearranging,
+    dragging: Boolean(dragArmedId) || Boolean(activeDragId),
+    resizing: freeformActive,
+  });
+  useEffect(() => {
+    webViewHost.setSuppressed(webViewSuppressed);
+    return () => webViewHost.setSuppressed(false);
+  }, [webViewSuppressed]);
+  // A generic display's Web View tiles take the mouse; the host reports their right-clicks for the widget menu.
+  const interactiveWebTiles = genericDisplay && !simulator && !embedded;
+  useEffect(() => {
+    webViewHost.setRestricted(restricted);
+    return () => webViewHost.setRestricted(false);
+  }, [restricted]);
+  useEffect(() => {
+    webViewHost.setInteractiveTiles(interactiveWebTiles);
+    return () => webViewHost.setInteractiveTiles(false);
+  }, [interactiveWebTiles]);
+  useEffect(() => {
+    webViewHost.setGestureEngagePx(Math.min(CONTROL_CENTER_ENGAGE_MM, TRAY_ENGAGE_TRAVEL_MM) * cssPxPerMm(surface));
+  }, [surface]);
+  const openCtxMenu = touch.openCtxMenu;
+  // A touch panel's interactive Web View tiles report a long-press the same way, so the menu stays reachable.
+  const reportsWebViewMenu = !simulator && !embedded && dragEditable && !restricted;
+  useEffect(() => {
+    if (!reportsWebViewMenu) return undefined;
+    return webViewHost.onContextMenu((id, x, y) => {
+      const widget = findWidgetById(paginatedLayout, id);
+      if (widget) openCtxMenu(widget, x, y);
+    });
+  }, [reportsWebViewMenu, paginatedLayout, openCtxMenu]);
+  const hoverResizeBusy = freeformActive || Boolean(activeDragId) || Boolean(dragArmedId) || Boolean(sheetMode) || Boolean(touch.ctxMenu) || touch.rearranging;
+  useEffect(() => {
+    if (hoverResizeBusy && !resizeGestureRef.current) setHoverResizeId(null);
+  }, [hoverResizeBusy]);
+  const trackHoverResize = (e: React.PointerEvent) => {
+    if (resizeGestureRef.current) return;
+    const allowed = hoverResizeAllowed({
+      canvasHost: hoverResize,
+      pointerType: e.pointerType,
+      hoverCapable: typeof window.matchMedia !== 'function' || window.matchMedia('(hover: hover)').matches,
+      mouseAsTouch,
+      busy: hoverResizeBusy,
+    });
+    const id = allowed ? hoverTargetId(e.target) : null;
+    if (id !== undefined) setHoverResizeId(prev => (prev === id ? prev : id));
+  };
   const { connectionIntroHost, clearConnectionIntro, resetAnnounced } = useConnectionIntro({
     blocked: connectionIntroBlocked,
     embedded,
@@ -1126,7 +1599,7 @@ export function PanelContent({
   const homeIntroActive = useHomeIntro(embedded && surface === 'desktop' && loaded);
   // Same surfaces as the tray; the connection intro blocks it so the two never stack.
   const swipeOnboarding = usePanelSwipeOnboarding({
-    enabled: kioskBehavior && surfaceSupportsTouch(surface, deviceTouch) && hasTouchInput(mouseAsTouch) && loaded && !isOffline,
+    enabled: kioskBehavior && surfaceSupportsTouch(surface, deviceTouch) && hasTouchInput(mouseAsTouch) && loaded && !isOffline && !restricted,
     blocked: connectionIntroBlocked || Boolean(connectionIntroHost),
     trayOpen,
   });
@@ -1155,13 +1628,27 @@ export function PanelContent({
     return label === 'connection.relayMode' ? 'Connected via cloud relay' : label;
   })();
 
+  // Always on top: a display panel keeps it on its record (absent = on), the Y70 in the global panel prefs.
+  const displayRecord = displayBound && kioskBehavior ? recordState.record : null;
+  const y70OnTop = glassSurface === 'y70' && !displayBound && kioskBehavior ? panelTheme.prefs?.panel?.alwaysOnTop : undefined;
+  const layeredOnTop = displayRecord ? displayRecord.alwaysOnTop ?? true : y70OnTop;
+  // The in-panel menu offers it only on generic displays; the device page edits it for known families.
+  // The Linux kiosk host has no on-top support, so the menu entry would do nothing there.
+  const menuAlwaysOnTop = genericDisplay && serviceStatus.ping?.platform !== 'linux' ? layeredOnTop : undefined;
+  // A solid generic display is never on top (its clicks would reach hidden windows); the stored choice waits.
+  const onTopBlocked = genericDisplay && backdrop !== 'desktop';
+  const effectiveOnTop = menuAlwaysOnTop === true && !onTopBlocked;
+  // A generic display's empty space always reaches the desktop; other display panels follow their record.
+  const clickThrough = seeThrough && (genericDisplay || recordState.record?.clickThrough === true);
+  // Empty space never opens panel UI where it is meant to pass clicks; the widget menu reaches it instead.
+  const emptySpaceInert = genericDisplay || clickThrough;
   // Long-press on the empty background opens the actions tray (mirrors the
   // widget long-press-to-menu). Kiosk surfaces only, not while in a sheet /
   // immersive / drag state, and only when the press misses widgets and
   // interactive elements.
   const backgroundLongPress = useLongPress(() => setTrayOpen(true), PANEL_CONTEXT_MENU_TRIGGER_MS, { allowMouse: mouseAsTouch });
   const backgroundPressBlocked = !kioskBehavior
-    || !surfaceSupportsTouch(surface, deviceTouch)
+    || !(surfaceSupportsTouch(surface, deviceTouch) || mouseEditable)
     || trayOpen
     || controlCenterOpen
     || Boolean(sheetMode)
@@ -1169,7 +1656,9 @@ export function PanelContent({
     || Boolean(activeDragId)
     || Boolean(dragArmedId)
     || isOffline
-    || touch.rearranging;
+    || touch.rearranging
+    || restricted
+    || emptySpaceInert;
   const handleBackgroundPointerDown = useCallback((e: React.PointerEvent) => {
     if (backgroundPressBlocked) return;
     if (!(e.target instanceof Element)) return;
@@ -1187,6 +1676,7 @@ export function PanelContent({
   // long-press: same gating, opens the tray. Suppresses the browser's native
   // menu on the panel surface.
   const handleBackgroundContextMenu = useCallback((e: React.MouseEvent) => {
+    if (emptySpaceInert) e.preventDefault();
     if (backgroundPressBlocked) return;
     if (!(e.target instanceof Element)) return;
     if (
@@ -1196,7 +1686,7 @@ export function PanelContent({
     ) return;
     e.preventDefault();
     setTrayOpen(true);
-  }, [backgroundPressBlocked]);
+  }, [backgroundPressBlocked, emptySpaceInert]);
 
   const clearCloseTimer = useCallback(() => {
     if (closeTimerRef.current) {
@@ -1214,7 +1704,23 @@ export function PanelContent({
     setEditorDockMotion(null);
   }, []);
 
-   
+  // A widget removed elsewhere ends its edit session for good, so it cannot reopen the sheet if it returns.
+  useEffect(() => {
+    if (sheetMode === 'settings' && !sheetClosing && editTargetGone(editingWidgetId, editingWidget !== null, editingWidgetId !== null && playlistTypeOfWidgetId(editingWidgetId) !== undefined)) {
+      finishSheetClose();
+    }
+  }, [sheetMode, sheetClosing, editingWidgetId, editingWidget, finishSheetClose]);
+
+  // Restricted mode arriving mid-session ends any open sheet and resize mode.
+  useEffect(() => {
+    if (!restricted) return;
+    if (sheetMode) {
+      clearCloseTimer();
+      finishSheetClose();
+    }
+    exitFreeform();
+  }, [restricted, sheetMode, clearCloseTimer, finishSheetClose, exitFreeform]);
+
   const closeSheet = useCallback(() => {
     if (!sheetMode) return;
     const closingWidget = editingWidgetId && editingWidgetSize
@@ -1254,6 +1760,24 @@ export function PanelContent({
     setPanelSettingsSection(section);
     setSheetMode(mode);
   }, [clearCloseTimer]);
+
+  // An incoming pairing approval shows as the same modal the dashboard uses,
+  // scaled with the panel chrome, so a touch panel can answer it in place
+  // without disturbing an open sheet.
+  const pairPromptEnabled = localPairAvailable && kioskBehavior
+    && (surfaceSupportsTouch(surface, deviceTouch) || mouseEditable) && !restricted;
+  const pairApproval = usePairApprovalRequest(pairPromptEnabled);
+  const pairPromptCard = pairApproval.active ? (
+    <IncomingPairCard
+      sas={pairApproval.active.sas}
+      deviceLabel={pairApproval.active.deviceLabel || t('phonePair.deviceFallback')}
+      remoteAddress={pairApproval.active.remoteAddress}
+      busy={pairApproval.busy}
+      error={pairApproval.error}
+      touch
+      onDecide={approved => void pairApproval.decide(approved)}
+    />
+  ) : null;
 
   useEffect(() => {
     if (!embedded || openCatalogSignal === undefined) return;
@@ -1333,7 +1857,7 @@ export function PanelContent({
   }, [pendingScrollId, sheetMode, allFiltered, activePageIndex, setActivePageIndex]);
 
   const addWidget = useCallback((type: string, size: PanelWidgetSize) => {
-    const defaultConfig = lookupApp(type)?.meta.defaultConfig?.();
+    const defaultConfig = lookupApp(type)?.meta.defaultConfig?.(size);
     const next: PanelWidget = {
       id: createUuid(),
       type,
@@ -1382,13 +1906,15 @@ export function PanelContent({
   }, [activePageIndex, paginatedLayout, capacity, singlePage]);
 
   const updateWidgetConfig = useCallback((widgetId: string, config: Record<string, PanelConfigValue>) => {
+    // Built on the latest queued layout, so two edits before a render both land.
+    const base = latestOr(latestLayoutRef, paginatedLayout);
     const standInType = playlistTypeOfWidgetId(widgetId);
     if (standInType) {
-      setLayout(patchPlaylistWidgetConfig(paginatedLayout, standInType, config));
+      setLayout(patchPlaylistWidgetConfig(base, standInType, config));
       return;
     }
     setLayout(patchWidgetById(
-      paginatedLayout,
+      base,
       widgetId,
       w => ({ ...w, config: { ...w.config, ...config } }),
       capacity,
@@ -1500,12 +2026,112 @@ export function PanelContent({
   const pointerSensor = useSensor(
     PointerSensor,
     desktopActivation
-      ? { activationConstraint: { distance: 6 } }
-      : { activationConstraint: { delay: PANEL_CONTEXT_MENU_TRIGGER_MS, tolerance: 8 } },
+      ? { activationConstraint: { distance: DRAG_DISTANCE_PX } }
+      : { activationConstraint: { delay: PANEL_CONTEXT_MENU_TRIGGER_MS, tolerance: DRAG_HOLD_TOLERANCE_PX } },
   );
+  // A real mouse on the glass drags on distance; touch and a mouse standing in for touch hold first.
+  const adaptiveSensor = useSensor(AdaptivePointerSensor, {
+    activationConstraint: undefined,
+    constraintFor: (e: PointerEvent) => (dragActivationFor(e.pointerType, mouseAsTouch) === 'distance'
+      ? { distance: DRAG_DISTANCE_PX }
+      : { delay: PANEL_CONTEXT_MENU_TRIGGER_MS, tolerance: DRAG_HOLD_TOLERANCE_PX }),
+  });
+  // The tile in resize mode is already selected, so on a hold-to-drag panel it drags on distance, like the desktop.
+  const resizeTileSensor = useSensor(ResizeTilePointerSensor, { activationConstraint: { distance: DRAG_DISTANCE_PX } });
   // A panel that can't be drag-edited (single-widget glass; display-only glass outside
   // the preview) registers no drag sensor, so a pointer press never lifts a cell.
-  const sensors = useSensors(dragEditable ? pointerSensor : null);
+  const sensors = useSensors(
+    dragEditable && !restricted && desktopActivation ? pointerSensor : null,
+    dragEditable && !restricted && !desktopActivation ? adaptiveSensor : null,
+    dragEditable && !restricted && freeformActive && !desktopActivation ? resizeTileSensor : null,
+  );
+
+  const touchCloseMenu = touch.closeCtxMenu;
+  // A hold that opened the context menu leads into the pull, and a late long-press can open it mid-pull; neither may outlive the pull.
+  const lockPullMenuOpen = lockDragging && Boolean(touch.ctxMenu);
+  useEffect(() => {
+    if (lockPullMenuOpen) touchCloseMenu();
+  }, [lockPullMenuOpen, touchCloseMenu]);
+  const lockActivationFor = useCallback(
+    (pointerType: string) => (desktopActivation ? 'distance' : dragActivationFor(pointerType, mouseAsTouch)),
+    [desktopActivation, mouseAsTouch],
+  );
+  // Lock applies wherever a widget can be arranged, except the phone's own gesture set.
+  const lockAvailable = dragEditable && genericDisplay;
+  const lockRecordId = recordState.record?.id;
+  const toggleWidgetsLocked = useCallback(() => {
+    if (lockRecordId) void patchPanelDevice(lockRecordId, { widgetsLocked: !widgetsLocked });
+  }, [lockRecordId, widgetsLocked]);
+  const toggleAlwaysOnTop = useCallback(() => {
+    if (menuAlwaysOnTop === undefined || onTopBlocked) return;
+    const next = !menuAlwaysOnTop;
+    if (displayRecord) void patchPanelDevice(displayRecord.id, { alwaysOnTop: next });
+    else void savePreferences({ panel: { alwaysOnTop: next } });
+  }, [displayRecord, menuAlwaysOnTop, onTopBlocked]);
+
+  // Host sync: a see-through, click-through display window takes input only where the panel draws.
+  const hostBound = kioskBehavior && displayBound && panelHostAvailable();
+  const hitFull = Boolean(lockDragging || sheetMode || trayOpen || controlCenterOpen || immersiveWidgetId || activeDragId || dragArmedId
+    || freeformActive || touch.rearranging || connectionIntroHost || touch.ctxMenu);
+  // Position and size, so a remote edit that keeps the ids still remeasures.
+  const frostGeometry = useMemo(() => allFiltered.flatMap(p => p.widgets.map(w => `${w.id}@${w.col},${w.row},${w.size}`)).join(','), [allFiltered]);
+  // Widget padding at 0%: cards sit flush and square. Single-widget surfaces force padding 0 internally and keep their radius.
+  const flushCards = !isSingleWidgetSurface(surface) && effectiveTheme.widgetPadding <= 0;
+  const hostKeys = panelHostKeys({
+    pageIndex: activePageIndex,
+    pageCount: paginatedLayout.pages.length,
+    menuSeq: touch.ctxMenu?.seq ?? 0,
+    backdrop: effectiveTheme.backdrop,
+    columns: runtimeGrid.columns,
+    rows: runtimeGrid.rows,
+    gap: runtimeGrid.gap,
+    geometry: frostGeometry,
+  });
+  // The Y70 kiosk never has a display record, yet its see-through window still starts with an empty input region.
+  usePanelHitTest(
+    panelHitTestBound(kioskBehavior, displayBound, glassSurface, panelHostAvailable()) && seeThrough,
+    clickThrough,
+    hitFull,
+    rootRef,
+    hostKeys.hitTest,
+  );
+  // The host blurs the desktop behind the cards: CSS cannot sample it.
+  usePanelFrost(
+    hostBound,
+    effectiveTheme.backgroundFrost,
+    seeThrough,
+    Boolean(activeDragId || lockDragging),
+    rootRef,
+    hostKeys.frost,
+    resolvedThemeMode,
+  );
+  // Every sheet (widget edit, catalog, panel settings, pairing) can hold a text field.
+  usePanelActivatable(hostBound, Boolean(sheetMode));
+  usePanelRaise(
+    hostBound && layeredOnTop === false,
+    Boolean(touch.ctxMenu || sheetMode || trayOpen || activeDragId || dragArmedId || freeformActive),
+  );
+
+  // The stored layout, not the local seed: the seed holds starter widgets until the record hydrates it.
+  const importLayout = recordState.record?.layout ?? EMPTY_IMPORT_LAYOUT;
+  const importCanvas = recordCanvasOf(recordState.record);
+  const importDensitySlots = importCanvas
+    ? densityShortSideSlots(importCanvas.width, importCanvas.height, importCanvas.dpr, recordState.record?.capabilities?.dpi ?? estimateRuntimePanelDpi(glassSurface))
+    : undefined;
+  // The legacy desktop overlay ran on plain OS displays, and its widgets of a Y70 are merged into the Y70 record.
+  const y70Import = glassSurface === 'y70';
+  useDesktopImport({
+    enabled: kioskBehavior && !simulator && (genericDisplay || y70Import),
+    hostReady: panelHostAvailable,
+    deviceId,
+    pending: recordState.record?.desktopImport,
+    layout: importLayout,
+    paddingPercent: effectiveTheme.widgetPadding,
+    grid: runtimeGrid,
+    singlePage: genericOnePage,
+    densitySlots: importDensitySlots,
+    glassSurface: y70Import ? 'y70' : undefined,
+  });
 
   const { clearEdgeAdvance, evaluateEdgeAdvance } = useEdgeAdvance(setActivePageIndex, pageCountRef);
   // Gesture refs for the collision detector. startX/Y is dnd-kit's press
@@ -1593,10 +2219,11 @@ export function PanelContent({
       target.col,
       target.row,
       capacity,
+      displayBound,
     );
     setPreviewLayout(preview);
     setDropRefused(preview === null);
-  }, [overIdTick, activeDragId, dragLayout, capacity, widgetById]);
+  }, [overIdTick, activeDragId, dragLayout, capacity, widgetById, displayBound]);
 
   const handleDndDragStart = useCallback((event: DragStartEvent) => {
     const id = String(event.active.id);
@@ -1680,8 +2307,13 @@ export function PanelContent({
   }, [paginatedLayout, touch, widgetById, embedded, surface, singlePage, setDraggingPinnableType, pinnedTail]);
 
   return (
+    <PanelSkinScope scope={portalScope}>
     <TouchViaPointerContext.Provider value={mouseAsTouch}>
+    <PanelRestrictedProvider value={restricted}>
+    <PanelGenericDisplayProvider value={genericDisplay}>
+    <PanelDigitizerProvider value={deviceTouch}>
     <PanelImmersiveOpenProvider value={immersiveWidgetId !== null}>
+    <PanelOpenWidgetProvider value={cellTapAction}>
     <PanelGaugeGradientProvider value={gaugeGradientValue}>
     <DeckInstanceProvider value={editingDeckInstanceId ? { instanceId: editingDeckInstanceId, value: sharedDeckInstance } : null}>
     <DndContext
@@ -1754,6 +2386,7 @@ export function PanelContent({
           target.col,
           target.row,
           capacity,
+          displayBound,
         );
         if (!preview) {
           // Refused drop (displaced widgets have nowhere to go, or a 1x1
@@ -1782,10 +2415,14 @@ export function PanelContent({
       <div
         ref={rootRef}
         className={`panel-root ${styles.panelRoot}`}
+        {...fontAttrs}
+        {...skinScope?.attrs}
+        data-skin-root={skinned ? '' : undefined}
         data-theme={resolvedThemeMode}
         data-surface={surface}
         data-screen-sleep={screenHidden ? 'true' : undefined}
         data-simulator={simulator ? 'true' : undefined}
+        data-stream={streamFrameCap(window.location.search) !== null ? 'true' : undefined}
         data-show-widget-labels={effectiveTheme.widgetLabels ? 'true' : 'false'}
         data-immersive-see-through={immersiveSeeThrough ? 'true' : undefined}
         // Omitted on single-widget surfaces: they force widgetPadding 0
@@ -1793,9 +2430,7 @@ export function PanelContent({
         // surface with no adjacent widget to sit flush against. Stamped
         // 'none' only at the resolved 0% (flush corners); any other percent
         // leaves the attribute unset (default rounded radius).
-        data-widget-padding={
-          isSingleWidgetSurface(surface) ? undefined : effectiveTheme.widgetPadding <= 0 ? 'none' : undefined
-        }
+        data-widget-padding={flushCards ? 'none' : undefined}
         data-context-menu-open={contextMenuWidgetId ? 'true' : undefined}
         data-editing={surface === 'phone' && sheetMode === 'settings' ? 'true' : undefined}
         data-connection-intro={connectionIntroHost ? 'active' : undefined}
@@ -1806,13 +2441,30 @@ export function PanelContent({
           // Reaches panel-root only when the click passed through empty area
           // unstopped. Forward to the parent to close its settings pane.
           if (e.target === e.currentTarget) onSimulatorBackgroundClicked?.();
+          const pressed = backgroundPressRef.current;
+          backgroundPressRef.current = null;
+          if (backgroundHoverTarget && clickOpensBackgroundMenu(pressed, e.target)) onSimulatorBackgroundMenu?.({ x: e.clientX, y: e.clientY });
         } : undefined}
+        onPointerDownCapture={e => {
+          backgroundPressRef.current = isPanelBackgroundTarget(e.target);
+          if (freeformActive) swallowOutsideFreeform(e);
+        }}
+        onClickCapture={freeformActive ? swallowOutsideFreeform : undefined}
         onPointerDown={handleBackgroundPointerDown}
-        onPointerMove={backgroundLongPress.onPointerMove}
+        onPointerMove={e => {
+          backgroundLongPress.onPointerMove(e);
+          trackHoverResize(e);
+          if (backgroundHoverTarget) setBackgroundHover(!activeDragId && !touch.rearranging && isPanelBackgroundTarget(e.target));
+        }}
+        onPointerLeave={() => {
+          if (!resizeGestureRef.current) setHoverResizeId(null);
+          if (backgroundHoverTarget) setBackgroundHover(false);
+        }}
         onPointerUp={backgroundLongPress.onPointerUp}
         onPointerCancel={backgroundLongPress.onPointerCancel}
         onContextMenu={handleBackgroundContextMenu}
       >
+        {skinOwnsBackdrop && <div data-skin-part="backdrop" data-panel-bg-layer aria-hidden="true" style={{ opacity: effectiveTheme.backgroundOpacity }} />}
         {showWallpaperLayer && <PanelBackgroundDesktop opacity={effectiveTheme.backgroundOpacity} />}
         {showBackgroundLayers && effectiveTheme.backgroundMode === 'shader' && (
           <PanelBackgroundShader
@@ -1837,7 +2489,7 @@ export function PanelContent({
               opacity={effectiveTheme.backgroundOpacity}
               covered={backgroundCovered}
             />
-          ) : effectiveTheme.backgroundMediaId && effectiveTheme.backgroundMediaType ? (
+          ) : effectiveTheme.backgroundMediaId && effectiveTheme.backgroundMediaType && failedMediaId !== effectiveTheme.backgroundMediaId ? (
             <PanelBackgroundMedia
               id={effectiveTheme.backgroundMediaId}
               deviceId={deviceId}
@@ -1845,16 +2497,13 @@ export function PanelContent({
               alpha={effectiveTheme.backgroundMediaAlpha}
               opacity={effectiveTheme.backgroundOpacity}
               covered={backgroundCovered}
+              onLoaded={() => { mediaRetryRef.current = 0; }}
+              onFailed={() => setFailedMediaId(effectiveTheme.backgroundMediaId ?? null)}
             />
-          ) : null
+          ) : <PanelBackgroundSolid opacity={effectiveTheme.backgroundOpacity} />
         )}
         {showBackgroundLayers && effectiveTheme.backgroundMode === 'solid' && (
-          <div
-            className={styles.backgroundSolid}
-            data-panel-bg-layer
-            style={{ '--panel-background-opacity': effectiveTheme.backgroundOpacity } as CSSProperties}
-            aria-hidden
-          />
+          <PanelBackgroundSolid opacity={effectiveTheme.backgroundOpacity} />
         )}
         {backgroundFrost > 0 && (
           <div
@@ -1864,6 +2513,7 @@ export function PanelContent({
             aria-hidden
           />
         )}
+        {backgroundHoverTarget && loaded && <BackgroundHoverLayer active={backgroundHover} area={backgroundArea} />}
         {!loaded ? (
           <PanelLoadingGate surface={surface} />
         ) : (
@@ -1876,7 +2526,7 @@ export function PanelContent({
                   pages={allFiltered}
                   activeIndex={Math.min(activePageIndex, pageCount - 1)}
                   onActiveChange={handlePageChange}
-                  swipeEnabled={!sheetMode && !dragArmedId}
+                  swipeEnabled={!sheetMode && !dragArmedId && !freeformActive}
                   renderPage={page => (
                     <>
                       <div
@@ -1890,7 +2540,7 @@ export function PanelContent({
                               widget={w}
                               deviceId={deviceId}
                               surface={surface}
-                              deviceTouch={deviceTouch}
+                              deviceTouch={cellTouch}
                               rearranging={touch.rearranging}
                               pressHint={!sheetMode && touch.pressedWidgetId === w.id}
                               dimmed={Boolean(contextMenuWidgetId) && contextMenuWidgetId !== w.id}
@@ -1911,18 +2561,24 @@ export function PanelContent({
                               editorPreview={simulator}
                               clickthrough={embedded && surface === 'desktop' && Boolean(onSectionNavigate) && isDashboardClickthroughType(w.type)}
                               movable={dragEditable}
-                              onContextMenu={dragEditable ? e => touch.handleContextMenu(e, w) : (e => e.preventDefault())}
-                              cellPointers={dragEditable ? touch.bindCellPointers(w) : noopCellPointers}
+                              locked={lockedOf()}
+                              lockActivationFor={lockActivationFor}
+                              onLockDragChange={setLockDragging}
+                              inert={restricted && !restrictedAllowsWidget(w.type)}
+                              restricted={restricted}
+                              onContextMenu={dragEditable && !(freeformActive && w.id === freeformId) ? e => touch.handleContextMenu(e, w) : (e => e.preventDefault())}
+                              resizeSelected={freeformActive && w.id === freeformId}
+                              cellPointers={!dragEditable ? noopCellPointers : freeformActive ? (w.id === freeformId ? freeformTapPointers : noopCellPointers) : touch.bindCellPointers(w)}
                               // Single-widget sim surfaces (Q-series) can't reach
                               // onCellTap via the pointer pipeline; a plain
                               // click opens the edit sheet from an iframe tap.
-                              // The blank widget has nothing to edit, so it takes
-                              // neither the click nor the hover notice.
-                              onSimulatorClick={simulator && w.type !== 'blank' && !dragEditable ? () => onSimulatorWidgetClicked?.(w.id) : undefined}
+                              onSimulatorClick={simulator && !dragEditable ? () => onSimulatorWidgetClicked?.(w.id) : undefined}
                               // Device-page preview only: nothing else says a
                               // widget in the canvas is click-to-edit (NEX-6),
                               // so hovering one fades in a full-cell notice.
-                              editHint={simulator && w.type !== 'blank' && !touch.rearranging && !activeDragId && simulatorSelectedWidgetId !== w.id}
+                              editHint={simulator && !touch.rearranging && !activeDragId && simulatorSelectedWidgetId !== w.id}
+                              backgroundSplit={backgroundMenuEnabled && singleSurface ? splitOrientationOf(w) : undefined}
+                              onEditBackground={backgroundMenuEnabled && singleSurface ? onSimulatorBackgroundMenu : undefined}
                               // Device-page preview only: hovering the widget
                               // marked immersive-on-load frames it and names
                               // the mark, so the canvas says which one opens.
@@ -1930,11 +2586,31 @@ export function PanelContent({
                               previewLayout={previewLayout}
                               onSectionNavigate={embedded && surface === 'desktop' ? onSectionNavigate : undefined}
                               onConfigureWidget={openWidgetSettings}
-                              onEnterImmersiveWidget={canEnterImmersive && widgetSupportsImmersiveOnLoad(w.type, isLandscape)
+                              moreActions={showWidgetMoreActions({ embedded, surface, simulator, editable: dragEditable, busy: Boolean(sheetMode) || freeformActive || Boolean(activeDragId) || Boolean(dragArmedId) }) ? {
+                                open: touch.ctxMenu?.widget.id === w.id,
+                                onOpen: (x, y) => touch.openCtxMenu(w, x, y),
+                                onClose: touch.closeCtxMenu,
+                              } : undefined}
+                              onEnterImmersiveWidget={canEnterImmersive && (!restricted || restrictedAllowsWidget(w.type)) && widgetSupportsImmersiveOnLoad(w.type, isLandscape)
                                 ? (widget) => enterImmersive(widget.id) : undefined}
                             />
                           </ErrorBoundary>
                         ))}
+                        {cornerTarget && !activeDragId && !dragArmedId && page.widgets.some(w => w.id === cornerTarget.id) ? (
+                          <FreeformResizeFrame
+                            widget={page.widgets.find(w => w.id === cornerTarget.id) ?? cornerTarget}
+                            label={t(freeformDef?.meta.i18nKey ?? '') || cornerTarget.type}
+                            hover={!freeformActive}
+                            touch={kioskBehavior && surfaceSupportsTouch(surface, deviceTouch)}
+                            room={cornerRooms ?? NO_ROOM}
+                            onBegin={beginResize}
+                            onUpdate={freeform.update}
+                            onStep={freeform.step}
+                            onEnd={endResize}
+                            onCancel={cancelResize}
+                            onExit={exitFreeform}
+                          />
+                        ) : null}
                         {activeDragId && allCellsForPage(page, capacity).map(cell => (
                           <EmptyCellDroppable
                             key={`${page.id}:${cell.col}:${cell.row}`}
@@ -1954,6 +2630,23 @@ export function PanelContent({
                           />
                         ) : null}
                       </div>
+                      {backgroundMenuEnabled && singleSurface && page.widgets.length === 0 && onSimulatorBackgroundMenu && (
+                        <BackgroundSplitHint
+                          // eslint-disable-next-line i18next/no-literal-string -- orientation enum value
+                          orientation="stacked"
+                          round={surfaceDisplayShape(surface) === 'round'}
+                          widgetHalf={false}
+                          onActivate={onSimulatorBackgroundMenu}
+                        />
+                      )}
+                      {mouseEditable && page.widgets.length === 0 && (
+                        <div className={styles.emptyPageAction} data-panel-hit="true">
+                          <button type="button" className="chip-action" onClick={() => openSheet('catalog')}>
+                            <Plus size={14} aria-hidden />
+                            <span>{t('panel.addWidgets')}</span>
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                 />
@@ -1965,12 +2658,13 @@ export function PanelContent({
                       total={pageCount}
                       active={Math.min(activePageIndex, pageCount - 1)}
                       visibilityToken={activePageIndex}
+                      onSelect={mouseEditable ? handlePageChange : undefined}
                     />
                   </div>
                 )}
               </div>
             </div>
-            {kioskBehavior && surfaceSupportsTouch(surface, deviceTouch) && (
+            {kioskBehavior && (surfaceSupportsTouch(surface, deviceTouch) || mouseEditable) && (
               <PanelActionsTray
                 open={trayOpen}
                 onOpen={() => setTrayOpen(true)}
@@ -1988,7 +2682,8 @@ export function PanelContent({
                 pairSheetAvailable={localPairAvailable || pairedPcsAvailable}
                 surfaceRef={rootRef}
                 surface={surface}
-                disabled={Boolean(sheetMode) || isOffline || touch.rearranging || !!dragArmedId || controlCenterOpen}
+                disabled={Boolean(sheetMode) || isOffline || touch.rearranging || !!dragArmedId || controlCenterOpen || freeformActive}
+                restricted={restricted}
                 machineName={machineName}
                 remotePaired={connectionIdentityVisible}
                 onSentry={surface === 'phone' && sentrySupported ? () => setSentryOpenRequest((n) => n + 1) : undefined}
@@ -2004,7 +2699,8 @@ export function PanelContent({
                 kioskBehavior={kioskBehavior}
                 surfaceRef={rootRef}
                 displayId={recordState.record?.displayId}
-                isLandscape={isLandscape}
+                backlightRecordId={recordState.record?.capabilities?.supportsBrightness ? recordState.record.id : undefined}
+                isLandscape={controlCenterLandscape}
                 resolvedThemeMode={resolvedThemeMode}
                 onSetThemeMode={panelTheme.commitThemeModePinned}
                 onScreenSleep={() => setScreenAsleep(true)}
@@ -2012,8 +2708,9 @@ export function PanelContent({
                 trayOpen={trayOpen}
                 offline={isOffline}
                 rearranging={touch.rearranging}
-                dragArmed={dragInProgress}
+                dragArmed={dragInProgress || freeformActive}
                 asleep={screenAsleep}
+                restricted={restricted}
               />
             )}
             {swipeOnboarding.hintVisible && <PanelSwipeHint />}
@@ -2040,15 +2737,16 @@ export function PanelContent({
               </>
             )}
             {kioskBehavior && !connectionIntroHost && relayConnected && (
-              <div
-                className={styles.relayBadge}
-                role="status"
-                aria-label={relayModeLabel}
-                title={relayModeLabel}
-              >
-                {/* eslint-disable-next-line i18next/no-literal-string -- aria boolean */}
-                <SatelliteDish size={15} aria-hidden="true" />
-              </div>
+              <HoverTooltip body={relayModeLabel}>
+                <div
+                  className={styles.relayBadge}
+                  role="status"
+                  aria-label={relayModeLabel}
+                >
+                  {/* eslint-disable-next-line i18next/no-literal-string -- aria boolean */}
+                  <SatelliteDish size={15} aria-hidden="true" />
+                </div>
+              </HoverTooltip>
             )}
           </>
         )}
@@ -2066,15 +2764,16 @@ export function PanelContent({
           && surfaceSupportsTouch(surface, deviceTouch);
         const ctxWidget = touch.ctxMenu.widget;
         const ctxPoint = { x: touch.ctxMenu.x, y: touch.ctxMenu.y };
-        // "Add to desktop" always pins another floating overlay copy; multiple
-        // same-type instances coexist, each with its own config. "Remove from
-        // desktop" deletes every instance of the type.
         const onDesktopSurface = embedded && surface === 'desktop';
-        const overlayMatches = onDesktopSurface
-          ? overlayWidgets.filter(o => o.type === ctxWidget.type)
-          : [];
-        const desktopAddAvailable = onDesktopSurface;
-        const desktopRemoveAvailable = onDesktopSurface && overlayMatches.length > 0;
+        const openRoute = genericDisplay && !simulator && !embedded
+          ? appRouteForWidget(ctxWidget, deviceId, ctxWidget.type === 'deck' ? deckKeyAt(touch.ctxMenu.target ?? null) : undefined)
+          : null;
+        const openUrl = genericDisplay && !simulator && !embedded ? webViewOpenUrl(ctxWidget) : null;
+        // The dashboard opens the widget's page, as a tap on its tile does.
+        const dashboardOpen = onDesktopSurface && !simulator && onSectionNavigate && isDashboardClickthroughType(ctxWidget.type) ? cellTapAction(ctxWidget) ?? undefined : undefined;
+        const webSnap = webViewHost.getSnapshot();
+        const webView = ctxWidget.type === 'web-view' && !simulator && !embedded && webSnap.status === 'supported' ? webSnap.views[ctxWidget.id] : undefined;
+        const webNav = { back: webView?.canGoBack === true, forward: webSnap.navControls && webView?.canGoForward === true, home: webSnap.navControls && webView?.away === true };
 
         // Sidebar pin toggle, only for pinnable types (isPinnableAppKey):
         // "Pin to Sidebar" when not pinned, "Unpin from Sidebar" when pinned.
@@ -2089,33 +2788,30 @@ export function PanelContent({
             x={ctxPoint.x}
             y={ctxPoint.y}
             currentSize={ctxWidget.size}
-            sizes={sizesForSurface(def.meta, surface, deviceTouch, forcedGrid)}
+            sizes={sizesForSurface(def.meta, surface, widgetTouch, forcedGrid, transposedTile)}
             hasConfig
+            title={t(def.meta.i18nKey) || ctxWidget.type}
             surface={surface}
             themeMode={resolvedThemeMode}
-            themeStyle={webkitSafePanelScale != null ? { ...panelThemeVars, '--panel-scale': webkitSafePanelScale } as CSSProperties : panelThemeVars}
+            themeStyle={webkitSafePanelScale != null ? { ...panelThemeVars, '--panel-scale': webkitSafePanelScale, '--panel-chrome-scale': webkitSafeChromeScale ?? webkitSafePanelScale } as CSSProperties : panelThemeVars}
             onResize={size => resizeWidget(ctxWidget.id, size, { animateFromContextMenu: true })}
-            onEdit={() => openWidgetSettings(ctxWidget, ctxPoint)}
+            onResizeMode={canResizeType(ctxWidget.type, lockedOf()) ? () => setFreeformId(ctxWidget.id) : undefined}
+            // The preview edits in the device page's settings pane, as a plain click does.
+            onEdit={() => (simulator ? onSimulatorWidgetClicked?.(ctxWidget.id) : openWidgetSettings(ctxWidget, ctxPoint))}
             onRemove={() => removeWidget(ctxWidget.id)}
             onImmersive={!embedded && immersiveAvailable ? () => enterImmersive(ctxWidget.id) : undefined}
-            onAddToDesktop={desktopAddAvailable ? () => {
-              void createOverlayWidget({
-                type: ctxWidget.type,
-                size: ctxWidget.size,
-                config: ctxWidget.config,
-              }).then(created => {
-                if (created) setOverlayWidgets(prev => [...prev, { id: created.id, type: created.type }]);
-              });
-            } : undefined}
-            onRemoveFromDesktop={desktopRemoveAvailable ? () => {
-              const removed = overlayMatches.map(o => o.id);
-              for (const id of removed) {
-                void deleteOverlayWidget(id);
-              }
-              // Optimistic update so the next menu open shows "Add to desktop"
-              // without waiting for the prefs topic round-trip.
-              setOverlayWidgets(prev => prev.filter(o => !removed.includes(o.id)));
-            } : undefined}
+            onWebBack={webNav.back ? () => webViewHost.sendCommand(ctxWidget.id, 'back') : undefined}
+            onWebForward={webNav.forward ? () => webViewHost.sendCommand(ctxWidget.id, 'forward') : undefined}
+            onWebHome={webNav.home ? () => webViewHost.sendCommand(ctxWidget.id, 'home') : undefined}
+            displayTargets={onDesktopSurface ? displayTargets : undefined}
+            onAddToDisplay={onDesktopSurface && displayTargets.length > 0 ? displayId => { void addToDisplay(displayId, ctxWidget); } : undefined}
+            onAddWidget={mouseEditable ? () => openSheet('catalog') : undefined}
+            alwaysOnTop={menuAlwaysOnTop === undefined ? undefined : effectiveOnTop}
+            alwaysOnTopDisabled={onTopBlocked}
+            onOpenPanelActions={emptySpaceInert && kioskBehavior ? () => setTrayOpen(true) : undefined}
+            onToggleAlwaysOnTop={menuAlwaysOnTop === undefined ? undefined : toggleAlwaysOnTop}
+            locked={widgetsLocked}
+            onToggleLock={lockAvailable && recordState.record ? toggleWidgetsLocked : undefined}
             onPinToSidebar={pinAvailable && pinnableKey ? () => {
               updateUiSettings({
                 pinnedSidebarApps: [...pinnedTail, pinnableKey],
@@ -2126,6 +2822,8 @@ export function PanelContent({
                 pinnedSidebarApps: pinnedTail.filter(k => k !== pinnableKey),
               });
             } : undefined}
+            onOpen={dashboardOpen ? dashboardOpen : openRoute ? () => { void openAppAt(openRoute); } : openUrl ? () => { void postService('/system/open-url', { url: openUrl }); } : undefined}
+            widgetItemsLast={onDesktopSurface}
             onClose={touch.closeCtxMenu}
           />
         );
@@ -2173,12 +2871,16 @@ export function PanelContent({
       <PanelScreenSleep asleep={screenAsleep} onSleepFaded={() => setScreenHidden(true)} onWakeStart={() => setScreenHidden(false)} onWake={() => setScreenAsleep(false)} />
 
       {sheetMode && (
+        <OverlayScaleContext.Provider value={sheetOverlayScale}>
         <PanelEditorSheet
           mode={sheetMode}
           surface={surface}
           deviceId={deviceId}
-          deviceTouch={deviceTouch}
+          deviceTouch={widgetTouch}
+          displayBound={displayBound}
+          genericDisplay={genericDisplay}
           forcedGrid={forcedGrid}
+          transposedTile={transposedTile}
           touchPanelChrome={touchPanelChrome}
           editingWidget={sheetMode === 'settings' ? editingWidget : null}
           immersiveOnLoadAvailable={editingImmersiveOnLoadAvailable}
@@ -2216,6 +2918,7 @@ export function PanelContent({
           onThemeBackgroundSlideshowCommit={panelTheme.commitBackgroundSlideshow}
           onThemeBackgroundMediaOrderCommit={panelTheme.commitBackgroundMediaOrder}
           showMediaTab={surface !== 'desktop' && !isTunnelActive()}
+          showSystemFonts={panelSystemFontsAvailable(glassSurface) && isLocalPanelClient()}
           deviceAspect={typeof window !== 'undefined' ? window.innerWidth / window.innerHeight : undefined}
           deviceW={glassSurface === 'q60' ? 720 : (typeof window !== 'undefined' ? Math.round(window.innerWidth * window.devicePixelRatio) : undefined)}
           deviceH={glassSurface === 'q60' ? 1280 : (typeof window !== 'undefined' ? Math.round(window.innerHeight * window.devicePixelRatio) : undefined)}
@@ -2226,6 +2929,8 @@ export function PanelContent({
           onThemeTextColorPreview={panelTheme.previewTextColor}
           onThemeTextColorCommit={panelTheme.commitTextColor}
           onThemeFontCommit={panelTheme.commitFont}
+          onThemeSkinCommit={panelTheme.commitSkin}
+          onThemeSkinReset={panelTheme.resetSkin}
           onThemeBackgroundFrostPreview={panelTheme.previewBackgroundFrost}
           onThemeBackgroundFrostCommit={panelTheme.commitBackgroundFrost}
           onThemeImmersiveBackdropCommit={panelTheme.commitImmersiveBackdrop}
@@ -2239,11 +2944,28 @@ export function PanelContent({
           onResize={resizeWidget}
           onUpdate={updateWidgetConfig}
           onRemove={removeWidget}
+          dockStyle={editorDockSupported && sheetMode === 'settings' ? editorDockMotion?.style : undefined}
           selectedMonitoringSlot={selectedMonitoringSlot}
           onSelectedMonitoringSlotChange={setSelectedMonitoringSlot}
           editView={deckEditView}
           onEditViewChange={setDeckEditView}
         />
+        </OverlayScaleContext.Provider>
+      )}
+
+      {pairPromptCard && (
+        <OverlayScaleContext.Provider value={sheetOverlayScale}>
+          <Overlay
+            open
+            onClose={() => { /* must explicitly Allow or Deny */ }}
+            variant="alert"
+            noEscDismiss
+            noBackdropDismiss
+            ariaLabel={t('phonePair.code.requestTitle', { device: pairApproval.active?.deviceLabel || t('phonePair.deviceFallback') })}
+          >
+            {pairPromptCard}
+          </Overlay>
+        </OverlayScaleContext.Provider>
       )}
 
       {kioskBehavior && (
@@ -2313,6 +3035,7 @@ export function PanelContent({
               fixedWidth={dragSnapshot.width}
               fixedHeight={dragSnapshot.height}
               showLabels={effectiveTheme.widgetLabels}
+              flush={flushCards}
               onSlot={handleDragOverlaySlot}
             />
           );
@@ -2321,7 +3044,12 @@ export function PanelContent({
     </DndContext>
     </DeckInstanceProvider>
     </PanelGaugeGradientProvider>
+    </PanelOpenWidgetProvider>
     </PanelImmersiveOpenProvider>
+    </PanelDigitizerProvider>
+    </PanelGenericDisplayProvider>
+    </PanelRestrictedProvider>
     </TouchViaPointerContext.Provider>
+    </PanelSkinScope>
   );
 }

@@ -1,0 +1,311 @@
+@use '../../../../styles/text' as *;
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  height: 100%;
+  padding-bottom: 0.75rem;
+  box-sizing: border-box;
+}
+
+// The pane's height follows the fan list, so a centered notice sinks below the fold on a long list; dock it at the top instead.
+.root .notice {
+  justify-content: flex-start;
+  height: auto;
+  padding-top: 2.5rem;
+}
+
+.emptyActions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 1rem;
+  min-width: 0;
+  @include text-body;
+  color: var(--text);
+}
+
+.stat {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel,
+.statNote {
+  @include text-caption;
+  font-size: var(--type-mini);
+  color: var(--text-dim);
+}
+
+.viewport {
+  position: relative;
+  flex: 1;
+  min-height: 18rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+  // Build's stage fill.
+  background: linear-gradient(var(--surface), var(--surface)), var(--backdrop-base);
+  touch-action: none;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.anchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.popover {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: 18.5rem;
+  max-width: 100%;
+  padding: 0.85rem;
+}
+
+.popoverTitle {
+  @include text-button;
+  color: var(--text);
+}
+
+.popoverNote {
+  @include text-caption;
+  color: var(--text-dim);
+}
+
+.flowBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1.2rem;
+}
+
+// Strips over the canvas: dark and translucent so their text reads over the scene; a press on one is not a press on empty canvas.
+.overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.75rem;
+  background: rgb(0 0 0 / var(--alpha-strong));
+  backdrop-filter: blur(var(--blur-backdrop));
+  color: #fff;
+}
+
+.overlayTop {
+  top: 0;
+}
+
+.overlayBottom {
+  bottom: 0;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+// The controls wrap inside their own column, so the Build button never lands on them at narrow widths.
+.bottomMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+}
+
+.control {
+  pointer-events: auto;
+}
+
+// Shown while the airflow is still settling: bottom left, above the display chips, in the weight of a caption. Out of the flex flow, so the always-mounted live region leaves no gap while empty.
+.settling {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 0.3rem;
+  @include text-caption;
+  font-size: var(--type-mini);
+  color: var(--text-dim);
+  pointer-events: none;
+
+  // Sits over the scene rather than inside the strip, so it carries the strip's backdrop to stay legible.
+  &:not(:empty) {
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    background: rgb(0 0 0 / var(--alpha-strong));
+    backdrop-filter: blur(var(--blur-backdrop));
+    color: #fff;
+  }
+}
+
+// The model caption floats over the canvas, right-aligned just above the bottom strip and level with the Build button. Out of flow and click-through except for its info button.
+.modelNote {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 100%;
+  margin-bottom: 0.3rem;
+  max-width: 55%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  text-align: right;
+  @include text-caption;
+  font-size: var(--type-mini);
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+// The logo takes the button's ink so it reads in the enabled, hover and disabled states.
+.control .buildLogo {
+  color: inherit;
+}
+
+// The status bar and the temperature legend stack at the canvas top, out of flow, so the legend coming and going moves nothing else.
+.topStack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  pointer-events: none;
+
+  .overlay {
+    position: static;
+    align-self: stretch;
+    pointer-events: auto;
+  }
+}
+
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  align-items: center;
+  align-self: stretch;
+  padding: 0 0.75rem;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius);
+  background: rgb(0 0 0 / var(--alpha-strong));
+  backdrop-filter: blur(var(--blur-backdrop));
+  @include text-caption;
+  font-size: var(--type-mini);
+  color: var(--text-dim);
+}
+
+.legendBar {
+  width: 6rem;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right, var(--airflow-cool), var(--airflow-purple), var(--bad));
+}
+
+// A device already driving another fan: the move is visible before it is chosen.
+.linkedElsewhere {
+  color: var(--accent);
+}
+
+.product {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.live {
+  @include text-caption;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.liveDot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--good);
+}
+
+.sourceGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sourceLabel {
+  @include text-caption;
+  color: var(--text-dim);
+}
+
+.productName {
+  @include text-caption;
+  color: var(--text);
+  // Catalog titles run long: two lines, the rest cut with an ellipsis.
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.productStats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin: 0;
+}
+
+.productRow {
+  @include text-caption;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--text-dim);
+
+  dd {
+    margin: 0;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+}

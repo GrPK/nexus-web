@@ -1,0 +1,28 @@
+// Neutral by design, never the accent: a text token, or the theme's full-contrast ink (--logo-contrast: pure white on dark,
+// pure black on light). The wordmark is an SVG in em units, so it ignores every font the panel or a skin sets.
+.logo {
+  display: inline-block;
+  flex: none;
+  font-size: var(--type-body);
+  pointer-events: none;
+}
+
+// Doubled with .logo: a host that sizes every svg in its icon slot (Button) must not resize the wordmark.
+.logo .mark {
+  display: block;
+  font-size: inherit;
+  height: 1.885em;
+  width: auto;
+}
+
+.contrast {
+  color: var(--logo-contrast);
+}
+
+.muted {
+  color: var(--text-dim);
+}
+
+.primary {
+  color: var(--text);
+}

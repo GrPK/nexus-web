@@ -1,5 +1,5 @@
 // Documentation catalog for the product-telemetry events the app emits to
-// PostHog. This is the human-readable mirror of the service's authoritative
+// nexus-api. This is the human-readable mirror of the service's authoritative
 // list in nexus-service `src/Telemetry/TelemetryEvents.cs` - keep `name`
 // values in sync with the constants there. Rendered at /telemetry-reference
 // (Settings → Dev tools → Telemetry events).
@@ -14,7 +14,7 @@ export interface TelemetryParam {
 }
 
 export interface TelemetryEventDoc {
-  /** Event name sent to PostHog. Must match TelemetryEvents.cs. */
+  /** Event name sent to nexus-api. Must match TelemetryEvents.cs. */
   name: string;
   title: string;
   /** 'live' = wired and emitting today. 'planned' = name reserved, not emitted yet. */
@@ -26,43 +26,40 @@ export interface TelemetryEventDoc {
   params: TelemetryParam[];
 }
 
-// Properties PostHog attaches to EVERY event - you never pass these yourself.
+// Envelope fields nexus-api receives with EVERY event - you never pass these yourself.
 export const AUTO_PROPERTIES: TelemetryParam[] = [
-  { name: 'distinct_id', type: 'string', required: true, description: 'Anonymous per-install id (no PII). Shared with the fleet heartbeat.' },
-  { name: '$lib', type: 'string', required: true, description: 'Always "nexus-service" for service-emitted events.' },
-  { name: '$lib_version', type: 'string', required: true, description: 'Build version (BuildInfo.Version).' },
-  { name: 'os', type: 'string', required: true, description: 'win | mac | linux | other.' },
+  { name: 'id', type: 'string', required: true, description: 'Per-event uuid; nexus-api dedupes resends on (id, ts).' },
+  { name: 'ts', type: 'string', required: true, description: 'Event timestamp (UTC, ISO 8601); nexus-api stores it as a column.' },
+  { name: 'installId', type: 'string', required: true, description: 'Anonymous per-install id (no PII). Shared with the fleet heartbeat.' },
 ];
 
-// Attached to the anonymous person via PostHog $set (never to a single
-// event), refreshed only when the value actually changes. The hardware half
-// is what makes every event above breakable down by machine; the usage half
-// is the current-state census that layout_snapshot mirrors over time.
+// Carried by the appended `profile` event (never on a single event), sent
+// when the value changes and re-sent periodically; the latest row per install
+// wins. The core hardware fields (cpu, gpu, ram, motherboard, os, version) are
+// NOT here: they arrive through the fleet `specs` event. The rows below are
+// the extra hardware and the current-state census that layout_snapshot
+// mirrors over time.
 //
-// The hardware half carries vendor model-name strings (cpu, gpu, monitor and
-// the devices list) - reported by the hardware itself, never typed by the
-// user. The usage half is counts and fixed values only. Nothing the user
+// The hardware rows carry vendor model-name strings (monitor and the devices
+// list) - reported by the hardware itself, never typed by the user. The usage
+// rows are counts and fixed values only. Nothing the user
 // authored is collected in either: widget titles, renamed devices, panel
 // display names, file paths and serials are all excluded.
-export const PERSON_PROPERTIES: TelemetryParam[] = [
-  { name: 'version', type: 'string', required: true, description: 'Nexus build version (BuildInfo.Version).' },
-  { name: 'os', type: 'string', required: true, description: 'win | mac | linux | other.' },
+export const PROFILE_PROPERTIES: TelemetryParam[] = [
   { name: 'os_build', type: 'string', required: false, description: 'Operating-system build string.' },
-  { name: 'cpu', type: 'string', required: false, description: 'CPU model name.' },
-  { name: 'gpu', type: 'string', required: false, description: 'GPU model name(s).' },
-  { name: 'ram', type: 'string', required: false, description: 'Installed RAM as reported (the raw string; ram_amount is the parsed figure).' },
-  { name: 'ram_amount', type: 'number', required: false, description: 'Installed RAM in GB, parsed from ram. Absent when the string does not parse.' },
-  { name: 'motherboard', type: 'string', required: false, description: 'Motherboard model name.' },
   { name: 'storage', type: 'string', required: false, description: 'Storage as reported (the raw string; storage_amount is the parsed figure).' },
   { name: 'storage_amount', type: 'number', required: false, description: 'Total storage in GB, parsed from storage. Absent when the string does not parse.' },
   { name: 'monitor', type: 'string', required: false, description: 'Monitor model name(s).' },
   { name: 'network', type: 'string', required: false, description: 'Network adapter model name(s).' },
   { name: 'sound', type: 'string', required: false, description: 'Sound device model name(s).' },
   { name: 'devices', type: 'array', required: true, description: 'Recognized connected devices by model name, sorted (capped at 80). Always sent, possibly empty.' },
-  { name: 'lighting_devices', type: 'number', required: false, description: 'Lighting cards currently enumerated - one entry per motherboard ARGB zone, including disabled devices, so higher than a count of physical products. Omitted when the provider read failed rather than reported as 0, because person properties are last-write-wins.' },
+  { name: 'lighting_devices', type: 'number', required: false, description: 'Lighting cards currently enumerated - one entry per motherboard ARGB zone, including disabled devices, so higher than a count of physical products. Omitted when the provider read failed rather than reported as 0, so a failed read does not overwrite a good value.' },
   { name: 'cooling_channels', type: 'number', required: false, description: 'Fan channels currently enumerated. Omitted on a failed read rather than reported as 0.' },
   { name: 'panel_devices', type: 'number', required: true, description: 'Configured panel devices.' },
   { name: 'panel_surfaces', type: 'array', required: true, description: 'Distinct panel surfaces in use.' },
+  { name: 'paired_phones', type: 'number', required: true, description: 'Live phone pairings: stored sessions still inside their idle limit (30 days for HTTPS or relay claims, 24 hours for plain-HTTP browser claims). Counts sessions, not unique phones.' },
+  { name: 'phones_active_7d', type: 'number', required: true, description: 'Live phone pairings last seen within a rolling 7-day window. Last-seen refreshes at most once a minute.' },
+  { name: 'relay_enabled', type: 'boolean', required: true, description: 'Whether the opt-in cloud relay for remote phone access is on.' },
   { name: 'widget_count', type: 'number', required: true, description: 'Total widget placements.' },
   { name: 'widget_page_count', type: 'number', required: true, description: 'Total panel pages.' },
   { name: 'widget_types', type: 'array', required: true, description: 'Distinct widget type keys placed, capped at 200. Keys that are neither a plain lowercase slug nor a valid app id are dropped at the send boundary.' },
@@ -85,9 +82,19 @@ export const TELEMETRY_EVENTS: TelemetryEventDoc[] = [
     title: 'Fan speed set',
     status: 'live',
     source: 'service',
-    description: 'A fan channel was set to a manual speed from the panel (POST /cooling/fan/{id}/speed).',
+    description: 'A fan channel was set to a manual speed by a deliberate user pick (POST /cooling/fan/{id}/speed). Not counted: the seed speed written when a BIOS fan is taken into software control (see fan_control_taken) and undo/redo replays.',
     params: [
       { name: 'speed', type: 'number', required: true, description: 'Resulting fan speed the hardware accepted (percent).' },
+    ],
+  },
+  {
+    name: 'fan_control_taken',
+    title: 'Fan control taken',
+    status: 'live',
+    source: 'service',
+    description: 'A fan was taken from BIOS into software control from the panel, once per fan. The page writes a placeholder speed to do it, which is not a speed choice; this records the control the user picked instead (POST /cooling/fan/{id}/speed with source "seed").',
+    params: [
+      { name: 'target', type: 'string', required: true, description: 'manual | curve - the control the user chose for the fan.' },
     ],
   },
   {
@@ -115,7 +122,7 @@ export const TELEMETRY_EVENTS: TelemetryEventDoc[] = [
     title: 'Fan preset applied',
     status: 'live',
     source: 'service',
-    description: 'A cooling preset was applied from the panel (POST /cooling/profile/{name}) - the fan-mode widget.',
+    description: 'A cooling preset was applied by a user pick from the panel (POST /cooling/profile/{name}) - the fan-mode widget. Not counted: the automatic switch from Off to Custom when a fan is changed, and undo/redo replays.',
     params: [
       { name: 'preset', type: 'string', required: true, description: 'The applied preset - a built-in name (silent, balanced, turbo, …), a custom curve name, or "off".' },
     ],
@@ -125,10 +132,10 @@ export const TELEMETRY_EVENTS: TelemetryEventDoc[] = [
     title: 'Lighting effect applied',
     status: 'live',
     source: 'service',
-    description: 'A lighting look was applied, from any of the three headless-start routes. Deduped on mode plus effect, so the ~30 posts/second a slider drag produces cost nothing and only a real change is recorded; stopping lighting clears the dedupe, so restarting the same look reports again. The count is therefore transitions, not time spent.',
+    description: 'A lighting look was applied, from any of the three headless-start routes. Deduped against the look already running (read from the persisted state before each start), so the ~30 posts/second a slider drag produces, a page replaying the running look after a restart, and looks changed by auto-restore, profile or preset switches cost nothing and only a real change is recorded; stopping lighting clears the dedupe, so restarting the same look reports again. The count is therefore transitions, not time spent.',
     params: [
       { name: 'mode', type: 'string', required: true, description: 'animate | static | screen - the mode the service actually ran, which is not always the route it arrived on: a static-catalog key posted to the animate route is rerouted into Static and reported as static.' },
-      { name: 'effect', type: 'string', required: true, description: 'Effect key, lowercased the same way the provider lowercases it before matching (e.g. plasma, fire, gradientlinear). Defaults are filled in as the service applies them - an animate start with no key runs rainbow. Anything outside the lowercase slug alphabet reports as "other". Always "screen" in screen mode, where the service ignores the field.' },
+      { name: 'effect', type: 'string', required: true, description: 'Effect key, lowercased the same way the provider lowercases it before matching (e.g. plasma, fire, gradientlinear). Defaults are filled in as the service applies them - an animate start with no key runs rainbow. Anything outside the lowercase slug alphabet reports as "other". Always "screen" in screen mode, where the service ignores the field. Always "flat" for a flat color (static mode with a color), whatever effect key the client sends with it.' },
     ],
   },
   {
@@ -149,15 +156,14 @@ export const TELEMETRY_EVENTS: TelemetryEventDoc[] = [
     description: 'A device firmware flash completed.',
     params: [
       { name: 'device', type: 'string', required: true, description: 'Device family flashed.' },
-      { name: 'version', type: 'string', required: false, description: 'Firmware version written.' },
-    ],
+        ],
   },
   {
     name: 'pair_completed',
     title: 'Pair completed',
-    status: 'planned',
+    status: 'live',
     source: 'service',
-    description: 'A phone successfully paired with this install.',
+    description: 'A phone successfully paired with this install. Fires once per pairing action, not per unique phone: a re-pair of the same phone counts again, and the approval-code path (host Allow) fires once when the session is issued.',
     params: [
       { name: 'transport', type: 'string', required: true, description: 'lan | relay - how the pairing claim reached the PC.' },
     ],
@@ -174,6 +180,9 @@ export const TELEMETRY_EVENTS: TelemetryEventDoc[] = [
       { name: 'widget_page_count', type: 'number', required: true, description: 'Total pages across every panel.' },
       { name: 'panel_devices', type: 'number', required: true, description: 'Number of configured panel devices.' },
       { name: 'panel_surfaces', type: 'array', required: true, description: 'Distinct panel surfaces in use, sorted, e.g. y70, q60, monitor.' },
+      { name: 'paired_phones', type: 'number', required: true, description: 'Live phone pairings: stored sessions still inside their idle limit (30 days for HTTPS or relay claims, 24 hours for plain-HTTP browser claims). Counts sessions, not unique phones.' },
+      { name: 'phones_active_7d', type: 'number', required: true, description: 'Live phone pairings last seen within a rolling 7-day window. Last-seen refreshes at most once a minute.' },
+      { name: 'relay_enabled', type: 'boolean', required: true, description: 'Whether the opt-in cloud relay for remote phone access is on.' },
       { name: 'lighting_devices', type: 'number', required: false, description: 'Lighting cards currently enumerated - what the lighting page lists, which is one entry per motherboard ARGB zone and includes disabled devices, so it runs higher than a count of physical products. Omitted entirely when the provider read failed, rather than reported as 0.' },
       { name: 'cooling_channels', type: 'number', required: false, description: 'Fan channels currently enumerated. Omitted when the provider read failed, rather than reported as 0.' },
       { name: 'lighting_mode', type: 'string', required: true, description: 'simple | advanced - the lighting page density.' },
@@ -216,6 +225,86 @@ export const TELEMETRY_EVENTS: TelemetryEventDoc[] = [
       { name: 'utm_campaign', type: 'string', required: false, description: 'From the link, when present.' },
       { name: 'utm_content', type: 'string', required: false, description: 'From the link, when present. Apps use it to tell buttons apart.' },
       { name: 'utm_term', type: 'string', required: false, description: 'From the link, when present.' },
+    ],
+  },
+  {
+    name: 'app_installed',
+    title: 'App installed',
+    status: 'live',
+    source: 'service',
+    description: 'An SDK app was installed from the Marketplace or copied in from a bundled app. Not emitted when the same version is installed over itself.',
+    params: [
+      { name: 'app_id', type: 'string', required: true, description: 'Installed app id, e.g. com.ibuypower.control.' },
+      { name: 'app_version', type: 'string', required: true, description: 'Version that was installed.' },
+      { name: 'reason', type: 'string', required: true, description: 'user (the person installed it) or auto (installed for detected hardware).' },
+    ],
+  },
+  {
+    name: 'app_updated',
+    title: 'App updated',
+    status: 'live',
+    source: 'service',
+    description: 'An installed SDK app moved to a different version.',
+    params: [
+      { name: 'app_id', type: 'string', required: true, description: 'Installed app id.' },
+      { name: 'app_version', type: 'string', required: true, description: 'Version now installed.' },
+      { name: 'from_version', type: 'string', required: true, description: 'Version it replaced.' },
+      { name: 'reason', type: 'string', required: true, description: 'auto (background update) or user.' },
+    ],
+  },
+  {
+    name: 'app_uninstalled',
+    title: 'App uninstalled',
+    status: 'live',
+    source: 'service',
+    description: 'An SDK app was removed from this PC.',
+    params: [
+      { name: 'app_id', type: 'string', required: true, description: 'Removed app id.' },
+      { name: 'app_version', type: 'string', required: true, description: 'Version that was removed.' },
+      { name: 'reason', type: 'string', required: true, description: 'user or yank (the Marketplace pulled that version).' },
+    ],
+  },
+  {
+    name: 'app_placed',
+    title: 'App placed',
+    status: 'live',
+    source: 'service',
+    description: 'An app widget instance appeared in a layout (a panel device layout or the desktop dashboard). Derived from the layout save, so a save that keeps the same widgets emits nothing; the first save of a layout that never existed reports its app widgets as placed.',
+    params: [
+      { name: 'app_id', type: 'string', required: true, description: 'App id of the widget.' },
+      { name: 'surface', type: 'string', required: true, description: 'Surface it was added to: desktop for the desktop dashboard, otherwise the device layout surface (e.g. y70).' },
+    ],
+  },
+  {
+    name: 'app_removed',
+    title: 'App removed from layout',
+    status: 'live',
+    source: 'service',
+    description: 'An app widget instance left a layout. Derived from the layout save, like app_placed. Uninstalling through removeAppEverywhere saves each layout that held the app, so it also emits one app_removed per placement. The service uninstall route and a Marketplace yank strip placements through RemoveWidgetType instead, and emit no app_removed.',
+    params: [
+      { name: 'app_id', type: 'string', required: true, description: 'App id of the widget.' },
+      { name: 'surface', type: 'string', required: true, description: 'Surface it was removed from, named as for app_placed.' },
+    ],
+  },
+  {
+    name: 'app_used',
+    title: 'App used',
+    status: 'live',
+    source: 'service',
+    description: 'An installed SDK app ran on this PC: its widget is mounted (the widget host reports on mount and hourly, so a widget left up across midnight counts each UTC day) or its page was opened. The settings editor does not count. At most once per app per UTC day per install; the day is remembered across restarts.',
+    params: [
+      { name: 'app_id', type: 'string', required: true, description: 'Installed app id.' },
+      { name: 'app_version', type: 'string', required: true, description: 'Installed version of the app.' },
+    ],
+  },
+  {
+    name: 'page_viewed',
+    title: 'Page viewed',
+    status: 'live',
+    source: 'service',
+    description: 'A top-level dashboard page was opened (POST /telemetry/page-viewed/{page}), including the page shown on load. App pages are reported by app_page_opened instead. At most once per page per install per UTC day.',
+    params: [
+      { name: 'page', type: 'string', required: true, description: 'Page slug: dashboard, monitoring, screentime, benchmark, lighting, smart-lights, home-assistant, cooling, devices, device (any device page), diagnostics, frames, store, build, calendar, clock, weather, steam, gallery, settings, profiles, account.' },
     ],
   },
   {
@@ -283,42 +372,36 @@ export const TELEMETRY_EVENTS: TelemetryEventDoc[] = [
     title: 'Install',
     status: 'live',
     source: 'service',
-    description: 'Delivered once per install id - reaches virtually every fresh install under the default-on consent default, plus existing opted-in installs once as a backfill on upgrade. Retried at boot and hourly until nexus-api acknowledges it (a persisted delivered flag prevents re-delivery); PostHog gets a single best-effort attempt alongside it. The nexus-api envelope additionally carries os, osVersion, arch, and deviceType.',
+    description: 'Delivered once per install id - reaches virtually every fresh install under the default-on consent default, plus existing opted-in installs once as a backfill on upgrade. Retried at boot and hourly until nexus-api acknowledges it (a persisted delivered flag prevents re-delivery); the usage sink gets a single best-effort copy alongside it. The nexus-api envelope additionally carries os, osVersion, arch, and deviceType.',
     params: [
-      { name: 'version', type: 'string', required: true, description: 'Nexus build version (BuildInfo.Version).' },
-    ],
+        ],
   },
   {
     name: 'specs',
     title: 'Hardware specs',
     status: 'live',
     source: 'service',
-    description: 'Fires once while opted in, then again only when the hardware summary hash changes (e.g. a component swap); skipped and retried next pass on a cold boot with no processor or GPU data yet. Upserts the latest snapshot per install id in nexus-api rather than appending, and reaches PostHog only once nexus-api has accepted it.',
+    description: 'Fires once while opted in, then again only when the hardware summary hash changes (e.g. a component swap); skipped and retried next pass on a cold boot with no processor or GPU data yet. Upserts the latest snapshot per install id in nexus-api rather than appending.',
     params: [
-      { name: 'cpu', type: 'string', required: true, description: 'CPU model name.' },
-      { name: 'gpu', type: 'array', required: false, description: 'GPU model name(s); more than one entry on a multi-GPU system.' },
-      { name: 'ram_bytes', type: 'number', required: true, description: 'Total installed RAM in bytes, derived from the parsed GB figure (an approximation, not an exact byte count).' },
-      { name: 'motherboard', type: 'string', required: true, description: 'Motherboard model name.' },
-    ],
+              { name: 'ram_bytes', type: 'number', required: true, description: 'Total installed RAM in bytes, derived from the parsed GB figure (an approximation, not an exact byte count).' },
+        ],
   },
   {
     name: 'opt_out',
     title: 'Opted out',
     status: 'live',
     source: 'service',
-    description: 'Fires on a true-to-false consent transition, from either the welcome screen or Settings. The one event still delivered after opting out: nexus-api retries it hourly until delivered once, and PostHog gets a single best-effort attempt alongside it. Appended, not deduped - the latest status wins.',
+    description: 'Fires on a true-to-false consent transition, from either the welcome screen or Settings. The one event still delivered after opting out: nexus-api retries it hourly until delivered once, and the usage sink gets a single best-effort copy alongside it. Appended, not deduped - the latest status wins.',
     params: [
-      { name: 'version', type: 'string', required: true, description: 'Nexus build version at the time of the transition.' },
-    ],
+        ],
   },
   {
     name: 'opt_in',
     title: 'Opted in',
     status: 'live',
     source: 'service',
-    description: 'Fires on a false-to-true consent transition from Settings, after a prior opt-out - not the initial welcome-screen confirmation, since posting the same value the fresh-install default already holds is not a transition. Delivered the same way as opt_out: nexus-api retries until it lands once, PostHog gets a single best-effort attempt. Appended, not deduped - the latest status wins.',
+    description: 'Fires on a false-to-true consent transition from Settings, after a prior opt-out - not the initial welcome-screen confirmation, since posting the same value the fresh-install default already holds is not a transition. Delivered the same way as opt_out: nexus-api retries until it lands once, the usage sink gets a single best-effort copy. Appended, not deduped - the latest status wins.',
     params: [
-      { name: 'version', type: 'string', required: true, description: 'Nexus build version at the time of the transition.' },
-    ],
+        ],
   },
 ];

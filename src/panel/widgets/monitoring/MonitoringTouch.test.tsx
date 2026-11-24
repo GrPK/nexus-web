@@ -20,7 +20,7 @@ vi.mock('../../../hooks/useSensorExtras', () => ({
         { id: 'battery/0/charge', name: 'Charge Level', type: 'Level', value: 80, units: '%', formatted: '80%', parent: { id: 'battery/0', name: 'Test Battery' } },
       ] },
     ],
-    nics: [], coolers: [], psus: [], nvmeStorage: [], embeddedControllers: [], memoryModules: [],
+    nics: [], coolers: [], psus: [], nvmeStorage: [], fanSensors: [], embeddedControllers: [], memoryModules: [],
   }),
 }));
 
@@ -64,7 +64,7 @@ describe('MonitoringTouch - extras-backed devices', () => {
   it('resolves an extras-topic sensor (battery) to a live value in immersive view', () => {
     render(<MonitoringTouch widget={touchWidget()} />);
 
-    expect(gaugeReadings()).toContain('80%');
+    expect(gaugeReadings()).toContain('80.0%');
     expect(screen.queryByText('-')).not.toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ import { useTranslation } from '../../../lib/i18n';
 import { pluralKey } from '../../../lib/pluralKey';
 import { isMultiSelectModifier } from '../../../lib/platform';
 import { paintLedFrame } from '../../../lib/ledFrame';
+import { AreaCells } from '../AreaCells/AreaCells';
 import { subscribeLedFrame } from '../../../lib/ledFrameStore';
 import type { EffectState } from '../../../types/lighting';
 import { CanvasNoticeBar } from '../CanvasNoticeBar';
@@ -16,7 +17,9 @@ import { DeviceContextMenu, menuSections, type DeviceMenuItem } from './DeviceCo
 import { stackMenuItems, type StackActions } from './groupMenuItems';
 import { sliceStackSlot, stackSlotOf, type DeviceStack } from '../../../lib/stackSlots';
 import { canvasLabelName } from '../../../lib/canvasLabelName';
+import { lockedFrameSize } from '../../../lib/aspectResize';
 import styles from './DeviceCanvas.module.scss';
+import { HoverTooltip } from '../HoverTooltip/HoverTooltip';
 
 interface DeviceCanvasProps {
   /** Drawn over the canvas stream and under the shader canvas and frames; it must not take pointer events. */
@@ -101,11 +104,11 @@ const GRID_PAD = 12;
  *  on that line. */
 const COLUMN_STAGGER_Y = 24;
 
-/** The slot a layout reset would give this device: a square-ish grid scaled to
- *  the device count, spread over the whole canvas, neighbouring columns offset
- *  vertically. Mirrors the service's CanvasGridLayout.Slot
- *  (nexus-service/src/Lighting/CanvasGridLayout.cs), which owns the same layout
- *  for fresh installs and for the reset endpoint. Change them together. */
+/** A device's grid slot: a square-ish grid scaled to the device count, spread
+ *  over the whole canvas, neighbouring columns offset vertically. Mirrors the
+ *  service's CanvasGridLayout.Slot (nexus-service/src/Lighting/CanvasGridLayout.cs),
+ *  the default for unplaced devices on an install without MaximizedCanvasDefaults;
+ *  a flagged install defaults them to the whole canvas. Change them together. */
 function defaultSlot(index: number, totalCount: number): { x: number; y: number; w: number; h: number } {
   if (totalCount <= 0 || index < 0) return { x: GRID_PAD, y: GRID_PAD, w: MIN_BOX_W, h: MIN_BOX_H };
   const n = Math.max(1, totalCount);
@@ -140,17 +143,45 @@ function defaultSlot(index: number, totalCount: number): { x: number; y: number;
   return { x, y, w, h };
 }
 
+/** The grid slot of each device, in the order given: one per device, except that
+ *  the zones of one Flex fan ("lianli-flex:{MAC}:{zone}") share the fan's slot.
+ *  Mirrors CompositeLightingDeviceProvider.ApplyDefaultLayouts in the service. */
+function gridSlots(devices: readonly LightingDevice[]): { slotOf: number[]; total: number } {
+  const fanSlots = new Map<string, number>();
+  const slotOf: number[] = [];
+  let total = 0;
+  for (const d of devices) {
+    const fan = flexFanKey(d.id);
+    const shared = fan === null ? undefined : fanSlots.get(fan);
+    if (shared !== undefined) { slotOf.push(shared); continue; }
+    slotOf.push(total);
+    if (fan !== null) fanSlots.set(fan, total);
+    total++;
+  }
+  return { slotOf, total };
+}
+
+const FLEX_PREFIX = 'lianli-flex:';
+
+/** "lianli-flex:{MAC}" for a Flex zone id, else null. */
+function flexFanKey(id: string): string | null {
+  if (!id.startsWith(FLEX_PREFIX)) return null;
+  const second = id.indexOf(':', FLEX_PREFIX.length);
+  return second < 0 ? id : id.slice(0, second);
+}
+
 /** Returns each target to the default grid slot for its place among the frames
  *  on the canvas, so no two on-canvas frames can land on each other. Indexes into
  *  the frames the canvas holds, not the service's full device list, so a canvas
  *  with parked or powered-off frames hidden packs the rest gaplessly instead of
- *  reserving slots nothing occupies; it matches the reset layout exactly when
+ *  reserving slots nothing occupies; it matches the service's grid exactly when
  *  none are hidden. A hidden frame keeps its own rect, so switching one back on
  *  can reveal it under a slot taken meanwhile. */
-function minimizeInto(targets: LightingDevice[], all: LightingDevice[]): void {
+export function minimizeInto(targets: LightingDevice[], all: LightingDevice[]): void {
+  const { slotOf, total } = gridSlots(all);
   for (const t of targets) {
     const i = all.indexOf(t);
-    const { x, y, w, h } = defaultSlot(i < 0 ? 0 : i, all.length);
+    const { x, y, w, h } = defaultSlot(i < 0 ? 0 : slotOf[i], total);
     t.canvasX = x;
     t.canvasY = y;
     t.canvasW = w;
@@ -613,15 +644,25 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, foreig
     } else {
       const rad = radOf(dev);
       if (rad === 0) {
-        dev.canvasW = Math.max(60, Math.min(CW - PAD - dev.canvasX, drag.origW + dx));
-        dev.canvasH = Math.max(60, Math.min(CH - PAD - dev.canvasY, drag.origH + dy));
+        const maxW = CW - PAD - dev.canvasX, maxH = CH - PAD - dev.canvasY;
+        if (e.shiftKey) {
+          const locked = lockedFrameSize(drag.origW, drag.origH, drag.origW + dx, drag.origH + dy, 60, maxW, maxH);
+          dev.canvasW = locked.w;
+          dev.canvasH = locked.h;
+        } else {
+          dev.canvasW = Math.max(60, Math.min(maxW, drag.origW + dx));
+          dev.canvasH = Math.max(60, Math.min(maxH, drag.origH + dy));
+        }
       } else {
         // The grip drags the frame's own bottom-right corner: the pointer delta
         // is read along the frame's axes and the opposite corner stays put, so
         // the centre the frame turns about moves with the resize.
         const c = Math.cos(rad), sn = Math.sin(rad);
-        const w = Math.max(60, drag.origW + dx * c + dy * sn);
-        const h = Math.max(60, drag.origH - dx * sn + dy * c);
+        const rawW = drag.origW + dx * c + dy * sn;
+        const rawH = drag.origH - dx * sn + dy * c;
+        const { w, h } = e.shiftKey
+          ? lockedFrameSize(drag.origW, drag.origH, rawW, rawH, 60, Infinity, Infinity)
+          : { w: Math.max(60, rawW), h: Math.max(60, rawH) };
         const ocx = drag.origX + drag.origW / 2, ocy = drag.origY + drag.origH / 2;
         const cornerX = ocx - (drag.origW / 2) * c + (drag.origH / 2) * sn;
         const cornerY = ocy - (drag.origW / 2) * sn - (drag.origH / 2) * c;
@@ -726,6 +767,7 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, foreig
 
   // Mutates dev's rect to the full canvas or to its default grid slot; no save/
   // render side effects so group maximize can set every target one direction.
+  // An unturned full-canvas rect equals the service's CanvasGridLayout.Full.
   const setMaximized = useCallback((dev: LightingDevice, maximize: boolean) => {
     if (maximize) {
       dev.canvasX = PAD;
@@ -891,6 +933,13 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, foreig
         // every one of them - that is the "clicked empty canvas" state.
         const deemphasized = !selected;
         const shownMembers = stackedWith(dev.id).filter(id => !hiddenIds.has(id));
+        // An area-sampled card shows boxes only. A stacked card without it keeps its dots only when it is the
+        // selected slot, so the frame never mixes a stray sibling dot into the boxes. Foreign members draw nothing.
+        const frameHasBoxes = shownMembers.some(m => {
+          if (foreignFrames?.has(m)) return false;
+          const d = devices.find(x => x.id === m);
+          return !!(d?.sampling && d.sampling !== 'led' && d.areaCells?.length);
+        });
         const foreign = !!foreignFrames && shownMembers.length > 0 && shownMembers.every(id => foreignFrames.has(id));
         // The canvas is held at the unit space's 5:3, so a turn in units is a
         // plain rotation on screen.
@@ -907,9 +956,11 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, foreig
             onPointerDown={e => handleFramePointerDown(e, dev)}
             onContextMenu={e => handleFrameContextMenu(e, dev)}>
             <div className={styles.resizeHandle} onPointerDown={e => startDrag(e, dev, 'resize-br')} />
-            <div className={styles.rotateHandle} title={t('lighting.devices.rotateHandle')} onPointerDown={e => startDrag(e, dev, 'rotate')}>
-              <RotateCw size={10} aria-hidden />
-            </div>
+            <HoverTooltip body={t('lighting.devices.rotateHandle')}>
+              <div className={styles.rotateHandle} onPointerDown={e => startDrag(e, dev, 'rotate')}>
+                <RotateCw size={10} aria-hidden />
+              </div>
+            </HoverTooltip>
             {foreign && <span className={styles.foreignCaption}>{foreignFrames.get(dev.id) ?? foreignFrames.get(shownMembers[0])}</span>}
             {selected && selectedDeviceLeds && shownMembers
               .filter(id => !foreignFrames?.has(id))
@@ -920,6 +971,18 @@ const DeviceOverlays = memo(function DeviceOverlays({ devices, hiddenIds, foreig
                 const slot = stackSlotOf(stacks, id);
                 const part = slot ? sliceStackSlot({ x: 0, y: 0, w: 1, h: 1 }, slot) : { x: 0, y: 0, w: 1, h: 1 };
                 const locked = ledColorsById.get(id);
+                const member = devices.find(d => d.id === id);
+                if (member?.sampling && member.sampling !== 'led' && member.areaCells?.length) {
+                  return [(
+                    <AreaCells
+                      key={`${id}:cells`}
+                      cells={member.areaCells}
+                      locked={locked}
+                      style={{ left: `${part.x * 100}%`, top: `${part.y * 100}%`, width: `${part.w * 100}%`, height: `${part.h * 100}%` }}
+                    />
+                  )];
+                }
+                if (frameHasBoxes && primaryDeviceId !== id) return [];
                 return (selectedDeviceLeds[id] ?? []).filter(l => !l.disabled).map(led => {
                   const color = locked?.get(led.index);
                   return (

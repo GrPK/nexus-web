@@ -2,11 +2,15 @@
 // file per preview to satisfy the fast-refresh rule would be dozens of tiny
 // files. Storybook entries reload (not HMR) on edit.
 import { useEffect, useRef, useState, type CSSProperties, type FC } from 'react';
-import { Monitor, Palette, Sparkles, X, Plus, Settings, Download, AlertTriangle, HardDrive, HardDriveDownload, Heart, Link2Off, Pause, Pointer, Power, Cpu, Gauge, MemoryStick } from 'lucide-react';
+import { Monitor, Palette, Sparkles, X, Plus, Settings, Download, AlertTriangle, HardDrive, HardDriveDownload, Heart, Link2Off, Pause, Pin, Pointer, Power, Cpu, Gauge, MemoryStick } from 'lucide-react';
 import { ViewHeader } from '../components/common/ViewHeader/ViewHeader';
 import { Sparkline } from '../components/common/Sparkline/Sparkline';
 import { SensorCard } from '../components/common/SensorCard/SensorCard';
 import { Card } from '../components/common/Card/Card';
+import { StatusRow } from '../components/common/StatusRow/StatusRow';
+import { groupedRules } from '../components/views/DiagnosticsView/thermalsHelpers';
+import { watchlistFixture } from '../components/views/DiagnosticsView/watchlistFixture';
+import { Badge } from '../components/common/Badge/Badge';
 import { Coachmark } from '../components/common/Coachmark/Coachmark';
 import { DomainGlyph } from '../components/common/DomainGlyph/DomainGlyph';
 import { InfoList, InfoRow } from '../components/common/InfoList/InfoList';
@@ -25,6 +29,7 @@ import { EffectTemplateSelector } from '../components/common/EffectTemplateSelec
 import { DeviceModal } from '../components/common/DeviceModal/DeviceModal';
 import { Slideout } from '../components/common/Slideout/Slideout';
 import { CardDeleteButton } from '../components/common/CardDeleteButton/CardDeleteButton';
+import { EditHint } from '../components/common/EditHint/EditHint';
 import { InfoTooltip } from '../components/common/InfoTooltip/InfoTooltip';
 import { HoverTooltip } from '../components/common/HoverTooltip/HoverTooltip';
 import { ChartHoverTooltip, ChartTooltipHeader, ChartTooltipRow, ChartTooltipVal } from '../components/common/ChartHoverTooltip/ChartHoverTooltip';
@@ -39,11 +44,14 @@ import { FeatureDisabled } from '../components/common/FeatureDisabled/FeatureDis
 import { PageHero } from '../components/common/PageHero/PageHero';
 import { Popover } from '../components/common/Popover/Popover';
 import { DatePicker } from '../components/common/DatePicker/DatePicker';
+import { MiniMonth } from '../components/common/MiniMonth/MiniMonth';
+import { MonthGrid } from '../components/common/MonthGrid/MonthGrid';
 import { EffectCard } from '../components/common/EffectCard/EffectCard';
 import { PairedPcsContent } from '../components/common/PairedPcs/PairedPcsContent';
 import { EffectControls } from '../panel/widgets/lighting/page/EffectControls';
 import { Tabs } from '../components/common/Tabs/Tabs';
 import { ChipGroup } from '../components/common/ChipGroup/ChipGroup';
+import { ViewSwitch } from '../components/common/ViewSwitch/ViewSwitch';
 import { ColorSlots } from '../components/common/ColorSlots/ColorSlots';
 import { ConfirmModal } from '../components/common/ConfirmModal/ConfirmModal';
 import { PromptModal } from '../components/common/PromptModal/PromptModal';
@@ -82,6 +90,9 @@ import { ConflictAllClear } from '../components/common/ConflictAllClear/Conflict
 import { ConflictAppCard } from '../components/common/ConflictAppCard/ConflictAppCard';
 import { OnboardingNote } from '../components/common/OnboardingNote/OnboardingNote';
 import { SkipOnboardingButton } from '../components/common/SkipOnboardingButton/SkipOnboardingButton';
+import { OnboardingHeader } from '../components/common/OnboardingHeader/OnboardingHeader';
+import { OnboardingFooter } from '../components/common/OnboardingFooter/OnboardingFooter';
+import { BrightnessScheduleButton } from '../components/common/BrightnessScheduleButton/BrightnessScheduleButton';
 import { ToastProvider, useToast } from '../components/common/Toast/Toast';
 import { WidgetHeader } from '../components/common/WidgetHeader/WidgetHeader';
 import { DEFAULT_ACCENT, PRESET_ACCENTS } from '../lib/settings';
@@ -109,7 +120,11 @@ import { SettingRow, SettingSelect, SettingSlider, SettingToggle } from '../comp
 import { ServiceLaunchButton } from '../components/common/ServiceLaunchButton/ServiceLaunchButton';
 import { DesktopOnlyBadge } from '../components/common/DesktopOnlyBadge/DesktopOnlyBadge';
 import { ExperimentalBadge } from '../components/common/ExperimentalBadge/ExperimentalBadge';
+import { BuildLogo } from '../components/common/BuildLogo/BuildLogo';
 import { ConflictRunningBadge } from '../components/common/ConflictRunningBadge/ConflictRunningBadge';
+import { NotRespondingBadge } from '../components/common/NotRespondingBadge/NotRespondingBadge';
+import { FixLightingModal } from '../components/common/FixLightingModal/FixLightingModal';
+import { TroubleshootLink } from '../components/common/TroubleshootLink/TroubleshootLink';
 import { NexusControlConflictModal } from '../components/common/NexusControlConflictModal/NexusControlConflictModal';
 import { ExperimentalEnableModal } from '../components/common/ExperimentalEnableModal/ExperimentalEnableModal';
 import { PairingQrView } from '../components/common/PairingQr/PairingQrView';
@@ -141,6 +156,8 @@ import { MediaCropper } from '../components/common/MediaCropper/MediaCropper';
 import { SyncConflictModal } from '../components/common/SyncConflictModal/SyncConflictModal';
 import { Spinner as StorybookSpinner } from '../components/common/Spinner/Spinner';
 import { Stepper as StorybookStepper } from '../components/common/Stepper/Stepper';
+import { CurveGraph } from '../panel/widgets/cooling/page/CurveEditor';
+import { ChannelLayout, type ChannelNode } from '../components/common/ChannelLayout/ChannelLayout';
 import { RangeBar } from '../components/common/RangeBar/RangeBar';
 import { GradientStopsEditor } from '../components/common/GradientStopsEditor/GradientStopsEditor';
 import { DEFAULT_GAUGE_GRADIENT, MAX_GAUGE_GRADIENT_STOPS, MIN_GAUGE_GRADIENT_STOPS, type GaugeGradientStop } from '../panel/theme/gaugeGradient';
@@ -154,6 +171,7 @@ import { TextInput } from '../components/common/TextInput/TextInput';
 import { Ring as StorybookRing } from '../components/common/Ring/Ring';
 import { Gauge as StorybookGauge } from '../components/common/Gauge/Gauge';
 import { CanvasNoticeBar } from '../components/common/CanvasNoticeBar';
+import { AreaCells } from '../components/common/AreaCells/AreaCells';
 // Side-effect: pulls the global `.panel-root { --panel-*: … }` token rules into
 // the Storybook bundle so the panel-scoped preview below resolves its vars.
 // Idempotent - PanelDevicePage imports the same sheet.
@@ -216,6 +234,35 @@ function PreviewSliderRange() {
     formatValue={x => `${x} DPI`} onChange={setV} />;
 }
 
+function PreviewCurveGraphEq() {
+  const [bands, setBands] = useState([4, 3, 2, 0, -4, -3, -3, 1, 2, 4]);
+  const hz = ['48Hz', '64Hz', '125Hz', '250Hz', '500Hz', '1KHz', '2KHz', '4KHz', '8KHz', '16KHz'];
+  const db = (v: number) => `${v > 0 ? '+' : ''}${v}dB`;
+  return (
+    <CurveGraph
+      points={bands.map((speed, temp) => ({ temp, speed }))}
+      height={230} tempMin={-0.5} tempMax={9.5} editable easing={'smooth'} keyboardStep={0.5}
+      axis={{ xTicks: bands.map((_, i) => i), formatX: v => hz[v] }}
+      yAxis={{ min: -20, max: 6, step: 0.5, lines: [0], labels: [{ value: 6, label: db(6) }, { value: -20, label: db(-20) }], formatValue: db }}
+      verticalDrag={{ isLocked: () => false, apply: (p, i, v) => p.map((pt, k) => (k === i ? { ...pt, speed: v } : pt)) }}
+      onChange={p => setBands(p.map(pt => pt.speed))}
+    />
+  );
+}
+
+function PreviewChannelLayout() {
+  const [lit, setLit] = useState<string | null>(null);
+  const spots: Record<string, { label: string; x: number; y: number }> = {
+    fl: { label: 'Front left', x: -0.5, y: -0.4 }, c: { label: 'Center', x: 0, y: -0.85 }, fr: { label: 'Front right', x: 0.5, y: -0.4 },
+    rl: { label: 'Rear left', x: -0.5, y: 0.55 }, rr: { label: 'Rear right', x: 0.5, y: 0.55 },
+  };
+  const nodes: ChannelNode[] = Object.entries(spots).map(([id, s]) => ({
+    id, label: s.label, pos: { x: s.x, y: s.y }, icon: <span aria-hidden>{id.toUpperCase()}</span>,
+    control: <StorybookStepper label={`${s.label} volume`} value={10} min={0} max={20} />,
+  }));
+  return <ChannelLayout nodes={nodes} activeId={lit} ariaLabel="Speakers" hint="Click to select." center={<span>Listener</span>} onActivate={setLit} />;
+}
+
 function PreviewEditableText() {
   const [name, setName] = useState('Click to edit');
   return <EditableText value={name} onCommit={setName} />;
@@ -230,6 +277,43 @@ function PreviewDatePicker() {
   const iso = new Date().toISOString().slice(0, 10);
   const [v, setV] = useState(iso);
   return <DatePicker value={v} max={iso} onChange={setV} />;
+}
+
+function PreviewMonthGrid() {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [selected, setSelected] = useState(today.getTime());
+  return (
+    <div style={{ width: 260 }}>
+      <MonthGrid
+        year={today.getFullYear()}
+        month={today.getMonth()}
+        weekStart={0}
+        isSelected={day => day === selected}
+        isToday={day => day === today.getTime()}
+        onPick={setSelected}
+      />
+    </div>
+  );
+}
+
+function PreviewMiniMonth() {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [month, setMonth] = useState(today.getTime());
+  const [selected, setSelected] = useState(today.getTime());
+  return (
+    <div style={{ width: 260 }}>
+      <MiniMonth
+        month={month}
+        selected={selected}
+        today={today.getTime()}
+        weekStart={0}
+        highlightWeek
+        onSelect={setSelected}
+        onMonthChange={delta => { const d = new Date(month); setMonth(new Date(d.getFullYear(), d.getMonth() + delta, 1).getTime()); }}
+        onSelectMonth={setMonth}
+      />
+    </div>
+  );
 }
 
 function PreviewHeartBurst() {
@@ -295,6 +379,10 @@ function PreviewInfoTooltip() {
       <div className={styles.previewHoverCard}>
         <span>Devices</span>
         <InfoTooltip message="Every USB device Nexus can see. Browse the supported-hardware catalogue or inspect the raw USB table." side="top" />
+      </div>
+      <div className={styles.previewHoverCard}>
+        <span>With action</span>
+        <InfoTooltip message="This feature was removed." side="right" action={{ label: 'Remove', onClick: () => {} }} />
       </div>
     </div>
   );
@@ -368,6 +456,7 @@ function PreviewDeviceWarningIcon() {
       <div className={styles.previewHoverCard}>
         <span>Chip (Devices list)</span>
         <DeviceWarningIcon code="usb-disconnected" chip />
+        <DeviceWarningIcon code="access-denied" chip />
         <DeviceWarningIcon code="some-future-code" chip />
       </div>
     </div>
@@ -487,6 +576,17 @@ function PreviewCardDeleteButton() {
   );
 }
 
+function PreviewEditHint() {
+  return (
+    <div className={styles.previewStack}>
+      <div className={styles.previewHoverCard} style={{ position: 'relative', minHeight: 90 }}>
+        <span>Effect</span>
+        <EditHint label="Edit effect" />
+      </div>
+    </div>
+  );
+}
+
 function PreviewSparkline() {
   const values = Array.from({ length: 30 }, (_, i) => 30 + Math.sin(i / 3) * 20 + sampleNoise(i, 1));
   return (
@@ -596,10 +696,10 @@ function PreviewTabs() {
   const [paused, setPaused] = useState(false);
   return <Tabs
     tabs={[
-      { key: 'day', label: 'Day' },
-      { key: 'week', label: 'Week' },
+      { key: 'day', label: 'Day', tooltip: 'Hourly view' },
+      { key: 'week', label: 'Week', tooltip: 'Daily view' },
       {
-        key: 'month', label: 'Month',
+        key: 'month', label: 'Month', tooltip: 'Weekly view',
         // Trailing control demo: only shown on the active tab, mirroring the
         // Lighting page's per-tab pause toggle. Tabs renders this as a
         // sibling of the tab's own button (not nested inside it), so its
@@ -624,6 +724,11 @@ function PreviewTabs() {
     activeKey={active}
     onChange={setActive}
   />;
+}
+
+function PreviewViewSwitch() {
+  const [value, setValue] = useState<'2d' | '3d'>('3d');
+  return <ViewSwitch ariaLabel="Sample view switch" value={value} onChange={setValue} labels={{ '2d': 'Layout', '3d': 'Desk' }} />;
 }
 
 function PreviewChipGroup() {
@@ -695,7 +800,7 @@ function PreviewNotice() {
         <NoticeSecondary>A dimmer line gives the cause.</NoticeSecondary>
       </Notice>
       <Notice tone="critical" role="alert">
-        <span>Critical: the fans were handed back to the BIOS.</span>
+        <span>Critical: all fans are running at full speed.</span>
       </Notice>
     </div>
   );
@@ -1157,6 +1262,18 @@ function PreviewEffectCard() {
           onDelete={() => { /* preview */ }}
           deleteAriaLabel="Delete"
         />
+        {/* Disabled while another item talks to the device: dimmed, no hover, clicks and delete ignored. */}
+        <EffectCard
+          asDiv
+          label="Nebula"
+          thumbUrl={null}
+          active={false}
+          disabled
+          onClick={() => {}}
+          meta="2.1s"
+          onDelete={() => { /* preview */ }}
+          deleteAriaLabel="Delete"
+        />
       </div>
     </div>
   );
@@ -1249,6 +1366,30 @@ function PreviewRangeSliderSpeed() {
       formatValue={x => `${x}%`}
       onChange={setV}
     />
+  );
+}
+
+function PreviewRangeSliderAlert() {
+  const [v, setV] = useState<[number, number]>([20, 85]);
+  const [lowOn, setLowOn] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setLowOn(on => !on)}>{lowOn ? 'Low bound on' : 'Low bound off'}</button>
+      <RangeSlider
+        orientation="stacked"
+        editable
+        softBounds
+        label="Temperature"
+        value={v}
+        min={0}
+        max={120}
+        lowEnabled={lowOn}
+        outsideTone="bad"
+        marker={{ value: 62, label: '62°C' }}
+        formatValue={x => `${x}°C`}
+        onChange={setV}
+      />
+    </>
   );
 }
 
@@ -1346,6 +1487,24 @@ function PreviewOnboardingNote() {
   );
 }
 
+function PreviewOnboardingHeader() {
+  return (
+    <div className={styles.previewStack}>
+      <OnboardingHeader onBack={() => { /* preview only */ }} onSkip={() => { /* preview only */ }} />
+    </div>
+  );
+}
+
+function PreviewOnboardingFooter() {
+  return (
+    <div className={styles.previewStack}>
+      <OnboardingFooter label="Continue" onContinue={() => { /* preview only */ }}>
+        <OnboardingNote>You can change these settings any time.</OnboardingNote>
+      </OnboardingFooter>
+    </div>
+  );
+}
+
 function PreviewEndTaskButton() {
   // Swallowed in capture phase so the click never reaches EndTaskButton's own
   // handler - it calls the real /conflicts/kill endpoint with no override prop.
@@ -1355,6 +1514,36 @@ function PreviewEndTaskButton() {
         <span>iCUE</span>
         <EndTaskButton conflictId="preview-icue" />
       </div>
+    </div>
+  );
+}
+
+function PreviewWatchlistFifty() {
+  const [q, setQ] = useState('');
+  const sections = groupedRules(watchlistFixture(50)).map(sec => ({ ...sec, rules: sec.rules.filter(r => r.sensor.name.toLowerCase().includes(q.trim().toLowerCase())) })).filter(sec => sec.rules.length > 0);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
+      <SearchInput value={q} onChange={setQ} placeholder="Search sensors" />
+      {sections.map(sec => (
+        <div key={sec.group} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ opacity: 0.6, fontSize: 11 }}>{sec.group}</span>
+          {sec.rules.map(r => (
+            <StatusRow key={r.id} name={r.sensor.name} chip={<Badge label="OK" color="var(--good)" />} value="42" dimmed={!r.enabled} onSelect={() => {}} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PreviewStatusRow() {
+  return (
+    <div className={styles.previewStack}>
+      <StatusRow name="AMD Ryzen 7 9800X3D" subtitle="Core (Tctl/Tdie)" value="61 C" chip={<Badge label="OK" color="var(--good)" />} toggle={<Toggle checked onChange={() => {}} ariaLabel="Enabled" />} onSelect={() => {}} />
+      <StatusRow name="CPU Package" value="45 C" chip={<Badge label="OK" color="var(--good)" />} toggle={<Toggle checked onChange={() => {}} ariaLabel="Enabled" />} selected onSelect={() => {}} />
+      <StatusRow name="GPU Hot Spot" toggle={<Toggle checked={false} onChange={() => {}} ariaLabel="Enabled" />} dimmed onSelect={() => {}} />
+      <StatusRow name="NVIDIA GeForce RTX 5080 GPU Core Voltage" value="0.87 V" chip={<Badge label="OK" color="var(--good)" />} toggle={<Toggle checked onChange={() => {}} ariaLabel="Enabled" />} onSelect={() => {}} />
+      <StatusRow name="Pump" value="1,108 RPM 31%" chip={<Badge label="Stalled" color="var(--bad)" />} danger toggle={<Toggle checked onChange={() => {}} ariaLabel="Monitor" />} />
     </div>
   );
 }
@@ -1391,6 +1580,16 @@ function PreviewConflictAppCard() {
         ]}
         onDisableAutostart={async () => true}
       />
+    </div>
+  );
+}
+
+function PreviewBrightnessScheduleButton() {
+  const sample = { scheduleOn: true, follows: true, onFollowsChange: () => {}, onTurnOn: () => {}, onEdit: () => {}, statusAt: () => 'Now 40%', capPercent: 40 };
+  return (
+    <div className={styles.previewRow}>
+      <BrightnessScheduleButton binding={{ ...sample, follows: true }} />
+      <BrightnessScheduleButton binding={{ ...sample, follows: false }} />
     </div>
   );
 }
@@ -1475,6 +1674,9 @@ function PreviewSelect() {
         { value: 'custom', label: 'Custom...', icon: '⚙️' },
       ]}
       ariaLabel="Profile"
+      // leadingAction: a real button drawn inside the box, left of the value, as a
+      // sibling of the trigger. Pressing it never opens the list.
+      leadingAction={<button type="button" aria-label="Unpin" onClick={() => setV('balanced')} style={{ display: 'inline-flex', padding: 0, border: 'none', background: 'none', color: 'inherit', cursor: 'pointer' }}><Pin size={12} aria-hidden="true" /></button>}
     />
   );
 }
@@ -1618,6 +1820,7 @@ function PreviewThermalGuardPanel() {
   const states: GuardResponse[] = [
     { ...PREVIEW_GUARD, state: 'floor', guardTempC: 84 },
     { ...PREVIEW_GUARD, state: 'tripped', guardTempC: 93, lastTrip: trip('limit', false) },
+    { ...PREVIEW_GUARD, state: 'tripped', guardTempC: 93, fansNotResponding: true, lastTrip: trip('cooling-loss', false) },
     { ...PREVIEW_GUARD, state: 'escalated', guardTempC: 94, lastTrip: trip('cooling-loss', true) },
     { ...PREVIEW_GUARD, watchdogLatched: true },
     {
@@ -1676,7 +1879,7 @@ function PreviewThermalGuardSetting() {
 
 function PreviewFlashProgress() {
   return (
-    <FlashProgress status={{ active: true, deviceType: 'q60', version: '1.0.0', phase: 'downloading', percent: 42, message: 'Downloading', success: false, error: '' }} />
+    <FlashProgress status={{ percent: 42, message: 'Downloading' }} />
   );
 }
 
@@ -1703,6 +1906,7 @@ function PreviewMicroBars() {
       <MicroBar label="CPU TOTAL" formatted="42 %" fillPercent={42} />
       <MicroBar label="TEMP" formatted="68 C" fillPercent={68} />
       <MicroBar label="POWER" formatted="92 W" fillPercent={61} />
+      <MicroBar label="TEMP" formatted="68 C" fillPercent={68} design="simple" />
     </div>
   );
 }
@@ -1745,7 +1949,7 @@ function PreviewSectionHeader() {
     <div className="panel-root" style={{ width: 280, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <SectionHeader>Widgets</SectionHeader>
-        <div style={{ color: 'var(--text)', fontSize: 13 }}>Widget labels · blur · opacity</div>
+        <div style={{ color: 'var(--text)', fontSize: 13 }}>Widget labels - blur - opacity</div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <SectionHeader>Theme</SectionHeader>
@@ -1890,7 +2094,7 @@ function PreviewPanelThemeSettings() {
     appAccentColor: '#8b5cf6', accentSyncWithDesktop: false, accentColor: '#8b5cf6',
     backgroundColor: '', backgroundColorLight: '',
     // Solid keeps the (thumbnail-fetching) animation picker out of the preview.
-    backgroundMode: 'solid', backgroundEffect: 'aurora', backgroundTemplate: 0, backgroundTemplates: {},
+    backgroundMode: 'solid', backgroundModeBefore: 'solid', backgroundEffect: 'aurora', backgroundTemplate: 0, backgroundTemplates: {},
     backgroundOpacity: 0.4,
     backdrop: 'theme' as const,
     backgroundEffectState: { speed: 0, intensity: 1, hue: 0, colorize: 0, saturation: 1, contrast: 1, params: {} },
@@ -1899,7 +2103,7 @@ function PreviewPanelThemeSettings() {
     backgroundMediaOrder: [],
     backgroundFrost: 0,
     immersiveBackdrop: true,
-    widgetOpacity: 1, widgetLabels: true, widgetPadding: 50, textColorMode: 'adaptive', textColor: '', font: null,
+    widgetOpacity: 1, widgetLabels: true, widgetPadding: 50, textColorMode: 'adaptive', textColor: '', font: null, skin: null, skinOverrides: {},
     gaugeGradient: [...DEFAULT_GAUGE_GRADIENT],
   });
   const set = (patch: Partial<PanelThemeSettingsState>) => setTheme(t => ({ ...t, ...patch }));
@@ -1944,6 +2148,8 @@ function PreviewPanelThemeSettings() {
         onTextColorPreview={v => set({ textColor: v })}
         onTextColorCommit={v => set({ textColor: v })}
         onFontCommit={v => set({ font: v })}
+        onSkinCommit={v => set({ skin: v })}
+        onSkinReset={() => set({ skinOverrides: {} })}
       />
     </div>
   );
@@ -2292,12 +2498,41 @@ function PreviewDesktopOnlyBadge() {
   return <DesktopOnlyBadge />;
 }
 
+function PreviewBuildLogo() {
+  return <BuildLogo />;
+}
+
 function PreviewExperimentalBadge() {
   return <ExperimentalBadge />;
 }
 
 function PreviewConflictRunningBadge() {
   return <ConflictRunningBadge appName="Lian Li L-Connect" />;
+}
+
+function PreviewNotRespondingBadge() {
+  return <NotRespondingBadge onClick={() => {}} />;
+}
+
+function PreviewTroubleshootLink() {
+  return (
+    <div style={{ display: 'flex', gap: '1.5rem' }}>
+      <TroubleshootLink label="Opens a page" href="https://hellonexus.com/docs/troubleshooting/lighting" />
+      <TroubleshootLink label="Runs an action" onClick={() => {}} />
+    </div>
+  );
+}
+
+function PreviewFixLightingModal() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className={styles.previewBtn} onClick={() => setOpen(true)}>
+        Fix lighting
+      </button>
+      <FixLightingModal open={open} onClose={() => setOpen(false)} deviceName="UNI FAN SL-INF" />
+    </>
+  );
 }
 
 const PREVIEW_CONTROL_CONFLICT = {
@@ -2421,9 +2656,25 @@ function PreviewCanvasNoticeBar() {
   );
 }
 
+function PreviewAreaCells() {
+  return (
+    <div style={{ position: 'relative', width: '100%', height: 96, background: '#222', borderRadius: 6 }}>
+      <AreaCells
+        cells={[[0, 0, 0.5, 0, 0.4, 1, 0, 1], [0.5, 0, 1, 0, 1, 1, 0.4, 1]]}
+        style={{ left: 0, top: 0, width: '100%', height: '100%' }}
+      />
+    </div>
+  );
+}
+
 function PreviewStepper() {
   const [v, setV] = useState(12);
-  return <StorybookStepper value={v} min={0} max={59} onChange={setV} />;
+  return (
+    <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+      <StorybookStepper value={v} min={0} max={59} onChange={setV} />
+      <StorybookStepper orientation="horizontal" pad={false} value={v} min={0} max={59} onChange={setV} />
+    </div>
+  );
 }
 
 function PreviewColorSlots() {
@@ -2585,7 +2836,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'Stepper', category: 'inputs',
     filePath: 'src/components/common/Stepper/Stepper.tsx',
-    description: 'Compact vertical chevron stepper: up/down buttons flanking a zero-padded value display. Supports min/max clamping and disabled state. Host-renderer bridge for the SDK Stepper element.',
+    description: 'Compact vertical chevron stepper: up/down buttons flanking a zero-padded value display. Supports min/max clamping, disabled state and a label that names it for assistive tech, a horizontal form (minus, value, plus) and an option to show plain numbers instead of zero-padded ones. Host-renderer bridge for the SDK Stepper element.',
     Preview: PreviewStepper,
   },
   {
@@ -2617,6 +2868,16 @@ export const REGISTRY: StorybookEntry[] = [
     description: 'Stacked slider with min and max printed under the track. Used by any range-bound control where the user needs to see the bounds.', Preview: PreviewSliderRange,
   },
   {
+    name: 'CurveGraph (fixed grid, eased)', category: 'inputs',
+    filePath: 'src/panel/widgets/cooling/page/CurveEditor.tsx',
+    description: 'The cooling fan-curve graph on a fixed grid, as the G560 equalizer uses it. Opt-in props: easing="smooth" draws a monotone cubic through the points (purely visual, values stay linear); axis.xTicks puts grid lines and labels on exact x values; yAxis sets another range, step, horizontal lines, edge labels and the value text; verticalDrag makes points move vertically only; keyboardStep makes each point focusable with up and down arrows (Shift for five steps). Without them the graph is the 0-100 duty curve.', Preview: PreviewCurveGraphEq,
+  },
+  {
+    name: 'ChannelLayout', category: 'inputs',
+    filePath: 'src/components/common/ChannelLayout/ChannelLayout.tsx',
+    description: 'Labeled nodes placed around a center, such as speakers around a listener. Positions run from -1 to 1 on each axis from the center. A click on a node reports onActivate; activeId lights one node. Every node stacks a round button (the icon), its label and an optional control such as a Stepper.', Preview: PreviewChannelLayout,
+  },
+  {
     name: 'RangeSlider (temperature)', category: 'inputs',
     filePath: 'src/components/common/Slider/RangeSlider.tsx',
     description: 'Dual-knob slider. Two thumbs with an accent band painted between them. Used in the cooling fan-curve linear band for temperature.', Preview: PreviewRangeSliderTemp,
@@ -2628,6 +2889,18 @@ export const REGISTRY: StorybookEntry[] = [
     description: 'Same RangeSlider primitive with a percent formatter. Used in the cooling fan-curve linear band for speed.', Preview: PreviewRangeSliderSpeed,
   },
   {
+    name: 'RangeSlider (one-sided, live marker)', category: 'inputs',
+    filePath: 'src/components/common/Slider/RangeSlider.tsx',
+    description: 'RangeSlider with lowEnabled / highEnabled (a disabled side hides its knob and the band runs to that edge), outsideTone (shades the track outside the band), marker (a live reading pointed at under the track) and softBounds (a typed value may widen the track). Used for sensor alert bounds.', Preview: PreviewRangeSliderAlert,
+    notes: 'All four props are optional and leave the dual-knob behavior unchanged. A one-sided band cannot be dragged as a unit.',
+  },
+  {
+    name: 'SensorAlertRuleSettings', category: 'cards',
+    filePath: 'src/components/views/DiagnosticsView/SensorAlertRuleSettings.tsx',
+    description: 'The alert settings of one tracked sensor, shown beside the Watchlist list: the sensor picker, an open-ended RangeSlider for the normal range (a knob on its track end means no limit), the raise delay with a one-line legend, the Urgent switch, the desktop notification switch, and Delete or Restore default. The panel opens with the alerts switch for the entry (the list rows carry no switch). Switching alerts off only stops the alerting: every setting stays visible and editable, and the sensor keeps its reading and its line on the chart.',
+    notes: 'No live preview - it reads live sensors through useSensorLookup and writes through useSensorAlerts.',
+  },
+  {
     name: 'SearchInput', category: 'inputs',
     filePath: 'src/components/common/SearchInput/SearchInput.tsx',
     description: 'Themed text input with a leading search icon and a clear button when non-empty. Replaces the duplicate inline implementations in SupportedDevicesModal, AppPicker, and the panel add-widget filter.', Preview: PreviewSearchInput,
@@ -2636,6 +2909,11 @@ export const REGISTRY: StorybookEntry[] = [
     name: 'RailSearch', category: 'inputs',
     filePath: 'src/components/common/RailSearch/RailSearch.tsx',
     description: 'Looking-glass filter for a page device rail (lighting devices, cooling fans): RailSearchButton sits in the rail header, RailSearchField opens a focused SearchInput above the list, useRailSearch holds the state. Closing (button or Escape) clears the query. Pages match with matchesAllWords and pass the active flag down to switch off rail drag while filtered.', Preview: PreviewRailSearch,
+  },
+  {
+    name: 'BrightnessScheduleButton', category: 'inputs',
+    filePath: 'src/components/common/BrightnessScheduleButton/BrightnessScheduleButton.tsx',
+    description: 'The sun button beside every brightness label (master brightness, panel and display sliders). Accented while the control follows the one universal brightness schedule; opens the shared brightness settings. Left: following. Right: not following. Click opens a popover with the follow switch for the control it sits on, the schedule status and an Edit schedule action.', Preview: PreviewBrightnessScheduleButton,
   },
   {
     name: 'Toggle', category: 'inputs',
@@ -2673,6 +2951,11 @@ export const REGISTRY: StorybookEntry[] = [
     description: 'Single-select chip row reusing the cooling curve/mode .chip-action buttons (.chip-active fills the selected one with the accent, labelled in the contrast-paired --accent-text). Single-select renders a radiogroup: one tab stop on the checked chip, arrows move focus without selecting, Space/Enter commits - callers write firmware and device settings on change, so selection must not follow focus. multiSelect keeps aria-pressed toggle buttons. fullWidth stretches the row so it reads as a segmented control; wrap reflows onto further lines for a data-length chip list (the lighting preset app bindings) instead of widening its container.', Preview: PreviewChipGroup,
   },
   {
+    name: 'ViewSwitch', category: 'inputs',
+    filePath: 'src/components/common/ViewSwitch/ViewSwitch.tsx',
+    description: 'The 2D / 3D canvas switch on the Lighting and Cooling headers: a ChipGroup whose segments start with a small 2D or 3D pill, then the view name.', Preview: PreviewViewSwitch,
+  },
+  {
     name: 'ChipGroup (multi-select)', category: 'inputs',
     filePath: 'src/components/common/ChipGroup/ChipGroup.tsx',
     description: 'Same ChipGroup in multi-select mode (multiSelect: true). Each chip toggles independently via onToggleKey; activeKeys is a ReadonlySet. Used by the hub composition port picker.', Preview: PreviewChipGroupMulti,
@@ -2680,8 +2963,8 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'Select', category: 'inputs',
     filePath: 'src/components/common/Select/Select.tsx',
-    description: 'Custom select: a button trigger plus a listbox portaled to <body> and clamped to the viewport, not the native <select> popup, which renders off-screen on the Y70 kiosk WebView. One control across desktop, phone, and Y70. Pass options for flat lists or <option> children (value + text, optional disabled/className/icon); optgroups are unsupported. Each option takes an optional `icon` ReactNode shown before the label in the trigger and the row (the language picker uses it for flags). On a keyboard/pointer desktop (not touch), a list of 8+ entries grows an auto-focused in-menu search field that substring-filters the options while the arrow keys still walk the filtered results. Used by SettingsView, CoolingView FanCard + CurveEditor, LightingView ModeControls, and the panel widget settings rows.', Preview: PreviewSelect,
-    notes: 'One size and one box across the app - a surface that needs its own palette (deck inspector, monitoring settings, cooling fan / curve rows) sets --select-bg / --select-border / --select-border-hover / --select-text on the wrapper rather than framing the trigger a second time. triggerIconOnly collapses the trigger to just the selected option icon (no label or chevron; the label moves to the trigger title) for compact icon controls like a header language flag - the open menu keeps the full icon + label rows. Long lists (8+) get an in-menu search on keyboard/pointer devices; the preview here is below that threshold.',
+    description: 'Custom select: a button trigger plus a listbox portaled to <body> and clamped to the viewport, not the native <select> popup, which renders off-screen on the Y70 kiosk WebView. One control across desktop, phone, and Y70. Pass options for flat lists or <option> children (value + text, optional disabled/className/icon); optgroups are unsupported. Each option takes an optional `icon` ReactNode shown before the label in the trigger and the row (the language picker uses it for flags). On a keyboard/pointer desktop (not touch), a list of 8+ entries grows an auto-focused in-menu search field that substring-filters the options while the arrow keys still walk the filtered results. An optional `leadingAction` ReactNode is drawn inside the box left of the value as a sibling of the trigger (so it can be a real button that does not open the list); the cooling fan card uses it for its pin. Used by SettingsView, CoolingView FanCard + CurveEditor, LightingView ModeControls, and the panel widget settings rows.', Preview: PreviewSelect,
+    notes: 'One size and one box across the app - a surface that needs its own palette (deck inspector, monitoring settings, cooling fan / curve rows) sets --select-bg / --select-border / --select-border-hover / --select-text on the wrapper rather than framing the trigger a second time. triggerIconOnly collapses the trigger to just the selected option icon (no label or chevron; the label moves to a hover tooltip) for compact icon controls like a header language flag - the open menu keeps the full icon + label rows. Long lists (8+) get an in-menu search on keyboard/pointer devices; the preview here is below that threshold.',
   },
   {
     name: 'ui-select (SDK dropdown)', category: 'inputs',
@@ -2718,7 +3001,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'EndTaskButton', category: 'inputs',
     filePath: 'src/components/common/EndTaskButton/EndTaskButton.tsx',
-    description: 'Danger Button wired to kill a detected conflicting app by catalog id (POST /conflicts/kill). Keeps its spinner up after a successful kill until the watcher clears the row and it unmounts; resets on failure, and when the app comes back under a new pid - an Automatic service the SCM restarts keeps the row and its React key, so without that the spinner would never clear. `busy` spins it while another control runs the same kill; `onKilled` + `terminated` hand the ended state to a surface that keeps the row listed, where it renders a green Terminated marker. Used by ConflictAppCard, so by ConflictWarningModal, ConflictOnboardingScreen and the device-page NexusControlOff gate.',
+    description: 'Danger Button wired to kill a detected conflicting app by catalog id (POST /conflicts/kill). Keeps its spinner up after a successful kill until the watcher clears the row and it unmounts; resets on failure, and when the app comes back under a new pid - an Automatic service the SCM restarts keeps the row and its React key, so without that the spinner would never clear. `busy` spins it while another control runs the same kill; `onKilled` + `terminated` hand the ended state to a surface that keeps the row listed, where it renders a green Terminated marker. Used by ConflictAppCard, so by the device-page NexusControlOff gate and its guarded-enable prompt.',
     Preview: PreviewEndTaskButton,
   },
   {
@@ -2732,6 +3015,18 @@ export const REGISTRY: StorybookEntry[] = [
     filePath: 'src/components/common/OnboardingNote/OnboardingNote.tsx',
     description: 'The closing "you can change this any time" line of an onboarding page, centered and muted at the bottom below the content. Onboarding-only: a settings section explains itself with its description prop instead.',
     Preview: PreviewOnboardingNote,
+  },
+  {
+    name: 'OnboardingHeader', category: 'inputs',
+    filePath: 'src/components/common/OnboardingHeader/OnboardingHeader.tsx',
+    description: 'Top bar shared by every onboarding screen after the welcome step: Back in the left corner when a handler is given, the Skip escape hatch in the right. Spans the surface edges; an absent side keeps its slot so the other stays put.',
+    Preview: PreviewOnboardingHeader,
+  },
+  {
+    name: 'OnboardingFooter', category: 'inputs',
+    filePath: 'src/components/common/OnboardingFooter/OnboardingFooter.tsx',
+    description: 'Bottom block shared by every onboarding screen: an optional closing note (children), an optional error line, then the large accent primary action with an optional secondary action beside it. Content-column width with fixed-width actions.',
+    Preview: PreviewOnboardingFooter,
   },
 
   {
@@ -2760,9 +3055,21 @@ export const REGISTRY: StorybookEntry[] = [
     notes: 'Click outside or Escape closes. "Today" button jumps to today if within bounds. Disabled cells are past / future out of range.',
   },
   {
+    name: 'MonthGrid', category: 'inputs',
+    filePath: 'src/components/common/MonthGrid/MonthGrid.tsx',
+    description: 'Weekday header and day cells of one month: the shared grid under DatePicker\'s popup and MiniMonth. Days are local-midnight epoch ms; the caller defines selected, today and disabled.', Preview: PreviewMonthGrid,
+    notes: 'Optional `highlightWeek` tints a whole week row. Cells are buttons with `aria-pressed` for the selected day.',
+  },
+  {
+    name: 'MiniMonth', category: 'inputs',
+    filePath: 'src/components/common/MiniMonth/MiniMonth.tsx',
+    description: 'An always-open month with arrow navigation and a year drill-up, for a side rail that picks a day (the Calendar page). Built on the same MonthGrid as DatePicker.', Preview: PreviewMiniMonth,
+    notes: 'Controlled: the caller owns the shown month and the selected day. The title opens a year view of twelve months (arrows step a year, Escape or the title returns); a picked month goes to `onSelectMonth`. `highlightWeek` tints the selected day\'s whole row for week-based views.',
+  },
+  {
     name: 'InfoTooltip', category: 'status',
     filePath: 'src/components/common/InfoTooltip/InfoTooltip.tsx',
-    description: 'Subtle info affordance rendered next to section titles. Hover (pointer) or click (touch) reveals a one-sentence explanation in an elevated-surface tooltip matching the app chrome. Used by ViewHeader (via titleTooltip prop) and inline next to Cooling section h3s.', Preview: PreviewInfoTooltip,
+    description: 'Subtle info affordance rendered next to section titles. Hover (pointer) or click (touch) reveals a one-sentence explanation in an elevated-surface tooltip matching the app chrome. An optional action prop adds a button under the message; the bubble stays open while the pointer or focus is inside it and Tab from the icon reaches the button. Used by ViewHeader (via titleTooltip prop) and inline next to Cooling section h3s.', Preview: PreviewInfoTooltip,
     notes: 'Hover, or Tab into the icon, or click to toggle. Esc closes. Auto-positions via the `side` prop (top/bottom/left/right).',
   },
   {
@@ -2801,7 +3108,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'RowGlyph', category: 'status',
     filePath: 'src/components/common/RowGlyph/RowGlyph.tsx',
-    description: 'Right-aligned status glyph with a hover label on a device or nav row; bare (non-focusable) so it can sit inside a row button. tone="dim" (default) or "accent". NexusControlOffIcon and DeviceUpdateIcon wrap it.',
+    description: 'Right-aligned status glyph with a hover label on a device or nav row; non-focusable by default so it can sit inside a row button; with `onActivate` it becomes a focusable role="button" that does not trigger the row click. tone="dim" (default) or "accent". NexusControlOffIcon and DeviceUpdateIcon wrap it.',
     Preview: PreviewRowGlyph,
   },
   {
@@ -2834,6 +3141,12 @@ export const REGISTRY: StorybookEntry[] = [
     filePath: 'src/components/common/CardDeleteButton/CardDeleteButton.tsx',
     description: 'Shared circular X overlay for "delete this card" actions. Hover-reveal by default via a data-attribute the parent container opts into (`:hover [data-card-delete="hover"] { opacity: 1 }`). Used by lighting effect cards and media library thumbnails. Cooling curve cards now use a bottom-anchored "Remove curve" affordance instead so the top-right slot can hold the live output % chip + wire nub.', Preview: PreviewCardDeleteButton,
     notes: 'Hover the item row to reveal the X. Keyboard focus also reveals it. Set revealOnHover={false} for always-visible variants.',
+  },
+  {
+    name: 'EditHint', category: 'inputs',
+    filePath: 'src/components/common/EditHint/EditHint.tsx',
+    description: 'Shared click-to-edit hover hint: a scrim over the host with a centered pencil and an optional label. Shared by the panel editor widgets and the lighting effect tiles. The host is position: relative and reveals it via `:hover [data-edit-hint-overlay] { opacity: 1 }`.', Preview: PreviewEditHint,
+    notes: 'Hidden until the host reveals it; the overlay is click-through and aria-hidden, so the host carries the accessible name.',
   },
   {
     name: 'HsvPicker', category: 'editable',
@@ -2870,6 +3183,16 @@ export const REGISTRY: StorybookEntry[] = [
     name: 'Card', category: 'cards',
     filePath: 'src/components/common/Card/Card.tsx',
     description: 'Canonical card surface (background, border, radius, padding) with optional icon / title / subtitle / actions header. Compose for any panel. `icon` renders a leading glyph before the title; `interactive` adds a hover state; `compact` tightens padding for dense layouts (tile grids); `fillHeight` fills the parent height and scrolls the body on its own instead of content-sizing (an inline detail sidebar); `selected` is the rail selected-item treatment (accent border + accent-soft fill, the lighting / cooling device cards); `role`/`ariaLabel` name the root as a landmark.', Preview: PreviewCard,
+  },
+  {
+    name: 'StatusRow', category: 'cards',
+    filePath: 'src/components/common/StatusRow/StatusRow.tsx',
+    description: 'List row for a monitored thing, built on Card: name on the left, the reading with its status chip stacked beneath it and right-aligned, then the on/off switch at the far right. An optional dim `subtitle` line (the sensor behind the name) keeps the name to one line. The reading never wraps; a long name takes the squeeze (two lines, then an ellipsis with the full name in a tooltip). A row with no reading (switched off) shows name and switch only. Used by the Diagnostics Sensors watchlist (no switch there; the switch lives in the sensor settings panel) and its fans list.', Preview: PreviewStatusRow,
+  },
+  {
+    name: 'Watchlist (50 entries)', category: 'cards',
+    filePath: 'src/components/views/DiagnosticsView/watchlistFixture.ts',
+    description: 'The Sensors watchlist at its 50-entry cap: six unit groups with a heading each, built-ins first, filtered by the search box above.', Preview: PreviewWatchlistFifty,
   },
   {
     name: 'DomainGlyph', category: 'cards',
@@ -2913,7 +3236,7 @@ export const REGISTRY: StorybookEntry[] = [
     name: 'EffectCard', category: 'cards',
     filePath: 'src/components/common/EffectCard/EffectCard.tsx',
     description: 'The one shared thumbnail card: lighting shader browser, panel Theme animation picker, media library, and the lighting widget tile all use it. overlay=true gives a full-bleed thumbnail with the label stroked over the lower third (both shader pickers); default layout is thumbnail-above-caption with optional meta line + hover-reveal delete X (media library).', Preview: PreviewEffectCard,
-    notes: 'Pass overlay for the full-bleed label-on-thumbnail shader-picker layout. Pass asDiv when the card contains a nested button (CardDeleteButton) - nested buttons are invalid HTML. Pass nonInteractive for a display-only card (plain div, no hover ring / cursor) - the lighting widget tile. thumbUrl=null renders a shimmer skeleton.',
+    notes: 'Pass overlay for the full-bleed label-on-thumbnail shader-picker layout. Pass asDiv when the card contains a nested button (CardDeleteButton) - nested buttons are invalid HTML. Pass nonInteractive for a display-only card (plain div, no hover ring / cursor) - the lighting widget tile. Pass disabled to dim the card and ignore its clicks and delete while the device is busy - the DeepCool Mystique media tiles. thumbUrl=null renders a shimmer skeleton.',
   },
   {
     name: 'AdvancedModeCta', category: 'cards',
@@ -2936,13 +3259,13 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'ThermalGuardPanel', category: 'cards',
     filePath: 'src/panel/widgets/cooling/page/ThermalGuardPanel.tsx',
-    description: 'Cooling page block for the CPU thermal guard: a banner while the guard is raising fans (floor), has forced them to 100% (tripped) or handed them back to the BIOS (escalated), a banner when the engine watchdog latched the fans to the BIOS, and the post-heal notice with Undo and Keep (Keep is the primary action). The switch lives in Settings. With the guard off the block shows nothing (last row).',
+    description: 'Cooling page block for the CPU thermal guard: a banner while the guard is raising fans (floor), has forced them to 100% (tripped) or held them at full speed after the CPU kept heating (escalated), a banner when the engine watchdog latched cooling mode (all fans at full speed), and the post-heal notice with Undo and Keep (Keep is the primary action). The switch lives in Settings. With the guard off the block shows nothing (last row).',
     Preview: PreviewThermalGuardPanel,
   },
   {
     name: 'GuardTripNotice', category: 'cards',
     filePath: 'src/components/views/DiagnosticsView/GuardTripNotice.tsx',
-    description: 'Notice at the top of the Diagnostics Cooling tab for a thermal guard trip nobody has dismissed. An ended trip shows when it happened, the peak and the cause with a Dismiss button; a trip still in progress shows an Open Cooling link and no Dismiss; a failed dismissal shows an inline error. Gone once acknowledged.',
+    description: 'Notice at the top of the Diagnostics Thermals tab for a thermal guard trip nobody has dismissed. An ended trip shows when it happened, the peak and the cause with a Dismiss button; a trip still in progress shows an Open Cooling link and no Dismiss; a failed dismissal shows an inline error. Gone once acknowledged.',
     Preview: PreviewGuardTripNotice,
   },
   {
@@ -2966,13 +3289,13 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'DeviceCanvas', category: 'cards',
     filePath: 'src/components/common/DeviceCanvas/DeviceCanvas.tsx',
-    description: 'Free-arrange device canvas for the Lighting view: drag-position device tiles, marquee multi-select, per-device LED preview driven by the live shader effect, right-click DeviceContextMenu. Device names render in a layer above every frame, de-collided vertically so they never overlap; clicking a name selects (and drags) that device whatever the frame stacking.',
+    description: 'Free-arrange device canvas for the Lighting view: drag-position device tiles, marquee multi-select, per-device LED preview driven by the live shader effect, right-click DeviceContextMenu (a menu row may carry a `description`, a dim second line under its label). Device names render in a layer above every frame, de-collided vertically so they never overlap; clicking a name selects (and drags) that device whatever the frame stacking.',
     notes: 'No live preview - needs live device geometry, LED maps, and shader state.',
   },
   {
     name: 'ConflictAppCard', category: 'cards',
     filePath: 'src/components/common/ConflictAppCard/ConflictAppCard.tsx',
-    description: 'Detected-conflict row: app name, executable / PID meta line, and an EndTaskButton. With `devices` (from useConflictDevices) it also lists the hardware Nexus recognizes that the app drives too, each tagged with who drives it now and an ExperimentalBadge after the name of any device whose support is experimental, under an all-or-none "Nexus controls these / <app> controls these" switch; choosing Nexus flips every device on and then ends the app, spinning the End task button while it runs. `terminated` keeps the row of an ended app listed with its devices, swapping the button for a green Terminated marker and dropping the switch. With `autostart` (from useConflictAutostart) a "Disable auto start" button sits under End task, over a line naming each Windows startup entry or service it will turn off - only for the apps the service holds a hand-verified recipe for, and only while one is still armed; ending the task does not stop the next boot, so a terminated row keeps it. A partial or failed disable leaves the button up under a warning. Used by ConflictWarningModal and ConflictOnboardingScreen (with devices) and the device-page NexusControlOff gate (plain row).',
+    description: 'Detected-conflict row: app name, executable / PID meta line, and an EndTaskButton. With `devices` (from useConflictDevices) it also lists the hardware Nexus recognizes that the app drives too, each tagged with who drives it now and an ExperimentalBadge after the name of any device whose support is experimental, under an all-or-none "Nexus controls these / <app> controls these" switch; choosing Nexus flips every device on and then ends the app, spinning the End task button while it runs. `terminated` keeps the row of an ended app listed with its devices, swapping the button for a green Terminated marker and dropping the switch. With `autostart` (from useConflictAutostart) a "Disable auto start" button sits under End task, over a line naming each Windows startup entry or service it will turn off - only for the apps the service holds a hand-verified recipe for, and only while one is still armed; ending the task does not stop the next boot, so a terminated row keeps it. A partial or failed disable leaves the button up under a warning. Used by the device-page NexusControlOff gate and NexusControlConflictModal; the conflict warning and onboarding screens use ConflictOutcomePanel.',
     Preview: PreviewConflictAppCard,
   },
 
@@ -3006,6 +3329,13 @@ export const REGISTRY: StorybookEntry[] = [
     description: 'Prompt held in front of a Nexus Control "on" while the device\'s competing app runs (driven by useConflictGuardedEnable). Conflict-popup chrome: DeviceModal with the warn icon, an intro, a plain ConflictAppCard whose End task is the yes, and Cancel. A kill that sticks, or the app exiting on its own after the prompt saw it live, turns control on and closes.',
     Preview: PreviewNexusControlConflictModal,
     notes: 'Preview End task posts the stub id to /conflicts/kill, which the service rejects as unknown, so the spinner resets.',
+  },
+  {
+    name: 'FixLightingModal', category: 'modals',
+    filePath: 'src/components/common/FixLightingModal/FixLightingModal.tsx',
+    description: 'The Fix lighting flow in DeviceModal chrome: an intro (naming the device when opened from a not-responding card), then three numbered Card steps. 1 lists the running conflicting apps as ConflictAppCard rows (End task, Disable auto start) or the ConflictAllClear line; 2 restarts Nexus through restartService and waits for the service to go down and answer again; 3 explains a full power-off. The footer is a TroubleshootLink to the lighting troubleshooting page. Opened from NotRespondingBadge, the not-responding ControlledByStrip and the Lighting page link.',
+    Preview: PreviewFixLightingModal,
+    notes: 'Preview reads the live conflict list; Restart Nexus restarts the real service.',
   },
   {
     name: 'Notice', category: 'cards',
@@ -3098,6 +3428,12 @@ export const REGISTRY: StorybookEntry[] = [
     notes: 'No live preview - Continue posts real /preferences and /onboarding/features-complete requests (and /onboarding/lighting-complete when Lighting is switched off), so opening it here would mutate the running install\'s feature switches.',
   },
   {
+    name: 'HyteOnboardingScreen', category: 'modals',
+    filePath: 'src/components/common/HyteOnboardingScreen/HyteOnboardingScreen.tsx',
+    description: 'Informational onboarding step between WelcomeScreen and FeaturesOnboardingScreen, shown only while HYTE Nexus 2 is installed: HYTE plus Nexus marks, a thank-you with two intro paragraphs, a What\'s new list of four static rows, and a Continue button. No controls besides Back, Skip onboarding and Continue.',
+    notes: 'No live preview - it mounts as a full-viewport non-dismissable overlay that would cover the Storybook modal.',
+  },
+  {
     name: 'Nexus2ImportSection', category: 'modals',
     filePath: 'src/components/common/Nexus2WelcomeScreen/Nexus2ImportSection.tsx',
     description: 'Grouped Nexus 2 import flow: previews on open, two consolidated checkboxes (Y70 panel personalization, Q-Series panel personalization) each expanding to their wire categories, apply (always replacing the current personalization), and per-group results in an internally scrolling box. Hosted by ImportCenter, which the onboarding gate and the Settings entry both open.',
@@ -3131,8 +3467,14 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'ConflictOnboardingScreen', category: 'modals',
     filePath: 'src/components/common/ConflictOnboardingScreen/ConflictOnboardingScreen.tsx',
-    description: 'The last onboarding gate: apps already driving the lighting, fans or peripherals Nexus is taking over. A full screen like the gates before it, not the sidebar badge\'s ConflictWarningModal. Lists one ConflictAppCard per detected app, each with End task. Continuing ends nothing; the action is per-app and explicit.',
-    notes: 'No live preview - the cards post real /conflicts/kill requests, so a click here would end a running app.',
+    description: 'The last onboarding gate: apps already driving the lighting, fans or peripherals Nexus is taking over. A full screen like the gates before it, not the sidebar badge\'s ConflictWarningModal. Hosts ConflictOutcomePanel: nothing is applied until a footer button is pressed.',
+    notes: 'No live preview - the footer buttons post real /conflicts/kill requests, so a click here would end a running app.',
+  },
+  {
+    name: 'ConflictOutcomePanel', category: 'cards',
+    filePath: 'src/components/common/ConflictOutcomePanel/ConflictOutcomePanel.tsx',
+    description: 'Shared body of ConflictOnboardingScreen and ConflictWarningModal: one selectable Card per detected app whose click toggles Will terminate against Keeps running, with the device owner switch coupled to the card (until the switch is clicked by hand), a Remove from startup checkbox, and a Keep all running / terminate footer. The onboarding variant adds a HYTE Nexus 2 uninstall card. Nothing is applied until a footer button is pressed.',
+    notes: 'No live preview - it reads the conflict hooks and the footer posts real /conflicts requests.',
   },
   {
     name: 'FanControlImportSection', category: 'modals',
@@ -3204,7 +3546,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'TimeSeriesChart', category: 'charts',
     filePath: 'src/components/common/TimeSeriesChart/TimeSeriesChart.tsx',
-    description: 'Multi-series line chart over a real date/time domain (not a fixed live-seconds window). Tracks container width via ResizeObserver. A gap wider than 1.5x the actual median point spacing (derived from the data, not a nominal bucket size) breaks the line instead of interpolating across it, and an isolated point renders as a dot. Used by the Diagnostics Cooling tab\'s temperature history and the Monitoring page\'s persistent history chart.', Preview: PreviewTimeSeriesChart,
+    description: 'Multi-series line chart over a real date/time domain (not a fixed live-seconds window). Tracks container width via ResizeObserver. A gap wider than 1.5x the actual median point spacing (derived from the data, not a nominal bucket size) breaks the line instead of interpolating across it, and an isolated point renders as a dot. `activeSeriesId` highlights one line and `onSeriesSelect` turns the legend items into buttons that report their series. Used by the Diagnostics Thermals tab\'s temperature history and the Monitoring page\'s persistent history chart.', Preview: PreviewTimeSeriesChart,
     notes: 'Points carry {t, avg, max}; only avg is plotted, both are shown in the hover tooltip. xTickFormat/valueFormat let the caller pick range-appropriate label granularity and unit formatting. Optional bands prop draws translucent spans (e.g. sustained-high episodes). Optional tooltipExtra(t) appends caller content after the series rows (e.g. the Cooling tab\'s per-bucket app breakdown) - renders nothing when it returns null. yAxisSide flips the tick-label lane to the right edge (the Monitoring history chart\'s convention). ribbons renders fixed-height, opacity-modulated bands (e.g. temperature) INSIDE the plot, stacked under the line and sharing its own x-domain/pixel mapping - each segment\'s opacity maps linearly from that ribbon\'s own window-observed min/max, and each ribbon carries its own points, fill, optional icon, and optional right-edge valueLabel.',
   },
   {
@@ -3286,7 +3628,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'Tabs', category: 'navigation',
     filePath: 'src/components/common/Tabs/Tabs.tsx',
-    description: 'Segmented tab group, flat at rest - the active tab carries the --bg pill (the immersive editors override it through --tab-active-bg). Supports optional leading icons through TabDef.icon, per-tab disable via TabDef.disabled, and an optional right-aligned trailing control via TabDef.trailing (shown here on Month) - rendered as a sibling of the tab\'s own button sharing one pill, never nested inside it, so its clicks are shielded from the tab\'s onChange without creating an invalid nested-interactive-control. Used inside ViewHeader for page-level tabs and standalone for in-page toggles (panel theme settings, icon picker).', Preview: PreviewTabs,
+    description: 'Segmented tab group, flat at rest - the active tab carries the --bg pill (the immersive editors override it through --tab-active-bg). Supports optional leading icons through TabDef.icon, an optional hover tooltip through TabDef.tooltip (also on a tab with a trailing control), per-tab disable via TabDef.disabled, and an optional right-aligned trailing control via TabDef.trailing (shown here on Month) - rendered as a sibling of the tab\'s own button sharing one pill, never nested inside it, so its clicks are shielded from the tab\'s onChange without creating an invalid nested-interactive-control. Used inside ViewHeader for page-level tabs and standalone for in-page toggles (panel theme settings, icon picker).', Preview: PreviewTabs,
     notes: 'Pairs with ViewHeader - do not roll your own tab bars. Disabled tabs get opacity 0.4 + not-allowed cursor.',
   },
   {
@@ -3335,7 +3677,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'Badge', category: 'status',
     filePath: 'src/components/common/Badge/Badge.tsx',
-    description: 'Status pill with tone-tinted color and color-mixed background. Accepts an optional icon ReactNode, and an optional `tooltip` ({ title?, body }) that also becomes its accessible name. Host-renderer bridge for the SDK Badge element.',
+    description: 'Status pill with tone-tinted color and color-mixed background. Caps by default (`uppercase={false}` keeps a value such as an executable name or a unit readout in its own case). Accepts an optional icon ReactNode, an optional `onClick` that makes it a button, and an optional `tooltip` ({ title?, body }) that also becomes its accessible name. Host-renderer bridge for the SDK Badge element.',
     Preview: PreviewBadge,
   },
   {
@@ -3356,6 +3698,12 @@ export const REGISTRY: StorybookEntry[] = [
     Preview: PreviewDesktopOnlyBadge,
   },
   {
+    name: 'BuildLogo', category: 'status',
+    filePath: 'src/components/common/BuildLogo/BuildLogo.tsx',
+    description: 'The BUILD logo: the name in the label style inside a rounded outline, the same as the Cooling widget\'s SILENT label. Primary text color by default, with contrast (pure white on dark, pure black on light) and muted tones on request, never the accent. fontSize sizes the type, and the padding, corner radius and stroke scale with it so every size has the same proportions. The Build widget shows it muted, a step smaller, in the top-right corner of its wide tiles, with the specs kept clear of it; the Build site header, footer and the in-app open-in-browser button use the same component.',
+    Preview: PreviewBuildLogo,
+  },
+  {
     name: 'ExperimentalBadge', category: 'status',
     filePath: 'src/components/common/ExperimentalBadge/ExperimentalBadge.tsx',
     description: 'Pill badge flagging a device whose support is experimental (non-HYTE/iBUYPOWER hardware). Composes Badge inside a HoverTooltip that spells out the caveat. Shown left of the Nexus Control switch on the Devices list and under the on/off switch on the device page.',
@@ -3366,6 +3714,18 @@ export const REGISTRY: StorybookEntry[] = [
     filePath: 'src/components/common/ConflictRunningBadge/ConflictRunningBadge.tsx',
     description: 'Warn pill naming a detected third-party app that also drives the device ("<app> running"), with a HoverTooltip explaining that turning Nexus Control on ends it. Shown beside ExperimentalBadge on the Devices list whenever the device\'s conflictAppId is in the live conflicts list, whatever the Nexus Control state or whitelist.',
     Preview: PreviewConflictRunningBadge,
+  },
+  {
+    name: 'NotRespondingBadge', category: 'status',
+    filePath: 'src/components/common/NotRespondingBadge/NotRespondingBadge.tsx',
+    description: 'Warn pill ("Not responding") for a device Nexus controls but cannot write lighting to, with a HoverTooltip. A Badge with onClick, so it is a real button that opens the Fix lighting flow. Shown on the Devices list only while the device reports writeHealth failing and its Nexus Control is on.',
+    Preview: PreviewNotRespondingBadge,
+  },
+  {
+    name: 'TroubleshootLink', category: 'status',
+    filePath: 'src/components/common/TroubleshootLink/TroubleshootLink.tsx',
+    description: 'Dim text link with the external-link glyph for a troubleshooting destination. With `href` it opens that page in a new tab; with `onClick` it is a button for an in-app fix flow. Used by the Q-series panel empty states, the Lighting page "Lighting doesn\'t match?" link and the Fix lighting footer.',
+    Preview: PreviewTroubleshootLink,
   },
   {
     name: 'Toast', category: 'status',
@@ -3399,6 +3759,12 @@ export const REGISTRY: StorybookEntry[] = [
     description: 'Bottom-docked translucent notice bar overlaid on a preview canvas. Click-through except for the optional action button. tone="wait" is the self-resolving state (GPU still initializing); the default fault tone warns that a shader effect previews in the browser but won\'t run on the service.',
     Preview: PreviewCanvasNoticeBar,
   },
+  {
+    name: 'AreaCells', category: 'status',
+    filePath: 'src/components/common/AreaCells/AreaCells.tsx',
+    description: 'Outlines of the cells Area sampling gives each LED, as one SVG over the unit square of the box it fills. Fixed-width stroke in the LED mark color; a locked LED outline wears its color. Non-interactive.',
+    Preview: PreviewAreaCells,
+  },
 
   // ── Panel kit ─────────────────────────────────────────────────────────
   {
@@ -3410,7 +3776,7 @@ export const REGISTRY: StorybookEntry[] = [
   {
     name: 'MicroBar', category: 'panel-kit',
     filePath: 'src/panel/widgets/monitoring/MicroBar.tsx',
-    description: 'Single horizontal-progress row used by the Micro monitoring layout (count = 3 on 2x2 / 4x2). Label-left, value-right above a thin progress track. Stack 3 of these + a centered category/model label to compose the Micro tile.',
+    description: 'Single horizontal-progress row used by the Micro monitoring layout (count = 3 on 2x2 / 4x2). Label-left, value-right above a thin progress track. Stack 3 of these + a centered category/model label to compose the Micro tile. The simple design drops the track for a label over a value, aligned left, center, or right.',
     Preview: PreviewMicroBars,
   },
   {
@@ -3583,12 +3949,6 @@ export const REGISTRY: StorybookEntry[] = [
     Preview: PreviewEmojiPicker,
   },
   {
-    name: 'WidgetEditSheet', category: 'panel-kit',
-    filePath: 'src/panel/widgets/common/WidgetEditSheet.tsx',
-    description: 'Anchored edit sheet for widget settings: positions itself beside the widget cell (flipping to fit the viewport), hosts the widget\'s settings pane + size selector.',
-    notes: 'No live preview - anchors to a real widget cell and edits live panel config.',
-  },
-  {
     name: 'StaticDeviceSelect', category: 'panel-kit',
     filePath: 'src/panel/widgets/lighting/effecteditor/StaticDeviceSelect.tsx',
     description: 'Devices tab of the immersive lighting editor, shown in Static mode only. Static assigns a colour per device, so a pick needs a target; this supplies one. Renders the lighting page\'s own ZoneCards in selectOnly mode (checkbox and card-tap selection, no per-card actions or context menu) over a Select all / Clear selection row. The selection is the page\'s - same localStorage key - so it is shared between the two surfaces.',
@@ -3640,7 +4000,7 @@ export const REGISTRY: StorybookEntry[] = [
     name: 'PresetToolbar', category: 'inputs',
     filePath: 'src/components/common/PresetToolbar/PresetToolbar.tsx',
     description: 'Generic named-preset manager: dropdown (with Rename/Delete when active and a capped New preset... entry, plus an optional capped Import preset... entry via onImport and an optional Trigger with apps... entry via onManageApps), optionally paired with Undo / Redo icon buttons via showHistory, plus a Reset button when onReset is supplied. A preset with `hasApps` carries an app glyph, marking it as one an app in focus activates. Used by the lighting canvas layout toolbar (full history controls) and the Stream Deck page (dropdown + onImport opening the Elgato import modal).',
-    notes: 'No live preview -- bound to live preset state via useLayoutPresets / useDeckInstance and requires a running service.',
+    notes: 'No live preview -- bound to live preset state via useLayoutPresets / useDeckInstance and requires a running service. presetsHeader puts a group header over the presets, inlineSave adds a Save button beside the select that opens the new-preset prompt, and reservedNames blocks names the caller lists itself (the G560 EQ uses all three with a built-in Manual entry).',
   },
   {
     name: 'CorsairDevicePage', category: 'panel-kit',

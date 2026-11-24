@@ -1,13 +1,19 @@
 import type { CollisionDetection } from '@dnd-kit/core';
 import type { SettingsTabKey } from '../../components/views/SettingsView/SettingsView';
-import { snapStride } from './grid';
+import { snapDropCell } from './grid';
 import type { PanelLayout, PanelWidget } from '../types';
 import { isPageOnlyAppKey } from '../../app/pageOnlyApps';
 import { isPinnableAppKey } from '../../app/sidebarAppKeys';
+import { APP_REGISTRY } from '../widgets/registry';
+import { marketplaceIdFromType } from '../../widgets/marketplaceRegistry';
+import type { WeatherLocation } from '../../api/weather';
+import { weatherPlaceRouteTab } from '../widgets/weather/WeatherLocationList';
+import { panelEditorRoute, type PanelEditorTarget } from './panelEditorLink';
 
 // A click on a dashboard widget tile navigates to the widget's app page, keyed
 // off the App registry (manifest.Page) like the sidebar pin list. Adding a
-// Page to an app makes its widget click-through automatically.
+// Page to an app makes its widget click-through automatically; a page-only app
+// with a registered tile (Build) is the other way in.
 export type DashboardWidgetSection = string;
 
 export interface DashboardSectionNavigatePayload {
@@ -22,16 +28,37 @@ export interface DashboardSectionNavigatePayload {
   // Anchors to scroll to and shine on the target page, first mounted wins
   // (the device pages' jump to the Lighting or Cooling rail).
   scrollAnchors?: readonly string[];
+  // A fan channel id the Cooling page selects on arrival, so its curve opens in the editor.
+  coolingFanId?: string;
 }
 
 export type DashboardSectionNavigate =
   (section: DashboardWidgetSection, payload?: DashboardSectionNavigatePayload) => void;
 
 export function isDashboardClickthroughType(type: string): type is DashboardWidgetSection {
-  // Click-through needs a TILE to click through from, so this is narrower than
-  // sidebar-pinnable: isPinnableAppKey also admits page-only apps (Store, Frames), which
-  // have no widget. A stale layout naming one must not be treated as clickable.
-  return !isPageOnlyAppKey(type) && isPinnableAppKey(type);
+  // Click-through needs a tile to click through from: a page-only key (Store, Frames) is
+  // clickable only when APP_REGISTRY holds a tile for it (Build), so a stale layout
+  // naming a tile-less one is not.
+  return isPinnableAppKey(type) && (!isPageOnlyAppKey(type) || APP_REGISTRY[type] !== undefined);
+}
+
+/** Sub-route a widget's open carries so the page lands on the widget's own state; undefined when it has none. */
+export function widgetOpenTab(widget: Pick<PanelWidget, 'type'> & Partial<Pick<PanelWidget, 'config'>>): string | undefined {
+  if (widget.type !== 'weather') return undefined;
+  return weatherPlaceRouteTab(widget.config?.location as WeatherLocation | null | undefined) ?? undefined;
+}
+
+/** The app path a widget's Open item goes to: its own page or editor, null when it has neither. */
+export function appRouteForWidget(widget: Pick<PanelWidget, 'id' | 'type'> & Partial<Pick<PanelWidget, 'config'>>, recordId?: string, deckKey?: PanelEditorTarget['deckKey']): string | null {
+  const { type } = widget;
+  if (type === 'deck') return recordId ? panelEditorRoute({ recordId, widgetId: widget.id, deckKey }) : null;
+  if (type === 'displays') return '/system/devices/displays';
+  if (!isDashboardClickthroughType(type)) return null;
+  // An SDK app type carries a colon, which the open-app route rejects; useRoute maps /system/app/<id> back.
+  const appId = marketplaceIdFromType(type);
+  if (appId) return `/system/app/${appId}`;
+  const tab = widgetOpenTab(widget);
+  return tab ? `/system/${type}/${tab}` : `/system/${type}`;
 }
 
 export interface DragTarget { pageId: string; col: number; row: number; }
@@ -195,17 +222,14 @@ export function buildPanelCollisionDetection(
     const stride = cellSize + gap;
     const rowStride = rowSize + gap;
     const rootStyle = window.getComputedStyle(root);
-    // Snap rule: 1x1 lands on every cell; multi-cell widgets land on 2-cell
-    // multiples (a 4x4 sits at col 0 or 2). Read the active's span off the
-    // source cell so the snap tracks the cursor.
+    // Snap rule: every widget lands on any cell, clamped to stay in the grid.
+    // Read the active's span off the source cell so the snap tracks the cursor.
     const activeColSpan = Math.max(1,
       Number.parseInt(sourceCell?.getAttribute('data-panel-cell-col-span') ?? '1', 10) || 1,
     );
     const activeRowSpan = Math.max(1,
       Number.parseInt(sourceCell?.getAttribute('data-panel-cell-row-span') ?? '1', 10) || 1,
     );
-    const activeColStep = snapStride(activeColSpan);
-    const activeRowStep = snapStride(activeRowSpan);
     const totalColsRaw = Number.parseFloat(rootStyle.getPropertyValue('--panel-columns'));
     const totalRowsRaw = Number.parseFloat(rootStyle.getPropertyValue('--panel-rows'));
     const totalCols = Number.isFinite(totalColsRaw) && totalColsRaw > 0 ? totalColsRaw : 4;
@@ -225,21 +249,19 @@ export function buildPanelCollisionDetection(
     const pageStyle = window.getComputedStyle(pageEl);
     const padLeft = Number.parseFloat(pageStyle.paddingLeft || '0') || 0;
     const padTop = Number.parseFloat(pageStyle.paddingTop || '0') || 0;
-    // Center-based snap: round the top-left cell index to the nearest snap
-    // stride multiple. Math.round() puts the threshold at the half-stride
-    // boundary, so the widget jumps past half a stride into a new slot.
+    // Center-based snap: round the top-left cell index to the nearest cell,
+    // so the widget moves to a new slot once it is past half a cell.
     const localX = translated.left - pageRect.left - padLeft;
     const localY = translated.top - pageRect.top - padTop;
     const continuousCol = localX / stride;
     const continuousRow = localY / rowStride;
-    const snappedCol = Math.round(continuousCol / activeColStep) * activeColStep;
-    const snappedRow = Math.round(continuousRow / activeRowStep) * activeRowStep;
-    // Clamp into the grid so the highlight stays visible past an edge. Max
-    // snap is the largest stride multiple that keeps the rect inside the grid.
-    const maxCol = Math.max(0, Math.floor((totalCols - activeColSpan) / activeColStep) * activeColStep);
-    const maxRow = Math.max(0, Math.floor((totalRows - activeRowSpan) / activeRowStep) * activeRowStep);
-    const col = Math.min(Math.max(0, snappedCol), maxCol);
-    const row = Math.min(Math.max(0, snappedRow), maxRow);
+    // Clamped into the grid so the highlight stays visible past an edge.
+    const { col, row } = snapDropCell(
+      continuousCol,
+      continuousRow,
+      { cols: activeColSpan, rows: activeRowSpan },
+      { cols: totalCols, rows: totalRows },
+    );
 
     const pageId = pageEl.dataset.panelPageId;
     if (!pageId) return [];
@@ -255,4 +277,33 @@ export function buildPanelCollisionDetection(
     }
     return [];
   };
+}
+
+// The hover "More actions" corner badge belongs to the home dashboard grid
+// alone: the embedded desktop panel, not a device-page preview, and not while a
+// sheet, a resize or a drag owns the grid.
+export function showWidgetMoreActions(o: {
+  embedded: boolean;
+  surface: string;
+  simulator: boolean;
+  editable: boolean;
+  busy: boolean;
+}): boolean {
+  return o.embedded && o.surface === 'desktop' && !o.simulator && o.editable && !o.busy;
+}
+
+const INTERACTIVE_SELECTOR = 'button, input, select, textarea, a, [role="button"], [role="slider"], [role="switch"], [role="checkbox"], [role="tab"], [role="menuitem"], [role="option"]';
+
+/** True for an event target that is the panel's empty background: not a widget, a control or a scroll pane. */
+export function isPanelBackgroundTarget(target: EventTarget | null): boolean {
+  return target instanceof Element
+    && !target.closest('[data-panel-widget-id]')
+    && !target.closest(INTERACTIVE_SELECTOR)
+    && !target.closest('[data-panel-scrollable="true"]')
+    && !target.closest('[data-panel-hit]');
+}
+
+/** A click opens the background menu only when it lands on the background and its press did too; a press that began on a widget (a drag ending over a gutter) is not one. `pressedOnBackground` is null when no press was seen (a keyboard click). */
+export function clickOpensBackgroundMenu(pressedOnBackground: boolean | null, clickTarget: EventTarget | null): boolean {
+  return pressedOnBackground !== false && isPanelBackgroundTarget(clickTarget);
 }

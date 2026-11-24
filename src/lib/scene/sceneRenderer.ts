@@ -28,10 +28,16 @@ import {
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import type { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { parseCaseModel, sceneToLayoutMatrix, STRUCTURE_LINE_DIM } from './caseModel';
+import { buildCase, type Dimmable, type Palette, type SceneLayout } from './pcScene';
 import type { SceneAnchor, SceneBinding, SceneCamera, SceneObject, Vec3 } from '../../api/lightingScene';
 import { subscribeLedFrame, type LedFrame } from '../ledFrameStore';
 import { applyCamera, CAMERA_FAR, CAMERA_NEAR, projectToCanvas } from './sceneCamera';
+import { liveContactButtons } from '../../panel/engine/touchViaPointer';
+import { curveRadius } from './curvedPanel';
+import { applyHighlight, buildDeskBoxes } from './deskNodes';
+import { deskLegBoxes, deskSlabBoxes, lDeskRect, placedItemBoxes, type DeskBox, type DeskKind as ItemKind, type DeskRect, type Rect } from './deskScene';
 import { CANVAS_H, CANVAS_W, rotateYaw, toWorld } from './sceneMath';
 
 export type ScenePick =
@@ -45,22 +51,19 @@ export interface SceneRenderState {
   leds: Map<string, Float32Array>;
   selectedDeviceId: string | null;
   selectedObjectId: string | null;
-  /** A device waiting for a surface: free surfaces glow to invite the click. */
-  placing: boolean;
-  /** Surface under a drag from the device list, as "objectId\nanchorId". */
-  dropTarget: string | null;
   /** The selected object can be dragged across the desk. */
   editable: boolean;
 }
 
 export interface SceneRendererCallbacks {
   onCamera: (camera: SceneCamera, final: boolean) => void;
-  onPick: (pick: ScenePick | null) => void;
+  /** The front-most thing under the click, and everything under it near to far, so a caller can look past an unbound surface. */
+  onPick: (pick: ScenePick | null, stack: ScenePick[]) => void;
   onMoveObject: (objectId: string, position: Vec3) => void;
   /** LED canvas positions after the camera or the placements changed. */
   onProjected?: (points: Map<string, Float32Array>) => void;
   /** What the pointer rests on, with its client position; null when it leaves everything. */
-  onHover?: (pick: ScenePick | null, clientX: number, clientY: number) => void;
+  onHover?: (pick: ScenePick | null, clientX: number, clientY: number, stack: ScenePick[]) => void;
 }
 
 /** Visual tones; the accent is read from the theme when the renderer mounts. */
@@ -74,7 +77,11 @@ export interface SceneTheme {
 const anchorKey = (objectId: string, anchorId: string) => `${objectId}\n${anchorId}`;
 const CLICK_SLOP_PX = 5;
 const SNAP_MM = 5;
-const DESK_THICKNESS = 25;
+// Build names an L desk's second arm after the desk.
+const RETURN_SUFFIX = '.return';
+// What a scene kind is when the desk scene draws it; a kind not listed is a plain box.
+const ITEM_KIND: Record<string, ItemKind> = { keyboard: 'keyboard', mouse: 'mouse', mousepad: 'mousepad', deskmat: 'mousepad', headset: 'headphones', monitor: 'monitor', speaker: 'speaker' };
+export { STRUCTURE_LINE_DIM };
 
 function dotTexture(): CanvasTexture {
   const c = document.createElement('canvas');
@@ -120,6 +127,12 @@ function outline(a: SceneAnchor): BufferGeometry {
   return g;
 }
 
+/** Build's case layout as its scene draws it, and the side its glass is on. */
+export interface CaseScene {
+  layout: SceneLayout;
+  windowRight: boolean;
+}
+
 export class SceneRenderer {
   readonly camera: PerspectiveCamera;
   private readonly renderer: WebGLRenderer;
@@ -129,6 +142,11 @@ export class SceneRenderer {
   private readonly objectsGroup = new Group();
   private readonly anchorsGroup = new Group();
   private model: Group | null = null;
+  private caseScene: CaseScene | null = null;
+  private fatLines: LineMaterial[] = [];
+  private deskBoxes = new Map<string, DeskBox[]>();
+  // The desk items' materials, which the selection tints the way Build's desk view does.
+  private deskDimmables: Dimmable[] = [];
   private dots: Points | null = null;
   private readonly dotMap = dotTexture();
   private readonly raycaster = new Raycaster();
@@ -139,7 +157,7 @@ export class SceneRenderer {
   private readonly unsubscribeFrame: () => void;
   private readonly resizeObserver: ResizeObserver;
   private interacting = false;
-  private down: { x: number; y: number; pick: ScenePick | null } | null = null;
+  private down: { x: number; y: number; pick: ScenePick | null; stack: ScenePick[] } | null = null;
   private drag: { objectId: string; group: Object3D; plane: Plane; offset: Vector3; start: Vec3; moved: boolean } | null = null;
   private hovered: string | null = null;
   // Redraw only when something on screen changed: the camera, the scene, or a new LED frame.
@@ -247,9 +265,16 @@ export class SceneRenderer {
     this.publishProjection();
   }
 
+  /** Draws the case with Build's own scene code from its layout; without one the exported model stands in. */
+  setCaseScene(next: CaseScene | null): void {
+    if (this.disposed || next === this.caseScene) return;
+    this.caseScene = next;
+    if (this.state) this.rebuild();
+  }
+
   async setModel(bytes: ArrayBuffer | null): Promise<void> {
     const token = ++this.modelToken;
-    const parsed = bytes ? (await new GLTFLoader().parseAsync(bytes, '')).scene : null;
+    const parsed = bytes ? await parseCaseModel(bytes) : null;
     // A newer call (or disposal) overtook this parse: its model is the one to keep.
     if (token !== this.modelToken || this.disposed) {
       if (parsed) this.clearGroup(parsed, true);
@@ -273,15 +298,30 @@ export class SceneRenderer {
 
   /** What sits under a viewport point (client pixels): a surface first, then an object. */
   pickAt(clientX: number, clientY: number): ScenePick | null {
+    const stack = this.pickStackAt(clientX, clientY);
+    return stack.find(p => p.kind === 'anchor') ?? stack[0] ?? null;
+  }
+
+  /** Every surface and object under a viewport point, nearest first. */
+  pickStackAt(clientX: number, clientY: number): ScenePick[] {
     const rect = this.canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return null;
+    if (rect.width === 0 || rect.height === 0) return [];
     this.pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(this.pointer, this.camera);
-    const hits = this.raycaster.intersectObjects([this.anchorsGroup, this.objectsGroup], true);
-    const anchor = hits.find(h => h.object.userData.pick === 'anchor');
-    if (anchor) return { kind: 'anchor', objectId: anchor.object.userData.objectId, anchorId: anchor.object.userData.anchorId };
-    const obj = hits.find(h => h.object.userData.pick === 'object');
-    return obj ? { kind: 'object', objectId: obj.object.userData.objectId } : null;
+    const stack: ScenePick[] = [];
+    const seen = new Set<string>();
+    for (const hit of this.raycaster.intersectObjects([this.anchorsGroup, this.objectsGroup], true)) {
+      const data = hit.object.userData;
+      const pick: ScenePick | null = data.pick === 'anchor'
+        ? { kind: 'anchor', objectId: data.objectId, anchorId: data.anchorId }
+        : data.pick === 'object' ? { kind: 'object', objectId: data.objectId } : null;
+      const key = pick ? (pick.kind === 'anchor' ? anchorKey(pick.objectId, pick.anchorId) : pick.objectId) : null;
+      if (pick && key !== null && !seen.has(`${pick.kind}:${key}`)) {
+        seen.add(`${pick.kind}:${key}`);
+        stack.push(pick);
+      }
+    }
+    return stack;
   }
 
   private resize(): void {
@@ -292,6 +332,7 @@ export class SceneRenderer {
     // The aspect stays the canvas's own: the viewport is styled to it, and the hardware samples through it.
     this.camera.aspect = CANVAS_W / CANVAS_H;
     this.camera.updateProjectionMatrix();
+    this.sizeFatLines();
     this.dirty = true;
   }
 
@@ -387,7 +428,7 @@ export class SceneRenderer {
         old.dispose();
       }
       mesh.material = new MeshBasicMaterial({ color: new Color(this.theme.face), transparent: true, opacity: 0.18, side: DoubleSide, depthWrite: false });
-      mesh.add(new LineSegments(new EdgesGeometry(mesh.geometry, 25), new LineBasicMaterial({ color: new Color(this.theme.line), transparent: true, opacity: 0.55 })));
+      mesh.add(new LineSegments(new EdgesGeometry(mesh.geometry, 25), new LineBasicMaterial({ color: new Color(this.theme.line), transparent: true, opacity: 0.55 * STRUCTURE_LINE_DIM })));
     }
     // Clones share these buffers; clearGroup leaves them for the model's own disposal.
     model.traverse(o => { o.userData.shared = true; });
@@ -398,16 +439,22 @@ export class SceneRenderer {
     if (!state) return;
     this.clearGroup(this.objectsGroup);
     this.clearGroup(this.anchorsGroup);
+    this.fatLines = [];
     this.anchorLines.clear();
     this.objectGroups.clear();
     this.clearDots();
 
-    this.objectsGroup.add(this.buildDesk(state.objects));
+    this.deskDimmables = [];
+    this.deskBoxes = this.deskSurfaces(state.objects);
+    this.objectsGroup.add(this.fittedDesk(state.objects));
     for (const obj of state.objects) {
       const g = new Group();
       g.position.set(...obj.position);
       g.rotation.y = (obj.yaw * Math.PI) / 180;
-      if (obj.kind === 'case' && obj.hasModel && this.model) {
+      if (obj.kind === 'case' && this.caseScene) {
+        g.add(this.buildCaseGroup(this.caseScene));
+        g.add(this.pickBox(obj));
+      } else if (obj.kind === 'case' && obj.hasModel && this.model) {
         const model = this.model.clone(true);
         g.add(model);
         // The model is drawn, but picking uses the case's bounds so it can be grabbed anywhere.
@@ -439,37 +486,84 @@ export class SceneRenderer {
     this.publishProjection();
   }
 
-  private buildDesk(objects: SceneObject[]): Group {
-    const g = new Group();
-    const desk = objects.filter(o => o.kind !== 'case' || o.position[1] <= 1);
-    let minX = -800, maxX = 800, minZ = -375, maxZ = 375;
-    for (const o of desk) {
-      const r = Math.hypot(o.size[0], o.size[2]) / 2;
-      minX = Math.min(minX, o.position[0] - r - 40);
-      maxX = Math.max(maxX, o.position[0] + r + 40);
-      minZ = Math.min(minZ, o.position[2] - r - 40);
-      maxZ = Math.max(maxZ, o.position[2] + r + 40);
-    }
-    const geo = new BoxGeometry(maxX - minX, DESK_THICKNESS, maxZ - minZ);
-    const slab = new Mesh(geo, new MeshBasicMaterial({ color: new Color(this.theme.desk), transparent: true, opacity: 0.35, depthWrite: false }));
-    slab.position.set((minX + maxX) / 2, -DESK_THICKNESS / 2, (minZ + maxZ) / 2);
-    const edges = new LineSegments(new EdgesGeometry(geo), new LineBasicMaterial({ color: new Color(this.theme.line), transparent: true, opacity: 0.25 }));
-    edges.position.copy(slab.position);
-    g.add(slab, edges);
+  // Build's case in layout space, carried into the exported model's scene space, which is where the case object's anchors are.
+  private buildCaseGroup({ layout, windowRight }: CaseScene): Group {
+    const palette = this.palette();
+    const [D, W, H] = layout.size;
+    const built = buildCase(layout, palette, this.fatLines, [], [], true, false, true, true);
+    // buildCase centers the case on the origin; the layout-to-scene matrix expects the layout's own corner there.
+    const corner = new Group();
+    corner.position.set(D / 2, H / 2, W / 2);
+    corner.add(built);
+    const toScene = new Group();
+    toScene.matrixAutoUpdate = false;
+    toScene.matrix.copy(sceneToLayoutMatrix(layout.size, windowRight).invert());
+    toScene.add(corner);
+    this.sizeFatLines();
+    return toScene;
+  }
+
+  private sizeFatLines(): void {
+    const w = this.canvas.clientWidth;
+    const h = this.canvas.clientHeight;
+    for (const m of this.fatLines) m.resolution.set(w, h);
+  }
+
+  // The palette Build draws with: parts in the accent, the frame in the face tone. The case here is drawn in it too.
+  private palette(): Palette {
+    return { part: new Color(this.theme.accent), frame: new Color(this.theme.face), bad: new Color('#ef4444'), limit: new Color('#f59e0b') };
+  }
+
+  // Desk items and surfaces are Build's own desk boxes, drawn by the shared desk scene: the same nodes, in the object's frame.
+  private deskNodes(obj: SceneObject, boxes: DeskBox[], offset: Vec3 = [0, 0, 0]): Group {
+    const faces: Mesh[] = [];
+    const g = buildDeskBoxes(boxes.map(b => ({ ...b, id: obj.id })), this.palette(), this.fatLines, faces, this.deskDimmables);
+    g.position.set(...offset);
+    for (const face of faces) face.userData = { pick: 'object', objectId: obj.id, role: 'face' };
+    this.sizeFatLines();
     return g;
   }
 
   private objectBox(obj: SceneObject): Group {
-    const g = new Group();
-    const [w, h, d] = obj.size;
-    const geo = new BoxGeometry(w, h, d);
-    const face = new Mesh(geo, new MeshBasicMaterial({ color: new Color(this.theme.face), transparent: true, opacity: 0.22, depthWrite: false }));
-    face.position.y = h / 2;
-    face.userData = { pick: 'object', objectId: obj.id, role: 'face' };
-    const edges = new LineSegments(new EdgesGeometry(geo), new LineBasicMaterial({ color: new Color(this.theme.line), transparent: true, opacity: 0.6 }));
-    edges.position.y = h / 2;
-    edges.userData = { role: 'edges' };
-    g.add(face, edges);
+    if (obj.kind === 'desk') {
+      // The desk's boxes are in the scene's frame; the object's group stands at its top, so they are carried back by it.
+      return this.deskNodes(obj, this.deskBoxes.get(obj.id) ?? [], [-obj.position[0], -obj.position[1], -obj.position[2]]);
+    }
+    return this.deskNodes(obj, placedItemBoxes({ id: obj.id, kind: ITEM_KIND[obj.kind] ?? 'other', cx: 0, cz: 0, minY: 0, yaw: 0, size: obj.size, curveRadius: curveRadius(obj) }));
+  }
+
+  /** The boxes of each desk object: the main one holds the slab and the legs, an L's return the slab beyond the main arm. */
+  private deskSurfaces(objects: SceneObject[]): Map<string, DeskBox[]> {
+    const arm = (o: SceneObject): Rect => ({ x0: o.position[0] - o.size[0] / 2, x1: o.position[0] + o.size[0] / 2, z0: o.position[2] - o.size[2] / 2, z1: o.position[2] + o.size[2] / 2 });
+    const desks = objects.filter(o => o.kind === 'desk');
+    const returns = desks.filter(o => o.id.endsWith(RETURN_SUFFIX));
+    const mains = desks.filter(o => !returns.includes(o));
+    const out = new Map<string, DeskBox[]>();
+    for (const main of mains) {
+      // A long id's return carries a shortened name, so a lone return belongs to a lone desk.
+      const ret = returns.find(o => o.id === main.id + RETURN_SUFFIX) ?? (mains.length === 1 ? returns[0] : undefined);
+      const rect = ret ? lDeskRect(arm(main), arm(ret)) : arm(main);
+      const [slab, ...beyond] = deskSlabBoxes(rect);
+      out.set(main.id, [slab, ...deskLegBoxes(rect), ...(ret ? [] : beyond)]);
+      if (ret) out.set(ret.id, beyond);
+    }
+    return out;
+  }
+
+  // Without a desk object in the shared setup, a surface fitted around what stands on it.
+  private fittedDesk(objects: SceneObject[]): Group {
+    if (objects.some(o => o.kind === 'desk')) return new Group();
+    const desk = objects.filter(o => o.kind !== 'case' || o.position[1] <= 1);
+    const rect: DeskRect = { x0: -800, x1: 800, z0: -375, z1: 375 };
+    for (const o of desk) {
+      const r = Math.hypot(o.size[0], o.size[2]) / 2;
+      rect.x0 = Math.min(rect.x0, o.position[0] - r - 40);
+      rect.x1 = Math.max(rect.x1, o.position[0] + r + 40);
+      rect.z0 = Math.min(rect.z0, o.position[2] - r - 40);
+      rect.z1 = Math.max(rect.z1, o.position[2] + r + 40);
+    }
+    const g = buildDeskBoxes([...deskSlabBoxes(rect), ...deskLegBoxes(rect)], this.palette(), this.fatLines, [], []);
+    this.sizeFatLines();
     return g;
   }
 
@@ -485,7 +579,7 @@ export class SceneRenderer {
     const m = anchorMatrix(obj, a);
     const g = new Group();
     g.applyMatrix4(m);
-    const line = new LineLoop(outline(a), new LineBasicMaterial({ color: new Color(this.theme.line), transparent: true, opacity: 0.4, depthTest: false }));
+    const line = new LineLoop(outline(a), new LineBasicMaterial({ color: new Color(this.theme.line), transparent: true, opacity: 0.4 * STRUCTURE_LINE_DIM, depthTest: false }));
     line.renderOrder = 5;
     const pickGeo = a.shape === 'ring' ? new CircleGeometry(Math.min(a.width, a.height) * 0.5, 32) : new PlaneGeometry(Math.max(a.width, 12), Math.max(a.height, 12));
     const pick = new Mesh(pickGeo, new MeshBasicMaterial({ color: new Color(this.theme.accent), transparent: true, opacity: 0, side: DoubleSide, depthWrite: false }));
@@ -510,47 +604,30 @@ export class SceneRenderer {
       const device = boundTo.get(key);
       const pick = loop.parent?.children.find(c => c.userData.pick === 'anchor') as Mesh | undefined;
       const pickMat = pick?.material as MeshBasicMaterial | undefined;
-      let opacity = 0.35;
+      let opacity = 0.35 * STRUCTURE_LINE_DIM;
       let color = line;
       let fill = 0;
       if (device) {
         color = accent;
         opacity = device === state.selectedDeviceId ? 1 : 0.75;
         fill = device === state.selectedDeviceId ? 0.18 : 0;
-      } else if (state.placing) {
-        color = accent;
-        opacity = 0.9;
-        fill = 0.12;
-      }
-      if (key === state.dropTarget || key === this.hovered) {
-        color = accent;
-        opacity = 1;
-        fill = 0.3;
+        if (key === this.hovered) {
+          opacity = 1;
+          fill = 0.3;
+        }
       }
       mat.color.copy(color);
       mat.opacity = opacity;
       if (pickMat) pickMat.opacity = fill;
     }
-    for (const [id, g] of this.objectGroups) {
-      const selected = id === state.selectedObjectId;
-      g.traverse(o => {
-        if (o.userData.role === 'edges') {
-          const mat = (o as LineSegments).material as LineBasicMaterial;
-          mat.color.copy(selected ? accent : line);
-          mat.opacity = selected ? 1 : 0.6;
-        }
-      });
-    }
-  }
-
-  private eventPick(e: PointerEvent): ScenePick | null {
-    return this.pickAt(e.clientX, e.clientY);
+    applyHighlight(this.deskDimmables, state.selectedObjectId, 'tint');
   }
 
   private readonly onPointerDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
-    const pick = this.eventPick(e);
-    this.down = { x: e.clientX, y: e.clientY, pick };
+    const stack = this.pickStackAt(e.clientX, e.clientY);
+    const pick = stack.find(p => p.kind === 'anchor') ?? stack[0] ?? null;
+    this.down = { x: e.clientX, y: e.clientY, pick, stack };
     const state = this.state;
     // Only the selected object drags across the desk; a drag that starts anywhere else orbits, so a
     // camera move that begins over the case never shoves it.
@@ -584,15 +661,17 @@ export class SceneRenderer {
       }
       return;
     }
-    if (e.buttons !== 0) {
-      this.callbacks.onHover?.(null, e.clientX, e.clientY);
+    if (liveContactButtons(e, this.down !== null) !== 0) {
+      this.callbacks.onHover?.(null, e.clientX, e.clientY, []);
       return;
     }
-    const pick = this.eventPick(e);
-    this.callbacks.onHover?.(pick, e.clientX, e.clientY);
+    const stack = this.pickStackAt(e.clientX, e.clientY);
+    const pick = stack.find(p => p.kind === 'anchor') ?? stack[0] ?? null;
+    this.callbacks.onHover?.(pick, e.clientX, e.clientY, stack);
     const key = pick?.kind === 'anchor' ? anchorKey(pick.objectId, pick.anchorId) : null;
     const movable = this.state?.editable && pick && pick.objectId === this.state.selectedObjectId;
-    this.canvas.style.cursor = pick ? (movable ? 'grab' : 'pointer') : '';
+    const freeSpot = !!key && !this.state?.bindings.some(b => b.targets.some(t => anchorKey(t.objectId, t.anchorId) === key));
+    this.canvas.style.cursor = pick && !freeSpot ? (movable ? 'grab' : 'pointer') : '';
     if (key !== this.hovered) {
       this.hovered = key;
       this.restyle();
@@ -612,7 +691,7 @@ export class SceneRenderer {
       this.hovered = null;
       this.restyle();
     }
-    this.callbacks.onHover?.(null, e.clientX, e.clientY);
+    this.callbacks.onHover?.(null, e.clientX, e.clientY, []);
   };
 
   private readonly onPointerUp = (e: PointerEvent) => {
@@ -628,6 +707,6 @@ export class SceneRenderer {
     }
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_SLOP_PX) return;
     if (e.target !== this.canvas && !drag) return;
-    this.callbacks.onPick(down.pick);
+    this.callbacks.onPick(down.pick, down.stack);
   };
 }

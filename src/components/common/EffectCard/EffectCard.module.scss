@@ -103,6 +103,16 @@
   }
 }
 
+.cardDisabled {
+  @include disabled;
+}
+
+// The active ring stays on a disabled card that is mid-transfer.
+.cardDisabled:not(.cardActive):hover {
+  border-color: transparent;
+  transform: none;
+}
+
 // Caption in the lower third: white fill, dark outline, drop shadow so it
 // stays legible over any screenshot.
 .labelOverlay {
@@ -186,6 +196,10 @@
   text-transform: capitalize;
 }
 
+.labelAsIs {
+  text-transform: none;
+}
+
 .meta {
   font-size: 0.62rem;
   color: var(--text-dim);
@@ -207,8 +221,34 @@
   right: 0.3rem;
 }
 
+// Shared edit hint (see EditHint). Dark scrim, so white glyph regardless of
+// theme; the glyph is sized as a share of the tile's width.
+.cardEditable {
+  position: relative;
+}
+
+.editHint {
+  --edit-hint-color: #fff;
+  --edit-hint-icon-size: 20%;
+}
+
+// Only the selected tile carries the hint, so :hover on the card shows it the
+// moment the pointer is already over it when the selection lands.
+// Keyed on the mouse marker (lib/pointerKind), not a media query: the overlay's WebViews report no pointer.
+// The marker is on body: the build prefixes every :hover rule with an html ancestor.
+:global(body[data-pointer='mouse']) .card:hover [data-edit-hint-overlay],
+:global(body[data-pointer='mouse']) .card:focus-visible [data-edit-hint-overlay],
+:global(body[data-pointer='mouse']) .card[data-edit-hint-shown] [data-edit-hint-overlay] {
+  opacity: 1;
+}
+
 .card:hover [data-card-delete='hover'],
 .card:focus-within [data-card-delete='hover'] {
   opacity: 1;
   pointer-events: auto;
+}
+
+// Outranks the hover reveal above, which sets pointer-events back to auto.
+.card.cardDisabled [data-card-delete] {
+  pointer-events: none;
 }

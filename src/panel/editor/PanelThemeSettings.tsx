@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ColorPickerWithPresets } from '../../components/common/ColorPickerWithPresets/ColorPickerWithPresets';
 import { ChipGroup } from '../../components/common/ChipGroup/ChipGroup';
 import { SettingsSection } from '../../components/common/SettingsSection/SettingsSection';
@@ -6,24 +6,38 @@ import { SettingRow, SettingSelect, SettingSlider, SettingToggle } from '../../c
 import { useTranslation } from '../../lib/i18n';
 import { DEFAULT_ACCENT, PRESET_ACCENTS, THEME_MODES, type ThemeMode } from '../../lib/settings';
 import { DEFAULT_CUSTOM_TEXT_COLOR, type TextColorMode } from '../theme/textColor';
-import { DEFAULT_PANEL_FONT, PANEL_FONTS, type PanelFontId } from '../theme/panelFont';
+import { DEFAULT_PANEL_FONT, systemFontFamily, type PanelFont } from '../theme/panelFont';
+import type { PanelSkinId } from '../skins/skins';
+import type { SkinOverrides } from '../skins/skinOverrides';
+import { SkinPicker } from './SkinPicker';
+import { offersSkinBackground, resolveSkin } from '../theme/panelSkin';
+import { buildPanelThemeVars } from '../theme/panelTheme';
+import { buildPanelFontOptions } from '../theme/panelFontOptions';
+import { loadRecentSystemFonts, pushRecentSystemFont } from '../theme/recentSystemFonts';
+import { loadSystemFonts, useSystemFonts } from '../theme/systemFontsCache';
 import type { EffectState } from '../../types/lighting';
 import type { GaugeGradientStop } from '../theme/gaugeGradient';
 import {
   PANEL_BACKGROUND_EFFECTS,
+  PANEL_BACKGROUND_EFFECTS_WITH_AUDIO,
   PANEL_BACKGROUND_FROST_STEP,
   PANEL_WIDGET_PADDING_STEP,
   normalizePanelBackgroundEffect,
   normalizePanelBackgroundTemplate,
   panelBackgroundDefault,
+  panelBackgroundState,
   panelBackgroundPresets,
+  resolveBackgroundDrawing,
   resolvePanelBackground,
   type PanelBackdrop,
+  type PanelBackgroundBase,
+  type SkinBackgroundHeld,
   type PanelBackgroundMode,
 } from '../background/panelBackground';
 import { BackgroundEffectPreview } from '../widgets/lighting/effecteditor/BackgroundEffectPreview';
 import { usePanelBackgroundEffectController } from '../widgets/lighting/effecteditor/usePanelBackgroundEffectController';
 import { usePanelBackgroundUsage } from '../../hooks/usePanelBackgroundUsage';
+import { SearchInput } from '../../components/common/SearchInput/SearchInput';
 import { AnimateGrid } from '../widgets/lighting/page/AnimateGrid';
 import { EffectControls } from '../widgets/lighting/page/EffectControls';
 import { BackgroundMediaPicker } from '../background/BackgroundMediaPicker';
@@ -48,9 +62,9 @@ export type PanelThemeSettingsSection = 'all' | 'theme' | 'background';
 
 export interface PanelThemeSettingsState {
   appThemeMode: ThemeMode;
-  // Desktop app's resolved theme from prefs.theme.resolvedThemeMode. '' when the
-  // service/desktop hasn't published one; sync mode then falls back to
-  // appThemeMode. Concrete value here = follow the desktop OS, not the panel's.
+  // Host OS theme from prefs.theme.resolvedThemeMode, published by the service.
+  // '' when not published; a synced panel on 'system' then resolves against its
+  // own device. Only consulted while appThemeMode is 'system'.
   appResolvedThemeMode: '' | ResolvedPanelThemeMode;
   themeSyncWithDesktop: boolean;
   themeMode: ThemeMode;
@@ -60,6 +74,10 @@ export interface PanelThemeSettingsState {
   backgroundColor: string;
   backgroundColorLight: string;
   backgroundMode: PanelBackgroundMode;
+  // The mode a Skin background falls back to when the skin is removed.
+  backgroundModeBefore: PanelBackgroundBase;
+  // The backdrop, frost and opacity the Skin background replaced; restored when it is left.
+  backgroundHeld?: SkinBackgroundHeld | null;
   backgroundEffect: string;
   backgroundTemplate: number;
   // Per-shader preset selection for this panel (effect key → preset index).
@@ -94,10 +112,16 @@ export interface PanelThemeSettingsState {
   // Hex for 'custom'; empty falls back to DEFAULT_CUSTOM_TEXT_COLOR.
   textColor: string;
   // Null is the app font.
-  font: PanelFontId | null;
+  font: PanelFont | null;
+  // Null is the stock look.
+  skin: PanelSkinId | null;
+  // Accent and font picked per skin; a skin absent from the map uses its own look.
+  skinOverrides: SkinOverrides;
   // Stops for the value-coloured monitoring gauges (see gaugeGradient.ts).
   gaugeGradient: GaugeGradientStop[];
 }
+
+const OPTIONS_TAB = 'options';
 
 export interface PanelThemeSettingsProps {
   theme: PanelThemeSettingsState;
@@ -131,7 +155,12 @@ export interface PanelThemeSettingsProps {
   onTextColorModeCommit: (mode: TextColorMode) => void;
   onTextColorPreview: (hex: string) => void;
   onTextColorCommit: (hex: string) => void;
-  onFontCommit: (font: PanelFontId | null) => void;
+  onFontCommit: (font: PanelFont | null) => void;
+  onSkinCommit: (skin: PanelSkinId | null) => void;
+  // Drops the active skin's remembered accent and font.
+  onSkinReset: () => void;
+  /** List installed host fonts under the bundled ones. Only for panels rendered on this PC's own OS. */
+  showSystemFonts?: boolean;
   /** Show the media background tab. All display-backed surfaces support it; the
    * embedded desktop deck never renders theme backgrounds (PanelApp gates on
    * !embedded || simulator), so desktop hides it. Tunneled panels also hide it:
@@ -139,10 +168,14 @@ export interface PanelThemeSettingsProps {
   showMediaTab?: boolean;
   /** Device aspect ratio (W/H) forwarded to the media cropper. */
   deviceAspect?: number;
+  /** Round display: media tiles are drawn as circles, as the preview shows the panel. */
+  roundDisplay?: boolean;
   /** Device native pixel width for the import conversion. */
   deviceW?: number;
   /** Device native pixel height for the import conversion. */
   deviceH?: number;
+  /** Extra row rendered first in the Widgets section (the per-device widget scale slider). */
+  widgetScaleRow?: ReactNode;
   /** Hide the widget-labels toggle. Single-widget surfaces (q-series) lock
    * labels off. */
   hideWidgetLabelsToggle?: boolean;
@@ -155,9 +188,16 @@ export interface PanelThemeSettingsProps {
   /** Show the backdrop selector. Kiosk-hosted surfaces (y70 / monitor) only:
    * the wallpaper and see-through modes need a desktop behind the panel. */
   showBackdropSelector?: boolean;
+  /** Show the immersive background toggle. Immersive views exist only on touch
+   * screens, so non-touch displays hide it. */
+  showImmersiveBackdrop?: boolean;
   sections?: PanelThemeSettingsSection;
+  /** Show a search field above the background animation grid. Desktop dashboard only. */
+  showEffectSearch?: boolean;
   /** Name of the focus mode holding this panel on a plain background right now, if any. */
   backgroundHeldBy?: string | null;
+  /** panelAudioReactiveAllowed for the surface being edited. Off offers no audio effects. */
+  audioReactive?: boolean;
 }
 
 export function PanelThemeSettings({
@@ -194,15 +234,23 @@ export function PanelThemeSettings({
   onTextColorPreview,
   onTextColorCommit,
   onFontCommit,
+  onSkinCommit,
+  onSkinReset,
   showMediaTab = false,
+  showSystemFonts = false,
   deviceAspect = 9 / 16,
+  roundDisplay = false,
   deviceW,
   deviceH,
   hideWidgetLabelsToggle = false,
   hideWidgetChromeControls = false,
+  widgetScaleRow = null,
   showBackdropSelector = false,
+  showEffectSearch = false,
+  showImmersiveBackdrop = true,
   sections = 'all',
   backgroundHeldBy = null,
+  audioReactive = false,
 }: PanelThemeSettingsProps) {
   const showTheme = sections !== 'background';
   const showBackground = sections !== 'theme';
@@ -212,16 +260,32 @@ export function PanelThemeSettings({
     return value === key ? fallback : value;
   };
   const syncWithDesktopLabel = t('panel.settings.syncWithDesktop') || 'Sync with desktop';
-  const backgroundEffect = normalizePanelBackgroundEffect(theme.backgroundEffect);
-  const backgroundTemplate = normalizePanelBackgroundTemplate(theme.backgroundTemplate);
+  // What this surface draws. A stored audio effect it cannot play shows the
+  // default, and the options below edit that, never the stored effect's template.
+  const storedBackgroundEffect = normalizePanelBackgroundEffect(theme.backgroundEffect);
+  const drawnBackground = resolveBackgroundDrawing(
+    storedBackgroundEffect,
+    normalizePanelBackgroundTemplate(theme.backgroundTemplate),
+    theme.backgroundEffectState,
+    audioReactive,
+  );
+  const backgroundEffect = drawnBackground.effect;
+  const backgroundTemplate = drawnBackground.template;
+  const backgroundEffectState = drawnBackground.effectState ?? panelBackgroundState(backgroundEffect, backgroundTemplate);
+  const backgroundSubstituted = backgroundEffect !== storedBackgroundEffect;
   const backgroundOpacityPercent = Math.round(theme.backgroundOpacity * 100);
   const widgetOpacityPercent = Math.round(theme.widgetOpacity * 100);
   const widgetPaddingLabel = label('panel.settings.widgetPadding', 'Widget padding');
+  const skin = resolveSkin(theme);
+  // A Skin background with no skin reads as the mode held before it.
+  const bgMode = !skin && theme.backgroundMode === 'skin' ? theme.backgroundModeBefore : theme.backgroundMode;
   // Frost blurs whatever the page itself paints, so it applies to the
   // redrawn wallpaper and to a shader/media layer. In see-through mode the
-  // page paints nothing and backdrop-filter has nothing to sample.
+  // page paints nothing, so the host blurs the desktop behind the cards.
+  // A flat solid or skin backdrop has nothing to blur.
   const frostApplies = theme.backdrop === 'wallpaper'
-    || (theme.backdrop === 'theme' && theme.backgroundMode !== 'solid');
+    || theme.backdrop === 'desktop'
+    || (theme.backdrop === 'theme' && bgMode !== 'solid' && bgMode !== 'skin');
   // Built outside the JSX so the option keys read as data, matching the other
   // ChipGroup call sites (the i18n lint rule scans JSX only).
   const backdropOptions = [
@@ -234,11 +298,23 @@ export function PanelThemeSettings({
     { key: 'theme', label: label('panel.settings.textColor.theme', 'Theme') },
     { key: 'custom', label: label('panel.settings.textColor.custom', 'Custom') },
   ];
-  const fontOptions = PANEL_FONTS.map(f => ({
-    value: f.id,
-    label: f.family,
-    fontFamily: `'${f.family}', var(--panel-font)`,
-  }));
+  const [recentFonts, setRecentFonts] = useState<string[]>(loadRecentSystemFonts);
+  const systemFonts = useSystemFonts(showSystemFonts && showTheme);
+  const fontOptions = buildPanelFontOptions(
+    showSystemFonts
+      ? { status: systemFonts.status, families: systemFonts.families, onLoad: () => { void loadSystemFonts(); } }
+      : null,
+    theme.font,
+    {
+      bundled: label('panel.settings.font.bundled', 'Bundled'),
+      system: label('panel.settings.font.system', 'System'),
+      recent: t('search.section.recent') || 'Recent',
+      load: label('panel.settings.font.system.load', 'Load system fonts'),
+      loading: label('panel.settings.font.system.loading', 'Loading system fonts'),
+      empty: label('panel.settings.font.system.empty', 'No system fonts found'),
+    },
+    recentFonts,
+  );
   const textColorDescription = theme.textColorMode === 'custom'
     ? label('panel.settings.textColor.custom.desc', 'One color for all widget text, accent text included')
     : theme.textColorMode === 'theme'
@@ -254,6 +330,8 @@ export function PanelThemeSettings({
   // EffectEditor shell) so the preview + tab bars + chips can sit in one
   // sticky dock while the grid / controls scroll with the page.
   const [editorTab, setEditorTab] = useState<'options' | 'effect'>('options');
+  const [effectQuery, setEffectQuery] = useState('');
+  const visibleEditorTab = backgroundSubstituted ? OPTIONS_TAB : editorTab;
 
   // The same Options | Effect editing surface as the immersive lighting view,
   // here targeting this panel's per-device background effect (animate-only).
@@ -261,7 +339,7 @@ export function PanelThemeSettings({
     effect: backgroundEffect,
     template: backgroundTemplate,
     templatesByEffect: theme.backgroundTemplates,
-    effectState: theme.backgroundEffectState,
+    effectState: backgroundEffectState,
     onSelectEffect: onBackgroundEffectCommit,
     onTemplateSelect: onBackgroundTemplateCommit,
     onPreview: onBackgroundEffectStatePreview,
@@ -281,13 +359,15 @@ export function PanelThemeSettings({
       fullWidth
       options={[
         // eslint-disable-next-line i18next/no-literal-string -- background-mode enum id
+        ...(offersSkinBackground(theme) ? [{ key: 'skin', label: label('skin.title', 'Skin') }] : []),
+        // eslint-disable-next-line i18next/no-literal-string -- background-mode enum id
         { key: 'solid', label: label('panel.settings.backgroundMode.solid', 'Solid') },
         // eslint-disable-next-line i18next/no-literal-string -- background-mode enum id
         { key: 'shader', label: label('panel.settings.backgroundMode.animations', 'Animations') },
         // eslint-disable-next-line i18next/no-literal-string -- background-mode enum id
         ...(showMediaTab ? [{ key: 'media', label: label('panel.settings.backgroundMode.media', 'Media') }] : []),
       ]}
-      activeKey={theme.backgroundMode}
+      activeKey={bgMode}
       onChange={key => onBackgroundModeCommit(key as PanelBackgroundMode)}
       ariaLabel={label('panel.settings.backgroundMode', 'Background mode')}
     />
@@ -320,8 +400,9 @@ export function PanelThemeSettings({
 
   return (
     <div className={styles.themePanel}>
-      {showTheme && (!hideWidgetLabelsToggle || !hideWidgetChromeControls) && (
+      {showTheme && (!hideWidgetLabelsToggle || !hideWidgetChromeControls || widgetScaleRow) && (
         <SettingsSection title={label('panel.settings.widgets', 'Widgets')} boxClassName={styles.themeBox}>
+          {widgetScaleRow}
           {!hideWidgetLabelsToggle && (
             <SettingToggle
               label={label('panel.settings.widgetLabels', 'Widget labels')}
@@ -392,6 +473,19 @@ export function PanelThemeSettings({
       )}
 
       {showTheme && (
+      <SettingsSection title={label('skin.title', 'Skin')}>
+        <SkinPicker
+          value={theme.skin}
+          overrides={theme.skinOverrides}
+          mode={resolvedThemeMode}
+          baseStyle={buildPanelThemeVars({ ...theme, skin: null }, resolvedThemeMode)}
+          onReset={onSkinReset}
+          onChange={onSkinCommit}
+        />
+      </SettingsSection>
+      )}
+
+      {showTheme && (
       <SettingsSection title={label('panel.settings.text', 'Text')} boxClassName={styles.themeBox}>
         <div className={styles.toggleReveal}>
           <SettingRow
@@ -419,9 +513,14 @@ export function PanelThemeSettings({
         </div>
         <SettingSelect
           label={label('panel.settings.font', 'Font')}
-          value={theme.font ?? DEFAULT_PANEL_FONT}
+          value={skin ? skin.font : theme.font ?? DEFAULT_PANEL_FONT}
           options={fontOptions}
-          onChange={value => onFontCommit(value === DEFAULT_PANEL_FONT ? null : value as PanelFontId)}
+          onChange={value => {
+            const family = systemFontFamily(value);
+            if (family) setRecentFonts(pushRecentSystemFont(family));
+            // Under a skin every pick is stored as is, so Lexend stays a choice instead of snapping back to the skin's face.
+            onFontCommit(!skin && value === DEFAULT_PANEL_FONT ? null : value as PanelFont);
+          }}
         />
       </SettingsSection>
       )}
@@ -429,16 +528,18 @@ export function PanelThemeSettings({
       {showTheme && (
       <SettingsSection title={label('devices.y70.theme.accent', 'Accent Color')} boxClassName={styles.themeBox}>
         <div className={styles.toggleReveal}>
-          <SettingToggle
-            label={syncWithDesktopLabel}
-            checked={theme.accentSyncWithDesktop}
-            onChange={onAccentSyncCommit}
-          />
-          {!theme.accentSyncWithDesktop && (
+          {!skin && (
+            <SettingToggle
+              label={syncWithDesktopLabel}
+              checked={theme.accentSyncWithDesktop}
+              onChange={onAccentSyncCommit}
+            />
+          )}
+          {(skin || !theme.accentSyncWithDesktop) && (
             <ColorPickerWithPresets
-              value={theme.accentColor || theme.appAccentColor}
+              value={skin?.accent ?? (theme.accentColor || theme.appAccentColor)}
               presets={PRESET_ACCENTS}
-              fallback={theme.appAccentColor || DEFAULT_ACCENT}
+              fallback={skin?.def.accent ?? (theme.appAccentColor || DEFAULT_ACCENT)}
               onPreview={onAccentPreview}
               onCommit={onAccentCommit}
               allowCustom
@@ -470,12 +571,14 @@ export function PanelThemeSettings({
                 />
               </SettingRow>
             )}
-            <SettingToggle
-              label={label('panel.settings.immersiveBackdrop', 'Immersive background')}
-              description={label('panel.settings.immersiveBackdrop.desc', 'Turn off to see your background through immersive views')}
-              checked={theme.immersiveBackdrop}
-              onChange={onImmersiveBackdropCommit}
-            />
+            {showImmersiveBackdrop && (
+              <SettingToggle
+                label={label('panel.settings.immersiveBackdrop', 'Immersive background')}
+                description={label('panel.settings.immersiveBackdrop.desc', 'Turn off to see your background through immersive views')}
+                checked={theme.immersiveBackdrop}
+                onChange={onImmersiveBackdropCommit}
+              />
+            )}
             {/* Frost and opacity stay visible under every backdrop, which
                 hides the theme-only mode controls below. */}
             <SettingSlider
@@ -499,10 +602,19 @@ export function PanelThemeSettings({
               }}
               onCommit={onBackgroundFrostCommit}
             />
-            {theme.backdrop === 'desktop' ? null : backgroundOpacitySlider}
+            {theme.backdrop === 'desktop' ? null : (
+              <>
+                {backgroundOpacitySlider}
+                {backgroundOpacityPercent === 0 && (
+                  <Notice tone="info" role="status">{label('panel.settings.backgroundOpacity.off', "The background isn't rendering.")}</Notice>
+                )}
+              </>
+            )}
             {theme.backdrop !== 'theme' ? null : (
             <>
-            {theme.backgroundMode === 'solid' ? (
+            {bgMode === 'skin' ? (
+              backgroundModeChips
+            ) : bgMode === 'solid' ? (
               <>
                 {backgroundModeChips}
                 <ColorPickerWithPresets
@@ -514,13 +626,14 @@ export function PanelThemeSettings({
                   allowCustom
                 />
               </>
-            ) : theme.backgroundMode === 'media' ? (
+            ) : bgMode === 'media' ? (
               <>
                 {backgroundModeChips}
                 <BackgroundMediaPicker
                   deviceId={deviceId ?? ''}
                   activeId={theme.backgroundMediaId}
                   deviceAspect={deviceAspect}
+                  round={roundDisplay}
                   deviceW={deviceW ?? Math.round(deviceAspect * 1280)}
                   deviceH={deviceH ?? 1280}
                   onSelect={(mediaId, type, alpha) => onBackgroundMediaCommit(mediaId, type, alpha)}
@@ -542,7 +655,8 @@ export function PanelThemeSettings({
                   <BackgroundEffectPreview
                     effect={backgroundEffect}
                     template={backgroundTemplate}
-                    effectState={theme.backgroundEffectState}
+                    effectState={backgroundEffectState}
+                    audioReactive={audioReactive}
                   />
                   <ChipGroup
                     fullWidth
@@ -550,18 +664,27 @@ export function PanelThemeSettings({
                       // eslint-disable-next-line i18next/no-literal-string -- editor tab id
                       { key: 'options', label: t('lighting.editor.options') },
                       // eslint-disable-next-line i18next/no-literal-string -- editor tab id
-                      { key: 'effect', label: t('lighting.rightPane.effect') },
+                      ...(backgroundSubstituted ? [] : [{ key: 'effect', label: t('lighting.rightPane.effect') }]),
                     ]}
-                    activeKey={editorTab}
+                    activeKey={visibleEditorTab}
                     onChange={key => setEditorTab(key as 'options' | 'effect')}
                     ariaLabel={t('lighting.rightPane.label')}
                   />
+                  {showEffectSearch && (backgroundSubstituted || editorTab === 'options') && (
+                    <SearchInput
+                      value={effectQuery}
+                      onChange={setEffectQuery}
+                      placeholder={t('lighting.effects.search')}
+                      ariaLabel={t('lighting.effects.search')}
+                    />
+                  )}
                 </div>
-                {editorTab === 'options' ? (
+                {backgroundSubstituted || editorTab === 'options' ? (
                   <AnimateGrid
                     effect={backgroundEffect}
                     onSelect={onBackgroundEffectCommit}
-                    effects={PANEL_BACKGROUND_EFFECTS}
+                    effects={audioReactive ? PANEL_BACKGROUND_EFFECTS_WITH_AUDIO : PANEL_BACKGROUND_EFFECTS}
+                    query={showEffectSearch ? effectQuery : undefined}
                     slotFor={backgroundController.slotFor}
                     versionFor={backgroundController.versionFor}
                     rgbActiveEffect={backgroundController.rgbActiveEffect}

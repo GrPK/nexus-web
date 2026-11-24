@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Button } from '../Button/Button';
+import { useSkinPortalHost } from '../ThemeScope/PanelSkinScope';
 import styles from './Coachmark.module.scss';
 
 export type CoachmarkSide = 'top' | 'bottom' | 'left' | 'right';
@@ -130,6 +131,10 @@ function resolveBoundary(boundary: CoachmarkBoundary | undefined, viewport: Boun
   };
 }
 
+// Frames the target must hold still, and the longest a follow may run.
+const FOLLOW_STILL_FRAMES = 6;
+const FOLLOW_MAX_MS = 1500;
+
 /**
  * THE standard way to show a one-time onboarding hint. Do not build a banner
  * or a one-off bubble for a hint; point this at the real control instead.
@@ -154,7 +159,9 @@ function resolveBoundary(boundary: CoachmarkBoundary | undefined, viewport: Boun
 export function Coachmark({ hintId, target, title, body, dismissLabel, onDismiss, placement = 'bottom', boundary }: CoachmarkProps) {
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const [placed, setPlaced] = useState<Placed | null>(null);
-  const [root, setRoot] = useState<HTMLElement>(() => document.body);
+  const skinHost = useSkinPortalHost();
+  const [stackRoot, setRoot] = useState<HTMLElement>(() => document.body);
+  const root = stackRoot === document.body && skinHost ? skinHost : stackRoot;
   const [announcement, setAnnouncement] = useState('');
   const announced = useRef(false);
   const targetInView = useRef(true);
@@ -213,14 +220,43 @@ export function Coachmark({ hintId, target, title, body, dismissLabel, onDismiss
       reposition();
     };
     sync();
-    const dom = new MutationObserver(sync);
-    dom.observe(document.body, { childList: true, subtree: true });
+    // A class toggle can move the page without resizing anything, so it gets
+    // a bounded per-frame follow.
+    let raf = 0;
+    let startedAt = 0;
+    let still = 0;
+    let last = '';
+    const tick = () => {
+      reposition();
+      const r = resolveTarget(target)?.getBoundingClientRect();
+      const key = r ? `${r.left},${r.top},${r.width},${r.height}` : '';
+      still = key === last ? still + 1 : 0;
+      last = key;
+      raf = still < FOLLOW_STILL_FRAMES && performance.now() - startedAt < FOLLOW_MAX_MS ? requestAnimationFrame(tick) : 0;
+    };
+    const follow = () => {
+      still = 0;
+      if (raf) return;
+      startedAt = performance.now();
+      last = '';
+      raf = requestAnimationFrame(tick);
+    };
+    const dom = new MutationObserver(records => {
+      if (records.some(r => r.type === 'childList')) sync();
+      if (records.some(r => r.type === 'attributes')) follow();
+    });
+    dom.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('transitionrun', follow, true);
+    document.addEventListener('transitionend', follow, true);
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', reposition, true);
     return () => {
       ro.disconnect();
       io?.disconnect();
       dom.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+      document.removeEventListener('transitionrun', follow, true);
+      document.removeEventListener('transitionend', follow, true);
       window.removeEventListener('resize', reposition);
       window.removeEventListener('scroll', reposition, true);
     };
@@ -246,6 +282,7 @@ export function Coachmark({ hintId, target, title, body, dismissLabel, onDismiss
       <div
         ref={bubbleRef}
         className={`${styles.bubble} ${placed ? styles[placed.side] : ''}`}
+        data-skin-part="surface"
         role="region"
         aria-labelledby={titleId}
         aria-describedby={body ? bodyId : undefined}

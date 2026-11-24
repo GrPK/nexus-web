@@ -8,7 +8,7 @@ import type { GaugeDesignKey } from './gauges';
 //
 // 'gpu2' (discrete cards beyond the primary), 'igpu' (the integrated GPU
 // beside a discrete primary), 'smart' (LHM SSD SMART, storage topic) and the
-// extras-topic categories ('memoryModule', 'battery', 'cooler', 'psu',
+// extras-topic categories ('memoryModule', 'battery', 'cooler', 'fanSensors', 'psu',
 // 'embeddedController') are widget-only: they are deliberately NOT part of
 // sensorCategories.ts' SENSOR_CATEGORIES, so the Tryx overlay picker (which
 // mirrors that shared set) never offers them - see useSensors.storageSensors
@@ -16,13 +16,13 @@ import type { GaugeDesignKey } from './gauges';
 // sensorCategories.gpu2Components / igpuComponents for the two GPU ones.
 export type DeviceKey =
   | 'quick' | 'cpu' | 'gpu' | 'gpu2' | 'igpu' | 'memory' | 'motherboard' | 'fan' | 'storage' | 'network' | 'fps'
-  | 'smart' | 'memoryModule' | 'battery' | 'cooler' | 'psu' | 'embeddedController';
+  | 'smart' | 'memoryModule' | 'battery' | 'cooler' | 'fanSensors' | 'psu' | 'embeddedController';
 
 // DeviceKeys resolved from the "extras" topic (useSensorExtras), as opposed
 // to the always-on "storage"/summary topics. Widgets gate their extras
 // subscription on whether any active slot uses one of these.
 export const EXTRAS_DEVICE_KEYS: readonly DeviceKey[] = [
-  'memoryModule', 'battery', 'cooler', 'psu', 'embeddedController',
+  'memoryModule', 'battery', 'cooler', 'fanSensors', 'psu', 'embeddedController',
 ];
 
 export function isExtrasBackedDevice(device: DeviceKey): boolean {
@@ -50,8 +50,25 @@ export const MICRO_WIDE_COUNTS = [6, 8] as const;
 // style: Progress Bar (caption over a thin fill track), Fill (value fill
 // sweeping the whole row behind the caption), and Backdrop (dim filled history
 // graph behind the caption). Rendered by MicroBar, not the tile GaugeComponents.
-export const MICRO_DESIGN_KEYS: GaugeDesignKey[] = ['bar', 'fill', 'backdrop'];
-export const DEFAULT_MICRO_DESIGN: GaugeDesignKey = 'bar';
+// 'simple' is Micro-only: label above value, no track, fill, or graph.
+export type MicroDesignKey = Extract<GaugeDesignKey, 'bar' | 'fill' | 'backdrop'> | 'simple';
+export const MICRO_DESIGN_KEYS: MicroDesignKey[] = ['bar', 'fill', 'backdrop', 'simple'];
+export const DEFAULT_MICRO_DESIGN: MicroDesignKey = 'bar';
+
+export function microDesignOf(config: Record<string, PanelConfigValue> | undefined): MicroDesignKey {
+  const raw = config?.micro_design;
+  return (MICRO_DESIGN_KEYS as unknown[]).includes(raw) ? (raw as MicroDesignKey) : DEFAULT_MICRO_DESIGN;
+}
+
+// Text alignment of the 'simple' design's label and value (`micro_align`).
+export type MicroAlign = 'left' | 'center' | 'right';
+export const MICRO_ALIGN_KEYS: MicroAlign[] = ['left', 'center', 'right'];
+export const DEFAULT_MICRO_ALIGN: MicroAlign = 'left';
+
+export function microAlignOf(config: Record<string, PanelConfigValue> | undefined): MicroAlign {
+  const raw = config?.micro_align;
+  return (MICRO_ALIGN_KEYS as unknown[]).includes(raw) ? (raw as MicroAlign) : DEFAULT_MICRO_ALIGN;
+}
 
 // Multi-device Micro: each row picks its own device (`micro_device{N}`, falling
 // back to the shared `micro_device`) and the bottom device caption is dropped.
@@ -87,6 +104,28 @@ export function defaultSlotDesign(size: PanelWidgetSize, slotIndex: number, layo
   if (layout && isSmallCell(size, layout, slotIndex)) return HERO_SMALL_DESIGN_KEYS[0];
   if (size === '2x2round') return DEFAULT_ROUND_DESIGN;
   return DEFAULT_SLOTS[slotIndex]?.design ?? DEFAULT_DESIGN;
+}
+
+// Designs stamped into a NEWLY created monitoring widget. DEFAULT_SLOTS stays
+// the render-time fallback for configs with no stored design, so widgets saved
+// before this change keep the look they already have.
+const NEW_WIDGET_DESIGNS: Record<number, GaugeDesignKey> = {
+  0: 'backdrop', // CPU usage
+  1: 'caterpillar', // memory usage
+  2: 'backdrop', // CPU temperature
+  6: 'backdrop', // CPU clock
+};
+
+// Initial slot designs for a widget added at `size`. The round glass keeps its
+// own ring default, and each slot is limited to the slots the size starts with.
+export function newWidgetSlotDesigns(size: PanelWidgetSize): Record<string, PanelConfigValue> {
+  if (size === '2x2round') return {};
+  const config: Record<string, PanelConfigValue> = {};
+  const count = defaultSlotCountForSize(size);
+  for (const [slot, design] of Object.entries(NEW_WIDGET_DESIGNS)) {
+    if (Number(slot) < count) config[`slot${slot}_design`] = design;
+  }
+  return config;
 }
 
 // Default slot count for a freshly-resized widget when no explicit count is
@@ -335,8 +374,7 @@ export function resolveSlotDesign(
 }
 
 // Whether this design on this size fills the round glass edge to edge, so the
-// tile drops its padding and scales the figure by the reciprocal of the card's
-// fit. Shared by the live tile and the catalog preview.
+// tile scales as one unit to the rim. Shared by the live tile and the catalog preview.
 export function designFillsRoundFrame(size: PanelWidgetSize, design: GaugeDesignKey): boolean {
   return size === '2x2round' && FRAME_FILLING_DESIGNS.has(design);
 }

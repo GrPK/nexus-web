@@ -4,11 +4,11 @@ import { TelemetryReference } from './telemetry/reference/TelemetryReference';
 import { I18nProvider } from './lib/i18n';
 import { SIMULATOR_QUERY_FLAG } from './panel/embed/simulatorProtocol';
 import {
-  OverlayWrapper,
   PanelEntrypoint,
   PanelSimulatorWrapper,
 } from './app/PanelEntrypoint';
 import { RESERVED_PANEL_PATH_SEGMENTS, shouldForcePhonePanelRoute } from './app/panelRouting';
+import { panelSurfaceHint } from './panel/device/inferSurface';
 import { Dashboard } from './app/Dashboard';
 import { isRemoteOrigin, setForceLanMode } from './api/service';
 import { isWindowsAppShell, isMacAppShell } from './app/windowActions';
@@ -94,27 +94,15 @@ export default function App() {
   // Nexus app directly when installed; otherwise this landing page
   // offers App Store + LAN-redirect fallbacks.
   if (path === '/r/pair') {
-    return <PairRedirect />;
+    return <I18nProvider><PairRedirect /></I18nProvider>;
   }
 
-  // Product-telemetry event catalog (what we send to PostHog), opened from the
+  // Product-telemetry event catalog (what we send), opened from the
   // Dev tools page.
   if (path === '/telemetry-reference') {
     return (
       <I18nProvider>
         <TelemetryReference />
-      </I18nProvider>
-    );
-  }
-
-  // /overlay is hosted by nexus-overlay.exe (transparent layered window
-  // per monitor). Loads with ?monitor=N&token=... so each overlay renders
-  // its own slice of the shared overlayLayout.
-  if (path === '/overlay') {
-    consumeUrlToken(new URLSearchParams(window.location.search));
-    return (
-      <I18nProvider>
-        <OverlayWrapper />
       </I18nProvider>
     );
   }
@@ -149,7 +137,8 @@ export default function App() {
     const second = segments[1];
     const isPhonePair = second === 'phone';
     const explicitDeviceId = second && !RESERVED_PANEL_PATH_SEGMENTS.has(second) ? second : null;
-    const surfaceHint = !isPhonePair && params.get('surface') === 'y70' ? 'y70' : null;
+    // The phone path is its own hint; the legacy /panel/q60 path declares q60.
+    const surfaceHint = isPhonePair ? null : second === 'q60' ? 'q60' : panelSurfaceHint(params.get('surface'));
     return (
       <I18nProvider>
         <PanelEntrypoint

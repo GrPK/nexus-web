@@ -7,12 +7,14 @@ import {
   setLightingDeviceControlled,
   setPins,
   startAnimate,
+  setAnimateSimple,
   startStatic,
   type LightingDevice,
 } from '../../../api/lighting';
 import { paletteColor } from '../../../types/lightingPalette';
 import { completeLightingOnboarding } from '../../../api/onboarding';
 import { useConflictApps } from '../../../hooks/useConflictApps';
+import { useZoneSizeDeviceIds } from '../../../hooks/useZoneSizeDeviceIds';
 
 vi.mock('../../../api/lighting', () => ({
   fetchLightingDevices: vi.fn(),
@@ -21,6 +23,10 @@ vi.mock('../../../api/lighting', () => ({
   // ZoneCard's identify affordance; unused in toggleMode but imported.
   identifyLightingDevice: vi.fn(),
   startAnimate: vi.fn(),
+  setAnimateSimple: vi.fn(() => Promise.resolve(null)),
+  fetchAnimateSettings: vi.fn(() => Promise.resolve({ templates: {} })),
+  fetchAnimateDefaults: vi.fn(() => Promise.resolve({})),
+  saveAnimateTemplates: vi.fn(() => Promise.resolve(null)),
   startStatic: vi.fn(),
   setPins: vi.fn(),
 }));
@@ -39,6 +45,10 @@ vi.mock('../../../api/onboarding', () => ({
 
 vi.mock('../../../hooks/useConflictApps', () => ({
   useConflictApps: vi.fn(),
+}));
+
+vi.mock('../../../hooks/useZoneSizeDeviceIds', () => ({
+  useZoneSizeDeviceIds: vi.fn(),
 }));
 
 vi.mock('../../../lib/i18n', () => ({
@@ -77,6 +87,7 @@ function chooseAdvanced() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(useConflictApps).mockReturnValue({ conflicts: [], ready: true });
+  vi.mocked(useZoneSizeDeviceIds).mockReturnValue(new Set());
   vi.mocked(setLightingDeviceControlled).mockResolvedValue(null);
   vi.mocked(setPins).mockResolvedValue(true);
 });
@@ -228,6 +239,17 @@ describe('LightingOnboardingScreen - device grid', () => {
     render(<LightingOnboardingScreen open onComplete={vi.fn()} />);
     expect(await screen.findByText('lighting.devices.empty')).toBeInTheDocument();
   });
+
+  it('tells an unsized OpenRGB device its LED counts come after setup', async () => {
+    const unsized: LightingDevice = { ...strip, id: 'openrgb-2', name: 'Test Controller', ledCount: 0 };
+    const broken: LightingDevice = { ...strip, id: 'openrgb-3', name: 'Test Broken', ledCount: 0 };
+    vi.mocked(useZoneSizeDeviceIds).mockReturnValue(new Set(['openrgb-2']));
+    seed([unsized, broken]);
+    renderScreen();
+
+    expect(await screen.findByText('lighting.devices.setLedCountsAfterSetup')).toBeInTheDocument();
+    expect(screen.getAllByText('lighting.devices.detectionFailed')).toHaveLength(1);
+  });
 });
 
 
@@ -243,6 +265,30 @@ describe('LightingOnboardingScreen - continue flow', () => {
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     expect(completeLightingOnboarding).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['simple', false, true],
+    ['advanced', true, false],
+  ])('in %s mode the rainbow start and Continue both carry the chosen mapping', async (_mode, goAdvanced, simple) => {
+    seed([strip]);
+    vi.mocked(completeLightingOnboarding).mockResolvedValue({ completed: true, lightingCompleted: true });
+    const onComplete = renderScreen();
+    if (goAdvanced) chooseAdvanced();
+    await screen.findByRole('switch', { name: 'Test Strip' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.simpleblue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.rainbow' }));
+    await waitFor(() => expect(startAnimate).toHaveBeenCalledTimes(1));
+    // The trailing argument is the mapping flag; named placeholders keep a reorder from passing silently.
+    expect(startAnimate).toHaveBeenCalledWith(
+      'rainbow', expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number),
+      expect.any(Number), expect.any(Number), expect.anything(), true, undefined, simple,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.finish' }));
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    expect(setAnimateSimple).toHaveBeenCalledWith(simple);
   });
 
   it('shows the error message and never calls onComplete when the write fails', async () => {
@@ -291,7 +337,7 @@ describe('LightingOnboardingScreen colour test strip', () => {
     await screen.findByRole('switch', { name: 'Test Strip' });
 
     const swatches = screen.getByRole('group', { name: 'lightingOnboarding.testColors' }).querySelectorAll('button');
-    expect(swatches[0]).toHaveAccessibleName('lighting.simple.anim.rainbow');
+    expect(swatches[0]).toHaveAccessibleName('lighting.controls.rainbow');
     expect(swatches[0]).toHaveAttribute('aria-pressed', 'true');
     expect(startAnimate).not.toHaveBeenCalled();
     expect(startStatic).not.toHaveBeenCalled();
@@ -332,11 +378,11 @@ describe('LightingOnboardingScreen colour test strip', () => {
     await screen.findByRole('switch', { name: 'Test Strip' });
 
     fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.simpleblue' }));
-    const rainbow = screen.getByRole('button', { name: 'lighting.simple.anim.rainbow' });
+    const rainbow = screen.getByRole('button', { name: 'lighting.controls.rainbow' });
     fireEvent.click(rainbow);
 
     await waitFor(() => expect(startAnimate).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(startAnimate).mock.calls[0].slice(0, 2)).toEqual(['sweeprainbow', 50]);
+    expect(vi.mocked(startAnimate).mock.calls[0].slice(0, 2)).toEqual(['rainbow', 50]);
     expect(rainbow).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -347,7 +393,7 @@ describe('LightingOnboardingScreen colour test strip', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.simplered' }));
     fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.simpleblue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'lighting.simple.anim.rainbow' }));
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.rainbow' }));
 
     await waitFor(() => expect(startAnimate).toHaveBeenCalledTimes(1));
     // The superseded colours never reach the lights, so none can land late.
@@ -416,6 +462,26 @@ describe('LightingOnboardingScreen colour test strip', () => {
     }
   });
 
+  it('keeps polling until OpenRGB is running, then stops', async () => {
+    vi.useFakeTimers();
+    try {
+      seed([strip], false, true, false);
+      render(<LightingOnboardingScreen open onComplete={vi.fn()} />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      const before = vi.mocked(fetchLightingDevices).mock.calls.length;
+      await act(async () => { await vi.advanceTimersByTimeAsync(6000); });
+      expect(vi.mocked(fetchLightingDevices).mock.calls.length).toBeGreaterThan(before);
+
+      seed([strip], false, true, true);
+      await act(async () => { await vi.advanceTimersByTimeAsync(6000); });
+      const settled = vi.mocked(fetchLightingDevices).mock.calls.length;
+      await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+      expect(vi.mocked(fetchLightingDevices).mock.calls.length).toBe(settled);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps polling while a scan is still running', async () => {
     vi.useFakeTimers();
     try {
@@ -476,7 +542,7 @@ describe('LightingOnboardingScreen mode choice', () => {
     expect(await screen.findByRole('button', { name: 'lighting.ledMap.selectAll' })).toBeDisabled();
   });
 
-  it('Simple drives every device, putting back any the user had switched off', async () => {
+  it('Simple leaves a device the user switched off uncontrolled', async () => {
     seed([{ ...strip, controlled: false }]);
     const onComplete = renderScreen();
     // Continue reads the device list, which lands after the mode radios.
@@ -485,7 +551,7 @@ describe('LightingOnboardingScreen mode choice', () => {
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.finish' }));
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
-    expect(setLightingDeviceControlled).toHaveBeenCalledWith('openrgb-0', true);
+    expect(setLightingDeviceControlled).not.toHaveBeenCalled();
   });
 
   it('offers only Simple and Advanced', async () => {

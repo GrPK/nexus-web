@@ -73,6 +73,9 @@ vi.mock('../../../api/cooling', async (importOriginal) => {
 });
 
 import { saveCurves } from '../../../api/cooling';
+import { allowSlowAsyncUtils } from '../../../__tests__/slowAsyncUtils';
+
+allowSlowAsyncUtils();
 
 const serviceState = { cooling: { calibrating: false } } as unknown as ServiceState;
 
@@ -104,7 +107,7 @@ const editorGroup = () => screen.getByRole('radiogroup', { name: 'cooling.curve.
 
 /** The curve type the editor is currently showing. */
 const editorType = () =>
-  screen.getAllByRole('radio')
+  within(editorGroup()).getAllByRole('radio')
     .find(r => r.getAttribute('aria-checked') === 'true')
     ?.getAttribute('aria-label') ?? null;
 

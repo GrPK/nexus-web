@@ -1,30 +1,33 @@
-import { Activity, Stethoscope, Thermometer } from 'lucide-react';
+import { Activity, HardDrive, Stethoscope, Zap } from 'lucide-react';
 import { Badge } from '../../common/Badge/Badge';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
-import { SettingRow, SettingToggle } from '../../common/SettingRow/SettingRow';
-import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
+import { SettingToggle } from '../../common/SettingRow/SettingRow';
 import { MonitoringEventsSettings } from '../../../panel/widgets/monitoring/page/MonitoringEventsSettings';
+import { DiagnosticsNotificationsSection, DiagnosticsResetSection } from './DiagnosticsSettingsSections';
 import { SmartPollSection } from './SmartPollSection';
+import { RamTemperatureSection } from './RamTemperatureSection';
+import { useUiSettings } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
 import type { NexusSettings } from '../../../lib/settings';
-import type { TempUnit } from '../../../lib/units';
 import styles from './SettingsView.module.scss';
 
 export interface MonitoringTabProps {
   settings: NexusSettings;
   updateGeneral: (patch: Partial<NexusSettings['general']>) => void;
   serviceOnline: boolean;
+  onOpenDevices?: () => void;
 }
 
-export function MonitoringTab({ settings, updateGeneral, serviceOnline }: MonitoringTabProps) {
+export function MonitoringTab({ settings, updateGeneral, serviceOnline, onOpenDevices }: MonitoringTabProps) {
   const { t } = useTranslation();
+  const { settings: ui, update } = useUiSettings();
 
   return (
     <div className={styles.tabPanel}>
       <SettingsSection title={t('settings.features.title')}>
         <SettingToggle
           label={t('settings.features.monitoring.label')}
-          labelSuffix={<Badge label={t('settings.features.master')} color="var(--accent)" uppercase />}
+          labelSuffix={<Badge label={t('settings.features.master')} color="var(--accent)" />}
           description={t('settings.features.monitoring.description')}
           icon={<Activity />}
           iconLeading="subtle"
@@ -34,7 +37,7 @@ export function MonitoringTab({ settings, updateGeneral, serviceOnline }: Monito
         />
         <SettingToggle
           label={t('settings.features.diagnostics.label')}
-          labelSuffix={<Badge label={t('settings.features.master')} color="var(--accent)" uppercase />}
+          labelSuffix={<Badge label={t('settings.features.master')} color="var(--accent)" />}
           description={t('settings.features.diagnostics.description')}
           icon={<Stethoscope />}
           iconLeading="subtle"
@@ -44,31 +47,42 @@ export function MonitoringTab({ settings, updateGeneral, serviceOnline }: Monito
         />
       </SettingsSection>
 
-      <SettingsSection>
-        <SettingRow
-          label={t('settings.units.temperature.label')}
-          icon={<Thermometer />}
+      <SettingsSection title={t('settings.hardwareSensors.title')}>
+        <SettingToggle
+          label={t('settings.powerMonitors.label')}
+          description={t('settings.powerMonitors.description')}
+          icon={<Zap />}
           iconLeading="subtle"
-          anchorId="set-temp-unit"
-          description={t('settings.units.temperature.description')}
-        >
-          <ChipGroup
-            ariaLabel={t('settings.units.temperature.label')}
-            activeKey={settings.general.monitoringTempUnit}
-            onChange={k => updateGeneral({ monitoringTempUnit: k as TempUnit })}
-            options={[
-              // eslint-disable-next-line i18next/no-literal-string -- temperature unit enum value
-              { key: 'c', label: t('settings.units.temperature.celsius') },
-              // eslint-disable-next-line i18next/no-literal-string -- temperature unit enum value
-              { key: 'f', label: t('settings.units.temperature.fahrenheit') },
-            ]}
-          />
-        </SettingRow>
+          anchorId="set-power-monitors"
+          checked={ui.powerMonitorsEnabled}
+          onChange={v => update({ powerMonitorsEnabled: v })}
+          disabled={!serviceOnline}
+        />
       </SettingsSection>
 
       <MonitoringEventsSettings />
 
+      <RamTemperatureSection serviceOnline={serviceOnline} onOpenDevices={onOpenDevices} />
+
+      <SettingsSection title={t('settings.driveActivity.title')}>
+        <SettingToggle
+          label={t('settings.driveActivity.label')}
+          description={t('settings.driveActivity.description')}
+          icon={<HardDrive />}
+          iconLeading="subtle"
+          anchorId="set-live-drive-activity"
+          checked={ui.liveDriveActivity}
+          onChange={v => update({ liveDriveActivity: v })}
+          disabled={!serviceOnline}
+        />
+      </SettingsSection>
+
       <SmartPollSection serviceOnline={serviceOnline} />
+
+
+      <DiagnosticsNotificationsSection />
+
+      <DiagnosticsResetSection />
     </div>
   );
 }
