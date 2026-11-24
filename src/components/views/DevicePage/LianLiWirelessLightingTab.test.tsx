@@ -89,6 +89,30 @@ describe('LianLiWirelessLightingTab', () => {
     expect(screen.getByText('devices.lianli-wireless.fanTypeSlv3Lcd')).toBeInTheDocument();
   });
 
+  it('counts a fan chain\'s screens after its name and reports the names', async () => {
+    const one = { ...fanChain, mac: 'ONE', fanCount: 1 };
+    const bare = { ...fanChain, mac: 'BARE', fanType: 28 };
+    const screens: Record<string, number> = { [fanChain.mac]: 3, ONE: 1 };
+    const onNames = vi.fn();
+    mockGetStrimers.mockResolvedValue({ ...catalog, chains: [strimer, fanChain, one, bare] });
+    await act(async () => {
+      render(<LianLiWirelessLightingTab screensOf={c => screens[c.mac] ?? 0} onNames={onNames} />);
+    });
+    const three = 'devices.lianli-hub.chainScreens:{"name":"devices.lianli-wireless.fanTypeSlv3Lcd","count":3}';
+    const single = 'devices.lianli-hub.chainOneScreen:{"name":"devices.lianli-wireless.fanTypeSlv3Lcd 2"}';
+    expect(screen.getByText('Strimer 24-Pin')).toBeInTheDocument();
+    expect(screen.getByText(three)).toBeInTheDocument();
+    expect(screen.getByText(single)).toBeInTheDocument();
+    expect(screen.getByText('devices.lianli-wireless.fanTypeTlv2')).toBeInTheDocument();
+    expect(onNames).toHaveBeenCalledTimes(1);
+    expect([...onNames.mock.calls[0][0]]).toEqual([
+      [strimer.mac, 'Strimer 24-Pin'],
+      [fanChain.mac, three],
+      ['BARE', 'devices.lianli-wireless.fanTypeTlv2'],
+      ['ONE', single],
+    ]);
+  });
+
   it('offers a fan chain its own catalog and no per-lane mode', async () => {
     await renderTab({ ...catalog, chains: [fanChain] });
     fireEvent.click(screen.getByLabelText('devices.lianli.lightingMode'));

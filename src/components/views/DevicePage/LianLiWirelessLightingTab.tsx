@@ -46,6 +46,14 @@ function chainTitle(t: Translate, chain: LianLiWirelessChainLighting): string {
     : t(`devices.lianli-wireless.${fanTypeKey(chain.fanType)}` as Parameters<Translate>[0]);
 }
 
+/** A fan chain's name with its screens counted; a chain without screens keeps its name. */
+function withScreenCount(t: Translate, name: string, screens: number): string {
+  if (screens <= 0) return name;
+  return screens === 1
+    ? t('devices.lianli-hub.chainOneScreen', { name })
+    : t('devices.lianli-hub.chainScreens', { name, count: screens });
+}
+
 /** The P28 V2 receiver: always driven by the Lighting page, with no stored effects, merge or motherboard ARGB. */
 export const isP28Chain = (chain: LianLiWirelessChainLighting, flex: boolean): boolean =>
   flex && (chain.family ? chain.family === 'p28v2' : fanTypeKey(chain.fanType) === 'fanTypeP28v2');
@@ -89,10 +97,14 @@ interface LianLiWirelessLightingTabProps {
    */
   chainFilter?: (chain: LianLiWirelessChainLighting) => boolean;
   chainOrder?: (a: LianLiWirelessChainLighting, b: LianLiWirelessChainLighting) => number;
+  /** The screens on a chain, counted after its name ("TL LCD Wireless Fans (3 screens)"); none by default. */
+  screensOf?: (chain: LianLiWirelessChainLighting) => number;
+  /** Runs with each chain's name on this page (by MAC) when the names change, for views that name the chains alike. */
+  onNames?: (names: ReadonlyMap<string, string>) => void;
 }
 
 /** Per-chain animation picker for the Strimer cables and fan chains bound to the controller. */
-export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LIGHTING_API, header, syncOn = false, onSettled, reloadSignal, onSequence, unitNames, chainFilter, chainOrder }: LianLiWirelessLightingTabProps) {
+export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LIGHTING_API, header, syncOn = false, onSettled, reloadSignal, onSequence, unitNames, chainFilter, chainOrder, screensOf, onNames }: LianLiWirelessLightingTabProps) {
   const { t } = useTranslation();
   const [data, setData] = useState<LianLiWirelessLighting | null>(null);
   const aliveRef = useRef(true);
@@ -219,15 +231,22 @@ export function LianLiWirelessLightingTab({ onSectionNavigate, api = WIRELESS_LI
     for (const { mac: m, sortIndex } of moves) void commit(m, { sortIndex });
   }, [data, commit, onSequence]);
 
+  const all = data ? sortBySequence(data.chains) : [];
+  // Units of one model read the same, so repeated titles are numbered in sequence order.
+  const numbered = numberDuplicateTitles(all.map(c => chainTitle(t, c)));
+  const names = new Map(all.map((c, i) => [c.mac, withScreenCount(t, unitNames?.get(c.mac) ?? numbered[i], screensOf?.(c) ?? 0)]));
+  const namesKey = JSON.stringify([...names]);
+  const namesRef = useRef(names);
+  namesRef.current = names;
+  useEffect(() => {
+    if (namesRef.current.size > 0) onNames?.(namesRef.current);
+  }, [namesKey, onNames]);
+
   if (!data) return null;
-  const all = sortBySequence(data.chains);
   // The service names the leader when it can; otherwise the same rule applies here.
   const leaderMac = data.mergeLeaderMac !== undefined ? data.mergeLeaderMac : mergeLeaderMac(all);
   const flex = api !== WIRELESS_LIGHTING_API;
   const leader = all.find(c => c.mac === leaderMac);
-  // Units of one model read the same, so repeated titles are numbered in sequence order.
-  const numbered = numberDuplicateTitles(all.map(c => chainTitle(t, c)));
-  const names = new Map(all.map((c, i) => [c.mac, unitNames?.get(c.mac) ?? numbered[i]]));
   const leaderTitle = leader && names.get(leader.mac);
   // Array.sort is stable, so chains the order ranks alike keep their sequence order.
   const chains = chainFilter ? all.filter(chainFilter).sort((a, b) => chainOrder?.(a, b) ?? 0) : all;

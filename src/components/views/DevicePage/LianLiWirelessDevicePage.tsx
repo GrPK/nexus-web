@@ -261,11 +261,16 @@ interface LianLiUnitTabBodyProps {
   hideHeader?: boolean;
   /** Lighting: runs when this body's writes have settled, so other groups of the same unit read again. */
   onLightingSettled?: () => void;
+  /** Lighting: the screens counted after each chain's name. */
+  screensOf?: (chain: LianLiWirelessChainLighting) => number;
+  /** Lighting: runs with the chains' names when they change. */
+  onChainNames?: (names: ReadonlyMap<string, string>) => void;
 }
 
 /** One tab of a unit's page: its fans and binding, lighting, cooling or screens. */
 export function LianLiUnitTabBody({
   unit, tab, onSectionNavigate, embedded = false, reloadSignal = 0, chainFilter, chainOrder, hideHeader = false, onLightingSettled,
+  screensOf, onChainNames,
 }: LianLiUnitTabBodyProps) {
   const { flex, state, refresh, flexSync, lightingRev, panelOpener, lcdRestart } = unit;
   const flexRefresh = flexSync.refresh;
@@ -301,6 +306,8 @@ export function LianLiUnitTabBody({
           reloadSignal={lightingRev + reloadSignal}
           chainFilter={chainFilter}
           chainOrder={chainOrder}
+          screensOf={screensOf}
+          onNames={onChainNames}
         />
       )}
       {tab === 'cooling' && (

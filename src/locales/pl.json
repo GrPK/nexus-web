@@ -1188,6 +1188,8 @@
   "devices.lianli-flex.zoneInner": "Wewnętrzna",
   "devices.lianli-flex.zoneOuter": "Zewnętrzna",
   "devices.lianli-flex.zoneUp": "Góra",
+  "devices.lianli-hub.chainOneScreen": "{name} (1 ekran)",
+  "devices.lianli-hub.chainScreens": "{name} (ekrany: {count})",
   "devices.lianli-hub.fanScreen": "{name}: ekran wentylatora",
   "devices.lianli-hub.fanScreens": "{name}: ekrany wentylatorów",
   "devices.lianli-hub.screenTitle": "{name}: ekran",

@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "内側",
   "devices.lianli-flex.zoneOuter": "外側",
   "devices.lianli-flex.zoneUp": "上",
+  "devices.lianli-hub.chainOneScreen": "{name} (画面 1 台)",
+  "devices.lianli-hub.chainScreens": "{name} (画面 {count} 台)",
   "devices.lianli-hub.fanScreen": "{name} のファン画面",
   "devices.lianli-hub.fanScreens": "{name} のファン画面",
   "devices.lianli-hub.screenTitle": "{name} の画面",

@@ -255,6 +255,7 @@ export function LianLiHubPage({ members, controlDevice, onSectionNavigate }: Lia
                       onLightingSettled={onGroupSettled}
                       chainFilter={chain => chainGroup(unit, chain) === group}
                       chainOrder={group === 'screens' ? (a, b) => chainScreens(unit, b) - chainScreens(unit, a) : undefined}
+                      screensOf={chain => chainScreens(unit, chain)}
                       // The Flex sync controls stand with the Flex fans: with its screens when it has them.
                       hideHeader={group !== (unit.hasScreen ? 'screens' : 'fans')}
                     />

@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "Binnen",
   "devices.lianli-flex.zoneOuter": "Buiten",
   "devices.lianli-flex.zoneUp": "Boven",
+  "devices.lianli-hub.chainOneScreen": "{name} (1 scherm)",
+  "devices.lianli-hub.chainScreens": "{name} ({count} schermen)",
   "devices.lianli-hub.fanScreen": "{name}: ventilatorscherm",
   "devices.lianli-hub.fanScreens": "{name}: ventilatorschermen",
   "devices.lianli-hub.screenTitle": "{name}: scherm",

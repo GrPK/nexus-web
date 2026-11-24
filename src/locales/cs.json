@@ -1188,6 +1188,8 @@
   "devices.lianli-flex.zoneInner": "Vnitřní",
   "devices.lianli-flex.zoneOuter": "Vnější",
   "devices.lianli-flex.zoneUp": "Horní",
+  "devices.lianli-hub.chainOneScreen": "{name} (1 obrazovka)",
+  "devices.lianli-hub.chainScreens": "{name} (obrazovky: {count})",
   "devices.lianli-hub.fanScreen": "{name}: obrazovka ventilátoru",
   "devices.lianli-hub.fanScreens": "{name}: obrazovky ventilátorů",
   "devices.lianli-hub.screenTitle": "{name}: obrazovka",

@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "Interior",
   "devices.lianli-flex.zoneOuter": "Exterior",
   "devices.lianli-flex.zoneUp": "Arriba",
+  "devices.lianli-hub.chainOneScreen": "{name} (1 pantalla)",
+  "devices.lianli-hub.chainScreens": "{name} ({count} pantallas)",
   "devices.lianli-hub.fanScreen": "{name}: pantalla del ventilador",
   "devices.lianli-hub.fanScreens": "{name}: pantallas de los ventiladores",
   "devices.lianli-hub.screenTitle": "{name}: pantalla",

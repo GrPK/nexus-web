@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "Innen",
   "devices.lianli-flex.zoneOuter": "Außen",
   "devices.lianli-flex.zoneUp": "Oben",
+  "devices.lianli-hub.chainOneScreen": "{name} (1 Bildschirm)",
+  "devices.lianli-hub.chainScreens": "{name} ({count} Bildschirme)",
   "devices.lianli-hub.fanScreen": "{name}: Lüfterbildschirm",
   "devices.lianli-hub.fanScreens": "{name}: Lüfterbildschirme",
   "devices.lianli-hub.screenTitle": "{name}: Bildschirm",

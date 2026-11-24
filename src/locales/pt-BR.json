@@ -1179,6 +1179,8 @@
   "devices.lianli-flex.zoneInner": "Interior",
   "devices.lianli-flex.zoneOuter": "Exterior",
   "devices.lianli-flex.zoneUp": "Cima",
+  "devices.lianli-hub.chainOneScreen": "{name} (1 tela)",
+  "devices.lianli-hub.chainScreens": "{name} ({count} telas)",
   "devices.lianli-hub.fanScreen": "{name}: tela da ventoinha",
   "devices.lianli-hub.fanScreens": "{name}: telas das ventoinhas",
   "devices.lianli-hub.screenTitle": "{name}: tela",
