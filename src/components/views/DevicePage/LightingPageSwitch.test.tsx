@@ -36,9 +36,9 @@ describe('LightingPageSwitch', () => {
     expect(screen.queryByText('smartLights.colorOnLightingPage')).not.toBeInTheDocument();
   });
 
-  it('puts Controlled by Sync all right after the label text, led by the warning icon', () => {
+  it('puts Sync is active right after the label text, led by the warning icon', () => {
     render(<LightingPageSwitch on={false} onChange={vi.fn()} disabled controlledBySyncAll onSectionNavigate={vi.fn()} />);
-    const pill = screen.getByText('devices.lianli-hub.controlledBySyncAll');
+    const pill = screen.getByText('devices.lianli-hub.syncActive');
     expect(pill.className).toContain('syncPill');
     // On the label's line, inside the label, ahead of the (hidden) Lighting page link.
     const label = screen.getByText('devices.lightingPage.use');
@@ -57,12 +57,12 @@ describe('LightingPageSwitch', () => {
   it('under Sync all locks only the switch, so the row with its pill stays readable', () => {
     render(<LightingPageSwitch on={false} onChange={vi.fn()} disabled controlledBySyncAll />);
     expect(screen.getByRole('switch')).toBeDisabled();
-    expect(rowOf(screen.getByText('devices.lianli-hub.controlledBySyncAll'))?.className).not.toContain('disabled');
+    expect(rowOf(screen.getByText('devices.lianli-hub.syncActive'))?.className).not.toContain('disabled');
   });
 
   it('dims a disabled row as before, with no pill, unless Sync all drives the light', () => {
     render(<LightingPageSwitch on={false} onChange={vi.fn()} disabled />);
-    expect(screen.queryByText('devices.lianli-hub.controlledBySyncAll')).not.toBeInTheDocument();
+    expect(screen.queryByText('devices.lianli-hub.syncActive')).not.toBeInTheDocument();
     expect(screen.getByRole('switch')).toBeDisabled();
     expect(rowOf(screen.getByText('devices.lightingPage.use'))?.className).toContain('disabled');
   });

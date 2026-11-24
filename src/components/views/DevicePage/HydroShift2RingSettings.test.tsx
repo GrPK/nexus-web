@@ -106,7 +106,7 @@ describe('HydroShift2RingSettings', () => {
       render(<HydroShift2RingSettings syncedAll />);
     });
     // In the Lighting page row, as a pill; no row of its own.
-    expect(rowOf(screen.getByText('devices.lianli-hub.controlledBySyncAll'))).toContainElement(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
+    expect(rowOf(screen.getByText('devices.lianli-hub.syncActive'))).toContainElement(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
     expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'devices.lianli.lightingMode' })).toBeDisabled();
   });

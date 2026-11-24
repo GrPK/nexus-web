@@ -14,7 +14,7 @@ interface LightingPageSwitchProps {
   onChange: (on: boolean) => void;
   disabled?: boolean;
   onSectionNavigate?: (section: string) => void;
-  /** Sync all on the Lian Li page drives the light: an amber "Controlled by Sync all" pill after the label. */
+  /** Sync all on the Lian Li page drives the light: an amber "Sync is active" pill after the label. */
   controlledBySyncAll?: boolean;
 }
 
@@ -41,7 +41,7 @@ export function LightingPageSwitch({ on, onChange, disabled, onSectionNavigate, 
   const syncPill = controlledBySyncAll && (
     <span className={styles.syncPill}>
       <WarningIcon className={styles.syncPillIcon} size="1em" aria-hidden />
-      {t('devices.lianli-hub.controlledBySyncAll')}
+      {t('devices.lianli-hub.syncActive')}
     </span>
   );
   return (

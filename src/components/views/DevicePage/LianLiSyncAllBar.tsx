@@ -276,7 +276,6 @@ export function LianLiSyncAllBar({ api = LIANLI_SYNC_ALL_API, onWritten, chainNa
       {mergedOn && (
         <>
           <p className={styles.zoneHeading} data-settings-aside="true">{t('devices.lianli-hub.mergeOrder')}</p>
-          <p className={styles.customNote} data-settings-aside="true">{t('devices.lianli-hub.mergeOrderHint')}</p>
           {data.devices.map((d, i) => (
             <SettingRow key={`${d.kind}:${d.id}`} label={deviceName(d)}>
               {data.devices.length > 1 && (<>
