@@ -46,6 +46,13 @@ beforeEach(() => {
   mockSet.mockResolvedValue({});
 });
 
+/** The setting row an element sits in: its nearest ancestor that holds a switch. */
+function rowOf(el: HTMLElement): HTMLElement | null {
+  let n: HTMLElement | null = el;
+  while (n && !n.querySelector('[role="switch"]')) n = n.parentElement;
+  return n;
+}
+
 describe('HydroShift2RingSettings', () => {
   it('lists the pump head effects by their localized names', async () => {
     await renderSettings();
@@ -98,7 +105,8 @@ describe('HydroShift2RingSettings', () => {
     await act(async () => {
       render(<HydroShift2RingSettings syncedAll />);
     });
-    expect(screen.getByText('devices.lianli-hub.followsSyncAll')).toBeInTheDocument();
+    // In the Lighting page row, as a pill; no row of its own.
+    expect(rowOf(screen.getByText('devices.lianli-hub.followsSyncAll'))).toContainElement(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
     expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'devices.lianli.lightingMode' })).toBeDisabled();
   });

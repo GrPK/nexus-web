@@ -2,3 +2,16 @@
 .linkHidden {
   visibility: hidden;
 }
+
+// Sync all drives the light: a small pill in the amber notice's colours.
+.syncPill {
+  display: inline-block;
+  padding: 0.1rem 0.6rem;
+  border: var(--border-width) solid var(--warn-line);
+  border-radius: 999px;
+  background: var(--warn-soft);
+  color: var(--text);
+  font-size: var(--type-small);
+  line-height: 1.4;
+  white-space: nowrap;
+}

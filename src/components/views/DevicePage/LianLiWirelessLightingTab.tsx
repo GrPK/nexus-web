@@ -429,6 +429,7 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
       {!p28 && <LightingPageSwitch
         on={lightingPage}
         disabled={argbOn || (synced && !(syncAll && lightingPage))}
+        followsSyncAll={syncAll}
         onChange={on => onCommit(on ? { mode: MODE_CUSTOM } : { mode: effectKey, effectMode: effectKey })}
         onSectionNavigate={onSectionNavigate}
       />}
@@ -465,7 +466,8 @@ function ChainSection({ chain, title, laneModes, onPreview, onCommit, onReset, f
         onPreview={onPreview}
         onCommit={onCommit}
       >
-        {synced && <SettingRow label={t(syncAll ? 'devices.lianli-hub.followsSyncAll' : 'devices.lianli-flex.followsSync')} />}
+        {/* Sync all says so in the Lighting page row; the Flex group sync keeps its own line. */}
+        {synced && !syncAll && <SettingRow label={t('devices.lianli-flex.followsSync')} />}
         {follower && <SettingRow label={t('devices.lianli-flex.followsLeader', { leader: followsTitle })} />}
         {perZone && zones.map(zone => (
           <Fragment key={zone.id}>

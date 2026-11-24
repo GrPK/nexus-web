@@ -9,10 +9,12 @@ interface LightingPageSwitchProps {
   onChange: (on: boolean) => void;
   disabled?: boolean;
   onSectionNavigate?: (section: string) => void;
+  /** Sync all on the Lian Li page drives the light: an amber "Follows Sync all" pill in the row. */
+  followsSyncAll?: boolean;
 }
 
 /** Hands a device's LEDs to the Lighting page, or back to the animation configured under it. */
-export function LightingPageSwitch({ on, onChange, disabled, onSectionNavigate }: LightingPageSwitchProps) {
+export function LightingPageSwitch({ on, onChange, disabled, onSectionNavigate, followsSyncAll = false }: LightingPageSwitchProps) {
   const { t } = useTranslation();
   // The link rides the label line and is only hidden while off, so the row never changes height.
   const link = onSectionNavigate && (
@@ -33,6 +35,7 @@ export function LightingPageSwitch({ on, onChange, disabled, onSectionNavigate }
     <SettingToggle
       label={t('devices.lightingPage.use')}
       labelSuffix={link}
+      centerBadge={followsSyncAll ? <span className={styles.syncPill}>{t('devices.lianli-hub.followsSyncAll')}</span> : undefined}
       description={t('devices.lightingPage.useHint')}
       checked={on}
       onChange={onChange}

@@ -263,6 +263,13 @@ describe('motherboard ARGB', () => {
   });
 });
 
+/** The setting row an element sits in: its nearest ancestor that holds a switch. */
+function rowOf(el: HTMLElement): HTMLElement | null {
+  let n: HTMLElement | null = el;
+  while (n && !n.querySelector('[role="switch"]')) n = n.parentElement;
+  return n;
+}
+
 describe('Sync all on the Lian Li page', () => {
   const tl: LianLiWirelessChainLighting = { ...fanChain, mac: '7880ae72ab3c', fanType: 28, supportsScope: true, argbCableConnected: true };
 
@@ -271,7 +278,8 @@ describe('Sync all on the Lian Li page', () => {
     await act(async () => {
       render(<LianLiWirelessLightingTab syncAllMacs={new Set(['7880AE72AB3C'])} />);
     });
-    expect(screen.getByText('devices.lianli-hub.followsSyncAll')).toBeInTheDocument();
+    // A pill in the Lighting page row, not a row of its own.
+    expect(rowOf(screen.getByText('devices.lianli-hub.followsSyncAll'))).toContainElement(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
     expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
     expect(screen.getByRole('switch', { name: 'devices.motherboardArgb.label' })).toBeDisabled();
     expect(screen.getByRole('switch', { name: 'devices.lianli-wireless.separateHalves' })).toBeDisabled();
@@ -345,7 +353,7 @@ describe('Sync all on the Lian Li page', () => {
     await act(async () => {
       render(<LianLiWirelessLightingTab syncAllMacs={new Set(['64F271E566E1'])} />);
     });
-    expect(screen.getByText('devices.lianli-hub.followsSyncAll')).toBeInTheDocument();
+    expect(rowOf(screen.getByText('devices.lianli-hub.followsSyncAll'))).toContainElement(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
     expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
     expect(screen.getByRole('switch', { name: 'devices.motherboardArgb.label' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'devices.lianli.lightingMode' })).toBeDisabled();

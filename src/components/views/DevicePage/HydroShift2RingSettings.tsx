@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SettingRow, SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
+import { SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
 import { HsvPicker } from '../../common/HsvPicker/HsvPicker';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { LightingPageSwitch } from './LightingPageSwitch';
@@ -121,6 +121,7 @@ export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING
       <LightingPageSwitch
         on={followsLightingPage}
         disabled={!loaded || (syncedAll && !followsLightingPage)}
+        followsSyncAll={syncedAll}
         onChange={on => {
           if (!lighting) return;
           const mode = on ? LIGHTING_PAGE_MODE : effectKey;
@@ -141,7 +142,6 @@ export function HydroShift2RingSettings({ onSectionNavigate, api = RING_LIGHTING
         options={(lighting?.modes ?? []).map(m => ({ value: m.key, label: effectLabel(t, m.key) }))}
         disabled={disabled}
       />
-      {syncedAll && <SettingRow label={t('devices.lianli-hub.followsSyncAll')} />}
 
       {selected?.hasBrightness && levelSlider(
         t('devices.lianli.lightingBrightness'),

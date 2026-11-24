@@ -46,6 +46,7 @@ const STATE_COLORS: Record<NonNullable<SettingState['tone']>, string> = {
 export function SettingRow({
   label,
   labelSuffix,
+  centerBadge,
   description,
   icon,
   iconLeading,
@@ -64,6 +65,9 @@ export function SettingRow({
   label?: string;
   // Inline content after the label text, e.g. a chip naming what the row belongs to.
   labelSuffix?: ReactNode;
+  // A status pill centred in the space between the label block and the control. On a narrow row it drops
+  // to its own line under the label, never over the control, and a disabled row does not dim it.
+  centerBadge?: ReactNode;
   description?: ReactNode;
   // Optional accent glyph rendered inline before the label text.
   icon?: ReactNode;
@@ -121,6 +125,7 @@ export function SettingRow({
     icon && iconLeading && styles.hasLeadingIcon,
     selected && styles.selected,
     nested && styles.nested,
+    centerBadge && styles.hasCenterBadge,
   ].filter(Boolean).join(' ');
   return (
     <div id={anchorId} data-search-anchor={anchorId} className={cls}>
@@ -144,6 +149,7 @@ export function SettingRow({
           {description && !descriptionBelow && <span className={styles.desc}>{description}</span>}
         </div>
       )}
+      {centerBadge && <div className={styles.centerBadge}>{centerBadge}</div>}
       <div className={styles.control}>
         {state && <Badge label={state.label} color={STATE_COLORS[state.tone ?? 'neutral']} />}
         {children}
@@ -166,6 +172,7 @@ export function SettingToggle({
   stackOnNarrow,
   mixed,
   labelSuffix,
+  centerBadge,
   nested,
 }: {
   label: string;
@@ -181,6 +188,8 @@ export function SettingToggle({
   /** The controlled targets disagree; see Toggle. */
   mixed?: boolean;
   labelSuffix?: ReactNode;
+  /** A status pill centred between the label block and the switch; see SettingRow. */
+  centerBadge?: ReactNode;
   /** Refines the row above it (indented, secondary label); place both in a SettingGroup. */
   nested?: boolean;
 }) {
@@ -188,6 +197,7 @@ export function SettingToggle({
     <SettingRow
       label={label}
       labelSuffix={labelSuffix}
+      centerBadge={centerBadge}
       description={description}
       icon={icon}
       iconLeading={iconLeading}

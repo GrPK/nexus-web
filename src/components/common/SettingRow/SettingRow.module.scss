@@ -99,6 +99,41 @@
   }
 }
 
+// Opt-in (centerBadge prop): a status pill centred in the space between the
+// label block and the control. The label block keeps its own width so that
+// space is the pill's. Below the narrow breakpoint the pill takes a line of its
+// own under the label and control, left-aligned with the label, so it never
+// sits over the control. A disabled row dims its label and control but not the
+// pill, which says why.
+.row.hasCenterBadge {
+  .info {
+    flex: 0 1 auto;
+  }
+
+  @media (max-width: 480px) {
+    .centerBadge {
+      order: 1;
+      flex-basis: 100%;
+      justify-content: flex-start;
+    }
+  }
+}
+
+.centerBadge {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: min-content;
+}
+
+.row.hasCenterBadge.disabled {
+  opacity: 1;
+
+  > :not(.centerBadge) {
+    opacity: 0.5;
+  }
+}
+
 // Floors the label at its longest word so a control too wide to fit wraps below it instead of overlapping.
 .info {
   display: flex;
