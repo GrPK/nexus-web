@@ -63,22 +63,26 @@ export function SdkMarketplaceWidget({ listing, instanceId, sandboxSurface, size
   const [settings, setSettings] = useState<Record<string, unknown>>(() => (preview ? {} : settingsBridge.get()));
   useEffect(() => {
     if (preview) return;
+    const release = settingsBridge.retain();
     const unsub = settingsBridge.onChange((v) => setSettings({ ...v }));
-    void settingsBridge.load();
-    return unsub;
+    settingsBridge.load().catch(() => { /* the next reconnect or broadcast retries */ });
+    return () => { unsub(); release(); };
   }, [settingsBridge, preview]);
 
   // Cross-device: the service broadcasts the full settings doc after each write. An older service never
   // sends the topic, so this stays inert. apply() skips equal docs, so a local save plus its echo is one update.
   useTopicCallback(appSettingsTopic(instanceId), !preview, (raw) => {
-    const values = (raw as { settings?: unknown } | null)?.settings;
-    if (values && typeof values === 'object' && !Array.isArray(values)) settingsBridge.apply(values as Record<string, unknown>);
+    const frame = raw as { values?: unknown; revision?: unknown } | null;
+    const values = frame?.values;
+    if (values && typeof values === 'object' && !Array.isArray(values)) {
+      settingsBridge.apply(values as Record<string, unknown>, typeof frame?.revision === 'number' ? frame.revision : undefined);
+    }
   });
   // A broadcast sent while the socket was down is not replayed; re-read on reconnect.
   const connected = useMultiplex()?.connected ?? false;
   const wasConnected = useRef(connected);
   useEffect(() => {
-    if (!preview && connected && !wasConnected.current) void settingsBridge.load().catch(() => { /* next reconnect retries */ });
+    if (!preview && connected && !wasConnected.current) settingsBridge.load().catch(() => { /* next reconnect retries */ });
     wasConnected.current = connected;
   }, [connected, settingsBridge, preview]);
 

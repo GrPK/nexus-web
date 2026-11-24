@@ -9,6 +9,8 @@ vi.mock('../../../widgets/settingsBridge', () => ({
   WidgetSettingsBridge: class {
     static for() { return new this(); }
     load() { return Promise.resolve({}); }
+    get() { return {}; }
+    retain() { return () => {}; }
     onChange() { return () => {}; }
     patch() { return Promise.resolve(); }
   },

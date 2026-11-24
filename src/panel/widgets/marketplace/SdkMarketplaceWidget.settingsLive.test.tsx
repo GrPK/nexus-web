@@ -58,7 +58,7 @@ describe('SDK tile live settings', () => {
   it('applies a broadcast frame', async () => {
     mount();
     await act(async () => {});
-    act(() => listeners.get('app-settings/inst-1')!({ settings: { color: 'green' } }));
+    act(() => listeners.get('app-settings/inst-1')!({ values: { color: 'green' }, revision: 5 }));
     expect(last()).toEqual({ color: 'green' });
   });
 
@@ -66,10 +66,77 @@ describe('SDK tile live settings', () => {
     mount();
     await act(async () => {});
     const before = seen.length;
-    act(() => listeners.get('app-settings/inst-1')!({ settings: { color: 'red' } }));
+    act(() => listeners.get('app-settings/inst-1')!({ values: { color: 'red' }, revision: 6 }));
     act(() => listeners.get('app-settings/inst-1')!({ nope: true }));
     act(() => listeners.get('app-settings/inst-1')!(null));
     expect(seen.length).toBe(before);
+  });
+});
+
+describe('SDK tile settings ordering and lifetime', () => {
+  const frame = (values: Record<string, unknown>, revision?: number) =>
+    act(() => listeners.get('app-settings/inst-1')!({ values, revision }));
+
+  it('drops a stale revision and out-of-order frames', async () => {
+    mount();
+    await act(async () => {});
+    frame({ color: 'b' }, 10);
+    frame({ color: 'old' }, 9);
+    expect(last()).toEqual({ color: 'b' });
+    frame({ color: 'c' }, 11);
+    frame({ color: 'b2' }, 10);
+    expect(last()).toEqual({ color: 'c' });
+  });
+
+  it('applies frames with no revision (older service)', async () => {
+    mount();
+    await act(async () => {});
+    frame({ color: 'x' });
+    expect(last()).toEqual({ color: 'x' });
+    frame({ color: 'y' });
+    expect(last()).toEqual({ color: 'y' });
+  });
+
+  it('copies values so callers cannot mutate the cache', () => {
+    const b = new WidgetSettingsBridge('copy');
+    const src = { a: 1 };
+    b.apply(src);
+    src.a = 2;
+    expect(b.get()).toEqual({ a: 1 });
+  });
+
+  it('does not apply a load that started before a newer apply when revisions are absent', async () => {
+    const b = new WidgetSettingsBridge('race');
+    const p = b.load();
+    b.apply({ a: 'newer' });
+    await p;
+    expect(b.get()).toEqual({ a: 'newer' });
+  });
+
+  it('applies an empty load result and drops the shared entry after the last release', () => {
+    const b = WidgetSettingsBridge.for('reuse');
+    const r1 = b.retain();
+    const r2 = b.retain();
+    r1();
+    expect(WidgetSettingsBridge.for('reuse')).toBe(b);
+    r2();
+    expect(WidgetSettingsBridge.for('reuse')).not.toBe(b);
+  });
+
+  it('reloads on reconnect', async () => {
+    const c = { ...ctx, connected: false } as unknown as MultiplexContextValue;
+    const { rerender } = render(
+      <MultiplexContext.Provider value={c}><SdkMarketplaceWidget listing={listing} instanceId="inst-1" size="2x2" /></MultiplexContext.Provider>,
+    );
+    await act(async () => {});
+    frame({ color: 'stale' }, 1);
+    rerender(
+      <MultiplexContext.Provider value={{ ...c, connected: true } as unknown as MultiplexContextValue}>
+        <SdkMarketplaceWidget listing={listing} instanceId="inst-1" size="2x2" />
+      </MultiplexContext.Provider>,
+    );
+    await act(async () => {});
+    expect(last()).toEqual({ color: 'red' });
   });
 });
 

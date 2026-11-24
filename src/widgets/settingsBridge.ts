@@ -8,6 +8,8 @@ import { getToken, handleUnauthorized } from '../api/auth';
 export interface WidgetSettingsDocument {
   widgetId: string;
   values: Record<string, unknown>;
+  /** Monotonic write counter; absent from an older service. */
+  revision?: number;
 }
 
 export interface WidgetSettingsPatch {
@@ -46,6 +48,10 @@ export class WidgetSettingsBridge {
   private readonly instanceId: string;
   private values: Record<string, unknown> = {};
   private loaded = false;
+  private lastRevision: number | null = null;
+  /** Bumped by every apply that took effect; lets load() detect a newer doc landing mid-request. */
+  private applySeq = 0;
+  private holders = 0;
   private readonly listeners = new Set<WidgetSettingsListener>();
 
   constructor(instanceId: string) { this.instanceId = instanceId; }
@@ -57,15 +63,37 @@ export class WidgetSettingsBridge {
     return b;
   }
 
+  /** Counts a holder (call from an effect); the returned release drops the shared entry once the last holder leaves. */
+  retain(): () => void {
+    this.holders++;
+    if (!shared.has(this.instanceId)) shared.set(this.instanceId, this);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.holders--;
+      if (this.holders <= 0 && shared.get(this.instanceId) === this) shared.delete(this.instanceId);
+    };
+  }
+
   /** Test hook: drops every shared instance. */
   static _resetSharedForTests(): void { shared.clear(); }
 
-  /** Adopts a full settings document from elsewhere (a broadcast). No-op when equal to the cache. */
-  apply(values: Record<string, unknown>): void {
-    if (this.loaded && settingsEqual(this.values, values)) return;
-    this.values = values;
+  /**
+   * Adopts a full settings document. A revision older than the newest seen is dropped; a missing revision
+   * (older service) always applies. No-op for listeners when the values are unchanged.
+   */
+  apply(values: Record<string, unknown>, revision?: number): boolean {
+    if (typeof revision === 'number') {
+      if (this.lastRevision !== null && revision < this.lastRevision) return false;
+      this.lastRevision = revision;
+    }
+    if (this.loaded && settingsEqual(this.values, values)) return true;
+    this.values = { ...values };
     this.loaded = true;
+    this.applySeq++;
     this.fire();
+    return true;
   }
 
   /** Returns the cached values. Triggers a load on first call. */
@@ -73,16 +101,20 @@ export class WidgetSettingsBridge {
     if (!this.loaded) {
       // Fire-and-forget initial load; subscribers receive a `changed` event
       // when it lands. Synchronous callers see `{}` until then.
-      void this.load();
+      void this.load().catch(() => { /* a later load retries */ });
     }
     return this.values;
   }
 
   async load(): Promise<Record<string, unknown>> {
+    const seq = this.applySeq;
     const doc = await fetchService<WidgetSettingsDocument>(
       `/apps-api/instance/${encodeURIComponent(this.instanceId)}/settings`,
     );
-    if (doc?.values) this.apply(doc.values);
+    if (doc && typeof doc === 'object') {
+      // Without a revision, a newer apply that landed while this request was in flight wins.
+      if (typeof doc.revision === 'number' || this.applySeq === seq) this.apply(doc.values ?? {}, doc.revision);
+    }
     return this.values;
   }
 
@@ -104,7 +136,7 @@ export class WidgetSettingsBridge {
     }
     if (!res.ok) return this.values;
     const doc = (await res.json()) as WidgetSettingsDocument;
-    this.apply(doc.values ?? {});
+    this.apply(doc.values ?? {}, doc.revision);
     return this.values;
   }
 
