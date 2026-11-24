@@ -107,4 +107,13 @@ describe('FrameRateSetting', () => {
     await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(0));
     expect(api.patchPanelDevice).not.toHaveBeenCalled();
   });
+
+  it('reads Mixed again when the first save from the mixed state fails', async () => {
+    const onSave = vi.fn().mockResolvedValue(false);
+    render(<FrameRateSetting cap={null} mixed onSave={onSave} />);
+    expect(trigger().textContent).toContain('common.mixed');
+    pick(HZ(25));
+    await waitFor(() => expect(toast.push).toHaveBeenCalled());
+    expect(trigger().textContent).toContain('common.mixed');
+  });
 });

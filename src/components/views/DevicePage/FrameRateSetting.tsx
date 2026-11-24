@@ -67,6 +67,8 @@ export function FrameRateSetting({ recordId = null, cap, onSave, mixed = false, 
       if (mine !== seq.current) return;
       failedSeq.current = mine;
       setCurrent(confirmed.current);
+      // Nothing was saved from the mixed state, so it reads Mixed again rather than the unsaved cap.
+      if (confirmedSeq.current === 0) setPicked(false);
       push({ title: t('lighting.ledMap.rateCapFailed') });
     };
     const saved = onSave ? onSave(sent) : patchPanelDevice(recordId as string, { fpsCap: sent });
