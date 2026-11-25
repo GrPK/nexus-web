@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Gauge, Keyboard, Mouse, MousePointer2, Music, RotateCcw, Sparkles, Undo2 } from 'lucide-react';
+import { Gauge, Keyboard, ListOrdered, Mouse, MousePointer2, Music, Pencil, RotateCcw, Sparkles, Undo2 } from 'lucide-react';
 import {
   restoreMouseProfile, setMouseActiveProfile, setMouseMode, updateMouseProfile,
-  type MouseButton, type MouseProfile, type MouseProfilePatch, type MouseState,
+  type MacroStep, type MouseButton, type MouseProfile, type MouseProfilePatch, type MouseState,
 } from '../../../api/logitechMouse';
 import { useTranslation } from '../../../lib/i18n';
 import { Button } from '../../common/Button/Button';
@@ -16,6 +16,8 @@ import { TextInput } from '../../common/TextInput/TextInput';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { ActionLibrary, type LibraryGroup } from './logitechMouse/ActionLibrary';
 import { DpiTrack } from './logitechMouse/DpiTrack';
+import { isModifier, keyCap } from './logitechMouse/hidKeys';
+import { MacroEditor } from './logitechMouse/MacroEditor';
 import { MouseIllustration } from './logitechMouse/MouseIllustration';
 import { FACTORY, HOTSPOTS, gName, type MouseView } from './logitechMouse/g502x';
 import { useLogitechMouse } from './useLogitechMouse';
@@ -56,30 +58,90 @@ const NAMED_KEYS: readonly { usage: number; key: string }[] = [
   { usage: 0x2B, key: 'tab' }, { usage: 0x2C, key: 'space' }, { usage: 0x4C, key: 'delete' },
 ];
 const SPECIAL_KIND = 'special';
+const MACRO_KIND = 'macro';
 const MODIFIER_NAMES: readonly [number, string][] = [[1, 'Ctrl'], [2, 'Shift'], [4, 'Alt'], [8, 'Win']];
+// Library values: a new macro opens the editor; a stored one carries its steps; one made elsewhere, where it lives.
+const MACRO_NEW = 'macro-new';
+const MACRO_STEPS = 'macro:';
+const MACRO_AT = 'macro-at:';
+// How many keys a macro's name lists before it is cut short.
+const SUMMARY_KEYS = 4;
+const ELLIPSIS = '…';
 
 function keyName(usage: number, t: (k: string) => string): string {
-  if (usage >= LETTER_A && usage < LETTER_A + 26) return String.fromCharCode(0x41 + usage - LETTER_A);
-  if (usage >= DIGIT_1 && usage < DIGIT_1 + 10) return String((usage - DIGIT_1 + 1) % 10);
-  if (usage >= F1 && usage < F1 + 12) return 'F' + String(usage - F1 + 1);
   const named = NAMED_KEYS.find(k => k.usage === usage);
-  return named ? t(`${P}key.${named.key}`) : '0x' + usage.toString(16).toUpperCase();
+  if (named) return t(`${P}key.${named.key}`);
+  return keyCap(usage) ?? '0x' + usage.toString(16).toUpperCase();
 }
 
-function encode(b: Pick<MouseButton, 'kind' | 'code' | 'modifiers' | 'raw'>): string {
-  return b.kind === 'raw' ? `raw:${b.raw ?? ''}` : `${b.kind}:${b.code}:${b.modifiers}`;
+const stepsKey = (steps: readonly MacroStep[]) => JSON.stringify(steps.map(s => [s.type, s.code, s.modifiers ?? 0]));
+
+function encode(b: Pick<MouseButton, 'kind' | 'code' | 'modifiers' | 'raw' | 'macro'>): string {
+  if (b.kind === 'raw') return `raw:${b.raw ?? ''}`;
+  if (b.kind === MACRO_KIND) return b.macro ? MACRO_STEPS + stepsKey(b.macro) : `${MACRO_AT}${b.code}:${b.modifiers}`;
+  return `${b.kind}:${b.code}:${b.modifiers}`;
 }
 
 function decode(value: string, slot: number): MouseButton {
+  if (value.startsWith(MACRO_STEPS)) {
+    const rows = JSON.parse(value.slice(MACRO_STEPS.length)) as [MacroStep['type'], number, number][];
+    return { slot, kind: MACRO_KIND, code: 0, modifiers: 0, macro: rows.map(([type, code, modifiers]) => ({ type, code, modifiers })) };
+  }
+  if (value.startsWith(MACRO_AT)) {
+    const [sector, address] = value.slice(MACRO_AT.length).split(':');
+    return { slot, kind: MACRO_KIND, code: Number(sector), modifiers: Number(address) };
+  }
   const [kind, a, b] = value.split(':');
   if (kind === 'raw') return { slot, kind: 'raw', code: 0, modifiers: 0, raw: a };
   return { slot, kind: kind as MouseButton['kind'], code: Number(a), modifiers: Number(b) };
 }
 
-/** The action library, grouped as the vendor app groups it. */
+/** Words for what one macro step presses: a key (with any extra modifiers), a mouse button, a media control. */
+function describeStep(step: MacroStep, t: (k: string, v?: Record<string, string>) => string): string {
+  if (step.type === 'mouseDown' || step.type === 'mouseUp') {
+    const names = MOUSE_BUTTONS.filter(m => (step.code & m.mask) !== 0).map(m => t(`${P}mouse.${m.key}`));
+    return names.join('+') || '0x' + step.code.toString(16);
+  }
+  if (step.type === 'consumerDown' || step.type === 'consumerUp') {
+    const media = MEDIA.find(m => m.usage === step.code);
+    return media ? t(`${P}media.${media.key}`) : t(`${P}consumerCode`, { code: '0x' + step.code.toString(16).toUpperCase() });
+  }
+  const mods = MODIFIER_NAMES.filter(([bit]) => ((step.modifiers ?? 0) & bit) !== 0).map(([, name]) => name);
+  return [...mods, keyName(step.code, t)].join('+');
+}
+
+/** A macro's name: the keys and buttons it presses, modifiers held at the time joined on ("Shift+H, I"). */
+function summarizeMacro(steps: readonly MacroStep[], t: (k: string, v?: Record<string, string>) => string): string {
+  const held: number[] = [];
+  const parts: string[] = [];
+  for (const s of steps) {
+    if (s.type === 'keyDown' && isModifier(s.code)) {
+      held.push(s.code);
+    } else if (s.type === 'keyUp' && isModifier(s.code)) {
+      const at = held.indexOf(s.code);
+      if (at >= 0) held.splice(at, 1);
+    } else if (s.type === 'keyDown' || s.type === 'mouseDown' || s.type === 'consumerDown') {
+      parts.push([...held.map(u => keyName(u, t)), describeStep(s, t)].join('+'));
+    }
+  }
+  if (parts.length === 0 && held.length > 0) parts.push(held.map(u => keyName(u, t)).join('+'));
+  return parts.length > SUMMARY_KEYS ? parts.slice(0, SUMMARY_KEYS).join(', ') + ELLIPSIS : parts.join(', ');
+}
+
+/** The action library, grouped as the vendor app groups it; the macros group lists every macro stored in the mouse. */
 function useLibrary(state: MouseState): LibraryGroup[] {
   const { t } = useTranslation();
   return useMemo(() => {
+    const macros = new Map<string, string>([[MACRO_NEW, t(`${P}macro.new`)]]);
+    for (const p of state.profiles) {
+      for (const b of [...p.buttons, ...p.gShiftButtons]) {
+        if (b.kind !== MACRO_KIND) continue;
+        const value = encode(b);
+        if (!macros.has(value)) {
+          macros.set(value, b.macro ? t(`${P}macro.summary`, { keys: summarizeMacro(b.macro, t) }) : t(`${P}macro.foreign`));
+        }
+      }
+    }
     const specialName = (code: number) => state.specials.find(s => s.code === code)?.name ?? String(code);
     const usages = [
       ...Array.from({ length: 26 }, (_, i) => LETTER_A + i),
@@ -92,12 +154,14 @@ function useLibrary(state: MouseState): LibraryGroup[] {
         items: MOUSE_BUTTONS.map(m => ({ value: encode({ kind: 'mouse', code: m.mask, modifiers: 0 }), label: t(`${P}mouse.${m.key}`) })) },
       { key: 'functions', title: t(`${P}group.functions`), icon: <Sparkles size={14} />,
         items: OFFERED_SPECIALS.map(code => ({ value: encode({ kind: SPECIAL_KIND, code, modifiers: 0 }), label: t(`${P}special.${specialName(code)}`) })) },
+      { key: 'macros', title: t(`${P}group.macros`), icon: <ListOrdered size={14} />,
+        items: [...macros].map(([value, label]) => ({ value, label })) },
       { key: 'media', title: t(`${P}group.media`), icon: <Music size={14} />,
         items: MEDIA.map(m => ({ value: encode({ kind: 'consumer', code: m.usage, modifiers: 0 }), label: t(`${P}media.${m.key}`) })) },
       { key: 'keys', title: t(`${P}group.keyboard`), icon: <Keyboard size={14} />,
         items: usages.map(u => ({ value: encode({ kind: 'key', code: u, modifiers: 0 }), label: keyName(u, t) })) },
     ];
-  }, [state.specials, t]);
+  }, [state.specials, state.profiles, t]);
 }
 
 /** Words for a binding, also for ones the library does not list (a key with modifiers, a macro). */
@@ -114,6 +178,7 @@ function bindingLabel(b: MouseButton | undefined, library: LibraryGroup[], state
   }
   if (b.kind === SPECIAL_KIND) return t(`${P}special.${state.specials.find(s => s.code === b.code)?.name ?? 'none'}`);
   if (b.kind === 'consumer') return t(`${P}consumerCode`, { code: '0x' + b.code.toString(16).toUpperCase() });
+  if (b.kind === MACRO_KIND) return b.macro ? t(`${P}macro.summary`, { keys: summarizeMacro(b.macro, t) }) : t(`${P}macro.foreign`);
   return t(`${P}customBinding`);
 }
 
@@ -125,6 +190,8 @@ function AssignmentsTab({ state, profile, change, busy }: ProfileProps) {
   const [layer, setLayer] = useState<Layer>('primary');
   const [selected, setSelected] = useState<number | null>(null);
   const [flash, setFlash] = useState<number | null>(null);
+  // The macro editor, open in the library's place for one button.
+  const [editing, setEditing] = useState<{ slot: number; steps: MacroStep[] | null } | null>(null);
   const flashTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(flashTimer.current), []);
   const buttons = layer === 'primary' ? profile.buttons : profile.gShiftButtons;
@@ -132,36 +199,71 @@ function AssignmentsTab({ state, profile, change, busy }: ProfileProps) {
   const spot = selected === null ? undefined : HOTSPOTS.find(h => h.slot === selected);
   const current = selected === null ? undefined : bySlot(selected);
 
-  const assign = (slot: number, value: string) => {
+  const assign = (slot: number, value: string): Promise<boolean> => {
+    setSelected(slot);
+    if (value === MACRO_NEW) {
+      setEditing({ slot, steps: null });
+      return Promise.resolve(false);
+    }
     const binding = decode(value, slot);
     const patch: MouseProfilePatch = layer === 'primary' ? { buttons: [binding] } : { gShiftButtons: [binding] };
-    setSelected(slot);
-    void change(() => updateMouseProfile(profile.number, patch)).then(ok => {
-      if (!ok) return;
-      window.clearTimeout(flashTimer.current);
-      setFlash(slot);
-      flashTimer.current = window.setTimeout(() => setFlash(null), FLASH_MS);
+    return change(() => updateMouseProfile(profile.number, patch)).then(ok => {
+      if (ok) {
+        window.clearTimeout(flashTimer.current);
+        setFlash(slot);
+        flashTimer.current = window.setTimeout(() => setFlash(null), FLASH_MS);
+      }
+      return ok;
     });
   };
+  const select = (slot: number) => {
+    // With the editor open, picking another button moves the macro being made to it.
+    if (editing) {
+      setSelected(slot);
+      setEditing({ ...editing, slot });
+      return;
+    }
+    setSelected(prev => (prev === slot ? null : slot));
+  };
+  const saveMacro = (steps: MacroStep[]) => {
+    if (!editing) return;
+    void assign(editing.slot, encode({ kind: MACRO_KIND, code: 0, modifiers: 0, macro: steps })).then(ok => {
+      if (ok) setEditing(null);
+    });
+  };
+  const editingSpot = editing ? HOTSPOTS.find(h => h.slot === editing.slot) : undefined;
   const reset = () => {
     if (selected === null || !FACTORY[selected]) return;
     const f = FACTORY[selected];
-    assign(selected, encode({ kind: f.kind, code: f.code, modifiers: 0 }));
+    void assign(selected, encode({ kind: f.kind, code: f.code, modifiers: 0 }));
   };
   const label = (slot: number) => bindingLabel(bySlot(slot), library, state, t);
 
   return (
     <div className={styles.assign}>
-      <ActionLibrary
-        groups={library}
-        currentValue={current ? encode(current) : null}
-        disabled={busy}
-        title={t(`${P}library`)}
-        hint={spot ? t(`${P}libraryHintSelected`, { button: gName(spot.g) }) : t(`${P}libraryHint`)}
-        searchLabel={t(`${P}librarySearch`)}
-        emptyLabel={t(`${P}libraryEmpty`)}
-        onPick={value => { if (selected !== null) assign(selected, value); }}
-      />
+      {editing && editingSpot ? (
+        <MacroEditor
+          key={editing.steps ? stepsKey(editing.steps) : MACRO_NEW}
+          buttonName={gName(editingSpot.g)}
+          initial={editing.steps}
+          busy={busy}
+          describe={step => describeStep(step, t)}
+          onSave={saveMacro}
+          onCancel={() => setEditing(null)}
+        />
+      ) : (
+        <ActionLibrary
+          groups={library}
+          initiallyOpen={3}
+          currentValue={current ? encode(current) : null}
+          disabled={busy}
+          title={t(`${P}library`)}
+          hint={spot ? t(`${P}libraryHintSelected`, { button: gName(spot.g) }) : t(`${P}libraryHint`)}
+          searchLabel={t(`${P}librarySearch`)}
+          emptyLabel={t(`${P}libraryEmpty`)}
+          onPick={value => { if (selected !== null) void assign(selected, value); }}
+        />
+      )}
       <div className={styles.stage}>
         <div className={styles.stageBar}>
           <ChipGroup
@@ -176,6 +278,11 @@ function AssignmentsTab({ state, profile, change, busy }: ProfileProps) {
               <span className={styles.selectedName}>{state.buttonLabels[spot.slot] ?? ''}</span>
               <span className={styles.selectedArrow} aria-hidden>{ARROW}</span>
               <span className={styles.selectedAction}>{label(spot.slot)}</span>
+              {current.kind === MACRO_KIND && current.macro && !editing && (
+                <Button size="sm" tone="ghost" icon={<Pencil size={14} />} disabled={busy} onClick={() => setEditing({ slot: spot.slot, steps: current.macro ?? null })}>
+                  {t(`${P}macro.edit`)}
+                </Button>
+              )}
               <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} disabled={busy || !FACTORY[spot.slot]} onClick={reset}>
                 {t(`${P}resetButton`)}
               </Button>
@@ -191,8 +298,8 @@ function AssignmentsTab({ state, profile, change, busy }: ProfileProps) {
                 selectedSlot={selected}
                 flashSlot={flash}
                 ariaLabel={t(`${P}view.${view}`)}
-                onSelect={slot => setSelected(prev => (prev === slot ? null : slot))}
-                onDropAction={assign}
+                onSelect={select}
+                onDropAction={(slot, value) => { void assign(slot, value); }}
               />
               <span className={styles.viewCaption}>{t(`${P}view.${view}`)}</span>
             </div>

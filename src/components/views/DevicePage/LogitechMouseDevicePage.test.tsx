@@ -143,6 +143,40 @@ describe('LogitechMouseDevicePage', () => {
     expect(api.setMouseMode).toHaveBeenCalledWith('onboard');
   });
 
+  it('names a stored macro by the keys it presses and offers it in the library', async () => {
+    const macro = [
+      { type: 'keyDown', code: 0xE1 }, { type: 'keyDown', code: 0x0B }, { type: 'delay', code: 30 }, { type: 'keyUp', code: 0x0B },
+      { type: 'keyUp', code: 0xE1 }, { type: 'keyDown', code: 0x0C }, { type: 'keyUp', code: 0x0C },
+    ] as const;
+    const withMacro = buttons.map(b => (b.slot === 9 ? { slot: 9, kind: 'macro' as const, code: 6, modifiers: 0, macro: [...macro], macroEditable: true } : b));
+    await mount(state({ profiles: [profile(1, { buttons: withMacro })] }));
+    expect(callout('G10').textContent).toContain(`${P}macro.summary:{"keys":"Shift+H, I"}`);
+    expect(screen.getAllByText(`${P}macro.summary:{"keys":"Shift+H, I"}`).some(el => el.closest('aside'))).toBe(true);
+    fireEvent.click(callout('G10'));
+    fireEvent.click(screen.getByText(`${P}macro.edit`));
+    expect(screen.getAllByText(`${P}macro.pressed:{"key":"H"}`)).toHaveLength(1);
+  });
+
+  it('records a macro and stores it in the mouse on the selected button', async () => {
+    api.updateMouseProfile.mockResolvedValue(state());
+    await mount(state());
+    fireEvent.click(callout('G4'));
+    fireEvent.click(screen.getAllByText(`${P}macro.new`).find(el => el.closest('aside')) as HTMLElement);
+    fireEvent.click(screen.getByText(`${P}macro.delay.none`));
+    fireEvent.click(screen.getByText(`${P}macro.record`));
+    fireEvent.keyDown(window, { code: 'ControlLeft' });
+    fireEvent.keyDown(window, { code: 'KeyC' });
+    fireEvent.keyDown(window, { code: 'KeyC', repeat: true });
+    fireEvent.keyUp(window, { code: 'KeyC' });
+    fireEvent.click(screen.getByText(`${P}macro.stop`));
+    fireEvent.click(screen.getByText(`${P}macro.save`));
+    await settle();
+    expect(api.updateMouseProfile).toHaveBeenCalledWith(1, { buttons: [{ slot: 3, kind: 'macro', code: 0, modifiers: 0, macro: [
+      { type: 'keyDown', code: 0xE0, modifiers: 0 }, { type: 'keyDown', code: 0x06, modifiers: 0 },
+      { type: 'keyUp', code: 0x06, modifiers: 0 }, { type: 'keyUp', code: 0xE0, modifiers: 0 },
+    ] }] });
+  });
+
   it('restores a profile from its backup', async () => {
     api.restoreMouseProfile.mockResolvedValue(state());
     await mount(state());
