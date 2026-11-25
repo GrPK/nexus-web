@@ -165,6 +165,13 @@ describe('CalendarPage', () => {
     expect(within(dialog).getAllByRole('button').length).toBe(9);
   });
 
+  it('marks only today in the month grid', () => {
+    const { container } = render(<CalendarPage tab="month" />);
+    const marked = container.querySelectorAll('[data-today="true"]');
+    expect(marked.length).toBe(1);
+    expect(marked[0].textContent).toBe('17');
+  });
+
   it('hides a calendar from the view only, and remembers the choice', () => {
     render(<CalendarPage tab="day" />);
     expect(screen.getByRole('button', { name: 'Pick up Leo' })).toBeTruthy();

@@ -42,6 +42,9 @@ export function CalendarMonthGrid({
       <div className={styles.weeks}>
         {weeks.map(week => (
           <div key={week.days[0]} className={styles.week}>
+            {week.days.map((day, i) => day === today && (
+              <div key={`today-${day}`} className={styles.todayFill} style={{ gridColumn: i + 1 }} aria-hidden />
+            ))}
             {week.days.map((day, i) => {
               const dow = new Date(day).getDay();
               const cls = [
@@ -51,7 +54,7 @@ export function CalendarMonthGrid({
                 day === today ? styles.today : '',
               ].filter(Boolean).join(' ');
               return (
-                <div key={day} className={cls} style={{ gridColumn: i + 1 }}>
+                <div key={day} className={cls} style={{ gridColumn: i + 1 }} data-today={day === today ? 'true' : undefined}>
                   <span>{fmt.dayNumber(day)}</span>
                 </div>
               );

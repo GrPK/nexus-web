@@ -59,6 +59,7 @@
 .compact .num { padding-left: 3px; }
 .out { color: var(--text-dim); opacity: 0.55; }
 .weekend { color: var(--text-dim); }
+.todayFill { grid-row: 1 / -1; background-color: var(--accent-soft); pointer-events: none; }
 .today span { background: var(--panel-accent); color: var(--accent-text); font-weight: var(--weight-strong); }
 
 .bar {
