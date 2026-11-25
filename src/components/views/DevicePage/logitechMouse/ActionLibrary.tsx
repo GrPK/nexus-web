@@ -18,6 +18,8 @@ export interface LibraryGroup {
 
 export interface ActionLibraryProps {
   groups: readonly LibraryGroup[];
+  /** How many groups, from the top, start unfolded (2 when not given). */
+  initiallyOpen?: number;
   /** The selected button's binding, highlighted in the list. */
   currentValue: string | null;
   disabled: boolean;
@@ -32,9 +34,9 @@ export interface ActionLibraryProps {
  * The action list next to the mouse, like the vendor app's assignment panel: groups that fold, a search
  * box across all of them, and items that are clicked onto the selected button or dragged onto any button.
  */
-export function ActionLibrary({ groups, currentValue, disabled, title, hint, searchLabel, emptyLabel, onPick }: ActionLibraryProps) {
+export function ActionLibrary({ groups, initiallyOpen = 2, currentValue, disabled, title, hint, searchLabel, emptyLabel, onPick }: ActionLibraryProps) {
   const [query, setQuery] = useState('');
-  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set(groups.slice(2).map(g => g.key)));
+  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set(groups.slice(initiallyOpen).map(g => g.key)));
   const q = query.trim().toLowerCase();
   const shown = useMemo(
     () => groups
