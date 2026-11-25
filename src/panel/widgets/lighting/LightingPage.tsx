@@ -27,6 +27,9 @@ import { useLayoutPresets, devicesToLayouts, devicesToPower } from './page/useLa
 import { mediaIdle, playCurrentOrFirstMedia } from '../../../api/mediaLibrary';
 import { getLianLiLighting, isLianLiHubId, setLianLiLighting } from '../../../api/lianli';
 import { getLianLiWirelessLighting, getLianLiWirelessState, setLianLiWirelessChainLighting, type LianLiWirelessFan } from '../../../api/lianli-wireless';
+import { isGalleonDeck } from '../../../lib/galleonDeck';
+import { useStreamDecks } from '../../../hooks/useStreamDecks';
+import { GALLEON_SAVE_ANCHOR, galleonDeviceKey, galleonKeyboardCards } from '../../../components/views/DevicePage/galleonKeyboardLighting';
 import { deviceTypeKey, lianLiWirelessDeviceAnchor } from '../../../components/views/DevicePage/LianLiWirelessFansTab';
 import { unboundWirelessCards, unboundWirelessFans } from './page/unboundWireless';
 import { LIANLI_FLEX_CHANNEL_PREFIX, lianLiFlexLightingApi } from '../../../api/lianli-flex';
@@ -131,6 +134,8 @@ import { OpenRgbButton } from './page/OpenRgbButton';
 import { GlobalBrightnessSlider } from './page/GlobalBrightnessSlider';
 import { PresetToolbar } from '../../../components/common/PresetToolbar/PresetToolbar';
 import { PresetAppsModal } from './page/PresetAppsModal';
+import { formatList } from '../../../components/common/Nexus2WelcomeScreen/nexus2WelcomeUtils';
+import { modeBlockedBySavedColors, savedColorsCards, savesColorsToDevice, selectionSavesColors } from './page/savedColorsOnly';
 import { EffectTab, type PostProcessState } from './page/EffectTab';
 import { useThrottle } from '../../../hooks/cadence';
 import { useAudioState } from '../../../hooks/useAudioState';
@@ -288,6 +293,8 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     scanning: serviceState.lighting?.scanning ?? false,
   };
   const [devices, setDevices] = useState<LightingDevice[]>([]);
+  const { decks: streamDecks } = useStreamDecks(true);
+  const galleonDeckSerials = streamDecks.filter(isGalleonDeck).map(d => d.serial);
   // User-made rail groups. The service owns them (they ride the device list),
   // so a write is optimistic and the lighting topic reconciles.
   const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[]>([]);
@@ -1129,7 +1136,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     setTabBaseMode(reconciledTab.base);
     setSelectionTab(reconciledTab.tab);
   }
-  const viewMode: LightingMode = selectionTab ?? mode;
+  // A selected card that keeps its colors on the device can only show a still look.
+  const staticOnly = selectionSavesColors(visibleDevices, selectedDeviceIds);
+  const savedColorNames = staticOnly ? savedColorsCards(visibleDevices, selectedDeviceIds).map(d => d.name) : [];
+  const openedMode: LightingMode = selectionTab ?? mode;
+  const viewMode: LightingMode = staticOnly && modeBlockedBySavedColors(openedMode) ? 'static' : openedMode;
   // Nothing selected on a tab other than the running mode: its picks reach no card until a
   // selection gives them one (or a press of the tab starts the mode), so they flash the scope chip.
   const detachedTab = selectedDeviceIds.size === 0 && viewMode !== mode;
@@ -2534,24 +2545,29 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
       const Icon = LIGHTING_MODE_ICONS[m.key];
       const showPauseToggle = synced && m.key === mode
         && (m.key === 'animate' || m.key === 'gif' || m.key === 'screen');
+      const blocked = staticOnly && modeBlockedBySavedColors(m.key);
+      const blockedTip = t('lighting.mode.savedColorsOnly', { name: formatList(savedColorNames, language), static: t('lighting.mode.static') });
       return {
         key: m.key,
         label: t(m.labelKey),
-        tooltip: serviceOnline ? t(`${m.labelKey}.desc`) : undefined,
+        tooltip: blocked ? blockedTip
+          : serviceOnline ? t(`${m.labelKey}.desc`) : undefined,
         icon: <Icon size={14} />,
+        blocked: blocked || undefined,
         trailing: showPauseToggle ? (
-          <HoverTooltip body={t(paused ? 'lighting.resume' : 'lighting.pause')} side="top">
+          <HoverTooltip body={blocked ? blockedTip : t(paused ? 'lighting.resume' : 'lighting.pause')} side="top">
             <span
               role="button"
               tabIndex={0}
-              className={`${styles.pauseToggle} ${paused ? styles.pauseTogglePaused : ''}`}
+              className={`${styles.pauseToggle} ${paused ? styles.pauseTogglePaused : ''} ${blocked ? styles.pauseToggleBlocked : ''}`}
               aria-label={t(paused ? 'lighting.resume' : 'lighting.pause')}
-              onClick={e => { e.stopPropagation(); void handlePauseToggle(); }}
+              aria-disabled={blocked || undefined}
+              onClick={e => { e.stopPropagation(); if (!blocked) void handlePauseToggle(); }}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
                   e.stopPropagation();
-                  void handlePauseToggle();
+                  if (!blocked) void handlePauseToggle();
                 }
               }}
             >
@@ -2573,6 +2589,13 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
     : (viewMode === 'none' ? MODE_MENU_TAB_KEY : viewMode);
   const globalTabKey = !synced ? undefined
     : (mode === 'none' ? MODE_MENU_TAB_KEY : mode);
+  // Every path that makes a look global (no selection, simple mode, presets, sync, another client)
+  // reaches an unpinned card, and a saved keyboard cannot keep an animated one. These cards show their
+  // saved colors then, and the card says so.
+  const savedAnimatedIds = useMemo(
+    () => new Set(visibleDevices.filter(d => savesColorsToDevice(d) && modeBlockedBySavedColors(cardMode(d.id))).map(d => d.id)),
+    [visibleDevices, cardMode],
+  );
   // What a tab press gives the selected cards: that mode's global look, or the
   // one shared Mirror or Media. Off cannot be pinned, so it
   // always changes everything.
@@ -3178,6 +3201,11 @@ export function LightingPage({ serviceOnline, serviceState, connectionState, act
             runningApps={runningApps}
             curatedControl={curatedControl}
             onOpenAppStrip={setAppStripIds}
+            savedAnimatedIds={savedAnimatedIds}
+            onOpenSaveToDevice={onSectionNavigate ? deviceId => {
+              const deviceKey = galleonDeviceKey(deviceId, galleonDeckSerials, galleonKeyboardCards(devices).length);
+              return deviceKey ? () => onSectionNavigate('device', { deviceKey, scrollAnchors: [GALLEON_SAVE_ANCHOR] }) : null;
+            } : undefined}
             onOpenFixLighting={deviceName => setFixLighting({ deviceName })}
             onOpenFixLightingLink={showCanvas || viewMode === 'static' ? () => setFixLighting({ deviceName: null }) : undefined}
           />
