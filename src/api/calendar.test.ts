@@ -81,6 +81,8 @@ describe('calendar api client', () => {
       const failure = await addCalendarSource({ url: again, name: 'B', color: '#fff' }).catch(e => e);
       expect(failure.code).toBe('duplicate');
     }
+    const wrongPort = await addCalendarSource({ url: 'https://dup.test:80/a.ics', name: 'D', color: '#fff' });
+    expect(wrongPort.host).toBe('dup.test');
     const other = await addCalendarSource({ url: 'https://dup.test/a.ics?x=1', name: 'C', color: '#fff' });
     expect(other.host).toBe('dup.test');
   });

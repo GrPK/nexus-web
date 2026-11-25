@@ -54,8 +54,8 @@ export function mockRefresh(): void {
 const addedFeeds = new Map<string, string>();
 
 function feedIdentity(url: URL): string {
-  const port = url.port && url.port !== '443' && url.port !== '80' ? `:${url.port}` : '';
-  return `${url.protocol}//${url.hostname.toLowerCase()}${port}${url.pathname.replace(/\/+$/, '')}${url.search}`;
+  // WHATWG host is lowercased and empty-ported only for the scheme's own default port.
+  return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, '')}${url.search}`;
 }
 
 export function mockAddSource(input: AddCalendarInput): { source: CalendarSourceDto } | { error: CalendarAddError } {
