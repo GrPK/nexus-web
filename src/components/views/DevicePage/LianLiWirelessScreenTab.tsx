@@ -88,15 +88,6 @@ const ROTATIONS = [0, 1, 2, 3];
 /** Clip rates the fan screens offer beyond the lighting presets. */
 const FAN_LCD_EXTRA_CAPS_HZ = [60] as const;
 
-const IMPORT_MSG_MAX = 80;
-
-/** A conversion failure carries raw encoder stderr; only a short plain service message is worth showing. */
-function importErrorBody(msg: string | undefined, t: (key: string) => string): string {
-  const plain = (msg ?? '').trim();
-  if (plain && plain.length <= IMPORT_MSG_MAX && !/[\r\n]|ffmpeg/i.test(plain)) return plain;
-  return t('lighting.controls.importConvertFailed');
-}
-
 const SELECTION_MODES: { key: 'single' | 'multiple'; labelKey: string }[] = [
   { key: 'single', labelKey: 'devices.lianli-wireless.selectionModeSingle' },
   { key: 'multiple', labelKey: 'devices.lianli-wireless.selectionModeMultiple' },
@@ -448,7 +439,7 @@ export function LianLiWirelessScreenTab({
         if (!result) {
           push({ title: t('lighting.controls.importFailed'), body: t('lighting.controls.importNetworkError') });
         } else if ('error' in result) {
-          push({ title: t('lighting.controls.importFailed'), body: importErrorBody(result.msg, t) });
+          push({ title: t('lighting.controls.importFailed'), body: t('lighting.controls.importConvertFailed') });
         } else if (aliveRef.current) {
           handleMediaSelect(result);
         }

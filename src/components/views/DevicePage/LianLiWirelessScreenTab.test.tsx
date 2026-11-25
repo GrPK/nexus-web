@@ -497,18 +497,12 @@ describe('LianLiWirelessScreenTab', () => {
     }));
   });
 
-  it('falls back to the friendly body for a long or multi-line service message', async () => {
-    mockImportMedia.mockResolvedValue({ error: true, msg: `bad input\n${'x'.repeat(200)}` });
+  it('never shows the service message, even a short one', async () => {
+    mockImportMedia.mockResolvedValue({ error: true, msg: 'File is too large' });
     await importOneFile();
     await waitFor(() => expect(toast.push).toHaveBeenCalledWith({
       title: 'lighting.controls.importFailed', body: 'lighting.controls.importConvertFailed',
     }));
-  });
-
-  it('still shows a short plain service message when an import is refused', async () => {
-    mockImportMedia.mockResolvedValue({ error: true, msg: 'File is too large' });
-    await importOneFile();
-    await waitFor(() => expect(toast.push).toHaveBeenCalledWith({ title: 'lighting.controls.importFailed', body: 'File is too large' }));
   });
 
   it('says the service could not be reached when an import gets no answer', async () => {
