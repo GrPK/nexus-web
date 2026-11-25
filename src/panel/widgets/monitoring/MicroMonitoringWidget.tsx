@@ -1,4 +1,4 @@
-import { useId, useMemo, type CSSProperties } from 'react';
+import { createContext, useCallback, useContext, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useSensors } from '../../../hooks/useSensors';
 import { useSensorExtras } from '../../../hooks/useSensorExtras';
 import { useFpsSensors } from '../../../hooks/useFpsSensors';
@@ -23,7 +23,7 @@ import {
 } from './MonitoringWidget';
 import { bareSensorLabel } from './sensorNames';
 import { gpu2Components, igpuComponents, sensorCaptionName } from './sensorCategories';
-import { adaptiveFillMax, chartDomainForScale, defaultFixedMax, DEFAULT_SCALE_MODE, fixedFillPercent, type ScaleMode } from './perfDomain';
+import { adaptiveFillMax, chartDomainForScale, observedPeak, usesAdaptiveCurrent, defaultFixedMax, DEFAULT_SCALE_MODE, fixedFillPercent, type ScaleMode } from './perfDomain';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
 import { ColumnScaleProvider, MicroBar } from './MicroBar';
 import { usePanelGaugeGradient, type PanelGaugeGradientValue } from '../common/PanelGaugeGradientContext';
@@ -83,6 +83,29 @@ export function bottomLabelForDevice(
     case 'network': return 'Network';
     case 'fps': return 'FPS';
   }
+}
+
+// One peak shared by every Current row in the card: each row reports its own
+// observed peak and reads the largest, so pins keep their relative heights.
+interface CurrentPeakValue {
+  peak: number;
+  report: (id: string, peak: number) => void;
+  drop: (id: string) => void;
+}
+const CurrentPeakContext = createContext<CurrentPeakValue | null>(null);
+
+function CurrentPeakProvider({ children }: { children: React.ReactNode }) {
+  const peaks = useRef(new Map<string, number>());
+  const [peak, setPeak] = useState(0);
+  const sync = useCallback(() => {
+    let next = 0;
+    for (const p of peaks.current.values()) if (p > next) next = p;
+    setPeak(prev => (prev === next ? prev : next));
+  }, []);
+  const report = useCallback((id: string, p: number) => { peaks.current.set(id, p); sync(); }, [sync]);
+  const drop = useCallback((id: string) => { peaks.current.delete(id); sync(); }, [sync]);
+  const value = useMemo(() => ({ peak, report, drop }), [peak, report, drop]);
+  return <CurrentPeakContext.Provider value={value}>{children}</CurrentPeakContext.Provider>;
 }
 
 export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlot }: MicroMonitoringWidgetProps) {
@@ -189,6 +212,7 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
   const half = Math.ceil(count / 2);
 
   return (
+    <CurrentPeakProvider>
     <div className={styles.micro}>
       {twoColumn ? (
         <div className={styles.columns}>
@@ -206,6 +230,7 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
         </HoverTooltip>
       )}
     </div>
+    </CurrentPeakProvider>
   );
 }
 
@@ -249,9 +274,18 @@ function MicroRow({ sensors, fpsSensors, networkSensors, extras, device, prefixe
   const label = displayLabel(labelMode, labelOverride, autoLabel);
   const sensorKey = `${device}::${effectiveSensorName || 'default'}`;
   const history = useSharedSensorHistory(sensorKey, rawValue) as number[];
+  const peakCtx = useContext(CurrentPeakContext);
   const maxValue = device === 'network'
     ? networkMaxValue(rawValue, history)
-    : adaptiveFillMax(sensor, rawValue, history, staticMaxForDevice(device, sensor?.name, sensor?.type, sensor?.value));
+    : adaptiveFillMax(sensor, rawValue, history, staticMaxForDevice(device, sensor?.name, sensor?.type, sensor?.value), peakCtx?.peak ?? 0);
+  const ownPeak = observedPeak(rawValue, history);
+  const reportsPeak = device !== 'network' && scale !== 'fixed' && usesAdaptiveCurrent(sensor);
+  const peakId = useId();
+  useLayoutEffect(() => {
+    if (!peakCtx || !reportsPeak) return undefined;
+    peakCtx.report(peakId, ownPeak);
+    return () => peakCtx.drop(peakId);
+  }, [peakCtx?.report, peakCtx?.drop, peakId, ownPeak, reportsPeak]); // eslint-disable-line react-hooks/exhaustive-deps
   // A shared Fixed range scales every bar to the same [min, max] window;
   // adaptive keeps each bar's natural percent fill.
   const [domainMin, domainMax] = chartDomainForScale(device, rawValue, history, maxValue, scale, sensor?.name, sensor?.type, fixedMin, fixedMax, defaultFixedMax(device, sensor, effectiveSensorName));

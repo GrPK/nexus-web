@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { adaptiveCurrentMax, adaptiveFillMax, chartDomainForScale, defaultFixedMax, designIsFill, designSupportsRange, designSupportsScale, fixedFillPercent, isHeterogeneousTypeDevice, relativeHistoryDomain, staticMaxForDevice } from './perfDomain';
+import { adaptiveCurrentMax, adaptiveFillMax, observedPeak, chartDomainForScale, defaultFixedMax, designIsFill, designSupportsRange, designSupportsScale, fixedFillPercent, isHeterogeneousTypeDevice, relativeHistoryDomain, staticMaxForDevice } from './perfDomain';
 
 describe('designSupportsScale', () => {
   it('supports only sparkline and line', () => {
@@ -84,6 +84,31 @@ describe('adaptiveCurrentMax', () => {
     const max = adaptiveCurrentMax(0.881, [0.881, peak]);
     expect((0.881 / max) * 100).toBeGreaterThan(70);
     expect((peak / max) * 100).toBeLessThan(85);
+  });
+});
+
+describe('shared Current peak', () => {
+  it('observedPeak takes the largest finite sample including the live value', () => {
+    expect(observedPeak(0.9, [0.5, 2, Number.NaN])).toBe(2);
+    expect(observedPeak(Number.NaN, [])).toBe(0);
+  });
+  it('rows with different values keep their relative heights under one shared peak', () => {
+    const pins = [0.881, 0.921, 0.993];
+    const shared = Math.max(...pins);
+    const fills = pins.map(v => (v / adaptiveCurrentMax(v, [v], shared)) * 100);
+    expect(fills[2]).toBeCloseTo(83.33, 1);
+    expect(fills[0]).toBeLessThan(fills[1]);
+    expect(fills[1]).toBeLessThan(fills[2]);
+    expect(fills[0] / fills[2]).toBeCloseTo(0.881 / 0.993, 5);
+  });
+  it('a row beyond the shared peak still sets its own ceiling', () => {
+    expect(adaptiveCurrentMax(5, [5], 1)).toBeCloseTo(6);
+  });
+  it('only Current rows are affected by a shared peak', () => {
+    const cur = { id: 'c', name: 'Pin 1', type: 'Current', value: 1, units: 'A', formatted: '1', parent: { id: 'p', name: 'p' } };
+    const temp = { ...cur, type: 'Temperature' };
+    expect(adaptiveFillMax(cur, 0.9, [0.9], 100, 30)).toBeCloseTo(36);
+    expect(adaptiveFillMax(temp, 70, [70], 100, 30)).toBe(100);
   });
 });
 

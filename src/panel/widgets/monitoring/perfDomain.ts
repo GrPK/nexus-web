@@ -129,29 +129,42 @@ export function defaultFixedMax(device: DeviceKey, sensor: HardwareSensor | unde
 const CURRENT_HEADROOM = 1.2;
 const CURRENT_FLOOR = 1;
 
-/**
- * Adaptive fill ceiling for Current sensors: 1.2x the largest sample in the
- * history the widget already holds (the live value counts), never below 1 A.
- * Current has no natural 0-100 scale, so a static ceiling left small readings
- * near empty; this follows the sensor's own recent peak instead.
- */
-export function adaptiveCurrentMax(rawValue: number, history: readonly number[]): number {
+/** Largest finite sample among the live value and the history held for it. */
+export function observedPeak(rawValue: number, history: readonly number[]): number {
   let peak = Number.isFinite(rawValue) ? rawValue : 0;
   for (const v of history) {
     if (Number.isFinite(v) && v > peak) peak = v;
   }
+  return peak;
+}
+
+/**
+ * Adaptive fill ceiling for Current sensors: 1.2x the peak, never below 1 A.
+ * Current has no natural 0-100 scale, so a static ceiling left small readings
+ * near empty. `sharedPeak` is the largest peak across the card's Current rows,
+ * so rows keep their heights relative to each other (an imbalance stays
+ * visible) instead of each reading full against itself.
+ */
+export function adaptiveCurrentMax(rawValue: number, history: readonly number[], sharedPeak = 0): number {
+  const peak = Math.max(observedPeak(rawValue, history), Number.isFinite(sharedPeak) ? sharedPeak : 0);
   return Math.max(CURRENT_HEADROOM * peak, CURRENT_FLOOR);
 }
 
-/** The Adaptive fill ceiling: the observed-peak one for Current, else `staticMax`. */
+/** The Adaptive fill ceiling: the peak-based one for Current, else `staticMax`. */
 export function adaptiveFillMax(
   sensor: HardwareSensor | undefined,
   rawValue: number,
   history: readonly number[],
   staticMax: number,
+  sharedPeak = 0,
 ): number {
-  if (sensor?.type !== 'Current' || (sensor.theoreticalMaximum ?? 0) > 0) return staticMax;
-  return adaptiveCurrentMax(rawValue, history);
+  if (!usesAdaptiveCurrent(sensor)) return staticMax;
+  return adaptiveCurrentMax(rawValue, history, sharedPeak);
+}
+
+/** Whether a sensor's Adaptive fill follows the observed Current peak. */
+export function usesAdaptiveCurrent(sensor: HardwareSensor | undefined): boolean {
+  return sensor?.type === 'Current' && !((sensor.theoreticalMaximum ?? 0) > 0);
 }
 
 export function chartDomainForScale(
