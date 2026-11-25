@@ -489,10 +489,26 @@ describe('LianLiWirelessScreenTab', () => {
     await waitFor(() => expect(mockImportMedia).toHaveBeenCalledTimes(1));
   }
 
-  it('shows the service message in a toast when an import is refused', async () => {
+  it('shows a friendly body, never encoder stderr, when a conversion fails', async () => {
     mockImportMedia.mockResolvedValue({ error: true, msg: 'ffmpeg exit 1: bad' });
     await importOneFile();
-    await waitFor(() => expect(toast.push).toHaveBeenCalledWith({ title: 'lighting.controls.importFailed', body: 'ffmpeg exit 1: bad' }));
+    await waitFor(() => expect(toast.push).toHaveBeenCalledWith({
+      title: 'lighting.controls.importFailed', body: 'lighting.controls.importConvertFailed',
+    }));
+  });
+
+  it('falls back to the friendly body for a long or multi-line service message', async () => {
+    mockImportMedia.mockResolvedValue({ error: true, msg: `bad input\n${'x'.repeat(200)}` });
+    await importOneFile();
+    await waitFor(() => expect(toast.push).toHaveBeenCalledWith({
+      title: 'lighting.controls.importFailed', body: 'lighting.controls.importConvertFailed',
+    }));
+  });
+
+  it('still shows a short plain service message when an import is refused', async () => {
+    mockImportMedia.mockResolvedValue({ error: true, msg: 'File is too large' });
+    await importOneFile();
+    await waitFor(() => expect(toast.push).toHaveBeenCalledWith({ title: 'lighting.controls.importFailed', body: 'File is too large' }));
   });
 
   it('says the service could not be reached when an import gets no answer', async () => {
@@ -778,6 +794,13 @@ describe('LianLiWirelessScreenTab Restart LCD', () => {
       mockGetScreens.mockResolvedValue([clip('S1', 30)]);
       await renderTab();
       expect(screen.getByRole('button', { name: RATE })).toHaveTextContent(HZ(30));
+    });
+
+    it('uses the clip hint rather than the panel redraw hint', async () => {
+      mockGetScreens.mockResolvedValue([clip('S1', 30)]);
+      await renderTab();
+      expect(screen.getByText('devices.lianli-wireless.frameRateClipHint')).toBeInTheDocument();
+      expect(screen.queryByText('devices.lcd.frameRateHint')).not.toBeInTheDocument();
     });
 
     it('is hidden for a still image, for a screen without a cap (older service) and for a Nexus panel', async () => {
