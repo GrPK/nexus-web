@@ -82,6 +82,9 @@ import type { DeckEditView } from './widgets/types';
 import { WidgetContextMenu } from './widgets/common/WidgetContextMenu';
 import { useDeckInstance, DeckInstanceProvider } from './widgets/deck/useDeckInstance';
 import { innerGridForSize } from './widgets/deck/deckLayout';
+import { PanelSkinScope, type PanelSkinScopeValue } from '../components/common/ThemeScope/PanelSkinScope';
+import { panelFontAttrs, panelSkinScopeAttrs } from './theme/panelSkin';
+import { useSkinStyles } from './skins/skinLoader';
 import { PanelGaugeGradientProvider, type PanelGaugeGradientValue } from './widgets/common/PanelGaugeGradientContext';
 import { PanelDeviceIdProvider } from './widgets/common/PanelDeviceIdContext';
 import { PanelImmersiveOpenProvider } from './widgets/common/PanelImmersiveContext';
@@ -135,7 +138,7 @@ import { tileTransposed } from './engine/tileOrientation';
 import { resolveRecordRotation } from '../components/views/DevicePage/panelRotation';
 import { inferSurfaceFromViewport } from './device/inferSurface';
 import { isLocalPanelClient } from './background/panelAudio';
-import { panelSystemFontsAvailable } from './theme/panelFont';
+import { panelSystemFontsAvailable, splitPanelFontStyle } from './theme/panelFont';
 import { PanelBackgroundShader } from './background/PanelBackgroundShader';
 import { PanelBackgroundMedia } from './background/PanelBackgroundMedia';
 import { PanelBackgroundSolid } from './background/PanelBackgroundSolid';
@@ -591,7 +594,13 @@ export function PanelContent({
   // shows the default theme (its fetch never runs).
   // Render-time per-surface overrides (persisted theme intact); see
   // resolveEffectivePanelTheme for what each surface forces.
-  const baseTheme = simulator && simulatorTheme ? simulatorTheme : panelTheme.theme;
+  const storedTheme = simulator && simulatorTheme ? simulatorTheme : panelTheme.theme;
+  // The skin applies only once its CSS has loaded; until then (and if the load fails) the panel keeps the stock look.
+  const skinStylesReady = useSkinStyles(embedded ? null : storedTheme.skin);
+  const baseTheme = useMemo(
+    () => (skinStylesReady || !storedTheme.skin ? storedTheme : { ...storedTheme, skin: null }),
+    [skinStylesReady, storedTheme],
+  );
   const focusStaticMode = useFocusStaticBackground(surface, !simulator && !embedded);
   const effectiveTheme = useMemo(() => {
     const theme = resolveEffectivePanelTheme(baseTheme, surface);
@@ -793,6 +802,14 @@ export function PanelContent({
     () => embedded ? buildEmbeddedPanelThemeVars(appAccentColor, resolvedThemeMode) : buildPanelThemeVars(effectiveTheme, resolvedThemeMode),
     [appAccentColor, embedded, effectiveTheme, resolvedThemeMode],
   );
+  // Skin attributes for every panel-root mount, mirrored on the portal host.
+  // The embedded desktop deck stays unskinned.
+  const skinScope = useMemo<PanelSkinScopeValue | null>(() => {
+    if (embedded) return null;
+    const skinAttrs = panelSkinScopeAttrs(effectiveTheme);
+    if (!skinAttrs) return null;
+    return { attrs: { ...skinAttrs, 'data-theme': resolvedThemeMode, 'data-surface': surface }, style: panelThemeVars };
+  }, [embedded, effectiveTheme, resolvedThemeMode, surface, panelThemeVars]);
   // The panel backdrop is always the theme's dark/light background; the chosen
   // solid colour, shader, or media sits over it as an opacity-controlled
   // overlay. The embedded desktop deck paints no panel background so the
@@ -828,7 +845,19 @@ export function PanelContent({
   // Dialogs opened from the sheet (a confirm) portal to <body>, outside the
   // sheet's zoom; hand them the same scale so they match the panel chrome.
   const sheetOverlayScale = touchPanelChrome ? (webkitSafeChromeScale ?? webkitSafePanelScale ?? 1) : 1;
-  const backdrop = wallpaperBackgroundAvailable && showPanelBackground
+  // Skin background mode replaces the theme layers with the skin backdrop; any other mode draws the skin tiles over the user's background.
+  const fontAttrs = useMemo(() => (embedded ? {} : panelFontAttrs(effectiveTheme)), [embedded, effectiveTheme]);
+  const skinned = skinScope !== null;
+  // A non-default font alone still needs the portal host, so sheets opened outside the panel root draw in it.
+  const portalScope = useMemo<PanelSkinScopeValue | null>(() => {
+    if (skinScope) return skinScope;
+    const { font } = splitPanelFontStyle(panelThemeVars);
+    if (embedded || !font || !fontAttrs['data-panel-font']) return null;
+    return { attrs: { ...fontAttrs, 'data-theme': resolvedThemeMode, 'data-surface': surface }, style: font };
+  }, [skinScope, embedded, panelThemeVars, fontAttrs, resolvedThemeMode, surface]);
+  // A wallpaper or desktop Rendering choice shows instead of the skin's backdrop, like any other source.
+  const skinOwnsBackdrop = skinned && effectiveTheme.backgroundMode === 'skin' && effectiveTheme.backdrop === 'theme';
+  const backdrop = wallpaperBackgroundAvailable && showPanelBackground && !skinOwnsBackdrop
     ? effectiveTheme.backdrop
     : 'theme';
   // Wallpaper redraws the desktop picture in-page; desktop paints nothing at
@@ -837,7 +866,7 @@ export function PanelContent({
   // wallpaper rather than going transparent over the dashboard.
   const seeThrough = backdrop === 'desktop' && !simulator;
   // At 0% nothing of the background shows, so no layer mounts: no video decode, no shader.
-  const backgroundVisible = effectiveTheme.backgroundOpacity > 0;
+  const backgroundVisible = effectiveTheme.backgroundOpacity > 0 && !skinOwnsBackdrop;
   const showWallpaperLayer = (backdrop === 'wallpaper' || (backdrop === 'desktop' && simulator)) && backgroundVisible;
   // html/body carry the app background from global.scss, so a transparent
   // panel root alone still paints over the desktop the kiosk is showing.
@@ -846,7 +875,8 @@ export function PanelContent({
     root.classList.toggle('panel-see-through', seeThrough);
     return () => root.classList.remove('panel-see-through');
   }, [seeThrough]);
-  useAutoTextColor(rootRef, effectiveTheme.textColorMode === 'adaptive', resolvedThemeMode === 'dark' ? 'light' : 'dark');
+  // The Skin backdrop is known, so the skin's own ink already fits it: nothing to sample.
+  useAutoTextColor(rootRef, effectiveTheme.textColorMode === 'adaptive' && !skinOwnsBackdrop, resolvedThemeMode === 'dark' ? 'light' : 'dark');
   // Scoped to the widget grids, the editor dock and the drag overlay, so the panel's own sheets and menus keep the theme.
   const customTextStyle = useMemo(
     () => (effectiveTheme.textColorMode === 'custom'
@@ -871,9 +901,9 @@ export function PanelContent({
     && !effectiveTheme.backgroundSlideshow
     && (!effectiveTheme.backgroundMediaId || !effectiveTheme.backgroundMediaType
       || failedMediaId === effectiveTheme.backgroundMediaId);
-  // Frosted glass blurs what the page itself painted. Solid mode renders no
-  // frost pass (a blurred solid colour is the colour), and see-through has
-  // nothing in-page to sample.
+  // Frosted glass blurs what the page itself painted. Solid and Skin modes
+  // render no frost pass (a blurred flat colour is the colour), and
+  // see-through has nothing in-page to sample.
   const backgroundFrost = (showWallpaperLayer || (showBackgroundLayers && effectiveTheme.backgroundMode !== 'solid' && !mediaShowsSolid))
     ? effectiveTheme.backgroundFrost
     : 0;
@@ -901,7 +931,7 @@ export function PanelContent({
   const panelRootStyle = useMemo(
     () => ({
       ...panelThemeVars,
-      background: themeBackdrop,
+      ...(skinOwnsBackdrop ? { backgroundColor: effectiveTheme.backgroundOpacity >= 1 ? 'var(--skin-backdrop)' : themeBackdrop } as Record<string, string> : { background: themeBackdrop }),
       '--panel-background-solid': panelSolidColor,
       '--panel-columns': gridColumns,
       // Drag collision clamps drop rows to this.
@@ -929,6 +959,8 @@ export function PanelContent({
       panelSolidColor,
       webkitSafeChromeScale,
       themeBackdrop,
+      skinOwnsBackdrop,
+      effectiveTheme.backgroundOpacity,
       panelThemeVars,
       runtimeGrid.cellSize,
       gridColumns,
@@ -1609,7 +1641,8 @@ export function PanelContent({
   // A generic display's empty space always reaches the desktop; other display panels follow their record.
   const clickThrough = seeThrough && (genericDisplay || recordState.record?.clickThrough === true);
   // Empty space never opens panel UI where it is meant to pass clicks; the widget menu reaches it instead.
-  const emptySpaceInert = genericDisplay || clickThrough;
+  // A touch generic display on a solid background keeps long-press, as any touch panel does.
+  const emptySpaceInert = genericOnePage || clickThrough;
   // Long-press on the empty background opens the actions tray (mirrors the
   // widget long-press-to-menu). Kiosk surfaces only, not while in a sheet /
   // immersive / drag state, and only when the press misses widgets and
@@ -2275,6 +2308,7 @@ export function PanelContent({
   }, [paginatedLayout, touch, widgetById, embedded, surface, singlePage, setDraggingPinnableType, pinnedTail]);
 
   return (
+    <PanelSkinScope scope={portalScope}>
     <TouchViaPointerContext.Provider value={mouseAsTouch}>
     <PanelRestrictedProvider value={restricted}>
     <PanelGenericDisplayProvider value={genericDisplay}>
@@ -2382,6 +2416,9 @@ export function PanelContent({
       <div
         ref={rootRef}
         className={`panel-root ${styles.panelRoot}`}
+        {...fontAttrs}
+        {...skinScope?.attrs}
+        data-skin-root={skinned ? '' : undefined}
         data-theme={resolvedThemeMode}
         data-surface={surface}
         data-screen-sleep={screenHidden ? 'true' : undefined}
@@ -2428,6 +2465,7 @@ export function PanelContent({
         onPointerCancel={backgroundLongPress.onPointerCancel}
         onContextMenu={handleBackgroundContextMenu}
       >
+        {skinOwnsBackdrop && <div data-skin-part="backdrop" data-panel-bg-layer aria-hidden="true" style={{ opacity: effectiveTheme.backgroundOpacity }} />}
         {showWallpaperLayer && <PanelBackgroundDesktop opacity={effectiveTheme.backgroundOpacity} />}
         {showBackgroundLayers && effectiveTheme.backgroundMode === 'shader' && (
           <PanelBackgroundShader
@@ -2771,7 +2809,7 @@ export function PanelContent({
             onAddWidget={mouseEditable ? () => openSheet('catalog') : undefined}
             alwaysOnTop={menuAlwaysOnTop === undefined ? undefined : effectiveOnTop}
             alwaysOnTopDisabled={onTopBlocked}
-            onOpenPanelActions={emptySpaceInert && kioskBehavior ? () => setTrayOpen(true) : undefined}
+            onOpenPanelActions={(genericDisplay || clickThrough) && kioskBehavior ? () => setTrayOpen(true) : undefined}
             onToggleAlwaysOnTop={menuAlwaysOnTop === undefined ? undefined : toggleAlwaysOnTop}
             locked={widgetsLocked}
             onToggleLock={lockAvailable && recordState.record ? toggleWidgetsLocked : undefined}
@@ -2892,6 +2930,8 @@ export function PanelContent({
           onThemeTextColorPreview={panelTheme.previewTextColor}
           onThemeTextColorCommit={panelTheme.commitTextColor}
           onThemeFontCommit={panelTheme.commitFont}
+          onThemeSkinCommit={panelTheme.commitSkin}
+          onThemeSkinReset={panelTheme.resetSkin}
           onThemeBackgroundFrostPreview={panelTheme.previewBackgroundFrost}
           onThemeBackgroundFrostCommit={panelTheme.commitBackgroundFrost}
           onThemeImmersiveBackdropCommit={panelTheme.commitImmersiveBackdrop}
@@ -3011,5 +3051,6 @@ export function PanelContent({
     </PanelGenericDisplayProvider>
     </PanelRestrictedProvider>
     </TouchViaPointerContext.Provider>
+    </PanelSkinScope>
   );
 }

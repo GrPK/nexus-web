@@ -10,7 +10,6 @@ import { patchPanelDevice, type PanelDevicePatch, type PanelDeviceRecord } from 
 import { broadcastLayoutChanged } from '../engine/panelSync';
 import type { PanelRecordState } from '../engine/usePanelRecord';
 import {
-  DEFAULT_PANEL_BACKGROUND_TEMPLATE,
   defaultBackgroundOpacityForMode,
   backdropHintFromUrl,
   normalizePanelBackgroundEffect,
@@ -28,11 +27,17 @@ import {
   panelBackgroundPair,
   panelBackgroundState,
   type PanelBackgroundMode,
+  backgroundModeBeforeSkin,
+  skinBackgroundHeld,
 } from '../background/panelBackground';
 import { useAnimateTemplates } from '../../hooks/useAnimateTemplates';
+import { chooseBackgroundMode, pickSkin, selectBackgroundEffect } from './skinBackgroundSwitch';
 import { gaugeGradientEquals, normalizeGaugeGradient, type GaugeGradientStop } from './gaugeGradient';
 import { normalizeTextColorMode, type TextColorMode } from './textColor';
 import { normalizePanelFont, panelFontVars, type PanelFont } from './panelFont';
+import { applyPanelSkin, normalizeStoredSkin, panelSkinVars } from './panelSkin';
+import { skinDef, type PanelSkinId } from '../skins/skins';
+import { normalizeSkinOverrides, resetSkinOverride, setSkinBackground, setSkinOverride } from '../skins/skinOverrides';
 import { saveAnimateTemplates } from '../../api/lighting';
 import type { EffectState } from '../../types/lighting';
 import type { PanelSlideshowSettings, PanelThemeSettingsState, ResolvedPanelThemeMode } from '../editor/PanelThemeSettings';
@@ -140,7 +145,7 @@ export function buildPanelThemeVars(theme: PanelThemeState, resolvedThemeMode: R
     '--panel-accent-on': onVars['--accent-on'],
     '--panel-accent-on-text': onVars['--accent-on-text'],
   };
-  return { ...vars, ...panelFontVars(theme.font) } as CSSProperties;
+  return { ...vars, ...panelFontVars(theme.font), ...panelSkinVars(theme, panelAccentColor(theme)) } as CSSProperties;
 }
 
 // Per-surface theme overrides applied at render time (persisted theme is
@@ -150,7 +155,8 @@ export function buildPanelThemeVars(theme: PanelThemeState, resolvedThemeMode: R
 // dashboard has no per-device theme record (INERT_PANEL_RECORD), so its
 // widgetPadding never resolves past the initial default; this forces it to the
 // slider's maximum (100%) as a surface-level default instead.
-export function resolveEffectivePanelTheme(baseTheme: PanelThemeState, surface: PanelSurface): PanelThemeState {
+export function resolveEffectivePanelTheme(skinnedTheme: PanelThemeState, surface: PanelSurface): PanelThemeState {
+  const baseTheme = applyPanelSkin(skinnedTheme);
   if (isSingleWidgetSurface(surface)) {
     return { ...baseTheme, widgetLabels: false, widgetOpacity: 0, widgetPadding: 0 };
   }
@@ -200,6 +206,7 @@ export function buildPanelTheme(prefs: Preferences | null, record: PanelDeviceRe
     r?.backdrop,
     supportsDesktopWallpaper((r?.capabilities?.surface ?? '') as PanelSurface, !!r?.displayId),
   );
+  const skin = normalizeStoredSkin(r?.skin);
   return {
     appThemeMode: normalizePanelThemeMode(t?.themeMode),
     appResolvedThemeMode: t?.resolvedThemeMode === 'dark' || t?.resolvedThemeMode === 'light'
@@ -212,6 +219,8 @@ export function buildPanelTheme(prefs: Preferences | null, record: PanelDeviceRe
     backgroundColor: r?.backgroundColor ?? '',
     backgroundColorLight: r?.backgroundColorLight ?? '',
     backgroundMode: bgMode,
+    backgroundModeBefore: backgroundModeBeforeSkin(r?.backgroundMode),
+    backgroundHeld: skinBackgroundHeld(r?.backgroundMode),
     backgroundEffect: effect,
     backgroundTemplate: normalizePanelBackgroundTemplate(templates[effect]),
     backgroundTemplates: templates,
@@ -240,6 +249,8 @@ export function buildPanelTheme(prefs: Preferences | null, record: PanelDeviceRe
     textColorMode: normalizeTextColorMode(r?.textColorMode),
     textColor: r?.textColor ?? '',
     font: normalizePanelFont(r?.font),
+    skin,
+    skinOverrides: normalizeSkinOverrides(r?.skinOverrides),
     gaugeGradient: normalizeGaugeGradient(r?.gaugeGradient),
   };
 }
@@ -297,6 +308,7 @@ function usePanelPreferences(enabled: boolean): Preferences | null {
 // `prefs.panel`. `deviceId` selects which panel's settings, so editing the Q60
 // never touches the Y70. The only cross-surface link is the desktop app theme
 // (`prefs.theme`), the sync source for theme-mode + accent when sync is on.
+
 export function usePanelTheme(
   recordState: PanelRecordState,
   deviceId: string | null | undefined,
@@ -380,10 +392,32 @@ export function usePanelTheme(
     });
   }, [persistPatch]);
 
+  // Stores one field in the active skin's entry and sends the whole map.
+  const writeSkinOverride = useCallback((field: 'accent' | 'font', value: string) => {
+    const cur = themeRef.current;
+    if (!cur.skin) return;
+    const next = setSkinOverride(cur.skinOverrides, cur.skin, field, value);
+    setTheme(prev => ({ ...prev, skinOverrides: next }));
+    persistPatch({ skinOverrides: next });
+  }, [persistPatch]);
+
+  // Reset also returns the background to Skin, the default every skin starts from.
+  const resetSkin = useCallback(() => {
+    const cur = themeRef.current;
+    if (!cur.skin) return;
+    const change = chooseBackgroundMode({ ...cur, skinOverrides: resetSkinOverride(cur.skinOverrides, cur.skin) }, 'skin');
+    setTheme(prev => ({ ...prev, ...change.theme }));
+    persistPatch(change.patch);
+  }, [persistPatch]);
+
   const commitAccent = useCallback((hex: string) => {
+    if (themeRef.current.skin) {
+      writeSkinOverride('accent', hex);
+      return;
+    }
     setTheme(prev => ({ ...prev, accentColor: hex }));
     persistPatch({ accentColor: hex });
-  }, [persistPatch]);
+  }, [persistPatch, writeSkinOverride]);
 
   const commitBackground = useCallback((hex: string) => {
     // Set both slots from the same column so dark/light stay in the picked hue
@@ -393,9 +427,11 @@ export function usePanelTheme(
     persistPatch({ backgroundColor: dark, backgroundColorLight: light });
   }, [persistPatch]);
 
+  // Entering Skin remembers the backdrop, frost and opacity it replaces; picking another mode gives them back.
   const commitBackgroundMode = useCallback((mode: PanelBackgroundMode) => {
-    setTheme(prev => ({ ...prev, backgroundMode: mode }));
-    persistPatch({ backgroundMode: mode });
+    const change = chooseBackgroundMode(themeRef.current, mode);
+    setTheme(prev => ({ ...prev, ...change.theme }));
+    persistPatch(change.patch);
   }, [persistPatch]);
 
   const commitBackdrop = useCallback((backdrop: PanelBackdrop) => {
@@ -409,14 +445,16 @@ export function usePanelTheme(
   const commitBackgroundEffect = useCallback((effect: string) => {
     const nextEffect = normalizePanelBackgroundEffect(effect);
     setDraftBackgroundState(null);
-    if (themeRef.current.backgroundEffect === nextEffect) return;
+    const cur = themeRef.current;
+    if (cur.backgroundEffect === nextEffect) return;
     // Switch to this panel's REMEMBERED preset for that shader (default 0) - the
     // selection is per-panel, per-shader, so switching never resets it.
-    const nextTemplate = normalizePanelBackgroundTemplate(
-      themeRef.current.backgroundTemplates[nextEffect] ?? DEFAULT_PANEL_BACKGROUND_TEMPLATE,
-    );
-    setTheme(prev => ({ ...prev, backgroundEffect: nextEffect, backgroundTemplate: nextTemplate }));
-    persistPatch({ backgroundEffect: nextEffect, backgroundTemplate: nextTemplate });
+    const selection = selectBackgroundEffect(cur.backgroundTemplates, nextEffect);
+    const skinned = cur.skin && cur.backgroundMode === 'shader'
+      ? { skinOverrides: setSkinBackground(cur.skinOverrides, cur.skin, 'shader', nextEffect) }
+      : {};
+    setTheme(prev => ({ ...prev, ...selection, ...skinned }));
+    persistPatch({ ...selection, ...skinned });
   }, [persistPatch]);
 
   const commitBackgroundTemplate = useCallback((template: number) => {
@@ -451,13 +489,13 @@ export function usePanelTheme(
 
   const commitBackgroundMedia = useCallback((mediaId: string | null, type: 'static' | 'animated' | null, alpha = false) => {
     // Picking media shows it: the theme backdrop and media mode ride in the same patch, since a wallpaper or desktop backdrop hides the theme background. Only a surface that offers the backdrop choice ever holds a non-theme one.
-    const showMedia = mediaId
-      ? { backgroundMode: 'media' as const, ...(themeRef.current.backdrop !== 'theme' ? { backdrop: 'theme' as const } : {}) }
-      : {};
-    setTheme(prev => ({ ...prev, ...showMedia, backgroundMediaId: mediaId, backgroundMediaType: type, backgroundMediaAlpha: alpha }));
+    // Under a skin the mode change goes through chooseBackgroundMode so the pre-skin hold and the skin's memory stay intact.
+    const change = mediaId ? chooseBackgroundMode(themeRef.current, 'media') : { theme: {}, patch: {} };
+    const toTheme = mediaId && (change.theme.backdrop ?? themeRef.current.backdrop) !== 'theme' ? { backdrop: 'theme' as const } : {};
+    setTheme(prev => ({ ...prev, ...change.theme, ...toTheme, backgroundMediaId: mediaId, backgroundMediaType: type, backgroundMediaAlpha: alpha }));
     // The service patch-merge ignores a JSON null (means "no change"); an empty
     // string clears the field via NullIfEmpty, same as the other theme fields.
-    persistPatch({ ...showMedia, backgroundMediaId: mediaId ?? '', backgroundMediaType: type ?? '', backgroundMediaAlpha: alpha });
+    persistPatch({ ...change.patch, ...toTheme, backgroundMediaId: mediaId ?? '', backgroundMediaType: type ?? '', backgroundMediaAlpha: alpha });
   }, [persistPatch]);
 
   // One patch for the slideshow group so a toggle + interval edit is a single
@@ -525,8 +563,19 @@ export function usePanelTheme(
   }, [persistPatch]);
 
   const commitFont = useCallback((font: PanelFont | null) => {
+    if (themeRef.current.skin) {
+      writeSkinOverride('font', font ?? skinDef(themeRef.current.skin)?.font ?? '');
+      return;
+    }
     setTheme(prev => ({ ...prev, font }));
     persistPatch({ font: font ?? '' });
+  }, [persistPatch, writeSkinOverride]);
+
+  const commitSkin = useCallback((skin: PanelSkinId | null) => {
+    const change = pickSkin(themeRef.current, skin);
+    if (change.theme.backgroundEffect !== undefined) setDraftBackgroundState(null);
+    setTheme(prev => ({ ...prev, ...change.theme }));
+    persistPatch(change.patch);
   }, [persistPatch]);
 
   const previewGaugeGradient = useCallback((stops: readonly GaugeGradientStop[]) => {
@@ -550,7 +599,7 @@ export function usePanelTheme(
     commitThemeMode,
     commitThemeModePinned,
     commitAccentSync,
-    previewAccent: (hex: string) => setTheme(prev => ({ ...prev, accentColor: hex })),
+    previewAccent: (hex: string) => setTheme(prev => (prev.skin ? { ...prev, skinOverrides: { ...prev.skinOverrides, [prev.skin]: { ...prev.skinOverrides[prev.skin], accent: hex } } } : { ...prev, accentColor: hex })),
     commitAccent,
     previewBackground: (hex: string) => setTheme(prev => (
       resolvedModeRef.current === 'light'
@@ -589,6 +638,8 @@ export function usePanelTheme(
     previewTextColor: (hex: string) => setTheme(prev => ({ ...prev, textColor: hex })),
     commitTextColor,
     commitFont,
+    commitSkin,
+    resetSkin,
     previewGaugeGradient,
     commitGaugeGradient,
     prefs,

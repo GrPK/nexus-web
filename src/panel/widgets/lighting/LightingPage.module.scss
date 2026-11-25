@@ -643,7 +643,7 @@
 .effectLabel {
   font-size: var(--type-mini);
   font-weight: var(--weight-body);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   color: var(--text);
   text-align: center;
   text-transform: capitalize;
@@ -772,10 +772,18 @@
   gap: 0.35rem;
 }
 
+// Label on the left, control right-aligned (toggle and colour params).
+.paramRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .paramEnumLabel {
   font-size: var(--type-small);
   color: var(--text-dim);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
 }
 
 // Pinned-to-bottom footer holding the scoped Reset button; stays
@@ -797,7 +805,7 @@
   color: var(--text-dim);
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em + var(--small-tracking, 0em));
   cursor: pointer;
   transition: border-color var(--ease-fast), color var(--ease-fast), background var(--ease-fast), opacity var(--ease-fast);
 
@@ -939,7 +947,7 @@
   font-size: var(--type-small);
   font-family: inherit;
   cursor: pointer;
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   white-space: nowrap;
   transition: border-color var(--ease-fast) ease, background var(--ease-fast) ease, color var(--ease-fast) ease;
 
@@ -988,7 +996,7 @@
 .monitorButtonTitle {
   font-size: var(--type-mini);
   font-weight: var(--weight-display);
-  letter-spacing: 0.01em;
+  letter-spacing: calc(0.01em + var(--small-tracking, 0em));
 }
 
 .monitorButtonRes {
@@ -1212,7 +1220,7 @@
   color: var(--text-dim);
   text-align: left;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em + var(--small-tracking, 0em));
   cursor: pointer;
   transition: background var(--ease-fast);
 
@@ -1701,7 +1709,7 @@
 .staticSwatchTitle {
   font-size: var(--type-small);
   color: var(--text-dim);
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em + var(--small-tracking, 0em));
   text-align: center;
 }
 

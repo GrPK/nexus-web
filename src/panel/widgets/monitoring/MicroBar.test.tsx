@@ -2,6 +2,19 @@ import { render, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { hasGaugeReading } from '../../../__tests__/panel/visibleText';
 import { MicroBar } from './MicroBar';
+import { DEFAULT_GAUGE_GRADIENT } from '../../theme/gaugeGradient';
+
+describe('MicroBar value state', () => {
+  it.each(['bar', 'fill', 'backdrop', 'simple', 'columns'] as const)('%s design stamps the state on the value only, never the row', design => {
+    const { container } = render(
+      <MicroBar label="GPU" formatted="92%" fillPercent={92} design={design} gradient={{ id: 'g', stops: DEFAULT_GAUGE_GRADIENT, bodyAlpha: 1 }} style={{}} />,
+    );
+    const stamped = container.querySelectorAll('[data-value-state]');
+    expect(stamped).toHaveLength(1);
+    expect(stamped[0].getAttribute('data-value-state')).toBe('critical');
+    expect(container.firstElementChild?.hasAttribute('data-value-state')).toBe(false);
+  });
+});
 
 describe('MicroBar designs', () => {
   it('backdrop design renders a filled history Sparkline; bar and fill do not', () => {
@@ -89,5 +102,28 @@ describe('MicroBar simple row fit', () => {
     const { container } = render(<MicroBar label="CPU" formatted="40" fillPercent={40} design="simple" />);
     const content = container.querySelector<HTMLElement>('[class*="simpleContent"]');
     expect(content?.style.transform).toBe('scale(1)');
+  });
+});
+
+describe('MicroBar columns design', () => {
+  it('fills the vertical track to the clamped percent and shows the value, not the label', () => {
+    const { container } = render(<MicroBar label="PIN 1 CURRENT" formatted="0.881 A" fillPercent={140} design="columns" />);
+    const fill = container.querySelector('[class*="columnFill"]') as HTMLElement;
+    expect(fill.style.height).toBe('100%');
+    expect(hasGaugeReading(container, '0.881 A')).toBe(true);
+    expect(container.textContent).not.toContain('PIN 1');
+    expect(container.querySelector('[class*="label"]')).toBeNull();
+  });
+
+  it('names the group by the full sensor name, and leaves an unnamed column without a group role', () => {
+    const named = render(<MicroBar label="" name="Pin 1 Current" formatted="3" fillPercent={35} design="columns" />);
+    expect(named.container.firstElementChild?.getAttribute('aria-label')).toBe('Pin 1 Current');
+    const unnamed = render(<MicroBar label="" formatted="3" fillPercent={35} design="columns" />);
+    expect(unnamed.container.firstElementChild?.hasAttribute('role')).toBe(false);
+  });
+
+  it('maps a partial fill to the same height percent', () => {
+    const { container } = render(<MicroBar label="" formatted="3" fillPercent={35} design="columns" />);
+    expect((container.querySelector('[class*="columnFill"]') as HTMLElement).style.height).toBe('35%');
   });
 });

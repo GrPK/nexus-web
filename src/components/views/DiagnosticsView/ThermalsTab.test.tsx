@@ -194,6 +194,17 @@ describe('ThermalsTab', () => {
     expect(chart.valueFormat(chart.thresholds[0].value)).toBe('176°F');
   });
 
+  it('formats the throughput graph values and limits in MB/s from the stored bytes per second', () => {
+    const MB = 1024 * 1024;
+    h.rules = [rule('r1', { sensor: { category: 'smart', id: '/nvme/0/write', name: 'Write Rate', type: 'Throughput', parentName: 'Drive' }, high: 500 * MB })];
+    h.states = [state('r1', { value: 500 * MB })];
+    render(<SensorsTab {...props({ history: history({ series: [{ id: 'r1', kind: 'sensorAlert', name: 'Write Rate', points: [{ t: 1000, avg: 500 * MB, max: 500 * MB }] }] }) })} />);
+    selectFirstRow();
+    const chart = h.chart.mock.calls.at(-1)![0] as { series: Array<{ points: Array<{ avg: number }> }>; thresholds: Array<{ value: number }>; valueFormat: (v: number) => string };
+    expect(chart.valueFormat(chart.series[0].points[0].avg)).toBe('500 MB/s');
+    expect(chart.valueFormat(chart.thresholds[0].value)).toBe('500 MB/s');
+  });
+
   it('selects nothing by default, and a clicked sensor opens its editor and graph', () => {
     h.rules = [rule('r1'), rule('r2')];
     render(<SensorsTab {...props()} />);

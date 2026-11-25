@@ -13,7 +13,9 @@ import { ParamToggle } from './ParamToggle';
 import { PaletteRing } from '../../../../components/common/PaletteRing/PaletteRing';
 import { EffectTemplateSelector } from '../../../../components/common/EffectTemplateSelector/EffectTemplateSelector';
 import { HoverTooltip } from '../../../../components/common/HoverTooltip/HoverTooltip';
-import { StaticColorSlots } from './StaticColorSlots';
+import { StaticColorSlots, slotHex } from './StaticColorSlots';
+import { ParamColor } from './ParamColor';
+import { hexToHsv } from '../../../../lib/settings';
 import styles from '../LightingPage.module.scss';
 
 /** value clamped to [min, max] for display, in the slider's own units. */
@@ -78,6 +80,12 @@ export const EffectControls = memo(function EffectControls({
     const named = def.sensors?.find(s => s.name === su.name);
     if (named) return named.labelKey ? t(named.labelKey) : named.label;
     return t('lighting.sensor.title');
+  };
+  const setBackground = (id: string, hex: string, commit: boolean) => {
+    const c = hexToHsv(hex);
+    // An achromatic pick has no hue of its own; keep the stored one so the picker does not snap to red.
+    const hue = c.s === 0 || c.v === 0 ? state.params[`u_${id}Hue`] ?? 0 : c.h / 360;
+    onChange({ params: { ...state.params, [`u_${id}Hue`]: hue, [`u_${id}Sat`]: c.s / 100, [`u_${id}Val`]: c.v / 100 } }, commit);
   };
   const selected = bundle.selected;
   // Simple fills are a fixed base colour: no colour wheel, no speed, no
@@ -199,6 +207,14 @@ export const EffectControls = memo(function EffectControls({
               onCommit={onCommit} />
           );
         })}
+        {loaded && def.background && specs[`u_${def.background.id}Hue`] && (
+          <ParamColor
+            label={t(def.background.labelKey)}
+            value={slotHex(def.background, state.params, specs)}
+            onPreview={hex => setBackground(def.background!.id, hex, false)}
+            onCommit={hex => { setBackground(def.background!.id, hex, true); onCommit(); }}
+          />
+        )}
         {loaded && sensors.map(su => {
           const label = sensorLabel(su);
           return (

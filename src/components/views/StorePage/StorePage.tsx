@@ -160,7 +160,15 @@ function InstallButton({ app, installedVersion, onNeedsSignIn, onInstalled }: {
       ? <Button type="button" tone="neutral" disabled>{t('store.installed')}</Button>
       : null;
   }
-  if (!latest) return <span className={styles.incompatible}>{t('store.incompatible')}</span>;
+  if (!latest) {
+    // A copy already here stays Installed; the requirement only gates a first install.
+    if (installedVersion) return <Button type="button" tone="neutral" disabled>{t('store.installed')}</Button>;
+    return (
+      <span className={styles.incompatible}>
+        {app.requiresNexus ? t('store.requiresNexus', { version: app.requiresNexus }) : t('store.incompatible')}
+      </span>
+    );
+  }
 
   // An installed copy keeps its normal controls; the gate only decides a first install.
   const hardware = app.hardware;
