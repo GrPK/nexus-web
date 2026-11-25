@@ -16,7 +16,7 @@ import { resolveCpuTempSensor, resolveGpuTempSensor } from '../../../lib/tempSen
 import type { WidgetProps } from '../types';
 import { useSharedSensorHistory } from '../common/useSharedSensorHistory';
 import { GAUGE_DESIGNS } from './gauges';
-import { AdaptiveNumbersContext } from './gauges/GaugeValue';
+import { AdaptiveNumbersContext, GaugeValueStateContext } from './gauges/GaugeValue';
 import type { GaugeDesignKey, GaugeProps } from './gauges';
 import { DEFAULT_SLOTS, defaultSlotDesign, heroSpecForSize, isExtrasBackedDevice, isFullBleedRound, isHeroLayout, isMicroLayout, resolvedSlotLayout, resolveSlotDesign } from './perfSlots';
 import type { DeviceKey } from './perfSlots';
@@ -25,10 +25,10 @@ import { currentFanProbeName, extrasSensorsForDevice, fanProbeAlias, gpu2Sensors
 import { MicroMonitoringWidget } from './MicroMonitoringWidget';
 import { buildNetworkSensors, networkMaxValue, NETWORK_SENSOR_TOTAL } from './networkSensors';
 import { formatSensorValue } from './sensorValueFormat';
-import { chartDomainForScale, DEFAULT_SCALE_MODE, defaultFixedMax, designIsFill, fixedFillPercent, staticMaxForDevice, type ScaleMode } from './perfDomain';
+import { adaptiveFillMax, chartDomainForScale, DEFAULT_SCALE_MODE, defaultFixedMax, designIsFill, fixedFillPercent, staticMaxForDevice, type ScaleMode } from './perfDomain';
 import { usePanelGaugeGradient, type PanelGaugeGradientValue } from '../common/PanelGaugeGradientContext';
 import { remapGaugeGradientToDomain } from '../../theme/gaugeGradient';
-import { defaultValueColorReverse, designSupportsValueColor, gaugeAccentVars, hasValueColorReading, reverseGaugeGradient, sensorSupportsValueColor } from './valueColor';
+import { defaultValueColorReverse, designSupportsValueColor, gaugeAccentVars, gaugeValueStateAttrs, hasValueColorReading, reverseGaugeGradient, sensorSupportsValueColor } from './valueColor';
 import { accentShadowAlpha } from '../../../lib/settings';
 import styles from './MonitoringWidget.module.scss';
 
@@ -368,7 +368,7 @@ export function PerfSlot({ slotIndex, sensors, fpsSensors, networkSensors, extra
   const sensorMax = sensor?.theoreticalMaximum && sensor.theoreticalMaximum > 0 ? sensor.theoreticalMaximum : 0;
   const maxValue = device === 'network'
     ? networkMaxValue(rawValue, history)
-    : sensorMax || staticMaxForDevice(device, sensor?.name, sensor?.type, sensor?.value);
+    : sensorMax || adaptiveFillMax(sensor, rawValue, history, staticMaxForDevice(device, sensor?.name, sensor?.type, sensor?.value));
   const fixedDefaultMax = defaultFixedMax(device, sensor, effectiveSensorName);
   const [domainMin, domainMax] = chartDomainForScale(device, rawValue, history, maxValue, scale, sensor?.name, sensor?.type, fixedMin, fixedMax, fixedDefaultMax);
   // Value-fill gauges scale to the Fixed [min, max] window when set; otherwise
@@ -428,8 +428,13 @@ export function PerfSlot({ slotIndex, sensors, fpsSensors, networkSensors, extra
 
   // The tint rides on an inner layout-less wrapper so the slot's own chrome
   // (the editor's selection ring) keeps the panel accent.
+  const stateAttrs = stops ? gaugeValueStateAttrs(stops, scaleFraction) : {};
   const content = gradeStyle
-    ? <div className={styles.slotPaint} style={gradeStyle}><GaugeComponent {...props} /></div>
+    ? (
+      <GaugeValueStateContext.Provider value={stateAttrs['data-value-state']}>
+        <div className={styles.slotPaint} style={gradeStyle}><GaugeComponent {...props} /></div>
+      </GaugeValueStateContext.Provider>
+    )
     : <GaugeComponent {...props} />;
 
   if (!onSelect) {

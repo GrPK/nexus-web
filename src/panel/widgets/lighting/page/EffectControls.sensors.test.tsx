@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BASE_DEFAULTS, type EffectState } from '../../../../types/lighting';
 import type { SensorBinding } from '../../../../lib/sensorBinding';
@@ -22,6 +22,7 @@ vi.mock('../../../../hooks/useShaderParams', () => ({
     specs: Object.fromEntries([
       spec('u_fill_angle', 0, 360), spec('u_fill_flip', 0, 1), spec('u_col_reverse', 0, 1),
       spec('u_speed', -2, 2, 0.02), spec('u_saturation', 0, 4, 0.01), spec('u_contrast', 0, 4, 0.01),
+      spec('u_fill_bgHue', 0, 1, 0.01), spec('u_fill_bgSat', 0, 1, 0.01), spec('u_fill_bgVal', 0, 1, 0.01),
     ].map(s => [s.name, s])),
     sensors: [{ name: 'u_fill_level_s', binding: shaderDefault }],
   }),
@@ -166,5 +167,43 @@ describe('EffectControls on/off params', () => {
     expect(onChange).toHaveBeenLastCalledWith({ params: { u_col_reverse: 1 } }, true);
     fireEvent.click(switches[1]);
     expect(onChange).toHaveBeenLastCalledWith({ params: { u_fill_flip: 1 } }, true);
+  });
+});
+
+describe('EffectControls background color', () => {
+  it('keeps the wheel, adds a Background swatch that starts black and writes the fill background params', () => {
+    const onChange = vi.fn();
+    const state = baseState();
+    render(
+      <EffectControls
+        effect="sensorbar" state={state} bundle={{ selected: 0, slots: [state] }} onTemplateSelect={() => {}}
+        canReset={false} onChange={onChange} onCommit={() => {}} onReset={() => {}} noPresets
+      />,
+    );
+    const picker = screen.getByRole('group', { name: 'lighting.controls.fillBackground' });
+    // One wheel only (the effect's own); the background is a labelled swatch row.
+    expect(screen.getAllByRole('group', { name: 'Palette' })).toHaveLength(1);
+    expect(within(picker).queryByRole('group', { name: 'Palette' })).toBeNull();
+    const swatch = within(picker).getByRole('button', { name: 'lighting.controls.fillBackground' });
+    expect(swatch.style.backgroundColor).toBe('rgb(0, 0, 0)');
+    expect(swatch.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(swatch);
+    expect(swatch.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.change(screen.getByLabelText('common.hexColor'), { target: { value: '#0000ff' } });
+    expect(onChange).toHaveBeenLastCalledWith({ params: { u_fill_bgHue: 240 / 360, u_fill_bgSat: 1, u_fill_bgVal: 1 } }, true);
+  });
+
+  it('keeps the stored hue when the picked color is achromatic', () => {
+    const onChange = vi.fn();
+    const state = { ...baseState(), params: { u_fill_bgHue: 0.62, u_fill_bgSat: 0.8, u_fill_bgVal: 0.35 } };
+    render(
+      <EffectControls
+        effect="sensorbar" state={state} bundle={{ selected: 0, slots: [state] }} onTemplateSelect={() => {}}
+        canReset={false} onChange={onChange} onCommit={() => {}} onReset={() => {}} noPresets
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'lighting.controls.fillBackground' }));
+    fireEvent.change(screen.getByLabelText('common.hexColor'), { target: { value: '#000000' } });
+    expect(onChange).toHaveBeenLastCalledWith({ params: { u_fill_bgHue: 0.62, u_fill_bgSat: 0, u_fill_bgVal: 0 } }, true);
   });
 });

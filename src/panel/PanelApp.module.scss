@@ -809,6 +809,59 @@
   box-shadow: 0 0 0 1px var(--panel-accent);
 }
 
+// A skin zeroes the card border and layers its own shadow, so a skinned catalog draws the
+// affordance as one overlay on the card area (the label strip is left out, like the unskinned
+// ring) and the card-level rings above are restored to the skin's own border and shadow.
+.catalogCellScoped::after,
+:global(.panel-root[data-panel-skin]) .catalogCell::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: calc(var(--panel-widget-label-strip, 0px) + var(--panel-widget-card-bottom-gap, 0px));
+  left: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+}
+.catalogCell.catalogCellScoped:not(.catalogCellDisabled):hover .cell,
+.catalogCell.catalogCellScoped:not(.catalogCellDisabled):focus-visible .cell,
+.catalogCell.catalogCellScoped.catalogCellSelected .cell,
+:global(.panel-root[data-panel-skin]) .catalogCell:not(.catalogCellDisabled):hover .cell,
+:global(.panel-root[data-panel-skin]) .catalogCell:not(.catalogCellDisabled):focus-visible .cell,
+:global(.panel-root[data-panel-skin]) .catalogCell.catalogCellSelected .cell {
+  border: var(--skin-card-border, 0 solid transparent);
+  box-shadow: var(--skin-card-shadow, none);
+}
+// Faded and frameless skin cards (skinBase.scss) stay bare under that restore; the
+// skin root sits inside a scoped cell, and around the cell on the panel.
+.catalogCell.catalogCellScoped:not(.catalogCellDisabled):hover :global(.panel-root[data-panel-skin][data-skin-card-faded]) .cell,
+.catalogCell.catalogCellScoped:not(.catalogCellDisabled):focus-visible :global(.panel-root[data-panel-skin][data-skin-card-faded]) .cell,
+.catalogCell.catalogCellScoped.catalogCellSelected :global(.panel-root[data-panel-skin][data-skin-card-faded]) .cell,
+:global(.panel-root[data-panel-skin][data-skin-card-faded]) .catalogCell:not(.catalogCellDisabled):hover .cell,
+:global(.panel-root[data-panel-skin][data-skin-card-faded]) .catalogCell:not(.catalogCellDisabled):focus-visible .cell,
+:global(.panel-root[data-panel-skin][data-skin-card-faded]) .catalogCell.catalogCellSelected .cell {
+  border-color: transparent;
+  box-shadow: none;
+}
+.catalogCell.catalogCellScoped:not(.catalogCellDisabled):hover :global(.panel-root[data-panel-skin][data-skin-frameless][data-widget-padding='none']) .cell,
+.catalogCell.catalogCellScoped:not(.catalogCellDisabled):focus-visible :global(.panel-root[data-panel-skin][data-skin-frameless][data-widget-padding='none']) .cell,
+.catalogCell.catalogCellScoped.catalogCellSelected :global(.panel-root[data-panel-skin][data-skin-frameless][data-widget-padding='none']) .cell,
+:global(.panel-root[data-panel-skin][data-skin-frameless][data-widget-padding='none']) .catalogCell:not(.catalogCellDisabled):hover .cell,
+:global(.panel-root[data-panel-skin][data-skin-frameless][data-widget-padding='none']) .catalogCell:not(.catalogCellDisabled):focus-visible .cell,
+:global(.panel-root[data-panel-skin][data-skin-frameless][data-widget-padding='none']) .catalogCell.catalogCellSelected .cell {
+  border-width: 0;
+  box-shadow: none;
+}
+.catalogCellScoped:not(.catalogCellDisabled):hover::after,
+.catalogCellScoped:not(.catalogCellDisabled):focus-visible::after,
+.catalogCellScoped.catalogCellSelected::after,
+:global(.panel-root[data-panel-skin]) .catalogCell:not(.catalogCellDisabled):hover::after,
+:global(.panel-root[data-panel-skin]) .catalogCell:not(.catalogCellDisabled):focus-visible::after,
+:global(.panel-root[data-panel-skin]) .catalogCell.catalogCellSelected::after {
+  border-color: var(--panel-accent);
+}
+
 .catalogCellDragging {
   position: relative;
   z-index: 3;
@@ -1328,7 +1381,7 @@
   // backdrop+sheet an atomic group under it (see the backdrop rule); overlap
   // is avoided by geometry, not by this z-index.
   z-index: 230;
-  width: min(380px, 88vw);
+  width: min(max(380px, min(600px, 45vw)), 88vw);
   max-width: 100vw;
   height: 100%;
   display: flex;
@@ -1669,27 +1722,32 @@
   }
 }
 
-// Touch-chrome landscape monitor (Xeneon Edge): the sheet keeps the desktop
-// dashboard's side-drawer shape but scales with the panel content, zooming so
-// its contents are shaped at their shown size. The drawer hugs the right edge
-// and fills the height. align-items is vestigial at height:100%; left alone
-// rather than changing layout this change was not measured against.
-// Landscape Y70 widget-edit takes the same drawer: the dock sits at the left
-// edge there, so a full-width bottom sheet would cover it.
+// Touch-chrome landscape panels (Xeneon Edge and Y70): the sheet keeps the
+// desktop dashboard's side-drawer shape but scales with the panel content,
+// zooming so its contents are shaped at their shown size. Every mode takes it;
+// the drawer hugs the right edge and fills the height. The Y70 dock sits at
+// the left edge during widget edit, which a full-width bottom sheet would
+// cover. align-items is vestigial at height:100%; left alone rather than
+// changing layout this change was not measured against.
 @media (orientation: landscape) {
-  .editorBackdrop[data-touch-chrome='true'][data-surface='monitor'],
-  .editorBackdrop[data-mode='settings'][data-surface='y70'] {
+  .editorBackdrop[data-touch-chrome='true'][data-surface] {
     align-items: center;
     justify-content: flex-end;
 
     .editorSheet {
       zoom: var(--panel-chrome-scale, var(--panel-scale, 1));
       --sheet-zoom: var(--panel-chrome-scale, var(--panel-scale, 1));
-      // The px term is multiplied by the zoom, which is what the drawer
-      // wants; the vw cap is divided because it would be multiplied too.
-      width: min(380px, calc(88vw / var(--panel-chrome-scale, var(--panel-scale, 1))));
+      // Panel units: the px terms are multiplied by the zoom, which is what
+      // the drawer wants; the vw terms are divided because they would be
+      // multiplied too.
+      width: min(
+        max(380px, min(600px, calc(45vw / var(--panel-chrome-scale, var(--panel-scale, 1))))),
+        calc(88vw / var(--panel-chrome-scale, var(--panel-scale, 1)))
+      );
       height: 100%;
       max-height: none;
+      // The scaled bottom sheet's auto inline margins would center the drawer.
+      margin-inline: 0;
       border-left: 1px solid var(--panel-border);
       border-radius: 0;
       box-shadow: -24px 0 60px rgb(0 0 0 / var(--alpha-medium));

@@ -132,6 +132,8 @@ const CALIBRATE_HINT_ID = 'cooling-calibrate';
 const CALIBRATE_HINT_SELECTOR = `[data-coachmark="${CALIBRATE_HINT_ID}"]`;
 const UNRESPONSIVE_HINT_ID = 'cooling-unresponsive';
 const UNRESPONSIVE_HINT_SELECTOR = `[data-coachmark="${UNRESPONSIVE_HINT_ID}"]`;
+const HIDDEN_FANS_HINT_ID = 'cooling-hidden-fans';
+const HIDDEN_FANS_HINT_SELECTOR = UNRESPONSIVE_HINT_SELECTOR;
 
 // Module scope so the history survives CoolingPage's unmount on navigation.
 // Session-only; assumes one mounted CoolingPage, as the lighting page does.
@@ -1361,6 +1363,18 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
     && !hideUncontrolled
     && channels.some(isFanUnresponsive) && !showCalibrateHint && !calibrating
     && !calConfirmOpen && !importDialogOpen && !modeMenuOpen;
+  // Explains the eye right after the fan menu hides unresponsive fans. Any press
+  // of the eye closes it for good, so a user who found the eye themselves never
+  // sees it.
+  const hiddenFansHint = useOnboardingHint(HIDDEN_FANS_HINT_ID);
+  const [hiddenFansHintOpen, setHiddenFansHintOpen] = useState(false);
+  const hideUnresponsiveFromMenu = useCallback(() => {
+    updateUiSettings({ showUncontrolledCoolingDevices: false });
+    if (hiddenFansHint.dismissed === false) setHiddenFansHintOpen(true);
+  }, [updateUiSettings, hiddenFansHint.dismissed]);
+  const showHiddenFansHint = hiddenFansHintOpen && hiddenFansHint.dismissed === false && hideUncontrolled
+    && !simpleDashboard && !showCalibrateHint && !calibrating
+    && !calConfirmOpen && !importDialogOpen && !modeMenuOpen;
   // What the rail search matches a fan on: its names, its hub or board block,
   // and every user group above it.
   const railSearchFields = useCallback((c: FanChannel) => {
@@ -1690,18 +1704,20 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
             )}
             <RailSearchButton open={railSearch.open} onToggle={railSearch.toggle} label={t('cooling.fan.search')} />
             <HoverTooltip
-              body={hideUncontrolled ? t('devices.hidden.show') : t('devices.hidden.hide')}
+              body={hideUncontrolled ? t('cooling.hidden.show') : t('cooling.hidden.hide')}
               side="bottom"
             >
               <Button
                 tone="ghost"
                 size="sm"
                 icon={hideUncontrolled ? <EyeOff /> : <Eye />}
-                aria-label={hideUncontrolled ? t('devices.hidden.show') : t('devices.hidden.hide')}
+                aria-label={hideUncontrolled ? t('cooling.hidden.show') : t('cooling.hidden.hide')}
                 aria-pressed={hideUncontrolled}
                 data-coachmark={UNRESPONSIVE_HINT_ID}
                 onClick={() => {
                   unresponsiveHint.dismiss();
+                  hiddenFansHint.dismiss();
+                  setHiddenFansHintOpen(false);
                   updateUiSettings({ showUncontrolledCoolingDevices: hideUncontrolled });
                 }}
               />
@@ -1918,6 +1934,7 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
                   onSpeedChange={handleSpeedChange}
                   onTogglePin={handleTogglePin}
                   onToggleControlled={handleSetFanControlled}
+                  onHideUnresponsive={hideUncontrolled ? undefined : hideUnresponsiveFromMenu}
                   onSelectOnly={() => setSelectedFanIds(new Set([ch.id]))}
                   bulk={bulkFor(ch)}
                   onSetRole={handleSetRole}
@@ -2178,6 +2195,17 @@ export function CoolingPage({ serviceOnline, serviceState, connectionState, acti
           body={t('cooling.calibrateHint.body')}
           dismissLabel={t('onboarding.hint.dismiss')}
           onDismiss={calibrateHint.dismiss}
+        />
+      )}
+      {showHiddenFansHint && (
+        <Coachmark
+          hintId={HIDDEN_FANS_HINT_ID}
+          target={HIDDEN_FANS_HINT_SELECTOR}
+          boundary={contentBelowTabs}
+          title={t('cooling.hiddenFansHint.title')}
+          body={t('cooling.hiddenFansHint.body')}
+          dismissLabel={t('onboarding.hint.dismiss')}
+          onDismiss={() => { hiddenFansHint.dismiss(); setHiddenFansHintOpen(false); }}
         />
       )}
       {showUnresponsiveHint && (

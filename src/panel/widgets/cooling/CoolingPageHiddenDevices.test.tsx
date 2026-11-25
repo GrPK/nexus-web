@@ -66,12 +66,12 @@ describe('CoolingPage hides fans without Nexus Control', () => {
     expect(screen.getByText('Dead Fan')).toBeInTheDocument();
     expect(screen.getByLabelText('cooling.fan.unresponsive')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('devices.hidden.hide'));
+    fireEvent.click(screen.getByLabelText('cooling.hidden.hide'));
 
     await waitFor(() => expect(screen.queryByText('Vendor Fan')).not.toBeInTheDocument());
     expect(screen.queryByText('Dead Fan')).not.toBeInTheDocument();
     // The fan Nexus does drive is untouched, and the control flips to "show".
     expect(screen.getByText('CPU Fan')).toBeInTheDocument();
-    expect(screen.getByLabelText('devices.hidden.show')).toBeInTheDocument();
+    expect(screen.getByLabelText('cooling.hidden.show')).toBeInTheDocument();
   });
 });
