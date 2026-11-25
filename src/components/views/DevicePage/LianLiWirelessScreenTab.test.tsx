@@ -493,7 +493,7 @@ describe('LianLiWirelessScreenTab', () => {
     mockImportMedia.mockResolvedValue({ error: true, msg: 'ffmpeg exit 1: bad' });
     await importOneFile();
     await waitFor(() => expect(toast.push).toHaveBeenCalledWith({
-      title: 'lighting.controls.importFailed', body: 'lighting.controls.importConvertFailed',
+      title: 'lighting.controls.importFailed', body: 'lighting.controls.importFileFailed',
     }));
   });
 
@@ -501,7 +501,7 @@ describe('LianLiWirelessScreenTab', () => {
     mockImportMedia.mockResolvedValue({ error: true, msg: 'File is too large' });
     await importOneFile();
     await waitFor(() => expect(toast.push).toHaveBeenCalledWith({
-      title: 'lighting.controls.importFailed', body: 'lighting.controls.importConvertFailed',
+      title: 'lighting.controls.importFailed', body: 'lighting.controls.importFileFailed',
     }));
   });
 

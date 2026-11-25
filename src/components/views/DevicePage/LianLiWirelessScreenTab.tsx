@@ -439,7 +439,7 @@ export function LianLiWirelessScreenTab({
         if (!result) {
           push({ title: t('lighting.controls.importFailed'), body: t('lighting.controls.importNetworkError') });
         } else if ('error' in result) {
-          push({ title: t('lighting.controls.importFailed'), body: t('lighting.controls.importConvertFailed') });
+          push({ title: t('lighting.controls.importFailed'), body: t('lighting.controls.importFileFailed') });
         } else if (aliveRef.current) {
           handleMediaSelect(result);
         }
