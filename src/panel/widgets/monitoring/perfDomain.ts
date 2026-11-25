@@ -55,10 +55,6 @@ const PUMP_MAX_RPM = 5000;
 // Loop coolant runs far cooler than silicon.
 const COOLANT_TEMP_MAX = 60;
 const COOLANT_NAME = /coolant|liquid|water/i;
-// Per-pin rating of the 12V-2x6 / 12VHPWR connector. Pin current sensors read
-// a few amps at most, so the generic 100 ceiling left their fill near zero.
-const PIN_CURRENT_MAX = 9.5;
-const PIN_NAME = /\bpin\b/i;
 const CPU_POWER_MAX = 300;
 const GPU_POWER_MAX = 600;
 const PSU_POWER_MAX = 1000;
@@ -113,7 +109,6 @@ export function staticMaxForDevice(device: DeviceKey, sensorName?: string, senso
     case 'Voltage':
       return device === 'psu' || device === 'battery' || (sensorValue ?? 0) > CORE_VOLTAGE_MAX ? RAIL_VOLTAGE_MAX : CORE_VOLTAGE_MAX;
     case 'Throughput': return THROUGHPUT_MAX_BPS;
-    case 'Current': return sensorName && PIN_NAME.test(sensorName) ? PIN_CURRENT_MAX : 100;
     case 'Power':
       if (device === 'cpu') return CPU_POWER_MAX;
       if (device === 'gpu' || device === 'gpu2') return GPU_POWER_MAX;
@@ -129,6 +124,34 @@ export function staticMaxForDevice(device: DeviceKey, sensorName?: string, senso
 export function defaultFixedMax(device: DeviceKey, sensor: HardwareSensor | undefined, nameFallback?: string): number {
   const sMax = sensor?.theoreticalMaximum && sensor.theoreticalMaximum > 0 ? sensor.theoreticalMaximum : 0;
   return sMax || staticMaxForDevice(device, sensor?.name ?? nameFallback, sensor?.type, sensor?.value);
+}
+
+const CURRENT_HEADROOM = 1.2;
+const CURRENT_FLOOR = 1;
+
+/**
+ * Adaptive fill ceiling for Current sensors: 1.2x the largest sample in the
+ * history the widget already holds (the live value counts), never below 1 A.
+ * Current has no natural 0-100 scale, so a static ceiling left small readings
+ * near empty; this follows the sensor's own recent peak instead.
+ */
+export function adaptiveCurrentMax(rawValue: number, history: readonly number[]): number {
+  let peak = Number.isFinite(rawValue) ? rawValue : 0;
+  for (const v of history) {
+    if (Number.isFinite(v) && v > peak) peak = v;
+  }
+  return Math.max(CURRENT_HEADROOM * peak, CURRENT_FLOOR);
+}
+
+/** The Adaptive fill ceiling: the observed-peak one for Current, else `staticMax`. */
+export function adaptiveFillMax(
+  sensor: HardwareSensor | undefined,
+  rawValue: number,
+  history: readonly number[],
+  staticMax: number,
+): number {
+  if (sensor?.type !== 'Current' || (sensor.theoreticalMaximum ?? 0) > 0) return staticMax;
+  return adaptiveCurrentMax(rawValue, history);
 }
 
 export function chartDomainForScale(

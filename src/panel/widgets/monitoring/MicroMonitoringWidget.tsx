@@ -23,7 +23,7 @@ import {
 } from './MonitoringWidget';
 import { bareSensorLabel } from './sensorNames';
 import { gpu2Components, igpuComponents, sensorCaptionName } from './sensorCategories';
-import { chartDomainForScale, defaultFixedMax, DEFAULT_SCALE_MODE, fixedFillPercent, type ScaleMode } from './perfDomain';
+import { adaptiveFillMax, chartDomainForScale, defaultFixedMax, DEFAULT_SCALE_MODE, fixedFillPercent, type ScaleMode } from './perfDomain';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
 import { ColumnScaleProvider, MicroBar } from './MicroBar';
 import { usePanelGaugeGradient, type PanelGaugeGradientValue } from '../common/PanelGaugeGradientContext';
@@ -251,7 +251,7 @@ function MicroRow({ sensors, fpsSensors, networkSensors, extras, device, prefixe
   const history = useSharedSensorHistory(sensorKey, rawValue) as number[];
   const maxValue = device === 'network'
     ? networkMaxValue(rawValue, history)
-    : staticMaxForDevice(device, sensor?.name, sensor?.type, sensor?.value);
+    : adaptiveFillMax(sensor, rawValue, history, staticMaxForDevice(device, sensor?.name, sensor?.type, sensor?.value));
   // A shared Fixed range scales every bar to the same [min, max] window;
   // adaptive keeps each bar's natural percent fill.
   const [domainMin, domainMax] = chartDomainForScale(device, rawValue, history, maxValue, scale, sensor?.name, sensor?.type, fixedMin, fixedMax, defaultFixedMax(device, sensor, effectiveSensorName));

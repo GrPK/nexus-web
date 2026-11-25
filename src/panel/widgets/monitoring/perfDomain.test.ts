@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { chartDomainForScale, defaultFixedMax, designIsFill, designSupportsRange, designSupportsScale, fixedFillPercent, isHeterogeneousTypeDevice, relativeHistoryDomain, staticMaxForDevice } from './perfDomain';
+import { adaptiveCurrentMax, adaptiveFillMax, chartDomainForScale, defaultFixedMax, designIsFill, designSupportsRange, designSupportsScale, fixedFillPercent, isHeterogeneousTypeDevice, relativeHistoryDomain, staticMaxForDevice } from './perfDomain';
 
 describe('designSupportsScale', () => {
   it('supports only sparkline and line', () => {
@@ -62,15 +62,41 @@ describe('chartDomainForScale', () => {
   });
 });
 
-describe('staticMaxForDevice - pin current', () => {
-  it('scales per-pin Current sensors to the 9.5 A connector rating', () => {
-    expect(staticMaxForDevice('gpu', 'Pin 1 Current', 'Current', 0.9)).toBe(9.5);
-    expect(staticMaxForDevice('cooler', 'PIN 6 CURRENT', 'Current', 1)).toBe(9.5);
-    expect(defaultFixedMax('gpu', { id: 'p', name: 'Pin 2 Current', type: 'Current', value: 1, units: 'A', formatted: '1 A', parent: { id: 'g', name: 'g' } })).toBe(9.5);
+describe('adaptiveCurrentMax', () => {
+  it('uses the live value as the peak when there is no history', () => {
+    expect(adaptiveCurrentMax(0.99, [])).toBeCloseTo(1.188);
+    expect(adaptiveCurrentMax(30, [])).toBeCloseTo(36);
   });
-  it('leaves other Current sensors (PSU rails and similar) on the 100 ceiling', () => {
-    expect(staticMaxForDevice('psu', '+12V Current', 'Current', 40)).toBe(100);
-    expect(staticMaxForDevice('gpu', 'GPU Current', 'Current', 5)).toBe(100);
+  it('a single sample is its own peak', () => {
+    expect(adaptiveCurrentMax(0.9, [0.9])).toBeCloseTo(1.08);
+  });
+  it('holds a spike for as long as it stays in the window, then decays with it', () => {
+    expect(adaptiveCurrentMax(0.9, [0.9, 5, 0.9])).toBeCloseTo(6);
+    expect(adaptiveCurrentMax(0.9, [0.9, 0.9, 0.9])).toBeCloseTo(1.08);
+  });
+  it('never drops below 1 A and ignores non-finite samples', () => {
+    expect(adaptiveCurrentMax(0, [])).toBe(1);
+    expect(adaptiveCurrentMax(0.2, [Number.NaN, 0.3])).toBe(1);
+    expect(adaptiveCurrentMax(Number.NaN, [Infinity, 0.5])).toBe(1);
+  });
+  it('puts 0.88 to 0.99 A pins at roughly 70 to 85 percent fill', () => {
+    const peak = 0.993;
+    const max = adaptiveCurrentMax(0.881, [0.881, peak]);
+    expect((0.881 / max) * 100).toBeGreaterThan(70);
+    expect((peak / max) * 100).toBeLessThan(85);
+  });
+});
+
+describe('adaptiveFillMax', () => {
+  const sensor = (type: string, tm?: number) => ({ id: 's', name: 'n', type, value: 1, units: 'A', formatted: '1', theoreticalMaximum: tm, parent: { id: 'p', name: 'p' } });
+  it('applies to Current only and leaves a sensor-supplied maximum alone', () => {
+    expect(adaptiveFillMax(sensor('Current'), 0.9, [0.9], 100)).toBeCloseTo(1.08);
+    expect(adaptiveFillMax(sensor('Temperature'), 70, [70], 100)).toBe(100);
+    expect(adaptiveFillMax(sensor('Current', 20), 0.9, [0.9], 100)).toBe(100);
+    expect(adaptiveFillMax(undefined, 0.9, [], 100)).toBe(100);
+  });
+  it('leaves the static ceiling and Fixed default for Current at 100', () => {
+    expect(staticMaxForDevice('gpu', 'Pin 1 Current', 'Current', 0.9)).toBe(100);
   });
 });
 
