@@ -82,6 +82,11 @@ describe('data and throughput types', () => {
     expect(formatAlertValue(defaultHigh('Throughput', 2400), 'Throughput', 'c', 'dot')).toBe('1 MB/s');
   });
 
+  it('rounds a scaled default limit to the display step', () => {
+    expect(defaultHigh('Throughput', 100.4 * MB)).toBe(120 * MB);
+    expect(defaultHigh('Throughput', 7.3 * MB)).toBe(9 * MB);
+  });
+
   it('keeps sub-step limits and the other knob when snapping', () => {
     expect(snapDisplay(0.4, 'Data')).toBe(0.4);
     expect(snapDisplay(3, 'Throughput')).toBe(3);

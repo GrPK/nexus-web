@@ -189,7 +189,7 @@ export function defaultHigh(type: string, observed: number | null): number {
   const decimals = type === 'Temperature' ? 0 : spec.decimals;
   // Rounded in the displayed unit; a scaled type never seeds below one display step, so an idle reading does not seed a limit that any burst trips.
   const shown = observed / scale;
-  const next = scale === 1 ? roundTo(shown * 1.2, decimals) : Math.max(roundTo(shown * 1.2, decimals), spec.step);
+  const next = scale === 1 ? roundTo(shown * 1.2, decimals) : Math.max(roundTo(Math.round(shown * 1.2 / spec.step) * spec.step, decimals), spec.step);
   return next > shown ? roundTo(next * scale, spec.decimals + 1) : spec.fallbackHigh;
 }
 
