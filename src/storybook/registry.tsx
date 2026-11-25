@@ -224,7 +224,7 @@ function PreviewSliderStacked() {
 
 function PreviewSliderFormatted() {
   const [v, setV] = useState(1.5);
-  return <Slider orientation="stacked" label="Response time" value={v} min={0.1} max={5.0} step={0.1}
+  return <Slider orientation="stacked" label="Response time" value={v} min={0.1} max={10.0} step={0.1}
     formatValue={x => x.toFixed(1) + 's'} onChange={setV} />;
 }
 
