@@ -62,6 +62,18 @@ describe('chartDomainForScale', () => {
   });
 });
 
+describe('staticMaxForDevice - pin current', () => {
+  it('scales per-pin Current sensors to the 9.5 A connector rating', () => {
+    expect(staticMaxForDevice('gpu', 'Pin 1 Current', 'Current', 0.9)).toBe(9.5);
+    expect(staticMaxForDevice('cooler', 'PIN 6 CURRENT', 'Current', 1)).toBe(9.5);
+    expect(defaultFixedMax('gpu', { id: 'p', name: 'Pin 2 Current', type: 'Current', value: 1, units: 'A', formatted: '1 A', parent: { id: 'g', name: 'g' } })).toBe(9.5);
+  });
+  it('leaves other Current sensors (PSU rails and similar) on the 100 ceiling', () => {
+    expect(staticMaxForDevice('psu', '+12V Current', 'Current', 40)).toBe(100);
+    expect(staticMaxForDevice('gpu', 'GPU Current', 'Current', 5)).toBe(100);
+  });
+});
+
 describe('staticMaxForDevice - network', () => {
   it('returns a 1 Gbps ceiling in the sensor\'s own bytes/sec unit, not the percent-scale fallback', () => {
     expect(staticMaxForDevice('network', undefined, 'Rate')).toBe(125_000_000);

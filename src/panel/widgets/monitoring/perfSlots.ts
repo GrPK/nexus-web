@@ -57,9 +57,19 @@ export type MicroDesignKey = Extract<GaugeDesignKey, 'bar' | 'fill' | 'backdrop'
 export const MICRO_DESIGN_KEYS: MicroDesignKey[] = ['bar', 'fill', 'backdrop', 'simple', 'columns'];
 export const DEFAULT_MICRO_DESIGN: MicroDesignKey = 'bar';
 
-export function microDesignOf(config: Record<string, PanelConfigValue> | undefined): MicroDesignKey {
+// Vertical Bars is not offered on the tall 2x4 with 6 or 8 columns: the values
+// would shrink below a readable size.
+export function columnsDesignOffered(size: PanelWidgetSize, count: number): boolean {
+  return !(widgetLayoutSize(size) === '2x4' && (MICRO_WIDE_COUNTS as readonly number[]).includes(count));
+}
+
+// With size and count given, a stored design the layout no longer offers falls
+// back to the default; the stored value itself is left alone.
+export function microDesignOf(config: Record<string, PanelConfigValue> | undefined, size?: PanelWidgetSize, count?: number): MicroDesignKey {
   const raw = config?.micro_design;
-  return (MICRO_DESIGN_KEYS as unknown[]).includes(raw) ? (raw as MicroDesignKey) : DEFAULT_MICRO_DESIGN;
+  if (!(MICRO_DESIGN_KEYS as unknown[]).includes(raw)) return DEFAULT_MICRO_DESIGN;
+  if (raw === 'columns' && size !== undefined && count !== undefined && !columnsDesignOffered(size, count)) return DEFAULT_MICRO_DESIGN;
+  return raw as MicroDesignKey;
 }
 
 // Text alignment of the 'simple' design's label and value (`micro_align`).

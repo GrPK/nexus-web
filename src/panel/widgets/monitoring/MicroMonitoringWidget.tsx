@@ -25,7 +25,7 @@ import { bareSensorLabel } from './sensorNames';
 import { gpu2Components, igpuComponents, sensorCaptionName } from './sensorCategories';
 import { chartDomainForScale, defaultFixedMax, DEFAULT_SCALE_MODE, fixedFillPercent, type ScaleMode } from './perfDomain';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
-import { MicroBar } from './MicroBar';
+import { ColumnScaleProvider, MicroBar } from './MicroBar';
 import { usePanelGaugeGradient, type PanelGaugeGradientValue } from '../common/PanelGaugeGradientContext';
 import { defaultValueColorReverse, gaugeAccentVars, hasValueColorReading, reverseGaugeGradient, sensorSupportsValueColor } from './valueColor';
 import { accentShadowAlpha } from '../../../lib/settings';
@@ -121,7 +121,7 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
   // Row style shared by every row; a 6/8-slot Micro on the wide 4x2 splits the
   // rows into two columns (3+3, 4+4) under the one shared caption. The tall 2x4
   // keeps all rows in one column.
-  const microDesign = microDesignOf(widget.config);
+  const microDesign = microDesignOf(widget.config, widget.size, count);
   const microAlign = microAlignOf(widget.config);
   const verticalBars = microDesign === 'columns';
   const twoColumn = !verticalBars && isTwoColumnMicro(widget.size, count);
@@ -196,7 +196,9 @@ export function MicroMonitoringWidget({ widget, count, selectedSlot, onSelectSlo
           <div className={styles.rows}>{rowEls.slice(half)}</div>
         </div>
       ) : (
-        <div className={verticalBars ? styles.barColumns : styles.rows}>{rowEls}</div>
+        verticalBars
+          ? <ColumnScaleProvider><div className={styles.barColumns}>{rowEls}</div></ColumnScaleProvider>
+          : <div className={styles.rows}>{rowEls}</div>
       )}
       {!categoryHidden && (
         <HoverTooltip body={bottomLabel} side="top">
