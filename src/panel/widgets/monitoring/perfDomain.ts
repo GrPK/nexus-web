@@ -139,7 +139,7 @@ export function observedPeak(rawValue: number, history: readonly number[]): numb
 }
 
 /**
- * Adaptive fill ceiling for Current sensors: the peak plus CURRENT_HEADROOM,
+ * Adaptive fill ceiling for Current sensors: the peak scaled by CURRENT_HEADROOM,
  * never below CURRENT_FLOOR. Current has no natural percent scale, and a fixed
  * ceiling would leave small readings near empty. `sharedPeak` is the largest
  * peak among the rows of one family (see currentFamilyKey), so sibling rows keep
