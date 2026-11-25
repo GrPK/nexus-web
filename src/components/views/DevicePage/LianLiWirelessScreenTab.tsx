@@ -439,7 +439,7 @@ export function LianLiWirelessScreenTab({
         if (!result) {
           push({ title: t('lighting.controls.importFailed'), body: t('lighting.controls.importNetworkError') });
         } else if ('error' in result) {
-          push({ title: t('lighting.controls.importFailed'), body: result.msg || undefined });
+          push({ title: t('lighting.controls.importFailed'), body: t('lighting.controls.importFileFailed') });
         } else if (aliveRef.current) {
           handleMediaSelect(result);
         }
@@ -622,6 +622,7 @@ export function LianLiWirelessScreenTab({
             mixed={fpsCap.mixed}
             onSave={handleFpsCapSave}
             extraCapsHz={FAN_LCD_EXTRA_CAPS_HZ}
+            hint={t('devices.lianli-wireless.frameRateClipHint')}
           />
         )}
         {lcdRestart && (

@@ -42,6 +42,15 @@ describe('FrameRateSetting', () => {
     expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual([OFF, ...[30, 25, 20, 15, 10, 5, 1].map(HZ)]);
   });
 
+  it('shows the panel hint by default and a caller hint when given', () => {
+    const { unmount } = render(<FrameRateSetting recordId="p1" cap={null} />);
+    expect(screen.getByText('devices.lcd.frameRateHint')).toBeInTheDocument();
+    unmount();
+    render(<FrameRateSetting recordId="p1" cap={null} hint="custom hint" />);
+    expect(screen.getByText('custom hint')).toBeInTheDocument();
+    expect(screen.queryByText('devices.lcd.frameRateHint')).not.toBeInTheDocument();
+  });
+
   it('sends the pick, and 0 for Off', async () => {
     api.patchPanelDevice.mockResolvedValue({ id: 'p1' });
     render(<FrameRateSetting recordId="p1" cap={null} />);

@@ -19,6 +19,8 @@ interface Props {
   mixed?: boolean;
   /** Rates offered beyond the lighting presets. */
   extraCapsHz?: readonly number[];
+  /** Replaces the default panel hint, for callers whose content is not redrawn. */
+  hint?: string;
 }
 
 /**
@@ -26,7 +28,7 @@ interface Props {
  * select back on the newest successful save. A value arriving from the parent while a save
  * is in flight (an older save's broadcast) never overwrites a newer pick.
  */
-export function FrameRateSetting({ recordId = null, cap, onSave, mixed = false, extraCapsHz }: Props) {
+export function FrameRateSetting({ recordId = null, cap, onSave, mixed = false, extraCapsHz, hint }: Props) {
   const { t } = useTranslation();
   const { push } = useToastSafe();
   const [current, setCurrent] = useState<number | null>(cap);
@@ -78,7 +80,7 @@ export function FrameRateSetting({ recordId = null, cap, onSave, mixed = false, 
   return (
     <SettingSelect
       label={t('lighting.ledMap.rateCap')}
-      description={t('devices.lcd.frameRateHint')}
+      description={hint ?? t('devices.lcd.frameRateHint')}
       value={mixed && !picked ? MIXED_VALUE : frameRateValue(current)}
       placeholder={mixed && !picked ? t('common.mixed') : undefined}
       options={frameRateCaps(current, extraCapsHz).map(hz => (hz === null
