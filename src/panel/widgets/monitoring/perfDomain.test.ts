@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { adaptiveCurrentMax, adaptiveFillMax, observedPeak, chartDomainForScale, defaultFixedMax, designIsFill, designSupportsRange, designSupportsScale, fixedFillPercent, isHeterogeneousTypeDevice, relativeHistoryDomain, staticMaxForDevice } from './perfDomain';
+import { currentFamilyKey, adaptiveCurrentMax, adaptiveFillMax, observedPeak, chartDomainForScale, defaultFixedMax, designIsFill, designSupportsRange, designSupportsScale, fixedFillPercent, isHeterogeneousTypeDevice, relativeHistoryDomain, staticMaxForDevice } from './perfDomain';
 
 describe('designSupportsScale', () => {
   it('supports only sparkline and line', () => {
@@ -109,6 +109,19 @@ describe('shared Current peak', () => {
     const temp = { ...cur, type: 'Temperature' };
     expect(adaptiveFillMax(cur, 0.9, [0.9], 100, 30)).toBeCloseTo(36);
     expect(adaptiveFillMax(temp, 70, [70], 100, 30)).toBe(100);
+  });
+});
+
+describe('currentFamilyKey', () => {
+  it('pins that differ only by a standalone number share a family', () => {
+    expect(currentFamilyKey('gpu', 'Pin 1 Current')).toBe(currentFamilyKey('gpu', 'Pin 6 Current'));
+  });
+  it('rails whose digits are attached to letters stay apart', () => {
+    const keys = ['12V Current', '5V Current', '3.3V Current'].map(n => currentFamilyKey('psu', n));
+    expect(new Set(keys).size).toBe(3);
+  });
+  it('different devices never share a family', () => {
+    expect(currentFamilyKey('gpu', 'Pin 1 Current')).not.toBe(currentFamilyKey('cooler', 'Pin 1 Current'));
   });
 });
 

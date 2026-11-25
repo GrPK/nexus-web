@@ -23,7 +23,7 @@ import {
 } from './MonitoringWidget';
 import { bareSensorLabel } from './sensorNames';
 import { gpu2Components, igpuComponents, sensorCaptionName } from './sensorCategories';
-import { adaptiveFillMax, chartDomainForScale, observedPeak, usesAdaptiveCurrent, defaultFixedMax, DEFAULT_SCALE_MODE, fixedFillPercent, type ScaleMode } from './perfDomain';
+import { adaptiveFillMax, chartDomainForScale, currentFamilyKey, observedPeak, usesAdaptiveCurrent, defaultFixedMax, DEFAULT_SCALE_MODE, fixedFillPercent, type ScaleMode } from './perfDomain';
 import { HoverTooltip } from '../../../components/common/HoverTooltip/HoverTooltip';
 import { ColumnScaleProvider, MicroBar } from './MicroBar';
 import { usePanelGaugeGradient, type PanelGaugeGradientValue } from '../common/PanelGaugeGradientContext';
@@ -85,26 +85,30 @@ export function bottomLabelForDevice(
   }
 }
 
-// One peak shared by every Current row in the card: each row reports its own
-// observed peak and reads the largest, so pins keep their relative heights.
+// Current rows of one family (see currentFamilyKey) share a peak: each row
+// reports its own observed peak and reads the largest of its family, so sibling
+// pins keep their relative heights while unrelated rails are not squashed.
 interface CurrentPeakValue {
-  peak: number;
-  report: (id: string, peak: number) => void;
+  peaks: Record<string, number>;
+  report: (id: string, family: string, peak: number) => void;
   drop: (id: string) => void;
 }
 const CurrentPeakContext = createContext<CurrentPeakValue | null>(null);
 
 function CurrentPeakProvider({ children }: { children: React.ReactNode }) {
-  const peaks = useRef(new Map<string, number>());
-  const [peak, setPeak] = useState(0);
+  const rows = useRef(new Map<string, { family: string; peak: number }>());
+  const [peaks, setPeaks] = useState<Record<string, number>>({});
   const sync = useCallback(() => {
-    let next = 0;
-    for (const p of peaks.current.values()) if (p > next) next = p;
-    setPeak(prev => (prev === next ? prev : next));
+    const next: Record<string, number> = {};
+    for (const { family, peak } of rows.current.values()) if (peak > (next[family] ?? 0)) next[family] = peak;
+    setPeaks(prev => {
+      const keys = Object.keys(next);
+      return keys.length === Object.keys(prev).length && keys.every(k => prev[k] === next[k]) ? prev : next;
+    });
   }, []);
-  const report = useCallback((id: string, p: number) => { peaks.current.set(id, p); sync(); }, [sync]);
-  const drop = useCallback((id: string) => { peaks.current.delete(id); sync(); }, [sync]);
-  const value = useMemo(() => ({ peak, report, drop }), [peak, report, drop]);
+  const report = useCallback((id: string, family: string, peak: number) => { rows.current.set(id, { family, peak }); sync(); }, [sync]);
+  const drop = useCallback((id: string) => { rows.current.delete(id); sync(); }, [sync]);
+  const value = useMemo(() => ({ peaks, report, drop }), [peaks, report, drop]);
   return <CurrentPeakContext.Provider value={value}>{children}</CurrentPeakContext.Provider>;
 }
 
@@ -275,17 +279,18 @@ function MicroRow({ sensors, fpsSensors, networkSensors, extras, device, prefixe
   const sensorKey = `${device}::${effectiveSensorName || 'default'}`;
   const history = useSharedSensorHistory(sensorKey, rawValue) as number[];
   const peakCtx = useContext(CurrentPeakContext);
+  const family = currentFamilyKey(device, sensor?.name ?? effectiveSensorName);
   const maxValue = device === 'network'
     ? networkMaxValue(rawValue, history)
-    : adaptiveFillMax(sensor, rawValue, history, staticMaxForDevice(device, sensor?.name, sensor?.type, sensor?.value), peakCtx?.peak ?? 0);
+    : adaptiveFillMax(sensor, rawValue, history, staticMaxForDevice(device, sensor?.name, sensor?.type, sensor?.value), peakCtx?.peaks[family] ?? 0);
   const ownPeak = observedPeak(rawValue, history);
   const reportsPeak = device !== 'network' && scale !== 'fixed' && usesAdaptiveCurrent(sensor);
   const peakId = useId();
   useLayoutEffect(() => {
     if (!peakCtx || !reportsPeak) return undefined;
-    peakCtx.report(peakId, ownPeak);
+    peakCtx.report(peakId, family, ownPeak);
     return () => peakCtx.drop(peakId);
-  }, [peakCtx?.report, peakCtx?.drop, peakId, ownPeak, reportsPeak]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [peakCtx?.report, peakCtx?.drop, peakId, family, ownPeak, reportsPeak]); // eslint-disable-line react-hooks/exhaustive-deps
   // A shared Fixed range scales every bar to the same [min, max] window;
   // adaptive keeps each bar's natural percent fill.
   const [domainMin, domainMax] = chartDomainForScale(device, rawValue, history, maxValue, scale, sensor?.name, sensor?.type, fixedMin, fixedMax, defaultFixedMax(device, sensor, effectiveSensorName));
@@ -303,6 +308,7 @@ function MicroRow({ sensors, fpsSensors, networkSensors, extras, device, prefixe
   return (
     <MicroBar
       label={label}
+      name={sensor?.name ?? effectiveSensorName}
       formatted={formatted}
       fillPercent={fillPercent}
       design={design}

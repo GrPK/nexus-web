@@ -57,8 +57,9 @@ export type MicroDesignKey = Extract<GaugeDesignKey, 'bar' | 'fill' | 'backdrop'
 export const MICRO_DESIGN_KEYS: MicroDesignKey[] = ['bar', 'fill', 'backdrop', 'simple', 'columns'];
 export const DEFAULT_MICRO_DESIGN: MicroDesignKey = 'bar';
 
-// Vertical Bars is not offered on the tall 2x4 with 6 or 8 columns: the values
-// would shrink below a readable size.
+// Vertical Bars is withheld from the tall 2x4 at the wide counts
+// (MICRO_WIDE_COUNTS): the columns get too narrow for their values to stay
+// readable.
 export function columnsDesignOffered(size: PanelWidgetSize, count: number): boolean {
   return !(widgetLayoutSize(size) === '2x4' && (MICRO_WIDE_COUNTS as readonly number[]).includes(count));
 }

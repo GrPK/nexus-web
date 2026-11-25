@@ -12,6 +12,8 @@ import styles from './MicroBar.module.scss';
 
 interface MicroBarProps {
   label: string;
+  /** Full sensor name; the Vertical Bars accessible name, as `label` may be hidden or custom. */
+  name?: string;
   formatted: string;
   fillPercent: number;
   // One of the Micro design keys (see MICRO_DESIGN_KEYS): 'bar' (fill track),
@@ -75,11 +77,11 @@ function useColumnFit() {
   return { boxRef: setBox, contentRef: setContent, scale: ctx ? ctx.scale : local };
 }
 
-function ColumnRow({ label, formatted, fillPercent, style }: { label: string; formatted: string; fillPercent: number; style?: CSSProperties }) {
+function ColumnRow({ name, formatted, fillPercent, style }: { name?: string; formatted: string; fillPercent: number; style?: CSSProperties }) {
   const { boxRef, contentRef, scale } = useColumnFit();
   const clamped = Math.max(0, Math.min(100, fillPercent));
   return (
-    <div className={styles.rowColumn} style={style} role="group" aria-label={label || undefined}>
+    <div className={styles.rowColumn} style={style} role={name ? 'group' : undefined} aria-label={name || undefined}>
       <div className={styles.columnTrack}>
         <div className={styles.columnFill} style={{ height: `${clamped}%` }} />
       </div>
@@ -111,8 +113,8 @@ export function MicroBar(props: MicroBarProps) {
   return <GaugeValueStateContext.Provider value={state}><MicroBarRow {...props} /></GaugeValueStateContext.Provider>;
 }
 
-function MicroBarRow({ label, formatted, fillPercent, design = 'bar', align = 'left', history, historyDomain, gradient, style }: MicroBarProps) {
-  if (design === 'columns') return <ColumnRow label={label} formatted={formatted} fillPercent={fillPercent} style={style} />;
+function MicroBarRow({ label, name, formatted, fillPercent, design = 'bar', align = 'left', history, historyDomain, gradient, style }: MicroBarProps) {
+  if (design === 'columns') return <ColumnRow name={name} formatted={formatted} fillPercent={fillPercent} style={style} />;
   if (design === 'simple') return <SimpleRow label={label} formatted={formatted} align={align} style={style} />;
 
   const head = (

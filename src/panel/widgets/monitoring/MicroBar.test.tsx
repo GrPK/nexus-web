@@ -115,6 +115,13 @@ describe('MicroBar columns design', () => {
     expect(container.querySelector('[class*="label"]')).toBeNull();
   });
 
+  it('names the group by the full sensor name, and leaves an unnamed column without a group role', () => {
+    const named = render(<MicroBar label="" name="Pin 1 Current" formatted="3" fillPercent={35} design="columns" />);
+    expect(named.container.firstElementChild?.getAttribute('aria-label')).toBe('Pin 1 Current');
+    const unnamed = render(<MicroBar label="" formatted="3" fillPercent={35} design="columns" />);
+    expect(unnamed.container.firstElementChild?.hasAttribute('role')).toBe(false);
+  });
+
   it('maps a partial fill to the same height percent', () => {
     const { container } = render(<MicroBar label="" formatted="3" fillPercent={35} design="columns" />);
     expect((container.querySelector('[class*="columnFill"]') as HTMLElement).style.height).toBe('35%');
