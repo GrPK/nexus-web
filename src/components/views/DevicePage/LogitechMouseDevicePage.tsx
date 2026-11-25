@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { MousePointer2, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Gauge, Keyboard, Mouse, MousePointer2, Music, RotateCcw, Sparkles, Undo2 } from 'lucide-react';
 import {
   restoreMouseProfile, setMouseActiveProfile, setMouseMode, updateMouseProfile,
   type MouseButton, type MouseProfile, type MouseProfilePatch, type MouseState,
@@ -9,24 +9,31 @@ import { Button } from '../../common/Button/Button';
 import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { Notice } from '../../common/Notice/Notice';
-import { Select, type SelectOption } from '../../common/Select/Select';
-import { SettingRow } from '../../common/SettingRow/SettingRow';
+import { Select } from '../../common/Select/Select';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { Spinner } from '../../common/Spinner/Spinner';
 import { TextInput } from '../../common/TextInput/TextInput';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
+import { ActionLibrary, type LibraryGroup } from './logitechMouse/ActionLibrary';
+import { DpiTrack } from './logitechMouse/DpiTrack';
+import { MouseIllustration } from './logitechMouse/MouseIllustration';
+import { FACTORY, HOTSPOTS, gName, type MouseView } from './logitechMouse/g502x';
 import { useLogitechMouse } from './useLogitechMouse';
 import styles from './LogitechMouseDevicePage.module.scss';
 
 const P = 'devices.logitechMouse.';
 type Change = (call: () => Promise<MouseState | null>) => Promise<boolean>;
+type Tab = 'assignments' | 'sensitivity';
 type Layer = 'primary' | 'gShift';
 const LAYERS: readonly Layer[] = ['primary', 'gShift'];
-
-// The HERO sensor's range, in the 50 DPI steps G HUB offers.
-const DPI_MIN = 100;
-const DPI_MAX = 25600;
-const DPI_STEP = 50;
+const VIEWS: readonly MouseView[] = ['top', 'side'];
+const TABS: readonly { key: Tab; icon: ReactNode }[] = [
+  { key: 'assignments', icon: <Mouse size={14} /> },
+  { key: 'sensitivity', icon: <Gauge size={14} /> },
+];
+// How long an assigned button's callout keeps its flash.
+const FLASH_MS = 1200;
+const ARROW = '→';
 
 // Mouse buttons as their bit in the binding's mask.
 const MOUSE_BUTTONS: readonly { mask: number; key: string }[] = [
@@ -49,13 +56,14 @@ const NAMED_KEYS: readonly { usage: number; key: string }[] = [
   { usage: 0x2B, key: 'tab' }, { usage: 0x2C, key: 'space' }, { usage: 0x4C, key: 'delete' },
 ];
 const SPECIAL_KIND = 'special';
+const MODIFIER_NAMES: readonly [number, string][] = [[1, 'Ctrl'], [2, 'Shift'], [4, 'Alt'], [8, 'Win']];
 
 function keyName(usage: number, t: (k: string) => string): string {
   if (usage >= LETTER_A && usage < LETTER_A + 26) return String.fromCharCode(0x41 + usage - LETTER_A);
   if (usage >= DIGIT_1 && usage < DIGIT_1 + 10) return String((usage - DIGIT_1 + 1) % 10);
-  if (usage >= F1 && usage < F1 + 12) return `F${usage - F1 + 1}`;
+  if (usage >= F1 && usage < F1 + 12) return 'F' + String(usage - F1 + 1);
   const named = NAMED_KEYS.find(k => k.usage === usage);
-  return named ? t(`${P}key.${named.key}`) : `0x${usage.toString(16).toUpperCase()}`;
+  return named ? t(`${P}key.${named.key}`) : '0x' + usage.toString(16).toUpperCase();
 }
 
 function encode(b: Pick<MouseButton, 'kind' | 'code' | 'modifiers' | 'raw'>): string {
@@ -68,158 +76,238 @@ function decode(value: string, slot: number): MouseButton {
   return { slot, kind: kind as MouseButton['kind'], code: Number(a), modifiers: Number(b) };
 }
 
-function useActionOptions(state: MouseState): SelectOption[] {
+/** The action library, grouped as the vendor app groups it. */
+function useLibrary(state: MouseState): LibraryGroup[] {
   const { t } = useTranslation();
   return useMemo(() => {
     const specialName = (code: number) => state.specials.find(s => s.code === code)?.name ?? String(code);
-    const opts: SelectOption[] = [{ value: 'h-mouse', label: t(`${P}group.mouse`), header: true }];
-    for (const m of MOUSE_BUTTONS) opts.push({ value: encode({ kind: 'mouse', code: m.mask, modifiers: 0 }), label: t(`${P}mouse.${m.key}`) });
-    opts.push({ value: 'h-special', label: t(`${P}group.functions`), header: true });
-    for (const code of OFFERED_SPECIALS) opts.push({ value: encode({ kind: SPECIAL_KIND, code, modifiers: 0 }), label: t(`${P}special.${specialName(code)}`) });
-    opts.push({ value: 'h-media', label: t(`${P}group.media`), header: true });
-    for (const m of MEDIA) opts.push({ value: encode({ kind: 'consumer', code: m.usage, modifiers: 0 }), label: t(`${P}media.${m.key}`) });
-    opts.push({ value: 'h-keys', label: t(`${P}group.keyboard`), header: true });
     const usages = [
       ...Array.from({ length: 26 }, (_, i) => LETTER_A + i),
       ...Array.from({ length: 10 }, (_, i) => DIGIT_1 + i),
       ...Array.from({ length: 12 }, (_, i) => F1 + i),
       ...NAMED_KEYS.map(k => k.usage),
     ];
-    for (const u of usages) opts.push({ value: encode({ kind: 'key', code: u, modifiers: 0 }), label: keyName(u, t) });
-    return opts;
+    return [
+      { key: 'mouse', title: t(`${P}group.mouse`), icon: <MousePointer2 size={14} />,
+        items: MOUSE_BUTTONS.map(m => ({ value: encode({ kind: 'mouse', code: m.mask, modifiers: 0 }), label: t(`${P}mouse.${m.key}`) })) },
+      { key: 'functions', title: t(`${P}group.functions`), icon: <Sparkles size={14} />,
+        items: OFFERED_SPECIALS.map(code => ({ value: encode({ kind: SPECIAL_KIND, code, modifiers: 0 }), label: t(`${P}special.${specialName(code)}`) })) },
+      { key: 'media', title: t(`${P}group.media`), icon: <Music size={14} />,
+        items: MEDIA.map(m => ({ value: encode({ kind: 'consumer', code: m.usage, modifiers: 0 }), label: t(`${P}media.${m.key}`) })) },
+      { key: 'keys', title: t(`${P}group.keyboard`), icon: <Keyboard size={14} />,
+        items: usages.map(u => ({ value: encode({ kind: 'key', code: u, modifiers: 0 }), label: keyName(u, t) })) },
+    ];
   }, [state.specials, t]);
 }
 
-/** Label for a binding the option list does not carry (a key with modifiers, a macro, a rare function). */
-function currentLabel(b: MouseButton, state: MouseState, t: (k: string, v?: Record<string, string>) => string): string {
+/** Words for a binding, also for ones the library does not list (a key with modifiers, a macro). */
+function bindingLabel(b: MouseButton | undefined, library: LibraryGroup[], state: MouseState, t: (k: string, v?: Record<string, string>) => string): string {
+  if (!b) return '';
+  const value = encode(b);
+  for (const g of library) {
+    const hit = g.items.find(i => i.value === value);
+    if (hit) return hit.label;
+  }
   if (b.kind === 'key') {
-    const mods = [b.modifiers & 1 ? 'Ctrl' : '', b.modifiers & 2 ? 'Shift' : '', b.modifiers & 4 ? 'Alt' : '', b.modifiers & 8 ? 'Win' : '']
-      .filter(Boolean);
+    const mods = MODIFIER_NAMES.filter(([bit]) => (b.modifiers & bit) !== 0).map(([, name]) => name);
     return [...mods, keyName(b.code, t)].join('+');
   }
   if (b.kind === SPECIAL_KIND) return t(`${P}special.${state.specials.find(s => s.code === b.code)?.name ?? 'none'}`);
-  if (b.kind === 'consumer') return t(`${P}consumerCode`, { code: `0x${b.code.toString(16).toUpperCase()}` });
+  if (b.kind === 'consumer') return t(`${P}consumerCode`, { code: '0x' + b.code.toString(16).toUpperCase() });
   return t(`${P}customBinding`);
 }
 
 interface ProfileProps { state: MouseState; profile: MouseProfile; change: Change; busy: boolean }
 
-function DpiSection({ profile, change, busy }: ProfileProps) {
+function AssignmentsTab({ state, profile, change, busy }: ProfileProps) {
   const { t } = useTranslation();
-  const [drafts, setDrafts] = useState<Record<number, string>>({});
-  const [invalid, setInvalid] = useState<number | null>(null);
-  const dpiKey = profile.dpi.join(',');
-  useEffect(() => { setDrafts({}); setInvalid(null); }, [profile.number, dpiKey]);
-  const used = profile.dpi.filter(v => v > 0).length;
-
-  const commit = (index: number, text: string) => {
-    const value = Math.round(Number(text) / DPI_STEP) * DPI_STEP;
-    if (!Number.isFinite(value) || value < DPI_MIN || value > DPI_MAX) {
-      setInvalid(index);
-      return;
-    }
-    setInvalid(null);
-    const dpi = profile.dpi.map((v, i) => (i === index ? value : v));
-    void change(() => updateMouseProfile(profile.number, { dpi }));
-  };
-  const levelOptions = Array.from({ length: Math.max(used, 1) }, (_, i) => ({ key: String(i), label: String(i + 1), disabled: busy }));
-
-  return (
-    <SettingsSection title={t(`${P}dpi`)} description={t(`${P}dpiHint`, { min: String(DPI_MIN), max: String(DPI_MAX), step: String(DPI_STEP) })} boxClassName={styles.box}>
-      {profile.dpi.map((v, i) => (
-        <SettingRow key={i} label={t(`${P}level`, { n: String(i + 1) })}>
-          <TextInput
-            type="number"
-            size="sm"
-            align="right"
-            ariaLabel={t(`${P}level`, { n: String(i + 1) })}
-            value={drafts[i] ?? (v > 0 ? String(v) : '')}
-            invalid={invalid === i}
-            disabled={busy}
-            onInput={text => setDrafts(prev => ({ ...prev, [i]: text }))}
-            onSubmit={text => commit(i, text)}
-            onBlur={text => { if (drafts[i] !== undefined && Number(text) !== v) commit(i, text); }}
-          />
-        </SettingRow>
-      ))}
-      <SettingRow label={t(`${P}defaultLevel`)} description={t(`${P}defaultLevelHint`)}>
-        <ChipGroup
-          ariaLabel={t(`${P}defaultLevel`)}
-          options={levelOptions}
-          activeKey={String(profile.defaultDpiIndex)}
-          onChange={key => { void change(() => updateMouseProfile(profile.number, { defaultDpiIndex: Number(key) })); }}
-        />
-      </SettingRow>
-      <SettingRow label={t(`${P}shiftLevel`)} description={t(`${P}shiftLevelHint`)}>
-        <ChipGroup
-          ariaLabel={t(`${P}shiftLevel`)}
-          options={levelOptions}
-          activeKey={String(profile.shiftDpiIndex)}
-          onChange={key => { void change(() => updateMouseProfile(profile.number, { shiftDpiIndex: Number(key) })); }}
-        />
-      </SettingRow>
-    </SettingsSection>
-  );
-}
-
-function ButtonsSection({ state, profile, change, busy }: ProfileProps) {
-  const { t } = useTranslation();
+  const library = useLibrary(state);
   const [layer, setLayer] = useState<Layer>('primary');
-  const base = useActionOptions(state);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [flash, setFlash] = useState<number | null>(null);
+  const flashTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
   const buttons = layer === 'primary' ? profile.buttons : profile.gShiftButtons;
+  const bySlot = (slot: number) => buttons.find(b => b.slot === slot);
+  const spot = selected === null ? undefined : HOTSPOTS.find(h => h.slot === selected);
+  const current = selected === null ? undefined : bySlot(selected);
 
-  const set = (slot: number, value: string) => {
+  const assign = (slot: number, value: string) => {
     const binding = decode(value, slot);
     const patch: MouseProfilePatch = layer === 'primary' ? { buttons: [binding] } : { gShiftButtons: [binding] };
-    void change(() => updateMouseProfile(profile.number, patch));
+    setSelected(slot);
+    void change(() => updateMouseProfile(profile.number, patch)).then(ok => {
+      if (!ok) return;
+      window.clearTimeout(flashTimer.current);
+      setFlash(slot);
+      flashTimer.current = window.setTimeout(() => setFlash(null), FLASH_MS);
+    });
   };
+  const reset = () => {
+    if (selected === null || !FACTORY[selected]) return;
+    const f = FACTORY[selected];
+    assign(selected, encode({ kind: f.kind, code: f.code, modifiers: 0 }));
+  };
+  const label = (slot: number) => bindingLabel(bySlot(slot), library, state, t);
 
   return (
-    <SettingsSection
-      title={t(`${P}buttons`)}
-      description={t(`${P}buttonsHint`)}
-      boxClassName={styles.box}
-      action={(
-        <ChipGroup
-          ariaLabel={t(`${P}layer`)}
-          options={LAYERS.map(l => ({ key: l, label: t(`${P}layer.${l}`) }))}
-          activeKey={layer}
-          onChange={key => setLayer(key as Layer)}
-        />
-      )}
-    >
-      {buttons.map(b => {
-        const value = encode(b);
-        const options = base.some(o => o.value === value) ? base : [{ value, label: currentLabel(b, state, t) }, ...base];
-        const label = state.buttonLabels[b.slot] ?? t(`${P}buttonN`, { n: String(b.slot + 1) });
-        return (
-          <SettingRow key={`${layer}-${b.slot}`} label={label}>
-            <Select ariaLabel={label} value={value} options={options} disabled={busy} onChange={v => set(b.slot, v)} />
-          </SettingRow>
-        );
-      })}
-    </SettingsSection>
+    <div className={styles.assign}>
+      <ActionLibrary
+        groups={library}
+        currentValue={current ? encode(current) : null}
+        disabled={busy}
+        title={t(`${P}library`)}
+        hint={spot ? t(`${P}libraryHintSelected`, { button: gName(spot.g) }) : t(`${P}libraryHint`)}
+        searchLabel={t(`${P}librarySearch`)}
+        emptyLabel={t(`${P}libraryEmpty`)}
+        onPick={value => { if (selected !== null) assign(selected, value); }}
+      />
+      <div className={styles.stage}>
+        <div className={styles.stageBar}>
+          <ChipGroup
+            ariaLabel={t(`${P}layer`)}
+            options={LAYERS.map(l => ({ key: l, label: t(`${P}layer.${l}`) }))}
+            activeKey={layer}
+            onChange={key => setLayer(key as Layer)}
+          />
+          {spot && current && (
+            <div className={styles.selectedInfo} aria-live="polite">
+              <span className={styles.selectedBadge}>{gName(spot.g)}</span>
+              <span className={styles.selectedName}>{state.buttonLabels[spot.slot] ?? ''}</span>
+              <span className={styles.selectedArrow} aria-hidden>{ARROW}</span>
+              <span className={styles.selectedAction}>{label(spot.slot)}</span>
+              <Button size="sm" tone="ghost" icon={<Undo2 size={14} />} disabled={busy || !FACTORY[spot.slot]} onClick={reset}>
+                {t(`${P}resetButton`)}
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className={`${styles.views} ${layer === 'gShift' ? styles.gShift : ''}`}>
+          {VIEWS.map(view => (
+            <div key={view} className={view === 'top' ? styles.viewTop : styles.viewSide}>
+              <MouseIllustration
+                view={view}
+                actionLabel={label}
+                selectedSlot={selected}
+                flashSlot={flash}
+                ariaLabel={t(`${P}view.${view}`)}
+                onSelect={slot => setSelected(prev => (prev === slot ? null : slot))}
+                onDropAction={assign}
+              />
+              <span className={styles.viewCaption}>{t(`${P}view.${view}`)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
-/** The Logitech mouse page: the profiles the mouse keeps in its own memory, as G HUB's onboard memory mode edits them. */
+function SensitivityTab({ state, profile, change, busy }: ProfileProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <SettingsSection title={t(`${P}dpi`)} description={t(`${P}dpiTrackHint`)} boxClassName={styles.box}>
+        <DpiTrack
+          dpi={profile.dpi}
+          defaultDpiIndex={profile.defaultDpiIndex}
+          shiftDpiIndex={profile.shiftDpiIndex}
+          busy={busy}
+          labels={{
+            track: t(`${P}dpi`),
+            level: n => t(`${P}level`, { n: String(n) }),
+            value: t(`${P}dpiValue`),
+            setDefault: t(`${P}setDefault`),
+            setShift: t(`${P}setShift`),
+            remove: t(`${P}removeLevel`),
+            add: t(`${P}addLevel`),
+            isDefault: t(`${P}defaultLevel`),
+            isShift: t(`${P}shiftLevel`),
+          }}
+          onCommit={c => { void change(() => updateMouseProfile(profile.number, c)); }}
+        />
+      </SettingsSection>
+      <SettingsSection title={t(`${P}reportRate`)} description={t(`${P}reportRateHint`)} boxClassName={styles.box}>
+        <ChipGroup
+          ariaLabel={t(`${P}reportRate`)}
+          options={[...state.reportRatesHz].sort((a, b) => a - b).map(hz => ({ key: String(hz), label: t(`${P}hz`, { hz: String(hz) }), disabled: busy }))}
+          activeKey={String(profile.reportRateHz)}
+          onChange={key => { void change(() => updateMouseProfile(profile.number, { reportRateHz: Number(key) })); }}
+        />
+      </SettingsSection>
+    </>
+  );
+}
+
+function ProfileBar({ state, profile, change, busy, onPick }: ProfileProps & { onPick: (n: number) => void }) {
+  const { t } = useTranslation();
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  useEffect(() => setNameDraft(null), [profile.number, profile.name]);
+  const saveName = (text: string) => {
+    const name = text.trim();
+    if (name !== profile.name) void change(() => updateMouseProfile(profile.number, { name }));
+  };
+  const active = profile.number === state.activeProfile;
+  return (
+    <div className={styles.profileBar}>
+      <Select
+        className={styles.profileSelect}
+        ariaLabel={t(`${P}profile`)}
+        value={String(profile.number)}
+        options={state.profiles.map(p => ({
+          value: String(p.number),
+          label: t(`${P}profileOption`, { n: String(p.number), name: p.name || t(`${P}unnamed`) }),
+          note: p.number === state.activeProfile ? t(`${P}active`) : (p.enabled ? undefined : t(`${P}notInCycle`)),
+        }))}
+        onChange={v => onPick(Number(v))}
+      />
+      {active
+        ? <span className={styles.activePill}>{t(`${P}active`)}</span>
+        : <Button size="sm" disabled={busy} onClick={() => { void change(() => setMouseActiveProfile(profile.number)); }}>{t(`${P}useProfile`)}</Button>}
+      <div className={styles.nameField}>
+        <TextInput
+          size="sm"
+          maxLength={24}
+          ariaLabel={t(`${P}name`)}
+          value={nameDraft ?? profile.name}
+          placeholder={t(`${P}unnamed`)}
+          disabled={busy}
+          onInput={setNameDraft}
+          onSubmit={saveName}
+          onBlur={text => { if (nameDraft !== null) saveName(text); }}
+        />
+      </div>
+      {busy && <Spinner size={16} />}
+      {profile.canRestore && (
+        <Button size="sm" tone="ghost" icon={<RotateCcw size={14} />} disabled={busy} onClick={() => { void change(() => restoreMouseProfile(profile.number)); }}>
+          {t(`${P}restore`)}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** The Logitech mouse page: the profiles in the mouse's own memory, edited the way the vendor app's onboard memory mode does. */
 export function LogitechMouseDevicePage() {
   const { t } = useTranslation();
   const { state, loadFailed, failure, busy, change } = useLogitechMouse();
+  const [tab, setTab] = useState<Tab>('assignments');
   const [selected, setSelected] = useState<number | null>(null);
-  const [nameDraft, setNameDraft] = useState<string | null>(null);
 
   const profiles = state?.profiles ?? [];
   const number = selected ?? state?.activeProfile ?? profiles[0]?.number ?? null;
   const profile = profiles.find(p => p.number === number) ?? null;
-  useEffect(() => setNameDraft(null), [profile?.number, profile?.name]);
-
   // Brand + model name, not translated.
-  const title = `Logitech ${state?.model ?? 'G502 X PLUS'}`;
+  const title = 'Logitech ' + (state?.model ?? 'G502 X PLUS');
 
   return (
     <div className={styles.page}>
-      <ViewHeader title={title} />
+      <ViewHeader
+        title={title}
+        tabs={state?.present ? TABS.map(({ key, icon }) => ({ key, icon, label: t(`${P}tab.${key}`) })) : undefined}
+        activeTab={tab}
+        onTabChange={key => setTab(key as Tab)}
+      />
       <div className={styles.body}>
         {failure && <Notice tone="critical" role="alert">{t(failure)}</Notice>}
         {loadFailed && !state && <Notice tone="critical" role="alert">{t(`${P}loadFailed`)}</Notice>}
@@ -237,59 +325,14 @@ export function LogitechMouseDevicePage() {
           </Notice>
         )}
         {state?.present && profile && (
-          <div className={styles.tab}>
-            <SettingsSection
-              title={t(`${P}profile`)}
-              description={t(`${P}profileHint`)}
-              boxClassName={styles.box}
-              action={profile.canRestore ? (
-                <Button size="sm" icon={<RotateCcw size={14} />} disabled={busy} onClick={() => { void change(() => restoreMouseProfile(profile.number)); }}>
-                  {t(`${P}restore`)}
-                </Button>
-              ) : undefined}
-            >
-              <SettingRow label={t(`${P}profile`)}>
-                <Select
-                  ariaLabel={t(`${P}profile`)}
-                  value={String(profile.number)}
-                  options={profiles.map(p => ({
-                    value: String(p.number),
-                    label: t(`${P}profileOption`, { n: String(p.number), name: p.name || t(`${P}unnamed`) }),
-                    note: p.number === state.activeProfile ? t(`${P}active`) : (p.enabled ? undefined : t(`${P}notInCycle`)),
-                  }))}
-                  onChange={v => setSelected(Number(v))}
-                />
-              </SettingRow>
-              <SettingRow label={t(`${P}inUse`)} description={t(`${P}inUseHint`)}>
-                {profile.number === state.activeProfile
-                  ? <span className={styles.active}>{t(`${P}active`)}</span>
-                  : <Button size="sm" disabled={busy} onClick={() => { void change(() => setMouseActiveProfile(profile.number)); }}>{t(`${P}useProfile`)}</Button>}
-              </SettingRow>
-              <SettingRow label={t(`${P}name`)}>
-                <TextInput
-                  size="sm"
-                  maxLength={24}
-                  ariaLabel={t(`${P}name`)}
-                  value={nameDraft ?? profile.name}
-                  placeholder={t(`${P}unnamed`)}
-                  disabled={busy}
-                  onInput={setNameDraft}
-                  onSubmit={text => { void change(() => updateMouseProfile(profile.number, { name: text.trim() })); }}
-                  onBlur={text => { if (nameDraft !== null && text.trim() !== profile.name) void change(() => updateMouseProfile(profile.number, { name: text.trim() })); }}
-                />
-              </SettingRow>
-              <SettingRow label={t(`${P}reportRate`)} description={t(`${P}reportRateHint`)}>
-                <ChipGroup
-                  ariaLabel={t(`${P}reportRate`)}
-                  options={[...state.reportRatesHz].sort((a, b) => a - b).map(hz => ({ key: String(hz), label: t(`${P}hz`, { hz: String(hz) }), disabled: busy }))}
-                  activeKey={String(profile.reportRateHz)}
-                  onChange={key => { void change(() => updateMouseProfile(profile.number, { reportRateHz: Number(key) })); }}
-                />
-              </SettingRow>
-            </SettingsSection>
-            <DpiSection state={state} profile={profile} change={change} busy={busy} />
-            <ButtonsSection state={state} profile={profile} change={change} busy={busy} />
-          </div>
+          <>
+            <ProfileBar state={state} profile={profile} change={change} busy={busy} onPick={setSelected} />
+            <div className={styles.tab} key={tab}>
+              {tab === 'assignments'
+                ? <AssignmentsTab state={state} profile={profile} change={change} busy={busy} />
+                : <SensitivityTab state={state} profile={profile} change={change} busy={busy} />}
+            </div>
+          </>
         )}
       </div>
     </div>
