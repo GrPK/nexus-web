@@ -114,7 +114,8 @@
 }
 
 .selectedAction {
-  @include text-label;
+  @include text-caption;
+  color: var(--text);
 }
 
 .views {

@@ -68,6 +68,11 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, on
   const [selected, setSelected] = useState(defaultDpiIndex);
   const [draft, setDraft] = useState<string | null>(null);
   const levels = dpi.map((v, i) => (drag?.index === i ? drag.value : v));
+  // A level whose value label would touch the previous one's drops its label under the handle.
+  const below = new Set<number>();
+  levels.map((v, i) => ({ v, i })).filter(l => l.v > 0).sort((a, b) => a.v - b.v).forEach((l, k, all) => {
+    if (k > 0 && !below.has(all[k - 1].i) && toPos(l.v) - toPos(all[k - 1].v) < 0.06) below.add(l.i);
+  });
   const used = dpi.filter(v => v > 0).length;
   useEffect(() => { setDraft(null); }, [selected, dpi]);
   useEffect(() => { if (selected >= used) setSelected(Math.max(0, used - 1)); }, [selected, used]);
@@ -142,7 +147,7 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, on
           <button
             type="button"
             key={i}
-            className={`${styles.handle} ${selected === i ? styles.selected : ''} ${drag?.index === i ? styles.dragging : ''}`}
+            className={`${styles.handle} ${selected === i ? styles.selected : ''} ${drag?.index === i ? styles.dragging : ''} ${below.has(i) ? styles.below : ''}`}
             style={{ left: `${toPos(v) * 100}%` }}
             aria-label={handleLabel(i, v)}
             aria-pressed={selected === i}
@@ -161,17 +166,19 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, on
       </div>
       <div className={styles.editor}>
         <span className={styles.editorTitle}>{labels.level(selected + 1)}</span>
-        <TextInput
-          type="number"
-          size="sm"
-          align="right"
-          ariaLabel={labels.value}
-          value={draft ?? String(dpi[selected] ?? '')}
-          disabled={busy}
-          onInput={setDraft}
-          onSubmit={typed}
-          onBlur={text => { if (draft !== null) typed(text); }}
-        />
+        <div className={styles.valueField}>
+          <TextInput
+            type="number"
+            size="sm"
+            align="right"
+            ariaLabel={labels.value}
+            value={draft ?? String(dpi[selected] ?? '')}
+            disabled={busy}
+            onInput={setDraft}
+            onSubmit={typed}
+            onBlur={text => { if (draft !== null) typed(text); }}
+          />
+        </div>
         <Button size="sm" icon={<Star size={14} />} disabled={busy || defaultDpiIndex === selected}
           onClick={() => commitLevels(dpi, selected, shiftDpiIndex)}>{labels.setDefault}</Button>
         <Button size="sm" icon={<Crosshair size={14} />} disabled={busy || shiftDpiIndex === selected}

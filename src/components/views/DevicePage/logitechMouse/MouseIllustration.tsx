@@ -8,8 +8,8 @@ export const ACTION_MIME = 'application/x-nexus-mouse-action';
 // Room around the art for the callouts, in art units.
 const PAD_TOP = 250;
 const PAD_BOTTOM = 150;
-const LABEL_GAP = 150;
-const LABEL_ROOM = 1150;
+const LABEL_GAP = 120;
+const LABEL_ROOM = 1050;
 const ELBOW = 70;
 
 export interface MouseIllustrationProps {
@@ -71,8 +71,13 @@ export function MouseIllustration({ view, actionLabel, selectedSlot, flashSlot, 
             <stop offset="0" className={styles.stopLight} />
             <stop offset="1" className={styles.stopDark} />
           </linearGradient>
+          <linearGradient id={`mouse-sheen-${view}`} x1="0" y1="0" x2="0.6" y2="0.7">
+            <stop offset="0" className={styles.sheenOn} />
+            <stop offset="1" className={styles.sheenOff} />
+          </linearGradient>
         </defs>
         <path className={styles.body} d={art.body} fill={`url(#mouse-body-${view})`} />
+        <path className={styles.sheen} d={art.body} fill={`url(#mouse-sheen-${view})`} />
         {art.details.map((d, i) => <path key={i} className={styles.detail} d={d} />)}
         {spots.map(h => (
           <path
@@ -117,7 +122,7 @@ export function MouseIllustration({ view, actionLabel, selectedSlot, flashSlot, 
           type="button"
           key={`c${h.slot}-${flashSlot === h.slot ? 'flash' : 'still'}`}
           className={`${styles.callout} ${h.side === 'left' ? styles.calloutLeft : styles.calloutRight} ${state(h.slot)} ${flashSlot === h.slot ? styles.flash : ''}`}
-          style={{ left: pctX(anchorX(h)), top: pctY(h.labelY) }}
+          style={{ left: pctX(anchorX(h)), top: pctY(h.labelY), maxWidth: `${(LABEL_ROOM / width) * 96}%` }}
           aria-pressed={selectedSlot === h.slot}
           onMouseEnter={() => setHover(h.slot)}
           onMouseLeave={() => setHover(null)}
