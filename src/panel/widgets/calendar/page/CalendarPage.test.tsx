@@ -170,6 +170,11 @@ describe('CalendarPage', () => {
     const marked = container.querySelectorAll('[data-today="true"]');
     expect(marked.length).toBe(1);
     expect(marked[0].textContent).toBe('17');
+    const cell = marked[0] as HTMLElement;
+    const fills = Array.from(container.querySelectorAll<HTMLElement>('[aria-hidden="true"]')).filter(el => el.style.gridColumn !== '');
+    expect(fills.length).toBe(1);
+    expect(fills[0].parentElement).toBe(cell.parentElement);
+    expect(fills[0].style.gridColumn).toBe(cell.style.gridColumn);
   });
 
   it('hides a calendar from the view only, and remembers the choice', () => {
