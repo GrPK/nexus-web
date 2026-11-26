@@ -9,11 +9,13 @@ import styles from './KeyboardIllustration.module.scss';
 export interface KeyFace {
   /** The assignment, short; null when the key does what it does by default. */
   label: string | null;
+  /** A smaller line above the label (the modifiers of a shortcut). */
+  sub?: string;
   /** "own": assigned on this layer. "inherited": the Base assignment showing through on G-Shift. */
   source: 'own' | 'inherited' | null;
   /** Colour family of the assignment. */
   tone?: 'gshift' | 'disabled';
-  /** Drawn instead of the label (media controls). */
+  /** Drawn above the label, or alone when there is no label (media controls, mouse buttons). */
   icon?: ReactNode;
 }
 
@@ -51,14 +53,20 @@ export function legendOf(k: KeyShape): string {
   return '';
 }
 
+// Text sizes in drawing units; the drawing shows at about half size, so 16 is the smallest that reads.
+const MIN_FONT = 16;
+const SUB_FONT = 15;
+const CHAR_WIDTH = 0.58;
+
 function fontFor(text: string, width: number): number {
   const n = [...text].length;
-  const size = n <= 1 ? 30 : n <= 2 ? 26 : n <= 4 ? 20 : n <= 6 ? 16 : 13;
-  return width < 66 ? Math.min(size, 20) : size;
+  const size = n <= 1 ? 32 : n <= 2 ? 28 : n <= 3 ? 24 : n <= 4 ? 21 : 18;
+  const fits = Math.floor((width - 2 * INSET) / (Math.max(n, 1) * CHAR_WIDTH));
+  return Math.max(MIN_FONT, Math.min(size, fits, width < 66 ? 22 : size));
 }
 
-function fit(text: string, width: number): string {
-  const max = Math.max(4, Math.floor(width / 9));
+function fit(text: string, width: number, font = MIN_FONT): string {
+  const max = Math.max(3, Math.floor((width - 2 * INSET) / (font * CHAR_WIDTH)));
   return [...text].length > max ? [...text].slice(0, max - 1).join('') + '…' : text;
 }
 
@@ -179,18 +187,38 @@ export function KeyboardIllustration({
                 {showLabel ? (
                   <>
                     {legend !== '' && !k.round && (
-                      <text className={styles.corner} x={k.x + INSET + 4} y={k.y + INSET + 14}>{fit(legend, k.w * 0.7)}</text>
+                      <text className={styles.corner} x={k.x + INSET + 3} y={k.y + INSET + 12}>{fit(legend, k.w * 0.6, 13)}</text>
                     )}
-                    {f.icon ? (
-                      <svg className={styles.icon} x={cx - iconSize / 2} y={cy - iconSize / 2 + 4} width={iconSize} height={iconSize} viewBox="0 0 24 24">{f.icon}</svg>
-                    ) : (
-                      <text className={styles.label} x={cx} y={cy + 6} fontSize={fontFor(f.label ?? '', k.w)}>{fit(f.label ?? '', k.w)}</text>
+                    {f.icon && (
+                      <svg
+                        className={styles.icon}
+                        x={cx - (f.label ? iconSize * 0.4 : iconSize / 2)}
+                        y={f.label ? cy - iconSize * 0.65 : cy - iconSize / 2 + 4}
+                        width={f.label ? iconSize * 0.8 : iconSize}
+                        height={f.label ? iconSize * 0.8 : iconSize}
+                        viewBox="0 0 24 24"
+                      >
+                        {f.icon}
+                      </svg>
+                    )}
+                    {f.sub && (
+                      <text className={styles.sub} x={cx} y={cy - 4} fontSize={SUB_FONT}>{fit(f.sub, k.w, SUB_FONT)}</text>
+                    )}
+                    {f.label !== null && (
+                      <text
+                        className={styles.label}
+                        x={cx}
+                        y={f.icon ? cy + 24 : f.sub ? cy + 22 : cy + 8}
+                        fontSize={f.icon || f.sub ? Math.min(22, fontFor(f.label, k.w)) : fontFor(f.label, k.w)}
+                      >
+                        {fit(f.label, k.w, f.icon || f.sub ? Math.min(22, fontFor(f.label, k.w)) : fontFor(f.label, k.w))}
+                      </text>
                     )}
                   </>
                 ) : mediaIcon ? (
                   <svg className={styles.legendIcon} x={cx - iconSize / 2} y={cy - iconSize / 2 - 2} width={iconSize} height={iconSize} viewBox="0 0 24 24">{mediaIcon}</svg>
                 ) : (
-                  <text className={styles.legend} x={cx} y={cy + 4} fontSize={fontFor(legend, k.w)}>{fit(legend, k.w)}</text>
+                  <text className={styles.legend} x={cx} y={cy + 6} fontSize={fontFor(legend, k.w)}>{fit(legend, k.w, fontFor(legend, k.w))}</text>
                 )}
               </g>
             );

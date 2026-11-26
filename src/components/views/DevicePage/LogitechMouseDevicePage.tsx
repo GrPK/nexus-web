@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Gauge, Keyboard, ListOrdered, Mouse, MousePointer2, Music, Pencil, RotateCcw, Sparkles, Undo2 } from 'lucide-react';
 import {
-  restoreMouseProfile, setMouseActiveProfile, setMouseMode, setMouseProfileCycle, updateMouseProfile,
+  restoreMouseProfile, setMouseActiveProfile, setMouseKeepOnboard, setMouseMode, setMouseProfileCycle, updateMouseProfile,
   type MacroStep, type MouseButton, type MouseProfile, type MouseProfilePatch, type MouseState,
 } from '../../../api/logitechMouse';
 import { useTranslation } from '../../../lib/i18n';
@@ -65,6 +65,8 @@ const MODIFIER_NAMES: readonly [number, string][] = [[1, 'Ctrl'], [2, 'Shift'], 
 const MACRO_NEW = 'macro-new';
 const MACRO_STEPS = 'macro:';
 const MACRO_AT = 'macro-at:';
+// The name G HUB gives a profile it never named; shown as a word, not as the token.
+const DEFAULT_NAME_TOKEN = 'PROFILE_NAME_DEFAULT';
 // How many keys a macro's name lists before it is cut short.
 const SUMMARY_KEYS = 4;
 const ELLIPSIS = '…';
@@ -353,7 +355,7 @@ function ProfileBar({ state, profile, change, busy, onPick }: ProfileProps & { o
   useEffect(() => setNameDraft(null), [profile.number, profile.name]);
   const saveName = (text: string) => {
     const name = text.trim();
-    if (name !== profile.name) void change(() => updateMouseProfile(profile.number, { name }));
+    if (name !== profile.name && !(name === '' && profile.name === DEFAULT_NAME_TOKEN)) void change(() => updateMouseProfile(profile.number, { name }));
   };
   const active = profile.number === state.activeProfile;
   return (
@@ -364,7 +366,7 @@ function ProfileBar({ state, profile, change, busy, onPick }: ProfileProps & { o
         value={String(profile.number)}
         options={state.profiles.map(p => ({
           value: String(p.number),
-          label: t(`${P}profileOption`, { n: String(p.number), name: p.name || t(`${P}unnamed`) }),
+          label: t(`${P}profileOption`, { n: String(p.number), name: p.name === DEFAULT_NAME_TOKEN ? t(`${P}defaultName`) : (p.name || t(`${P}unnamed`)) }),
           note: p.number === state.activeProfile ? t(`${P}active`) : (p.enabled ? undefined : t(`${P}notInCycle`)),
         }))}
         onChange={v => onPick(Number(v))}
@@ -387,8 +389,8 @@ function ProfileBar({ state, profile, change, busy, onPick }: ProfileProps & { o
           size="sm"
           maxLength={24}
           ariaLabel={t(`${P}name`)}
-          value={nameDraft ?? profile.name}
-          placeholder={t(`${P}unnamed`)}
+          value={nameDraft ?? (profile.name === DEFAULT_NAME_TOKEN ? '' : profile.name)}
+          placeholder={profile.name === DEFAULT_NAME_TOKEN ? t(`${P}defaultName`) : t(`${P}unnamed`)}
           disabled={busy}
           onInput={setNameDraft}
           onSubmit={saveName}
@@ -401,6 +403,16 @@ function ProfileBar({ state, profile, change, busy, onPick }: ProfileProps & { o
           {t(`${P}restore`)}
         </Button>
       )}
+      <label className={styles.cycle}>
+        <Toggle
+          size="sm"
+          checked={state.keepOnboard === true}
+          disabled={busy}
+          ariaLabel={t(`${P}keepOnboard`)}
+          onChange={next => { void change(() => setMouseKeepOnboard(next)); }}
+        />
+        <span>{t(`${P}keepOnboard`)}</span>
+      </label>
     </div>
   );
 }

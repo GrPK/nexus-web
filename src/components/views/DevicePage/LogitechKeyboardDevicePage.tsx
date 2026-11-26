@@ -20,7 +20,7 @@ import { ActionLibrary, type LibraryGroup } from './logitechMouse/ActionLibrary'
 import { isModifier, usageOfCode } from './logitechMouse/hidKeys';
 import { KeyboardIllustration, legendOf, type KeyFace } from './logitechKeyboard/KeyboardIllustration';
 import { KEYS, type KeyboardLayout } from './logitechKeyboard/g915x';
-import { MEDIA, MODIFIERS, MOUSE_BUTTONS, capText, keyName, shortcutText } from './logitechKeyboard/keyNames';
+import { MEDIA, MODIFIERS, MOUSE_BUTTONS, capText, keyName, modifierCaps, shortcutText } from './logitechKeyboard/keyNames';
 import { usePolledDevice } from './usePolledDevice';
 import styles from './LogitechKeyboardDevicePage.module.scss';
 
@@ -91,17 +91,19 @@ function describe(a: Assign, t: T): string {
 function capFace(a: Assign, source: KeyFace['source'], t: T): KeyFace {
   switch (a.kind) {
     case 'keyboard': {
-      const plain = a.modifiers === 0 ? capText(a.code) : '';
-      return { source, label: plain || shortcutText(a.code, a.modifiers, t) };
+      const cap = capText(a.code) || keyName(a.code, t);
+      return a.modifiers === 0 ? { source, label: cap } : { source, label: cap, sub: modifierCaps(a.modifiers) };
     }
     case 'consumer':
-      return { source, label: describe(a, t), icon: MEDIA_ICON[a.code] };
+      return MEDIA_ICON[a.code] ? { source, label: null, icon: MEDIA_ICON[a.code] } : { source, label: describe(a, t) };
+    case 'mouse': {
+      const shorts = MOUSE_BUTTONS.filter(m => (a.code & m.mask) !== 0).map(m => m.short).join('');
+      return { source, label: shorts || '?', icon: <MousePointer2 /> };
+    }
     case 'gshift':
-      return { source, label: 'G-Shift', tone: 'gshift' };
-    case 'disabled':
-      return { source, label: '⊘', tone: 'disabled' };
+      return { source, label: 'G', sub: 'SHIFT', tone: 'gshift' };
     default:
-      return { source, label: describe(a, t) };
+      return { source, label: '⊘', tone: 'disabled' };
   }
 }
 

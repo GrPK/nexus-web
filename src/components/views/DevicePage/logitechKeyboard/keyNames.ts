@@ -43,6 +43,17 @@ export const MODIFIERS: readonly [number, string][] = [
   [0x10, 'Right Ctrl'], [0x20, 'Right Shift'], [0x40, 'Right Alt'], [0x80, 'Right Win'],
 ];
 
+/** Modifiers as they fit on a key cap: "Ctrl ⇧", right-hand ones marked with an R. */
+export function modifierCaps(modifiers: number): string {
+  const caps: [number, string][] = [[0x01, 'Ctrl'], [0x02, '⇧'], [0x04, 'Alt'], [0x08, '⊞']];
+  const parts: string[] = [];
+  for (const [bit, cap] of caps) {
+    if ((modifiers & bit) !== 0) parts.push(cap);
+    if ((modifiers & (bit << 4)) !== 0) parts.push('R' + cap);
+  }
+  return parts.join(' ');
+}
+
 /** "Ctrl+Shift+Esc" for a key with modifiers. */
 export function shortcutText(usage: number, modifiers: number, t: (k: string) => string): string {
   const mods = MODIFIERS.filter(([bit]) => (modifiers & bit) !== 0).map(([, name]) => name);
@@ -52,7 +63,7 @@ export function shortcutText(usage: number, modifiers: number, t: (k: string) =>
 /** Mouse buttons by their bit in a button mask. */
 export const MOUSE_BUTTONS: readonly { mask: number; key: string; short: string }[] = [
   { mask: 0x01, key: 'left', short: 'L' }, { mask: 0x02, key: 'right', short: 'R' }, { mask: 0x04, key: 'middle', short: 'M' },
-  { mask: 0x08, key: 'back', short: '◁' }, { mask: 0x10, key: 'forward', short: '▷' },
+  { mask: 0x08, key: 'back', short: '←' }, { mask: 0x10, key: 'forward', short: '→' },
 ];
 
 /** Media controls by HID consumer usage. */
