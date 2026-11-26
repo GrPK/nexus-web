@@ -29,7 +29,9 @@ const LABEL_STEP = 0.075;
 // leader and marker styles keep their weight.
 const ART_HEIGHT = 2700;
 // The halo around a button, as a share of the picture's width.
-const HALO = 0.04;
+const HALO = 0.032;
+// The marker dot, in drawing units (the drawn mouse's size).
+const DOT = 20;
 // Spots right of this share of the width put their callout on the right.
 const RIGHT_FROM = 0.33;
 
@@ -126,9 +128,9 @@ export function MousePhoto({ picture, photoUrl, actionLabel, selectedSlot, flash
             {...dragProps(s.slot)}
           >
             <circle className={styles.halo} r={halo} />
-            <circle className={base.ring} r={halo * 0.55} />
-            <circle className={`${base.ring} ${base.ringLate}`} r={halo * 0.55} />
-            <circle className={base.dot} r={halo * 0.28} />
+            <circle className={base.ring} r={DOT * 1.2} />
+            <circle className={`${base.ring} ${base.ringLate}`} r={DOT * 1.2} />
+            <circle className={base.dot} r={DOT} />
           </g>
         ))}
       </svg>

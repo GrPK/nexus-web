@@ -10,9 +10,10 @@
   cursor: pointer;
 }
 
+// Hidden until the button is hovered or selected, so the picture stays clean.
 .halo {
-  fill: rgb(255 255 255 / 0.04);
-  stroke: rgb(255 255 255 / 0.35);
+  fill: transparent;
+  stroke: transparent;
   stroke-width: 5;
   transition: fill var(--ease), stroke var(--ease);
 }
