@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MouseButton, MouseState } from '../../../api/logitechMouse';
 import { LogitechMouseDevicePage } from './LogitechMouseDevicePage';
 import { ACTION_MIME } from './logitechMouse/MouseIllustration';
-import { normalizeDpi } from './logitechMouse/DpiTrack';
+import { normalizeDpi, spreadLabels } from './logitechMouse/DpiTrack';
 
 vi.mock('../../../lib/i18n', () => ({
   useTranslation: () => ({
@@ -136,6 +136,13 @@ describe('LogitechMouseDevicePage', () => {
 
   it('normalizes DPI levels: ascending, zeros last, start and shift levels follow their values', () => {
     expect(normalizeDpi([3200, 800, 0, 1600, 0], 0, 1)).toEqual({ dpi: [800, 1600, 3200, 0, 0], defaultDpiIndex: 2, shiftDpiIndex: 0 });
+  });
+
+  it('keeps DPI values on one row, spreading close ones apart inside the track', () => {
+    expect(spreadLabels([100, 300], 1000, 64)).toEqual([100, 300]);
+    expect(spreadLabels([500, 520, 540], 1000, 64)).toEqual([456, 520, 584]);
+    expect(spreadLabels([0, 10], 1000, 64)).toEqual([32, 96]);
+    expect(spreadLabels([990, 1000], 1000, 64)).toEqual([904, 968]);
   });
 
   it('offers to put the mouse back on its onboard memory when software drives it', async () => {
