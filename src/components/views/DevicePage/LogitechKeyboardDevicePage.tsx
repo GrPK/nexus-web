@@ -4,7 +4,7 @@ import {
   Square, Undo2, Volume1, Volume2, VolumeX, Zap,
 } from 'lucide-react';
 import {
-  fetchKeyboard, rewriteKeyboard, setKeyboardEnabled, setKeyboardLayers, setKeyboardLayout,
+  fetchKeyboard, keyboardPhotoUrl, rewriteKeyboard, setKeyboardEnabled, setKeyboardLayers, setKeyboardLayout,
   type KeyAssignment, type KeyboardLayers, type KeyboardState,
 } from '../../../api/logitechKeyboard';
 import { useTranslation } from '../../../lib/i18n';
@@ -339,6 +339,7 @@ function AssignmentsStage({ state, change, busy }: StageProps) {
         </div>
         <div className={`${styles.board} ${styles[`layer_${layer}`] ?? ''}`}>
           <KeyboardIllustration
+            photoUrl={state.photo ? keyboardPhotoUrl(layout) : null}
             layout={layout}
             keyOf={cid => keyOfCid.get(cid)}
             face={face}

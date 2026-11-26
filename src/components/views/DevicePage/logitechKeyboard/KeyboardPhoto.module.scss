@@ -1,0 +1,213 @@
+// The keyboard's own picture with the keys as targets over it, styled like the vendor app's:
+// assigned keys light up in the accent, the selected key rings, hover brightens.
+
+.canvas {
+  position: relative;
+  width: 100%;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.photo {
+  filter: brightness(1.35) contrast(1.06) drop-shadow(0 28px 36px rgb(0 0 0 / 0.7));
+  pointer-events: none;
+}
+
+.key {
+  cursor: pointer;
+  outline: none;
+}
+
+.hit {
+  fill: transparent;
+  transition: fill var(--ease-fast);
+}
+
+.key.hover .hit,
+.key:focus-visible .hit {
+  fill: rgb(255 255 255 / 0.16);
+}
+
+.key.dropOver .hit {
+  fill: var(--accent-soft);
+  stroke: var(--accent-glow);
+  stroke-width: 3;
+  stroke-dasharray: 8 5;
+}
+
+.fill {
+  fill: var(--accent);
+  stroke: rgb(255 255 255 / 0.35);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 12px var(--accent-glow-shadow));
+  transition: fill var(--ease);
+}
+
+.gshift .fill {
+  fill: var(--airflow-purple);
+}
+
+.disabled .fill {
+  fill: #3a1218;
+  stroke: var(--bad);
+  filter: none;
+}
+
+.inherited .fill {
+  fill: color-mix(in srgb, var(--accent) 35%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 7 5;
+  filter: none;
+}
+
+.ring {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 3.5;
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 0 7px var(--accent));
+}
+
+.selected .ring {
+  opacity: 1;
+}
+
+.ripple {
+  fill: none;
+  stroke: var(--accent-glow);
+  stroke-width: 4;
+  opacity: 0;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.content {
+  pointer-events: none;
+}
+
+.fill,
+.content {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.label,
+.sub,
+.corner {
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-family: var(--font-sans);
+  user-select: none;
+}
+
+.label {
+  fill: #fff;
+  font-weight: 700;
+  filter: drop-shadow(0 0 4px rgb(255 255 255 / 0.5));
+}
+
+.sub {
+  fill: #fff;
+  opacity: 0.9;
+  font-weight: 600;
+}
+
+.corner {
+  text-anchor: start;
+  font-size: 13px;
+  font-weight: 700;
+  fill: rgb(255 255 255 / 0.75);
+}
+
+.icon {
+  color: #fff;
+  filter: drop-shadow(0 0 4px rgb(255 255 255 / 0.5));
+}
+
+.disabled .label {
+  fill: var(--bad);
+  filter: none;
+}
+
+.inherited .label,
+.inherited .sub,
+.inherited .icon {
+  opacity: 0.85;
+  filter: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .keys .fill,
+  .keys .content {
+    animation: fill-in calc(var(--ease-slow) * 2) ease-out backwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  .selected .ring {
+    animation: ring-pulse calc(var(--ease-slow) * 6) ease-in-out infinite;
+  }
+
+  .flash .fill,
+  .flash .content {
+    animation: key-pop calc(var(--ease-slow) * 2) ease-out;
+  }
+
+  .flash .ripple {
+    animation: ripple calc(var(--ease-slow) * 3) ease-out;
+  }
+}
+
+@keyframes fill-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ring-pulse {
+  0%,
+  100% {
+    stroke-opacity: 1;
+    stroke-width: 3.5;
+  }
+  50% {
+    stroke-opacity: 0.35;
+    stroke-width: 9;
+  }
+}
+
+@keyframes key-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}

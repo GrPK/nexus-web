@@ -1,40 +1,12 @@
 import { useId, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { Gamepad2, Pause, SkipBack, SkipForward, Sun, VolumeX } from 'lucide-react';
 import { ACTION_MIME } from '../logitechMouse/MouseIllustration';
-import { capText } from './keyNames';
-import { ART, CASE, KEYS, type KeyShape, type KeyboardLayout } from './g915x';
+import { ART, CASE, KEYS } from './g915x';
+import { fit, fontFor, legendOf, type KeyboardIllustrationProps } from './keyCaps';
+import { KeyboardPhoto } from './KeyboardPhoto';
 import styles from './KeyboardIllustration.module.scss';
 
-/** What a key does on the layer shown, worded for its cap. */
-export interface KeyFace {
-  /** The assignment, short; null when the key does what it does by default. */
-  label: string | null;
-  /** A smaller line above the label (the modifiers of a shortcut). */
-  sub?: string;
-  /** "own": assigned on this layer. "inherited": the Base assignment showing through on G-Shift. */
-  source: 'own' | 'inherited' | null;
-  /** Colour family of the assignment. */
-  tone?: 'gshift' | 'disabled';
-  /** Drawn above the label, or alone when there is no label (media controls, mouse buttons). */
-  icon?: ReactNode;
-}
-
-export interface KeyboardIllustrationProps {
-  layout: KeyboardLayout;
-  /** Key number of a control id, or undefined when this keyboard has no such control. */
-  keyOf: (cid: number) => number | undefined;
-  face: (key: number) => KeyFace;
-  selectedKey: number | null;
-  /** The key whose assignment just changed; it pops and ripples. */
-  flashKey: number | null;
-  /** Changes with the layer shown, so the keys sweep in again. */
-  layerKey: string;
-  ariaLabel: string;
-  /** Accessible name of a key, from its legend. */
-  keyAria: (key: number, legend: string) => string;
-  onSelect: (key: number) => void;
-  onDropAction: (key: number, value: string) => void;
-}
+export { legendOf, type KeyFace } from './keyCaps';
 
 // Icons for the media keys' own legends, by consumer usage.
 const MEDIA_LEGEND: Record<number, ReactNode> = {
@@ -58,28 +30,7 @@ const FACE_LIP = 9;
 // The sweep across the keys when a layer opens, in ms per drawing unit from the left.
 const SWEEP_MS_PER_UNIT = 0.18;
 const ROLLER_RIDGES = 46;
-const MIN_FONT = 16;
 const SUB_FONT = 15;
-const CHAR_WIDTH = 0.58;
-
-/** A key's own legend: its cap text, or its G number. */
-export function legendOf(k: KeyShape): string {
-  if (k.g) return `G${k.g}`;
-  if (k.usage !== undefined) return capText(k.usage);
-  return '';
-}
-
-function fontFor(text: string, width: number): number {
-  const n = [...text].length;
-  const size = n <= 1 ? 30 : n <= 2 ? 26 : n <= 3 ? 22 : n <= 4 ? 19 : 17;
-  const fits = Math.floor((width - 2 * FACE_INSET - 8) / (Math.max(n, 1) * CHAR_WIDTH));
-  return Math.max(MIN_FONT, Math.min(size, fits));
-}
-
-function fit(text: string, width: number, font = MIN_FONT): string {
-  const max = Math.max(3, Math.floor((width - 2 * FACE_INSET - 6) / (font * CHAR_WIDTH)));
-  return [...text].length > max ? [...text].slice(0, max - 1).join('') + '…' : text;
-}
 
 /**
  * The keyboard, drawn as a low-profile board on a brushed aluminium case: keycaps with a raised
@@ -88,11 +39,12 @@ function fit(text: string, width: number, font = MIN_FONT): string {
  * with the accent colour and shows its new action, its own legend in the corner; a changed key
  * pops with a ripple; opening a layer sweeps the keys in. Actions from the library drop onto keys.
  */
-export function KeyboardIllustration({
-  layout, keyOf, face, selectedKey, flashKey, layerKey, ariaLabel, keyAria, onSelect, onDropAction,
-}: KeyboardIllustrationProps) {
+export function KeyboardIllustration(props: KeyboardIllustrationProps & { photoUrl?: string | null }) {
+  const { layout, keyOf, face, selectedKey, flashKey, layerKey, ariaLabel, keyAria, onSelect, onDropAction, photoUrl } = props;
   const [hover, setHover] = useState<number | null>(null);
   const [dropOver, setDropOver] = useState<number | null>(null);
+  // The picture failed to load for this URL; draw the keyboard instead.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const uid = useId().replace(/:/g, '');
   const id = (name: string) => `kb-${uid}-${name}`;
   const url = (name: string) => `url(#${id(name)})`;
@@ -119,6 +71,10 @@ export function KeyboardIllustration({
       onDropAction(key, value);
     },
   });
+
+  if (photoUrl && photoUrl !== failedUrl) {
+    return <KeyboardPhoto {...props} photoUrl={photoUrl} onPhotoError={() => setFailedUrl(photoUrl)} />;
+  }
 
   return (
     <div className={styles.canvas} style={{ aspectRatio: `${width} / ${height}` }} role="group" aria-label={ariaLabel}>

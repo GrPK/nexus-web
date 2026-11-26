@@ -1,4 +1,4 @@
-import { fetchService, postService, putService } from './service';
+import { fetchService, postService, putService, resolveHttp, tokenParam } from './service';
 
 /**
  * What one key does on a layer: "keyboard" (code = HID usage, modifiers = Ctrl 1, Shift 2, Alt 4,
@@ -34,6 +34,8 @@ export interface KeyboardState {
   layoutChoice?: 'ansi' | 'iso' | null;
   /** The layout known for the keyboard's layout code; null when unknown. */
   layoutDetected?: 'ansi' | 'iso' | null;
+  /** Whether G HUB's picture of this keyboard (for `layout`) is on this PC. */
+  photo?: boolean;
   /** Logitech control id of each key number; 0 for an empty slot. */
   controls: number[];
   /** Whether the keyboard applies the assignments now (Fn+F1 switches it too). */
@@ -46,6 +48,13 @@ export interface KeyboardState {
 const BASE = '/devices/logitech-keyboard';
 
 export const fetchKeyboard = (signal?: AbortSignal) => fetchService<KeyboardState>(BASE, signal);
+
+/** URL of G HUB's picture of the keyboard for a layout (from the user's G HUB install; not shipped with Nexus). */
+export function keyboardPhotoUrl(layout: 'ansi' | 'iso'): string {
+  const base = resolveHttp(`${BASE}/image?layout=${layout}`);
+  const tok = tokenParam();
+  return tok ? `${base}&${tok}` : base;
+}
 
 // Every change answers with the state after it, or null when the keyboard did not take it.
 export const setKeyboardLayers = (layers: KeyboardLayers) => putService<KeyboardState>(`${BASE}/layers`, layers);

@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
   rewriteKeyboard: vi.fn(),
   setKeyboardEnabled: vi.fn(),
   setKeyboardLayout: vi.fn(),
+  keyboardPhotoUrl: vi.fn(() => 'photo.webp'),
 }));
 vi.mock('../../../api/logitechKeyboard', () => api);
 
