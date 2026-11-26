@@ -1,0 +1,52 @@
+// The mouse as a real picture: the photo itself, and over each button a halo that lights on hover
+// and fills with the accent when the button is selected (callouts come from MouseIllustration).
+
+.photo {
+  filter: brightness(1.12) contrast(1.04) drop-shadow(0 26px 34px rgb(0 0 0 / 0.75));
+  pointer-events: none;
+}
+
+.spot {
+  cursor: pointer;
+}
+
+.halo {
+  fill: rgb(255 255 255 / 0.04);
+  stroke: rgb(255 255 255 / 0.35);
+  stroke-width: 5;
+  transition: fill var(--ease), stroke var(--ease);
+}
+
+.spot.hover .halo,
+.spot.dropOver .halo {
+  fill: var(--accent-soft);
+  stroke: var(--accent-glow);
+  stroke-width: 8;
+}
+
+.spot.dropOver .halo {
+  stroke-dasharray: 20 12;
+}
+
+.spot.selected .halo {
+  fill: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke: var(--accent);
+  stroke-width: 10;
+  filter: drop-shadow(0 0 30px var(--accent-glow-shadow));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spot.selected .halo {
+    animation: halo-breathe calc(var(--ease-slow) * 6) ease-in-out infinite;
+  }
+}
+
+@keyframes halo-breathe {
+  0%,
+  100% {
+    fill-opacity: 0.75;
+  }
+  50% {
+    fill-opacity: 1;
+  }
+}

@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   setMouseMode: vi.fn(),
   setMouseProfileCycle: vi.fn(),
   setMouseKeepOnboard: vi.fn(),
+  mousePictureUrl: vi.fn(() => 'mouse.png'),
 }));
 vi.mock('../../../api/logitechMouse', () => api);
 

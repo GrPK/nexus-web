@@ -1,4 +1,4 @@
-import { fetchService, postService, putService } from './service';
+import { fetchService, postService, putService, resolveHttp, tokenParam } from './service';
 
 /**
  * One step of a macro the mouse plays from its own memory: "keyDown"/"keyUp" (code = HID usage,
@@ -47,6 +47,13 @@ export interface MouseProfile {
   canRestore: boolean;
 }
 
+/** A picture of the mouse the user gave Nexus, with each button's spot on it (in its pixels). */
+export interface MousePicture {
+  width: number;
+  height: number;
+  spots: { slot: number; x: number; y: number; side?: 'left' | 'right' | null }[];
+}
+
 export interface MouseState {
   present: boolean;
   name?: string;
@@ -55,6 +62,8 @@ export interface MouseState {
   mode?: 'onboard' | 'host';
   /** Nexus puts the mouse back on its onboard memory when another app switches it to host mode (not while G HUB runs). */
   keepOnboard?: boolean;
+  /** A picture of the mouse kept in its Nexus folder; null when there is none. */
+  picture?: MousePicture | null;
   activeProfile?: number;
   buttonCount: number;
   buttonLabels: string[];
@@ -81,6 +90,13 @@ export interface MouseProfilePatch {
 const BASE = '/devices/logitech-mouse';
 
 export const fetchMouse = (signal?: AbortSignal) => fetchService<MouseState>(BASE, signal);
+
+/** URL of the picture of the mouse kept in its Nexus folder. */
+export function mousePictureUrl(): string {
+  const base = resolveHttp(`${BASE}/picture`);
+  const tok = tokenParam();
+  return tok ? `${base}?${tok}` : base;
+}
 
 // Every change answers with the state after it, or null when the mouse did not take it.
 export const updateMouseProfile = (profile: number, patch: MouseProfilePatch) =>
