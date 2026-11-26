@@ -7,7 +7,7 @@ $label-row: 1.7rem;
 $lead: 1rem; // LEAD_HEIGHT in DpiTrack.tsx (16 px)
 $knob: 1.9rem;
 $knob-top: $label-row + $lead;
-$rail: 4px;
+$rail: 0.25rem;
 
 .wrap {
   display: flex;
