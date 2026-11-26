@@ -22,6 +22,7 @@ import { AsusGlacialLcdDevicePage } from './AsusGlacialLcdDevicePage';
 import { AstralDevicePage } from './AstralDevicePage';
 import { AsusRyujinExtremeDevicePage } from './AsusRyujinExtremeDevicePage';
 import { LogitechSpeakerDevicePage } from './LogitechSpeakerDevicePage';
+import { LogitechKeyboardDevicePage } from './LogitechKeyboardDevicePage';
 import { LogitechMouseDevicePage } from './LogitechMouseDevicePage';
 import { DeepCoolMystiqueDevicePage } from './DeepCoolMystiqueDevicePage';
 import { GlacialPanelRoute } from './GlacialPanelRoute';
@@ -306,6 +307,10 @@ function DeviceBody({ device, controlDevice, platform, onOpenFirmware, onSection
 
   if (device.curatedId === 'logitech-mouse') {
     return <LogitechMouseDevicePage key={device.key} />;
+  }
+
+  if (device.curatedId === 'logitech-keyboard') {
+    return <LogitechKeyboardDevicePage key={device.key} />;
   }
 
   if (device.curatedId === 'deepcool-mystique') {

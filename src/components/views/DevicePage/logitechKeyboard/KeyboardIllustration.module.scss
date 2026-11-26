@@ -1,0 +1,250 @@
+// The keyboard drawing. Keycaps sit on the case with a lit top face; hover lifts a key, selection
+// rings and breathes it, an assigned key turns the accent colour and pops when it changes, and a
+// layer opens with a sweep across the keys.
+
+.canvas {
+  position: relative;
+  width: 100%;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.caseTop {
+  stop-color: var(--bg-card-hover);
+}
+
+.caseBottom {
+  stop-color: var(--bg);
+}
+
+.faceTop {
+  stop-color: var(--surface-hover);
+}
+
+.faceBottom {
+  stop-color: var(--bg-elevated);
+}
+
+.case {
+  stroke: var(--text-dim);
+  stroke-opacity: 0.35;
+  stroke-width: 3;
+  filter: drop-shadow(0 26px 40px rgb(0 0 0 / var(--alpha-strong)));
+}
+
+.band {
+  fill: rgb(255 255 255 / var(--alpha-faint));
+}
+
+.roller {
+  fill: var(--bg);
+  stroke: var(--text-dim);
+  stroke-opacity: 0.4;
+  stroke-width: 3;
+}
+
+.ridge {
+  stroke: var(--text-dim);
+  stroke-opacity: 0.35;
+  stroke-width: 3;
+}
+
+.fixed {
+  fill: var(--bg);
+  stroke: var(--text-dim);
+  stroke-opacity: 0.4;
+  stroke-width: 3;
+}
+
+.key {
+  cursor: pointer;
+  outline: none;
+  transition: transform var(--ease-fast);
+}
+
+.cap {
+  fill: var(--bg);
+  stroke: var(--border-strong);
+  stroke-width: 2.5;
+  transition: fill var(--ease), stroke var(--ease);
+}
+
+.face {
+  stroke: rgb(255 255 255 / var(--alpha-faint));
+  stroke-width: 1.5;
+  transition: opacity var(--ease);
+}
+
+.ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 5;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.legend,
+.label,
+.corner {
+  text-anchor: middle;
+  font-family: var(--font-sans);
+  pointer-events: none;
+  user-select: none;
+}
+
+.legend {
+  fill: var(--text);
+  font-weight: var(--weight-heading);
+}
+
+.legendIcon {
+  color: var(--text);
+  pointer-events: none;
+}
+
+.label {
+  fill: var(--accent-text);
+  font-weight: var(--weight-strong);
+}
+
+.icon {
+  color: var(--accent-text);
+  pointer-events: none;
+}
+
+.corner {
+  text-anchor: start;
+  font-size: 13px;
+  fill: var(--text-dim);
+}
+
+.key.hover,
+.key.dropOver,
+.key:focus-visible {
+  transform: translateY(-3px);
+}
+
+.key.hover .cap,
+.key.dropOver .cap,
+.key:focus-visible .cap {
+  stroke: var(--accent-glow);
+}
+
+.key.dropOver .cap {
+  stroke-dasharray: 10 6;
+}
+
+// Assigned on this layer: the cap takes the accent colour.
+.assigned .cap {
+  fill: var(--accent);
+  stroke: var(--accent-glow);
+}
+
+.assigned .face {
+  opacity: 0.18;
+}
+
+.assigned .corner {
+  fill: var(--accent-text);
+  opacity: 0.75;
+}
+
+// The Base assignment showing through on the G-Shift layer.
+.inherited .cap {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-dasharray: 8 6;
+}
+
+.inherited .label {
+  fill: var(--text);
+  opacity: 0.8;
+}
+
+.inherited .icon {
+  color: var(--text);
+}
+
+.inherited .corner {
+  fill: var(--text-dim);
+}
+
+.assigned.gshift .cap {
+  fill: var(--airflow-purple);
+  stroke: var(--airflow-purple);
+}
+
+.assigned.disabled .cap {
+  fill: var(--bad-soft);
+  stroke: var(--bad);
+}
+
+.assigned.disabled .label {
+  fill: var(--bad);
+}
+
+.selected .ring {
+  opacity: 1;
+}
+
+.selected .cap {
+  stroke: var(--accent);
+  stroke-width: 4;
+  filter: drop-shadow(0 0 18px var(--accent-glow-shadow));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .keys .key {
+    animation: key-in calc(var(--ease-slow) * 2) ease-out backwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  .selected .ring {
+    animation: ring-pulse calc(var(--ease-slow) * 6) ease-in-out infinite;
+  }
+
+  .keys .key.flash {
+    animation: key-pop calc(var(--ease-slow) * 2) ease-out;
+  }
+}
+
+@keyframes key-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ring-pulse {
+  0%,
+  100% {
+    stroke-opacity: 1;
+    stroke-width: 5;
+  }
+  50% {
+    stroke-opacity: 0.35;
+    stroke-width: 11;
+  }
+}
+
+@keyframes key-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
