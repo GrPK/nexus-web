@@ -204,6 +204,7 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, vi
               max={DPI_MAX}
               step={DPI_STEP}
               aria-label={labels.value}
+              style={{ width: `${Math.max(3, (draft ?? String(dpi[selected] ?? '')).length) + 0.4}ch` }}
               value={draft ?? String(dpi[selected] ?? '')}
               disabled={busy}
               onChange={e => setDraft(e.target.value)}
