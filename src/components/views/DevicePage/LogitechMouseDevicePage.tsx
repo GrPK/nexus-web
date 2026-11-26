@@ -10,7 +10,6 @@ import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { Notice } from '../../common/Notice/Notice';
 import { Select } from '../../common/Select/Select';
-import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { Spinner } from '../../common/Spinner/Spinner';
 import { TextInput } from '../../common/TextInput/TextInput';
 import { Toggle } from '../../common/Toggle/Toggle';
@@ -20,6 +19,7 @@ import { DpiTrack } from './logitechMouse/DpiTrack';
 import { isModifier, keyCap } from './logitechMouse/hidKeys';
 import { MacroEditor } from './logitechMouse/MacroEditor';
 import { MouseIllustration } from './logitechMouse/MouseIllustration';
+import { MouseMini } from './logitechMouse/MouseMini';
 import { FACTORY, HOTSPOTS, gName, type MouseView } from './logitechMouse/g502x';
 import { useLogitechMouse } from './useLogitechMouse';
 import styles from './LogitechMouseDevicePage.module.scss';
@@ -34,6 +34,8 @@ const TABS: readonly { key: Tab; icon: ReactNode }[] = [
   { key: 'assignments', icon: <Mouse size={14} /> },
   { key: 'sensitivity', icon: <Gauge size={14} /> },
 ];
+// The DPI up and down buttons (slots), lit on the sensitivity page.
+const DPI_BUTTONS: readonly number[] = [9, 10];
 // How long an assigned button's callout keeps its flash.
 const FLASH_MS = 1200;
 const ARROW = '→';
@@ -316,36 +318,44 @@ function AssignmentsTab({ state, profile, change, busy }: ProfileProps) {
 function SensitivityTab({ state, profile, change, busy }: ProfileProps) {
   const { t } = useTranslation();
   return (
-    <>
-      <SettingsSection title={t(`${P}dpi`)} description={t(`${P}dpiTrackHint`)} boxClassName={styles.box}>
-        <DpiTrack
-          dpi={profile.dpi}
-          defaultDpiIndex={profile.defaultDpiIndex}
-          shiftDpiIndex={profile.shiftDpiIndex}
-          busy={busy}
-          labels={{
-            track: t(`${P}dpi`),
-            level: n => t(`${P}level`, { n: String(n) }),
-            value: t(`${P}dpiValue`),
-            setDefault: t(`${P}setDefault`),
-            setShift: t(`${P}setShift`),
-            remove: t(`${P}removeLevel`),
-            add: t(`${P}addLevel`),
-            isDefault: t(`${P}defaultLevel`),
-            isShift: t(`${P}shiftLevel`),
-          }}
-          onCommit={c => { void change(() => updateMouseProfile(profile.number, c)); }}
-        />
-      </SettingsSection>
-      <SettingsSection title={t(`${P}reportRate`)} description={t(`${P}reportRateHint`)} boxClassName={styles.box}>
-        <ChipGroup
-          ariaLabel={t(`${P}reportRate`)}
-          options={[...state.reportRatesHz].sort((a, b) => a - b).map(hz => ({ key: String(hz), label: t(`${P}hz`, { hz: String(hz) }), disabled: busy }))}
-          activeKey={String(profile.reportRateHz)}
-          onChange={key => { void change(() => updateMouseProfile(profile.number, { reportRateHz: Number(key) })); }}
-        />
-      </SettingsSection>
-    </>
+    <div className={styles.sensitivity}>
+      <div className={styles.sensHead}>
+        <div className={styles.sensIntro}>
+          <h3 className={styles.sensTitle}>{t(`${P}dpi`)}</h3>
+          <p className={styles.sensHint}>{t(`${P}dpiTrackHint`)}</p>
+        </div>
+        <div className={styles.rate}>
+          <span className={styles.rateLabel}>{t(`${P}reportRate`)}</span>
+          <ChipGroup
+            ariaLabel={t(`${P}reportRate`)}
+            options={[...state.reportRatesHz].sort((a, b) => a - b).map(hz => ({ key: String(hz), label: t(`${P}hz`, { hz: String(hz) }), disabled: busy }))}
+            activeKey={String(profile.reportRateHz)}
+            onChange={key => { void change(() => updateMouseProfile(profile.number, { reportRateHz: Number(key) })); }}
+          />
+          <span className={styles.sensHint}>{t(`${P}reportRateHint`)}</span>
+        </div>
+      </div>
+      <DpiTrack
+        dpi={profile.dpi}
+        defaultDpiIndex={profile.defaultDpiIndex}
+        shiftDpiIndex={profile.shiftDpiIndex}
+        busy={busy}
+        labels={{
+          track: t(`${P}dpi`),
+          level: n => t(`${P}level`, { n: String(n) }),
+          value: t(`${P}dpiValue`),
+          unit: t(`${P}dpi`),
+          setDefault: t(`${P}setDefault`),
+          setShift: t(`${P}setShift`),
+          remove: t(`${P}removeLevel`),
+          add: t(`${P}addLevel`),
+          isDefault: t(`${P}defaultLevel`),
+          isShift: t(`${P}shiftLevel`),
+        }}
+        visual={selected => <MouseMini lit={DPI_BUTTONS} pulse={selected} />}
+        onCommit={c => { void change(() => updateMouseProfile(profile.number, c)); }}
+      />
+    </div>
   );
 }
 

@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { Crosshair, Plus, Star, Trash2 } from 'lucide-react';
 import { Button } from '../../../common/Button/Button';
-import { TextInput } from '../../../common/TextInput/TextInput';
 import styles from './DpiTrack.module.scss';
 
 export const DPI_MIN = 100;
@@ -72,6 +71,8 @@ export interface DpiTrackLabels {
   track: string;
   level: (n: number) => string;
   value: string;
+  /** The unit after the big number ("DPI"). */
+  unit: string;
   setDefault: string;
   setShift: string;
   remove: string;
@@ -86,17 +87,20 @@ export interface DpiTrackProps {
   shiftDpiIndex: number;
   busy: boolean;
   labels: DpiTrackLabels;
+  /** Drawn beside the big readout (the mouse with its DPI buttons lit); gets the selected level. */
+  visual?: (selected: number) => ReactNode;
   onCommit: (change: DpiChange) => void;
 }
 
 /**
- * The vendor app's sensitivity strip: every DPI level a numbered handle sitting on one track, dragged
- * to its value. The values read on one straight row above the track, spread apart with a lead line
- * when two levels sit close; the start level is marked with a star and the DPI shift level with a
- * crosshair, under the handle and on the level's chip below. A drag only writes to the mouse when it
- * ends.
+ * The sensitivity stage, in the mouse page's studio look. On top, the selected level as a big glowing
+ * number you can type into, with its start / shift badges and actions, beside the mouse. Then the
+ * track: every level a numbered orb on one glowing line, dragged to its value, the values on one
+ * straight row above (spread apart with a lead line when two levels sit close), octave ticks under.
+ * Last, a card per level in the order the DPI buttons step through them, and one to add a level. A
+ * drag only writes to the mouse when it ends.
  */
-export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, onCommit }: DpiTrackProps) {
+export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, visual, onCommit }: DpiTrackProps) {
   const track = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [drag, setDrag] = useState<{ index: number; value: number } | null>(null);
@@ -154,9 +158,14 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, on
   };
 
   const typed = (text: string) => {
+    setDraft(null);
     const v = snap(Number(text));
-    if (!Number.isFinite(Number(text)) || text.trim() === '') return;
+    if (!Number.isFinite(Number(text)) || text.trim() === '' || v === dpi[selected]) return;
     commitLevels(dpi.map((x, i) => (i === selected ? v : x)));
+  };
+  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') typed(e.currentTarget.value);
+    if (e.key === 'Escape') setDraft(null);
   };
   const remove = () => {
     if (used <= 1) return;
@@ -182,6 +191,41 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, on
 
   return (
     <div className={styles.wrap}>
+      <div className={styles.hero}>
+        {visual && <div className={styles.visual}>{visual(selected)}</div>}
+        <div className={styles.readout}>
+          <span className={styles.kicker}>{labels.level(selected + 1)}</span>
+          <div key={selected} className={styles.bigRow}>
+            <input
+              className={styles.big}
+              type="number"
+              inputMode="numeric"
+              min={DPI_MIN}
+              max={DPI_MAX}
+              step={DPI_STEP}
+              aria-label={labels.value}
+              value={draft ?? String(dpi[selected] ?? '')}
+              disabled={busy}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={onKey}
+              onBlur={e => { if (draft !== null) typed(e.currentTarget.value); }}
+            />
+            <span className={styles.unit}>{labels.unit}</span>
+          </div>
+          <div className={styles.badges}>
+            {defaultDpiIndex === selected && <span className={styles.badge}><Star size={13} className={styles.star} />{labels.isDefault}</span>}
+            {shiftDpiIndex === selected && <span className={styles.badge}><Crosshair size={13} className={styles.shift} />{labels.isShift}</span>}
+          </div>
+          <div className={styles.actions}>
+            <Button size="sm" tone="ghost" icon={<Star size={14} />} disabled={busy || defaultDpiIndex === selected}
+              onClick={() => commitLevels(dpi, selected, shiftDpiIndex)}>{labels.setDefault}</Button>
+            <Button size="sm" tone="ghost" icon={<Crosshair size={14} />} disabled={busy || shiftDpiIndex === selected}
+              onClick={() => commitLevels(dpi, defaultDpiIndex, selected)}>{labels.setShift}</Button>
+            <Button size="sm" tone="ghost" icon={<Trash2 size={14} />} disabled={busy || used <= 1} onClick={remove}>{labels.remove}</Button>
+          </div>
+        </div>
+      </div>
+
       <div
         ref={track}
         className={styles.track}
@@ -234,47 +278,32 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, on
             {i + 1}
           </button>
         ))}
-        {order.map(({ v, i }) => (
-          <span key={`m${i}`} className={styles.marks} style={{ left: `${toPos(v) * 100}%` }}>{marks(i)}</span>
-        ))}
       </div>
-      <div className={styles.chips}>
+
+      <div className={styles.cards}>
         {order.map(({ v, i }) => (
           <button
             type="button"
             key={`c${i}`}
-            className={`${styles.chip} ${state(i)}`}
+            className={`${styles.card} ${state(i)}`}
             aria-pressed={selected === i}
             disabled={busy}
             onClick={() => setSelected(i)}
           >
-            <span className={styles.chipNumber}>{i + 1}</span>
-            <span className={styles.chipValue}>{v}</span>
-            <span className={styles.chipMarks}>{marks(i)}</span>
+            <span className={styles.cardTop}>
+              <span className={styles.cardNumber}>{i + 1}</span>
+              <span className={styles.cardMarks}>{marks(i)}</span>
+            </span>
+            <span className={styles.cardValue}>{v}</span>
+            <span className={styles.cardUnit}>{labels.unit}</span>
           </button>
         ))}
-      </div>
-      <div className={styles.editor}>
-        <span className={styles.editorTitle}>{labels.level(selected + 1)}</span>
-        <div className={styles.valueField}>
-          <TextInput
-            type="number"
-            size="sm"
-            align="right"
-            ariaLabel={labels.value}
-            value={draft ?? String(dpi[selected] ?? '')}
-            disabled={busy}
-            onInput={setDraft}
-            onSubmit={typed}
-            onBlur={text => { if (draft !== null) typed(text); }}
-          />
-        </div>
-        <Button size="sm" icon={<Star size={14} />} disabled={busy || defaultDpiIndex === selected}
-          onClick={() => commitLevels(dpi, selected, shiftDpiIndex)}>{labels.setDefault}</Button>
-        <Button size="sm" icon={<Crosshair size={14} />} disabled={busy || shiftDpiIndex === selected}
-          onClick={() => commitLevels(dpi, defaultDpiIndex, selected)}>{labels.setShift}</Button>
-        <Button size="sm" icon={<Trash2 size={14} />} disabled={busy || used <= 1} onClick={remove}>{labels.remove}</Button>
-        <Button size="sm" icon={<Plus size={14} />} disabled={busy || used >= LEVELS} onClick={add}>{labels.add}</Button>
+        {used < LEVELS && (
+          <button type="button" className={`${styles.card} ${styles.addCard}`} disabled={busy} onClick={add}>
+            <Plus size={20} />
+            <span className={styles.cardUnit}>{labels.add}</span>
+          </button>
+        )}
       </div>
     </div>
   );

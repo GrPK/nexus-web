@@ -23,6 +23,23 @@
   pointer-events: none;
 }
 
+// The small top view on the sensitivity page; its DPI buttons glow.
+.mini {
+  display: block;
+  height: 100%;
+  width: auto;
+  overflow: visible;
+  filter: drop-shadow(0 18px 24px rgb(0 0 0 / 0.55));
+}
+
+.lit {
+  fill: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke: var(--accent-glow);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 6px var(--accent-glow-shadow));
+}
+
 // Labels printed on the mouse.
 .printed,
 .printedMid {
@@ -197,6 +214,10 @@
     animation: region-breathe calc(var(--ease-slow) * 6) ease-in-out infinite;
   }
 
+  .lit {
+    animation: lit-flash calc(var(--ease-slow) * 4) ease-out;
+  }
+
   .region.flash {
     animation: region-flash calc(var(--ease-slow) * 3) ease-out;
   }
@@ -229,6 +250,16 @@
   }
   50% {
     stroke-opacity: 0.55;
+  }
+}
+
+@keyframes lit-flash {
+  0% {
+    fill: var(--accent-glow);
+    filter: drop-shadow(0 0 14px var(--accent-glow));
+  }
+  100% {
+    filter: drop-shadow(0 0 6px var(--accent-glow-shadow));
   }
 }
 
