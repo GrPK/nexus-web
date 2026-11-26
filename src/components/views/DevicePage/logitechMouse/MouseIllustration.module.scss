@@ -1,8 +1,9 @@
 @use '../../../../styles/text' as *;
 
-// The mouse drawing with its callouts. The mouse keeps its own colours (matte black shell, metal
-// wheel); light, selection and assignments take the theme's accent. Selection fills the button,
-// draws its leader line in, ripples its marker and lifts its callout, like the vendor app.
+// The mouse drawing with its callouts. The drawing keeps its own colours (matte black shell,
+// metal wheel, the light strip); hover, selection and assignments take the theme's accent.
+// Selection glows the button, draws its leader line in, ripples its marker and lifts its
+// callout, like the vendor app. Lines keep one weight on screen whatever the view's scale.
 
 .canvas {
   position: relative;
@@ -18,89 +19,28 @@
   overflow: visible;
 }
 
-.foot {
-  fill: #0a0a0c;
-}
-
-.seam {
-  fill: none;
-  stroke: #050506;
-  stroke-width: 10;
-  stroke-linecap: round;
-}
-
-.seamLight {
-  fill: none;
-  stroke: rgb(255 255 255 / 0.09);
-  stroke-width: 4;
-  stroke-linecap: round;
-}
-
-.panelSeam {
-  stroke: #050506;
-  stroke-width: 12;
-}
-
-.panelEdge {
-  fill: none;
-  stroke: rgb(255 255 255 / 0.1);
-  stroke-width: 3;
-}
-
-.stripGlow {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 40;
-  opacity: 0.9;
-}
-
-.strip {
-  fill: none;
-  stroke: var(--accent-glow);
-  stroke-width: 7;
-  stroke-linecap: round;
-}
-
-.well {
-  fill: #050506;
-}
-
-.knurlDark {
-  stroke: rgb(0 0 0 / 0.55);
-  stroke-width: 4;
-}
-
-.knurlLight {
-  stroke: rgb(255 255 255 / 0.18);
-  stroke-width: 2;
-}
-
-.tilt {
-  fill: none;
-  stroke: rgb(255 255 255 / 0.22);
-  stroke-width: 6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.art {
   pointer-events: none;
 }
 
-.button {
-  stroke: rgb(255 255 255 / 0.14);
-  stroke-width: 3;
+// Labels printed on the mouse.
+.printed,
+.printedMid {
+  font-family: var(--font-sans, sans-serif);
+  font-weight: 700;
 }
 
-.rimLight {
-  fill: none;
-  stroke: rgb(255 255 255 / 0.14);
-  stroke-width: 5;
-  pointer-events: none;
+.printedMid {
+  text-anchor: middle;
 }
 
-// The buttons themselves: clear until hovered, filled with the accent when selected.
+// The buttons themselves: clear until hovered, glowing in the accent when selected.
 .region {
   fill: transparent;
   stroke: transparent;
-  stroke-width: 8;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
   cursor: pointer;
   transition: fill var(--ease), stroke var(--ease);
 }
@@ -112,19 +52,21 @@
 }
 
 .region.dropOver {
-  stroke-dasharray: 26 14;
+  stroke-dasharray: 6 4;
 }
 
 .region.selected {
-  fill: color-mix(in srgb, var(--accent) 45%, transparent);
+  fill: color-mix(in srgb, var(--accent) 40%, transparent);
   stroke: var(--accent);
-  filter: drop-shadow(0 0 30px var(--accent-glow-shadow));
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 8px var(--accent-glow-shadow));
 }
 
 .leader {
   fill: none;
   stroke: var(--text-dim);
-  stroke-width: 4;
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
   opacity: 0.45;
   pointer-events: none;
   transition: stroke var(--ease), opacity var(--ease);
@@ -138,7 +80,7 @@
 
 .leader.selected {
   stroke: var(--accent);
-  stroke-width: 6;
+  stroke-width: 1.6px;
   opacity: 1;
   stroke-dasharray: 3000;
 }
@@ -149,8 +91,9 @@
 
 .dot {
   fill: #121215;
-  stroke: rgb(255 255 255 / 0.7);
-  stroke-width: 6;
+  stroke: rgb(255 255 255 / 0.75);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
   transform-box: fill-box;
   transform-origin: center;
   transition: fill var(--ease), stroke var(--ease), transform var(--ease);
@@ -171,7 +114,8 @@
 .ring {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 6;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
   opacity: 0;
   transform-box: fill-box;
   transform-origin: center;
@@ -245,12 +189,16 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .bloom {
+    animation: bloom-breathe calc(var(--ease-slow) * 16) ease-in-out infinite;
+  }
+
   .region.selected {
     animation: region-breathe calc(var(--ease-slow) * 6) ease-in-out infinite;
   }
 
-  .stripGlow {
-    animation: strip-breathe calc(var(--ease-slow) * 16) ease-in-out infinite;
+  .region.flash {
+    animation: region-flash calc(var(--ease-slow) * 3) ease-out;
   }
 
   .leader.selected {
@@ -274,6 +222,16 @@
   }
 }
 
+@keyframes bloom-breathe {
+  0%,
+  100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.55;
+  }
+}
+
 @keyframes region-breathe {
   0%,
   100% {
@@ -284,13 +242,13 @@
   }
 }
 
-@keyframes strip-breathe {
-  0%,
-  100% {
-    opacity: 0.9;
+@keyframes region-flash {
+  0% {
+    fill: var(--accent-glow);
+    fill-opacity: 0.9;
   }
-  50% {
-    opacity: 0.5;
+  100% {
+    fill-opacity: 0.4;
   }
 }
 

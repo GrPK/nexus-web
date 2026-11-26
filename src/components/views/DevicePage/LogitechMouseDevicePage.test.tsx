@@ -153,9 +153,10 @@ describe('LogitechMouseDevicePage', () => {
     ] as const;
     const withMacro = buttons.map(b => (b.slot === 9 ? { slot: 9, kind: 'macro' as const, code: 6, modifiers: 0, macro: [...macro], macroEditable: true } : b));
     await mount(state({ profiles: [profile(1, { buttons: withMacro })] }));
-    expect(callout('G10').textContent).toContain(`${P}macro.summary:{"keys":"Shift+H, I"}`);
+    // Slot 9 is DPI up, printed G8 on the mouse.
+    expect(callout('G8').textContent).toContain(`${P}macro.summary:{"keys":"Shift+H, I"}`);
     expect(screen.getAllByText(`${P}macro.summary:{"keys":"Shift+H, I"}`).some(el => el.closest('aside'))).toBe(true);
-    fireEvent.click(callout('G10'));
+    fireEvent.click(callout('G8'));
     fireEvent.click(screen.getByText(`${P}macro.edit`));
     expect(screen.getAllByText(`${P}macro.pressed:{"key":"H"}`)).toHaveLength(1);
   });

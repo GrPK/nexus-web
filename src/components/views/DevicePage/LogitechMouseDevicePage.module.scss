@@ -143,17 +143,8 @@
   filter: hue-rotate(160deg);
 }
 
-.photoView {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  max-width: 64rem;
-  margin: 0 auto;
-  transition: filter var(--ease-slow);
-}
-
 .viewTop {
-  flex: 0 1 64%;
+  flex: 0 1 62%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -162,7 +153,7 @@
 }
 
 .viewSide {
-  flex: 0 1 34%;
+  flex: 0 1 36%;
   display: flex;
   flex-direction: column;
   align-items: center;

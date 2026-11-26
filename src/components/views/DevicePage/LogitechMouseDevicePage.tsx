@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Gauge, Keyboard, ListOrdered, Mouse, MousePointer2, Music, Pencil, RotateCcw, Sparkles, Undo2 } from 'lucide-react';
 import {
-  mousePictureUrl, restoreMouseProfile, setMouseActiveProfile, setMouseKeepOnboard, setMouseMode, setMouseProfileCycle, updateMouseProfile,
+  restoreMouseProfile, setMouseActiveProfile, setMouseKeepOnboard, setMouseMode, setMouseProfileCycle, updateMouseProfile,
   type MacroStep, type MouseButton, type MouseProfile, type MouseProfilePatch, type MouseState,
 } from '../../../api/logitechMouse';
 import { useTranslation } from '../../../lib/i18n';
@@ -20,7 +20,6 @@ import { DpiTrack } from './logitechMouse/DpiTrack';
 import { isModifier, keyCap } from './logitechMouse/hidKeys';
 import { MacroEditor } from './logitechMouse/MacroEditor';
 import { MouseIllustration } from './logitechMouse/MouseIllustration';
-import { MousePhoto } from './logitechMouse/MousePhoto';
 import { FACTORY, HOTSPOTS, gName, type MouseView } from './logitechMouse/g502x';
 import { useLogitechMouse } from './useLogitechMouse';
 import styles from './LogitechMouseDevicePage.module.scss';
@@ -194,8 +193,6 @@ function AssignmentsTab({ state, profile, change, busy }: ProfileProps) {
   const [layer, setLayer] = useState<Layer>('primary');
   const [selected, setSelected] = useState<number | null>(null);
   const [flash, setFlash] = useState<number | null>(null);
-  // The user's picture of the mouse failed to load; draw the mouse instead.
-  const [photoFailed, setPhotoFailed] = useState(false);
   // The macro editor, open in the library's place for one button.
   const [editing, setEditing] = useState<{ slot: number; steps: MacroStep[] | null } | null>(null);
   const flashTimer = useRef(0);
@@ -295,21 +292,6 @@ function AssignmentsTab({ state, profile, change, busy }: ProfileProps) {
             </div>
           )}
         </div>
-        {state.picture && !photoFailed ? (
-          <div className={`${styles.photoView} ${layer === 'gShift' ? styles.gShift : ''}`}>
-            <MousePhoto
-              picture={state.picture}
-              photoUrl={mousePictureUrl()}
-              actionLabel={label}
-              selectedSlot={selected}
-              flashSlot={flash}
-              ariaLabel={t(`${P}view.top`)}
-              onSelect={select}
-              onDropAction={(slot, value) => { void assign(slot, value); }}
-              onPhotoError={() => setPhotoFailed(true)}
-            />
-          </div>
-        ) : (
         <div className={`${styles.views} ${layer === 'gShift' ? styles.gShift : ''}`}>
           {VIEWS.map(view => (
             <div key={view} className={view === 'top' ? styles.viewTop : styles.viewSide}>
@@ -326,7 +308,6 @@ function AssignmentsTab({ state, profile, change, busy }: ProfileProps) {
             </div>
           ))}
         </div>
-        )}
       </div>
     </div>
   );
