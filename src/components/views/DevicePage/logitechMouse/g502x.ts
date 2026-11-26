@@ -1,4 +1,4 @@
-// The G502 X PLUS as the mouse page draws it: our own outline art (no vendor images), with every
+// The G502 X PLUS as the mouse page draws it: our own shaded art (no vendor images), with every
 // button where the vendor app marks it. Coordinates are in each view's art space (top view
 // 1391 x 2700, side view 936 x 2700, front of the mouse at the top).
 
@@ -24,8 +24,22 @@ export interface MouseArtView {
   width: number;
   height: number;
   body: string;
-  /** Seams and details drawn over the body. */
+  /** Seams engraved in the shell. */
   details: string[];
+  /** The rubber grip, clipped to the body. */
+  grip: string;
+  /** The light strip, drawn lit in the theme's accent. */
+  strip?: string;
+  /** The recess between the main buttons. */
+  channel?: string;
+  /** The scroll wheel seen from above. */
+  wheel?: { x: number; y: number; w: number; h: number };
+  /** Tilt arrows beside the wheel. */
+  tilt?: string[];
+  /** Where the dark foot under the thumb rest starts (side view). */
+  footY?: number;
+  /** Buttons drawn as the shell's big panels (the rest are drawn as small raised buttons). */
+  panels: number[];
 }
 
 export const ART: Record<MouseView, MouseArtView> = {
@@ -37,14 +51,17 @@ export const ART: Record<MouseView, MouseArtView> = {
       'C1280 1350 1300 1700 1260 2050 C1220 2400 1060 2610 800 2630 C560 2645 330 2520 250 2250 ' +
       'C190 2050 120 1850 110 1600 C100 1400 150 1250 210 1150 C170 1000 160 800 200 620 C230 450 270 320 360 230 Z',
     details: [
-      // seam between the main buttons and the palm
-      'M240 1030 C480 980 700 960 800 960 C930 960 1100 975 1290 1010',
-      // palm ridge and light strip
-      'M420 1500 C560 1440 1040 1440 1180 1520',
+      // palm ridge, thumb rest edge, the side panel on the right
       'M600 1980 C700 1940 900 1940 1000 1980',
-      // thumb rest edge
       'M210 1150 C260 1400 270 1800 300 2150',
+      'M1288 1060 C1215 1320 1200 1700 1250 2080',
     ],
+    grip: 'M0 1120 C200 1150 250 1400 270 1800 C285 2050 300 2300 360 2700 L0 2700 Z',
+    strip: 'M420 1500 C560 1440 1040 1440 1180 1520',
+    channel: 'M760 140 L840 142 L840 945 L760 940 Z',
+    wheel: { x: 755, y: 405, w: 90, h: 480 },
+    tilt: ['M730 640 L700 680 L730 720', 'M870 640 L900 680 L870 720'],
+    panels: [1, 2],
   },
   side: {
     width: 936,
@@ -53,9 +70,11 @@ export const ART: Record<MouseView, MouseArtView> = {
       'M180 220 C300 150 470 160 560 240 C690 360 760 700 800 1050 C840 1400 860 1750 820 2050 ' +
       'C780 2350 640 2560 420 2590 C280 2610 170 2560 130 2400 C100 2000 110 1400 120 900 C125 600 130 350 180 220 Z',
     details: [
-      'M130 2380 L820 2380',
       'M150 820 C320 860 520 860 700 820',
     ],
+    grip: 'M100 1500 C300 1480 600 1500 900 1560 L900 2380 L100 2380 Z',
+    footY: 2380,
+    panels: [],
   },
 };
 

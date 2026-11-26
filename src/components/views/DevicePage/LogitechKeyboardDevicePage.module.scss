@@ -50,7 +50,11 @@
   padding: var(--space-md);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
-  background: radial-gradient(ellipse at 50% 45%, var(--bg-elevated), var(--bg));
+  // A dark studio with a soft spotlight on the device, like the vendor app's stage.
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgb(255 255 255 / 0.07), transparent 70%),
+    radial-gradient(ellipse 60% 30% at 50% 100%, var(--accent-glow-shadow), transparent 70%),
+    var(--bg);
 }
 
 .stageBar {
@@ -138,7 +142,7 @@
 .board {
   display: flex;
   justify-content: center;
-  padding: var(--space-sm) 0;
+  padding: var(--space-md) var(--space-sm) var(--space-lg);
   transition: filter var(--ease-slow);
 }
 

@@ -85,7 +85,11 @@
   padding: var(--space-md);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
-  background: radial-gradient(ellipse at 50% 40%, var(--bg-elevated), var(--bg));
+  // A dark studio with a soft spotlight on the mouse, like the vendor app's stage.
+  background:
+    radial-gradient(ellipse 65% 60% at 45% 42%, rgb(255 255 255 / 0.07), transparent 70%),
+    radial-gradient(ellipse 60% 30% at 50% 100%, var(--accent-glow-shadow), transparent 70%),
+    var(--bg);
 }
 
 .stageBar {

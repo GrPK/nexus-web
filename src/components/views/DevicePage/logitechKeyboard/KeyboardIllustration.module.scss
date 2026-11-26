@@ -1,6 +1,5 @@
-// The keyboard drawing. Keycaps sit on the case with a lit top face; hover lifts a key, selection
-// rings and breathes it, an assigned key turns the accent colour and pops when it changes, and a
-// layer opens with a sweep across the keys.
+// The keyboard drawing: a low-profile board on brushed aluminium. The device keeps its own colours
+// (dark metal, white legends); only light, selection and assignments take the theme's accent.
 
 .canvas {
   position: relative;
@@ -15,51 +14,35 @@
   overflow: visible;
 }
 
-.caseTop {
-  stop-color: var(--bg-card-hover);
-}
-
-.caseBottom {
-  stop-color: var(--bg);
-}
-
-.faceTop {
-  stop-color: var(--surface-hover);
-}
-
-.faceBottom {
-  stop-color: var(--bg-elevated);
-}
-
-.case {
-  stroke: var(--text-dim);
-  stroke-opacity: 0.35;
-  stroke-width: 3;
-  filter: drop-shadow(0 26px 40px rgb(0 0 0 / var(--alpha-strong)));
-}
-
 .band {
-  fill: rgb(255 255 255 / var(--alpha-faint));
+  stroke: rgb(0 0 0 / 0.5);
+  stroke-width: 2;
 }
 
-.roller {
-  fill: var(--bg);
-  stroke: var(--text-dim);
-  stroke-opacity: 0.4;
-  stroke-width: 3;
+.well {
+  fill: #0a0a0c;
 }
 
-.ridge {
-  stroke: var(--text-dim);
-  stroke-opacity: 0.35;
-  stroke-width: 3;
+.ridgeLight {
+  stroke: rgb(255 255 255 / 0.18);
+  stroke-width: 2;
 }
 
-.fixed {
-  fill: var(--bg);
-  stroke: var(--text-dim);
-  stroke-opacity: 0.4;
-  stroke-width: 3;
+.ridgeDark {
+  stroke: rgb(0 0 0 / 0.45);
+  stroke-width: 2;
+}
+
+.fixedIcon {
+  color: #c9c9d1;
+  pointer-events: none;
+}
+
+// Light spilling from under every key, in the accent colour.
+.underglow {
+  fill: var(--accent);
+  opacity: 0.38;
+  pointer-events: none;
 }
 
 .key {
@@ -68,71 +51,102 @@
   transition: transform var(--ease-fast);
 }
 
-.cap {
-  fill: var(--bg);
-  stroke: var(--border-strong);
-  stroke-width: 2.5;
-  transition: fill var(--ease), stroke var(--ease);
+.face {
+  transition: fill var(--ease);
 }
 
-.face {
-  stroke: rgb(255 255 255 / var(--alpha-faint));
+.faceLine {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.07);
+  stroke-width: 1.2;
+}
+
+.topLight {
+  stroke: rgb(255 255 255 / 0.16);
   stroke-width: 1.5;
-  transition: opacity var(--ease);
+  stroke-linecap: round;
+}
+
+.rim {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.12);
+  stroke-width: 1.5;
 }
 
 .ring {
   fill: none;
-  stroke: var(--accent);
-  stroke-width: 5;
+  stroke: #fff;
+  stroke-width: 3;
   opacity: 0;
   pointer-events: none;
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+
+.ripple {
+  fill: none;
+  stroke: var(--accent-glow);
+  stroke-width: 4;
+  opacity: 0;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .legend,
 .label,
 .sub,
+.shifted,
 .corner {
   text-anchor: middle;
+  dominant-baseline: central;
   font-family: var(--font-sans);
   pointer-events: none;
   user-select: none;
 }
 
 .legend {
-  fill: var(--text);
-  font-weight: var(--weight-heading);
+  fill: #f1f1f4;
+  font-weight: 600;
+  filter: drop-shadow(0 0 2.5px rgb(255 255 255 / 0.35));
+}
+
+.word {
+  fill: #c4c4cc;
+}
+
+.shifted {
+  fill: #9d9da8;
+  font-weight: 600;
 }
 
 .legendIcon {
-  color: var(--text);
+  color: #e6e6ea;
   pointer-events: none;
-}
-
-.label {
-  fill: var(--accent-text);
-  font-weight: var(--weight-strong);
-}
-
-.icon {
-  color: var(--accent-text);
-  pointer-events: none;
-}
-
-.sub {
-  fill: var(--accent-text);
-  opacity: 0.85;
-  font-weight: var(--weight-heading);
-}
-
-.inherited .sub {
-  fill: var(--text-dim);
 }
 
 .corner {
   text-anchor: start;
   font-size: 13px;
-  fill: var(--text-dim);
+  font-weight: 700;
+  fill: rgb(255 255 255 / 0.72);
+}
+
+.label {
+  fill: #fff;
+  font-weight: 700;
+  filter: drop-shadow(0 0 4px rgb(255 255 255 / 0.55));
+}
+
+.sub {
+  fill: #fff;
+  opacity: 0.88;
+  font-weight: 600;
+}
+
+.icon {
+  color: #fff;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgb(255 255 255 / 0.5));
 }
 
 .key.hover,
@@ -141,73 +155,65 @@
   transform: translateY(-3px);
 }
 
-.key.hover .cap,
-.key.dropOver .cap,
-.key:focus-visible .cap {
+.key.hover .faceLine,
+.key:focus-visible .faceLine {
+  stroke: rgb(255 255 255 / 0.3);
+}
+
+.key.dropOver .faceLine {
   stroke: var(--accent-glow);
+  stroke-width: 2.5;
+  stroke-dasharray: 8 5;
 }
 
-.key.dropOver .cap {
-  stroke-dasharray: 10 6;
-}
-
-// Assigned on this layer: the cap takes the accent colour.
-.assigned .cap {
-  fill: var(--accent);
-  stroke: var(--accent-glow);
-}
-
+// Assigned on this layer: the face fills with the accent and glows.
 .assigned .face {
-  opacity: 0.18;
+  fill: var(--accent);
+  filter: drop-shadow(0 0 10px var(--accent-glow-shadow));
 }
 
-.assigned .corner {
-  fill: var(--accent-text);
-  opacity: 0.75;
+.assigned .faceLine {
+  stroke: rgb(255 255 255 / 0.25);
 }
 
-// The Base assignment showing through on the G-Shift layer.
-.inherited .cap {
-  fill: var(--accent-soft);
-  stroke: var(--accent);
-  stroke-dasharray: 8 6;
-}
-
-.inherited .label {
-  fill: var(--text);
-  opacity: 0.8;
-}
-
-.inherited .icon {
-  color: var(--text);
-}
-
-.inherited .corner {
-  fill: var(--text-dim);
-}
-
-.assigned.gshift .cap {
+.gshift .face {
   fill: var(--airflow-purple);
-  stroke: var(--airflow-purple);
 }
 
-.assigned.disabled .cap {
-  fill: var(--bad-soft);
-  stroke: var(--bad);
+.disabled .face {
+  fill: #3a1218;
+  filter: none;
 }
 
-.assigned.disabled .label {
+.disabled .label {
   fill: var(--bad);
+  filter: none;
+}
+
+// The Base assignment showing through on G-Shift.
+.inherited .face {
+  fill: var(--accent-soft);
+}
+
+.inherited .faceLine {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 7 5;
+}
+
+.inherited .label,
+.inherited .sub,
+.inherited .icon {
+  opacity: 0.8;
+  filter: none;
+}
+
+.selected {
+  transform: translateY(-4px);
 }
 
 .selected .ring {
   opacity: 1;
-}
-
-.selected .cap {
-  stroke: var(--accent);
-  stroke-width: 4;
-  filter: drop-shadow(0 0 18px var(--accent-glow-shadow));
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -223,12 +229,16 @@
   .keys .key.flash {
     animation: key-pop calc(var(--ease-slow) * 2) ease-out;
   }
+
+  .flash .ripple {
+    animation: ripple calc(var(--ease-slow) * 3) ease-out;
+  }
 }
 
 @keyframes key-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.92);
+    transform: translateY(10px) scale(0.94);
   }
   to {
     opacity: 1;
@@ -240,11 +250,11 @@
   0%,
   100% {
     stroke-opacity: 1;
-    stroke-width: 5;
+    stroke-width: 3;
   }
   50% {
     stroke-opacity: 0.35;
-    stroke-width: 11;
+    stroke-width: 8;
   }
 }
 
@@ -253,9 +263,20 @@
     transform: scale(1);
   }
   40% {
-    transform: scale(1.14);
+    transform: scale(1.12);
   }
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
   }
 }
