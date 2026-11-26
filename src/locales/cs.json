@@ -1570,6 +1570,7 @@
   "devices.logitechMouse.group.mouse": "Myš",
   "devices.logitechMouse.hostMode": "Myš teď ovládá software, takže nepoužívá profily uložené v ní. Změny zde se uloží a uplatní se, jakmile poběží z vestavěné paměti.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "V cyklu profilů",
   "devices.logitechMouse.key.backspace": "Backspace",
   "devices.logitechMouse.key.delete": "Delete",
   "devices.logitechMouse.key.enter": "Enter",

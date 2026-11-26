@@ -1570,6 +1570,7 @@
   "devices.logitechMouse.group.mouse": "Мышь",
   "devices.logitechMouse.hostMode": "Сейчас мышью управляет программа, поэтому она не использует сохранённые в ней профили. Изменения здесь сохранятся и вступят в силу, когда мышь будет работать от встроенной памяти.",
   "devices.logitechMouse.hz": "{hz} Гц",
+  "devices.logitechMouse.inCycle": "В цикле профилей",
   "devices.logitechMouse.key.backspace": "Backspace",
   "devices.logitechMouse.key.delete": "Delete",
   "devices.logitechMouse.key.enter": "Enter",

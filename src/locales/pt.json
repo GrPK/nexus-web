@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "Rato",
   "devices.logitechMouse.hostMode": "Neste momento o rato é controlado por software e não usa os perfis guardados nele. As alterações aqui ficam guardadas e aplicam-se quando funcionar com a memória integrada.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "No ciclo de perfis",
   "devices.logitechMouse.key.backspace": "Retrocesso",
   "devices.logitechMouse.key.delete": "Delete",
   "devices.logitechMouse.key.enter": "Enter",

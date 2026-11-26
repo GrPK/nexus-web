@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Gauge, Keyboard, ListOrdered, Mouse, MousePointer2, Music, Pencil, RotateCcw, Sparkles, Undo2 } from 'lucide-react';
 import {
-  restoreMouseProfile, setMouseActiveProfile, setMouseMode, updateMouseProfile,
+  restoreMouseProfile, setMouseActiveProfile, setMouseMode, setMouseProfileCycle, updateMouseProfile,
   type MacroStep, type MouseButton, type MouseProfile, type MouseProfilePatch, type MouseState,
 } from '../../../api/logitechMouse';
 import { useTranslation } from '../../../lib/i18n';
@@ -13,6 +13,7 @@ import { Select } from '../../common/Select/Select';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { Spinner } from '../../common/Spinner/Spinner';
 import { TextInput } from '../../common/TextInput/TextInput';
+import { Toggle } from '../../common/Toggle/Toggle';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { ActionLibrary, type LibraryGroup } from './logitechMouse/ActionLibrary';
 import { DpiTrack } from './logitechMouse/DpiTrack';
@@ -371,6 +372,16 @@ function ProfileBar({ state, profile, change, busy, onPick }: ProfileProps & { o
       {active
         ? <span className={styles.activePill}>{t(`${P}active`)}</span>
         : <Button size="sm" disabled={busy} onClick={() => { void change(() => setMouseActiveProfile(profile.number)); }}>{t(`${P}useProfile`)}</Button>}
+      <label className={styles.cycle}>
+        <Toggle
+          size="sm"
+          checked={profile.enabled}
+          disabled={busy || (profile.enabled && state.profiles.filter(p => p.enabled).length <= 1)}
+          ariaLabel={t(`${P}inCycle`)}
+          onChange={next => { void change(() => setMouseProfileCycle(profile.number, next)); }}
+        />
+        <span>{t(`${P}inCycle`)}</span>
+      </label>
       <div className={styles.nameField}>
         <TextInput
           size="sm"

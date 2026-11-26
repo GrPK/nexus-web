@@ -47,6 +47,15 @@
   width: 12rem;
 }
 
+.cycle {
+  @include text-caption;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
 .activePill {
   @include text-label;
   padding: 0.2rem 0.7rem;

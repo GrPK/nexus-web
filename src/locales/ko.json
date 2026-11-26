@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "마우스",
   "devices.logitechMouse.hostMode": "지금은 소프트웨어가 마우스를 제어하고 있어 저장된 프로필을 사용하지 않습니다. 여기서 바꾼 내용은 저장되며 온보드 메모리로 동작할 때 적용됩니다.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "프로필 순환에 포함",
   "devices.logitechMouse.key.backspace": "Backspace",
   "devices.logitechMouse.key.delete": "Delete",
   "devices.logitechMouse.key.enter": "Enter",

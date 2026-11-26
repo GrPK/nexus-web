@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "Ratón",
   "devices.logitechMouse.hostMode": "Un programa controla el ratón ahora, así que no usa los perfiles guardados en él. Los cambios de aquí se guardan y se aplican cuando funcione con su memoria integrada.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "En el ciclo de perfiles",
   "devices.logitechMouse.key.backspace": "Retroceso",
   "devices.logitechMouse.key.delete": "Supr",
   "devices.logitechMouse.key.enter": "Intro",

@@ -87,6 +87,11 @@ export const updateMouseProfile = (profile: number, patch: MouseProfilePatch) =>
 /** Writes back the profile as Nexus first read it from this mouse. */
 export const restoreMouseProfile = (profile: number) => postService<MouseState>(`${BASE}/profiles/${profile}/restore`, {});
 
+/** Switches profiles; one out of the cycle is put in it first (the mouse only switches to those). */
 export const setMouseActiveProfile = (profile: number) => postService<MouseState>(`${BASE}/active`, { profile });
+
+/** Puts a profile in the cycle the profile button steps through, or takes it out. */
+export const setMouseProfileCycle = (profile: number, enabled: boolean) =>
+  postService<MouseState>(`${BASE}/profiles/${profile}/cycle`, { enabled });
 
 export const setMouseMode = (mode: 'onboard' | 'host') => postService<MouseState>(`${BASE}/mode`, { mode });

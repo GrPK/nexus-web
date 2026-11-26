@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "Souris",
   "devices.logitechMouse.hostMode": "Un logiciel pilote la souris en ce moment : elle n'utilise pas ses profils enregistrés. Les modifications faites ici sont enregistrées et s'appliquent dès qu'elle fonctionne sur sa mémoire intégrée.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "Dans le cycle des profils",
   "devices.logitechMouse.key.backspace": "Retour arrière",
   "devices.logitechMouse.key.delete": "Suppr",
   "devices.logitechMouse.key.enter": "Entrée",

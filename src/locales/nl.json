@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "Muis",
   "devices.logitechMouse.hostMode": "De muis wordt nu door software aangestuurd en gebruikt de opgeslagen profielen niet. Wijzigingen hier worden opgeslagen en gelden zodra hij op zijn ingebouwde geheugen draait.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "In de profielcyclus",
   "devices.logitechMouse.key.backspace": "Backspace",
   "devices.logitechMouse.key.delete": "Delete",
   "devices.logitechMouse.key.enter": "Enter",

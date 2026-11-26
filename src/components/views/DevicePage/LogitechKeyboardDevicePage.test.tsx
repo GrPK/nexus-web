@@ -64,6 +64,7 @@ describe('LogitechKeyboardDevicePage', () => {
     await mount(state());
     expect(key('G1')).toBeTruthy();
     expect(key('Esc')).toBeTruthy();
+    expect(screen.getByText(`${M}special.gShift`)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'G3' })).toBeNull();
 
     api.setKeyboardLayers.mockResolvedValue(state({ layers: { base: [{ key: G1, kind: 'mouse', code: 0x10, modifiers: 0 }], fn: [], gShift: [] } }));
@@ -81,7 +82,8 @@ describe('LogitechKeyboardDevicePage', () => {
 
     fireEvent.click(key('A → L'));
     expect(screen.getByText(`${P}fromBase`)).toBeTruthy();
-    fireEvent.click(screen.getByText(`${P}group.functions`));
+    // The functions group is open; on G-Shift it offers no G-Shift key.
+    expect(screen.getByText(`${P}group.functions`)).toBeTruthy();
     expect(screen.queryByText(`${M}special.gShift`)).toBeNull();
 
     api.setKeyboardLayers.mockResolvedValue(state());

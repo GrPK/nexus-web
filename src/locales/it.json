@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "Mouse",
   "devices.logitechMouse.hostMode": "Al momento il mouse è controllato da un software e non usa i profili salvati. Le modifiche fatte qui vengono salvate e valgono quando usa la memoria integrata.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "Nel ciclo dei profili",
   "devices.logitechMouse.key.backspace": "Backspace",
   "devices.logitechMouse.key.delete": "Canc",
   "devices.logitechMouse.key.enter": "Invio",

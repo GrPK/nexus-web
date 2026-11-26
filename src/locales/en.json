@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "Mouse",
   "devices.logitechMouse.hostMode": "Software is driving the mouse right now, so it is not using the profiles stored in it. Changes here are saved and apply once it runs on its onboard memory.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "In the profile cycle",
   "devices.logitechMouse.key.backspace": "Backspace",
   "devices.logitechMouse.key.delete": "Delete",
   "devices.logitechMouse.key.enter": "Enter",

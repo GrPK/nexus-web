@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "Mouse",
   "devices.logitechMouse.hostMode": "Cumò un program al pilote il mouse, duncje nol dopre i profîi salvâts dentri. Lis modifichis fatis achì a vegnin salvadis e a valin cuant che al lavore cu la sô memorie.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "Tal cicli dai profîi",
   "devices.logitechMouse.key.backspace": "Backspace",
   "devices.logitechMouse.key.delete": "Elimine",
   "devices.logitechMouse.key.enter": "Invie",

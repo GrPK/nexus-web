@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "マウス",
   "devices.logitechMouse.hostMode": "現在はソフトウェアがマウスを制御しているため、保存されたプロファイルは使われていません。ここでの変更は保存され、オンボードメモリで動作するようになると反映されます。",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "プロファイル切替に含める",
   "devices.logitechMouse.key.backspace": "Backspace",
   "devices.logitechMouse.key.delete": "Delete",
   "devices.logitechMouse.key.enter": "Enter",

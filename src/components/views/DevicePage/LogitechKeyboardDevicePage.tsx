@@ -34,6 +34,10 @@ const ARROW = '→';
 // Library values that are not an assignment.
 const SHORTCUT = 'shortcut';
 const LAYOUT_AUTO = 'auto';
+const LAYOUT_ANSI: KeyboardLayout = 'ansi';
+const LAYOUT_ISO: KeyboardLayout = 'iso';
+// The library opens with every group but the long list of keys unfolded; search reaches the keys too.
+const OPEN_GROUPS = 4;
 
 // Keys offered in the library, by HID usage.
 const LETTER_A = 0x04;
@@ -117,15 +121,15 @@ function useLibrary(layer: LayerName): LibraryGroup[] {
       { value: encode({ kind: 'disabled', code: 0, modifiers: 0 }), label: t(`${P}disable`) },
     ];
     return [
-      { key: 'keys', title: t(`${M}group.keyboard`), icon: <Keyboard size={14} />,
-        items: usages.map(u => ({ value: encode({ kind: 'keyboard', code: u, modifiers: 0 }), label: keyName(u, t) })) },
       { key: 'shortcut', title: t(`${P}group.shortcut`), icon: <Zap size={14} />,
         items: [{ value: SHORTCUT, label: t(`${P}shortcut.record`) }] },
+      { key: 'functions', title: t(`${P}group.functions`), icon: <Sparkles size={14} />, items: functions },
       { key: 'mouse', title: t(`${M}group.mouse`), icon: <MousePointer2 size={14} />,
         items: MOUSE_BUTTONS.map(m => ({ value: encode({ kind: 'mouse', code: m.mask, modifiers: 0 }), label: t(`${M}mouse.${m.key}`) })) },
       { key: 'media', title: t(`${M}group.media`), icon: <Music size={14} />,
         items: MEDIA.map(m => ({ value: encode({ kind: 'consumer', code: m.usage, modifiers: 0 }), label: t(`${M}media.${m.key}`) })) },
-      { key: 'functions', title: t(`${P}group.functions`), icon: <Sparkles size={14} />, items: functions },
+      { key: 'keys', title: t(`${M}group.keyboard`), icon: <Keyboard size={14} />,
+        items: usages.map(u => ({ value: encode({ kind: 'keyboard', code: u, modifiers: 0 }), label: keyName(u, t) })) },
     ];
   }, [layer, t]);
 }
@@ -274,7 +278,7 @@ function AssignmentsStage({ state, change, busy }: StageProps) {
     <div className={styles.assign}>
       <ActionLibrary
         groups={library}
-        initiallyOpen={2}
+        initiallyOpen={OPEN_GROUPS}
         currentValue={current?.source === 'own' ? encode(current.row) : null}
         disabled={busy}
         title={t(`${M}library`)}
@@ -406,10 +410,10 @@ export function LogitechKeyboardDevicePage() {
                 value={layoutValue}
                 options={[
                   { value: LAYOUT_AUTO, label: t(`${P}layout.auto`, { layout: autoLayout }) },
-                  { value: 'ansi', label: t(`${P}layout.ansi`) },
-                  { value: 'iso', label: t(`${P}layout.iso`) },
+                  { value: LAYOUT_ANSI, label: t(`${P}layout.ansi`) },
+                  { value: LAYOUT_ISO, label: t(`${P}layout.iso`) },
                 ]}
-                onChange={v => { void change(() => setKeyboardLayout(v === LAYOUT_AUTO ? null : (v as 'ansi' | 'iso'))); }}
+                onChange={v => { void change(() => setKeyboardLayout(v === LAYOUT_AUTO ? null : (v as KeyboardLayout))); }}
               />
               {busy && <Spinner size={16} />}
               {state.written && (

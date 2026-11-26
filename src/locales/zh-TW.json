@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "滑鼠",
   "devices.logitechMouse.hostMode": "目前由軟體控制滑鼠，因此不會使用其中儲存的設定檔。這裡的變更會被儲存，並在滑鼠使用內建記憶體時生效。",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "在設定檔循環中",
   "devices.logitechMouse.key.backspace": "Backspace",
   "devices.logitechMouse.key.delete": "Delete",
   "devices.logitechMouse.key.enter": "Enter",

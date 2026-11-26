@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "Maus",
   "devices.logitechMouse.hostMode": "Die Maus wird gerade von Software gesteuert und nutzt die gespeicherten Profile nicht. Änderungen hier werden gespeichert und gelten, sobald sie mit ihrem Onboard-Speicher läuft.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "Im Profilwechsel",
   "devices.logitechMouse.key.backspace": "Rücktaste",
   "devices.logitechMouse.key.delete": "Entf",
   "devices.logitechMouse.key.enter": "Eingabe",

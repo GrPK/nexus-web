@@ -1561,6 +1561,7 @@
   "devices.logitechMouse.group.mouse": "鼠标",
   "devices.logitechMouse.hostMode": "当前由软件控制鼠标，因此不会使用其中保存的配置文件。这里的更改会被保存，并在鼠标使用板载内存时生效。",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "在配置文件循环中",
   "devices.logitechMouse.key.backspace": "退格",
   "devices.logitechMouse.key.delete": "删除",
   "devices.logitechMouse.key.enter": "回车",

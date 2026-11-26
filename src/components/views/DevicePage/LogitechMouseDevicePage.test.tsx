@@ -18,6 +18,7 @@ const api = vi.hoisted(() => ({
   restoreMouseProfile: vi.fn(),
   setMouseActiveProfile: vi.fn(),
   setMouseMode: vi.fn(),
+  setMouseProfileCycle: vi.fn(),
 }));
 vi.mock('../../../api/logitechMouse', () => api);
 

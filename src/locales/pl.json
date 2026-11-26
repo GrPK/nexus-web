@@ -1570,6 +1570,7 @@
   "devices.logitechMouse.group.mouse": "Mysz",
   "devices.logitechMouse.hostMode": "Teraz mysz jest sterowana przez oprogramowanie i nie używa zapisanych w niej profili. Zmiany tutaj zostaną zapisane i zadziałają, gdy będzie korzystać z pamięci wbudowanej.",
   "devices.logitechMouse.hz": "{hz} Hz",
+  "devices.logitechMouse.inCycle": "W cyklu profili",
   "devices.logitechMouse.key.backspace": "Backspace",
   "devices.logitechMouse.key.delete": "Delete",
   "devices.logitechMouse.key.enter": "Enter",
