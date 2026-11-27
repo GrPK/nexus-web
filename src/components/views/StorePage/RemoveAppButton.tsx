@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Trash2 } from 'lucide-react';
-import { Button } from '../../common/Button/Button';
+import { Button, type ButtonTone } from '../../common/Button/Button';
 import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
 import { useTranslation } from '../../../lib/i18n';
 import { findAppUsage, removeAppEverywhere, type AppUsage } from '../../../api/storeUsage';
@@ -14,6 +14,8 @@ interface RemoveAppButtonProps {
   label: string;
   /** Renders the trash glyph alone, for a row action that has no room for a label. */
   iconOnly?: boolean;
+  /** Button tone; defaults to danger. A quieter tone suits a secondary spot beside a primary action. */
+  tone?: ButtonTone;
 }
 
 /**
@@ -21,7 +23,7 @@ interface RemoveAppButtonProps {
  * orphaned widgets silently, so a user who uninstalls without being told would
  * find widgets simply missing from panels they were not thinking about.
  */
-export function RemoveAppButton({ app, onRemoved, label, iconOnly }: RemoveAppButtonProps) {
+export function RemoveAppButton({ app, onRemoved, label, iconOnly, tone = 'danger' }: RemoveAppButtonProps) {
   const { t } = useTranslation();
   const [usage, setUsage] = useState<AppUsage | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,7 +51,7 @@ export function RemoveAppButton({ app, onRemoved, label, iconOnly }: RemoveAppBu
     <>
       <Button
         type="button"
-        tone="danger"
+        tone={tone}
         size="sm"
         icon={<Trash2 size={14} />}
         aria-label={iconOnly ? label : undefined}

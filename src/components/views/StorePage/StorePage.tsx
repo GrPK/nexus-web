@@ -22,6 +22,7 @@ import {
 } from '../../../widgets/marketplaceRegistry';
 import type { UnifiedDevice } from '../../../hooks/useUnifiedDevices';
 import { announceSidebarArrival } from '../../../app/sidebarArrival';
+import { RemoveAppButton } from './RemoveAppButton';
 import { InstallPlacementModal } from './InstallPlacementModal';
 import { dashboardColumnsForWidth } from './installPlacement';
 import type { UseCloudAccountsResult } from '../../../hooks/useCloudAccounts';
@@ -600,6 +601,9 @@ function AppDetail({ appId, onBack, installed, onNeedsSignIn, onInstalled }: {
           <div className={styles.heroActions}>
             <LocalPreviewChip app={app} />
             <InstallButton app={app} installedVersion={installed?.version} onNeedsSignIn={onNeedsSignIn} onInstalled={onInstalled} />
+            {installed && (
+              <RemoveAppButton app={{ id: app.id, name: app.name }} label={t('account.purchases.uninstall')} tone="ghost" />
+            )}
           </div>
           {installed && (
             <span className={`${styles.installedVersion} selectable`}>
