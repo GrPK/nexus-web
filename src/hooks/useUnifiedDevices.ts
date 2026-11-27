@@ -127,8 +127,6 @@ export function groupLianLiDevices(list: readonly UnifiedDevice[]): UnifiedDevic
   return grouped;
 }
 
-}
-
 // A simulated panel carries the marker on its panel record; the Tryx sim sets
 // `simulated` directly. Neither marker alone covers both.
 /** Whether the Nexus Control gate on this device reads as a panel on/off rather than releasing the hardware. */
