@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Headphones, Mic, Music, Speaker } from 'lucide-react';
+import { Crosshair, Headphones, Speaker } from 'lucide-react';
 import {
   DECODER, PLAYBACK, RECORDING, paramKey, setSoundBlasterFilter, setSoundBlasterMicBoost, setSoundBlasterOutput,
   setSoundBlasterParameter, setSoundBlasterSbx, setSoundBlasterScout,
@@ -20,15 +20,10 @@ import { useSoundBlaster } from './useSoundBlaster';
 import { dbLabel, hzLabel } from './speakerUtils';
 import styles from './SoundBlasterDevicePage.module.scss';
 
-type Tab = 'playback' | 'microphone';
 type Change = (call: () => Promise<SoundBlasterState | null>) => Promise<boolean>;
 interface TabProps { state: SoundBlasterState; change: Change }
 
 const P = 'devices.soundBlaster.';
-const TABS: readonly { key: Tab; icon: ReactNode }[] = [
-  { key: 'playback', icon: <Music size={14} /> },
-  { key: 'microphone', icon: <Mic size={14} /> },
-];
 
 // Playback parameters (Creative's MalcolmPlaybackManagerCommand).
 const SURROUND = 0x00, SURROUND_LEVEL = 0x01, DIALOG = 0x02, DIALOG_LEVEL = 0x03;
@@ -185,10 +180,33 @@ function EqBands({ state, change, disabled }: TabProps & { disabled: boolean }) 
   );
 }
 
-function PlaybackTab({ state, change }: TabProps) {
+/** While Scout Mode holds the effects: the sections under it blurred, with a way out on top. */
+function ScoutVeil({ active, onOff, children }: { active: boolean; onOff: () => void; children: ReactNode }) {
   const { t } = useTranslation();
-  // Scout Mode takes the SBX processing over; the effects wait until it is off.
-  const off = !state.sbx || state.scout;
+  return (
+    <div className={styles.veilWrap}>
+      <div className={active ? `${styles.veilContent} ${styles.veiled}` : styles.veilContent} aria-hidden={active || undefined}>
+        {children}
+      </div>
+      {active && (
+        <div className={styles.veil}>
+          <div className={styles.veilCard} role="status">
+            <Crosshair size={22} className={styles.veilIcon} aria-hidden />
+            <span className={styles.veilTitle}>{t(`${P}scoutVeilTitle`)}</span>
+            <span className={styles.veilBody}>{t(`${P}scoutVeilBody`)}</span>
+            <Button size="sm" onClick={onOff}>{t(`${P}scoutOff`)}</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlaybackSections({ state, change }: TabProps) {
+  const { t } = useTranslation();
+  // The G8 ties SBX to the effects itself (an effect turned on turns SBX on, the last one off turns it off),
+  // so the switches stay usable with SBX off. Only Scout Mode holds them.
+  const off = state.scout;
   const eqOn = val(state, PLAYBACK, EQ) >= 0.5;
   const bands = BAND_HZ.map((_, i) => val(state, PLAYBACK, BAND0 + i));
   const flatten = async () => {
@@ -199,77 +217,6 @@ function PlaybackTab({ state, change }: TabProps) {
 
   return (
     <>
-      <SettingsSection title={t(`${P}acoustic`)} description={t(`${P}acousticHint`)} boxClassName={styles.box}>
-        <SettingToggle
-          label={t(`${P}sbx`)}
-          checked={state.sbx}
-          disabled={state.scout}
-          onChange={on => { void change(() => setSoundBlasterSbx(on)); }}
-        />
-        <Effect state={state} change={change} label={t(`${P}surround`)} description={t(`${P}surroundHint`)} on={SURROUND} level={SURROUND_LEVEL} disabled={off} />
-        <Effect state={state} change={change} label={t(`${P}crystalizer`)} description={t(`${P}crystalizerHint`)} on={CRYSTALIZER} level={CRYSTALIZER_LEVEL} disabled={off} />
-        <Effect state={state} change={change} label={t(`${P}bass`)} description={t(`${P}bassHint`)} on={BASS} level={BASS_LEVEL} disabled={off}>
-          <ParamSlider
-            state={state}
-            change={change}
-            family={PLAYBACK}
-            id={CROSSOVER}
-            nested
-            label={t(`${P}crossover`)}
-            min={CROSSOVER_MIN}
-            max={CROSSOVER_MAX}
-            step={1}
-            format={hzLabel}
-            disabled={off || val(state, PLAYBACK, BASS) < 0.5}
-          />
-        </Effect>
-        <Effect state={state} change={change} label={t(`${P}smartVolume`)} description={t(`${P}smartVolumeHint`)} on={SMART_VOLUME} level={SMART_VOLUME_LEVEL} disabled={off}>
-          {has(state, PLAYBACK, SMART_VOLUME_MODE) && (
-            <SettingRow label={t(`${P}mode`)} nested disabled={off || val(state, PLAYBACK, SMART_VOLUME) < 0.5}>
-              <ChipGroup
-                ariaLabel={t(`${P}mode`)}
-                options={SVM_MODES.map((m, i) => ({
-                  key: String(i), label: t(`${P}${m}`), disabled: off || val(state, PLAYBACK, SMART_VOLUME) < 0.5,
-                }))}
-                activeKey={String(Math.round(val(state, PLAYBACK, SMART_VOLUME_MODE)))}
-                onChange={k => { void change(() => setSoundBlasterParameter(PLAYBACK, SMART_VOLUME_MODE, Number(k))); }}
-              />
-            </SettingRow>
-          )}
-        </Effect>
-        <Effect state={state} change={change} label={t(`${P}dialog`)} description={t(`${P}dialogHint`)} on={DIALOG} level={DIALOG_LEVEL} disabled={off} />
-      </SettingsSection>
-
-      <SettingsSection
-        title={t(`${P}equalizer`)}
-        boxClassName={styles.box}
-        action={(
-          <Button size="sm" disabled={off || !eqOn || bands.every(b => b === 0)} onClick={() => { void flatten(); }}>
-            {t(`${P}flat`)}
-          </Button>
-        )}
-      >
-        <SettingToggle
-          label={t(`${P}equalizerOn`)}
-          checked={eqOn}
-          disabled={off}
-          onChange={on => { void change(() => setSoundBlasterParameter(PLAYBACK, EQ, on ? 1 : 0)); }}
-        />
-        <ParamSlider
-          state={state}
-          change={change}
-          family={PLAYBACK}
-          id={PREAMP}
-          label={t(`${P}preamp`)}
-          min={-PREAMP_DB}
-          max={PREAMP_DB}
-          step={DB_STEP}
-          format={dbLabel}
-          disabled={off || !eqOn}
-        />
-        <EqBands state={state} change={change} disabled={off || !eqOn} />
-      </SettingsSection>
-
       <SettingsSection title={t(`${P}scout`)} boxClassName={styles.box}>
         <SettingToggle
           label={t(`${P}scout`)}
@@ -278,6 +225,80 @@ function PlaybackTab({ state, change }: TabProps) {
           onChange={on => { void change(() => setSoundBlasterScout(on)); }}
         />
       </SettingsSection>
+
+      <ScoutVeil active={state.scout} onOff={() => { void change(() => setSoundBlasterScout(false)); }}>
+        <SettingsSection title={t(`${P}acoustic`)} description={t(`${P}acousticHint`)} boxClassName={styles.box}>
+          <SettingToggle
+            label={t(`${P}sbx`)}
+            description={t(`${P}sbxHint`)}
+            checked={state.sbx}
+            disabled={off}
+            onChange={on => { void change(() => setSoundBlasterSbx(on)); }}
+          />
+          <Effect state={state} change={change} label={t(`${P}surround`)} description={t(`${P}surroundHint`)} on={SURROUND} level={SURROUND_LEVEL} disabled={off} />
+          <Effect state={state} change={change} label={t(`${P}crystalizer`)} description={t(`${P}crystalizerHint`)} on={CRYSTALIZER} level={CRYSTALIZER_LEVEL} disabled={off} />
+          <Effect state={state} change={change} label={t(`${P}bass`)} description={t(`${P}bassHint`)} on={BASS} level={BASS_LEVEL} disabled={off}>
+            <ParamSlider
+              state={state}
+              change={change}
+              family={PLAYBACK}
+              id={CROSSOVER}
+              nested
+              label={t(`${P}crossover`)}
+              min={CROSSOVER_MIN}
+              max={CROSSOVER_MAX}
+              step={1}
+              format={hzLabel}
+              disabled={off || val(state, PLAYBACK, BASS) < 0.5}
+            />
+          </Effect>
+          <Effect state={state} change={change} label={t(`${P}smartVolume`)} description={t(`${P}smartVolumeHint`)} on={SMART_VOLUME} level={SMART_VOLUME_LEVEL} disabled={off}>
+            {has(state, PLAYBACK, SMART_VOLUME_MODE) && (
+              <SettingRow label={t(`${P}mode`)} nested disabled={off || val(state, PLAYBACK, SMART_VOLUME) < 0.5}>
+                <ChipGroup
+                  ariaLabel={t(`${P}mode`)}
+                  options={SVM_MODES.map((m, i) => ({
+                    key: String(i), label: t(`${P}${m}`), disabled: off || val(state, PLAYBACK, SMART_VOLUME) < 0.5,
+                  }))}
+                  activeKey={String(Math.round(val(state, PLAYBACK, SMART_VOLUME_MODE)))}
+                  onChange={k => { void change(() => setSoundBlasterParameter(PLAYBACK, SMART_VOLUME_MODE, Number(k))); }}
+                />
+              </SettingRow>
+            )}
+          </Effect>
+          <Effect state={state} change={change} label={t(`${P}dialog`)} description={t(`${P}dialogHint`)} on={DIALOG} level={DIALOG_LEVEL} disabled={off} />
+        </SettingsSection>
+
+        <SettingsSection
+          title={t(`${P}equalizer`)}
+          boxClassName={styles.box}
+          action={(
+            <Button size="sm" disabled={off || !eqOn || bands.every(b => b === 0)} onClick={() => { void flatten(); }}>
+              {t(`${P}flat`)}
+            </Button>
+          )}
+        >
+          <SettingToggle
+            label={t(`${P}equalizerOn`)}
+            checked={eqOn}
+            disabled={off}
+            onChange={on => { void change(() => setSoundBlasterParameter(PLAYBACK, EQ, on ? 1 : 0)); }}
+          />
+          <ParamSlider
+            state={state}
+            change={change}
+            family={PLAYBACK}
+            id={PREAMP}
+            label={t(`${P}preamp`)}
+            min={-PREAMP_DB}
+            max={PREAMP_DB}
+            step={DB_STEP}
+            format={dbLabel}
+            disabled={off || !eqOn}
+          />
+          <EqBands state={state} change={change} disabled={off || !eqOn} />
+        </SettingsSection>
+      </ScoutVeil>
 
       <SettingsSection title={t(`${P}output`)} boxClassName={styles.box}>
         {state.outputs.length > 0 && (
@@ -318,7 +339,7 @@ function PlaybackTab({ state, change }: TabProps) {
   );
 }
 
-function MicrophoneTab({ state, change }: TabProps) {
+function MicrophoneSections({ state, change }: TabProps) {
   const { t } = useTranslation();
   const on = (id: number) => val(state, RECORDING, id) >= 0.5;
   const toggle = (id: number, label: string, description?: string) => has(state, RECORDING, id) && (
@@ -384,10 +405,9 @@ function MicrophoneTab({ state, change }: TabProps) {
   );
 }
 
-/** A Creative Sound Blaster (G8, G6): Creative App's acoustic engine, equalizer, Scout Mode, output and microphone. */
+/** A Creative Sound Blaster (G8, G6): Creative App's Scout Mode, acoustic engine, equalizer, output and microphone, one under the other. */
 export function SoundBlasterDevicePage() {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<Tab>('playback');
   const { state, loadFailed, failure, change } = useSoundBlaster();
 
   return (
@@ -395,9 +415,6 @@ export function SoundBlasterDevicePage() {
       <ViewHeader
         // eslint-disable-next-line i18next/no-literal-string -- brand + model name
         title={state?.name ?? 'Creative Sound Blaster'}
-        tabs={state?.present ? TABS.map(({ key, icon }) => ({ key, icon, label: t(`${P}${key}`) })) : undefined}
-        activeTab={tab}
-        onTabChange={key => setTab(key as Tab)}
       />
       <div className={styles.body}>
         {failure && <Notice tone="critical" role="alert">{t(failure)}</Notice>}
@@ -408,7 +425,8 @@ export function SoundBlasterDevicePage() {
         )}
         {state?.present && (
           <div className={styles.tab}>
-            {tab === 'microphone' ? <MicrophoneTab state={state} change={change} /> : <PlaybackTab state={state} change={change} />}
+            <PlaybackSections state={state} change={change} />
+            <MicrophoneSections state={state} change={change} />
             {state.firmware && <p className={styles.meta}>{t(`${P}firmware`, { version: state.firmware })}</p>}
           </div>
         )}

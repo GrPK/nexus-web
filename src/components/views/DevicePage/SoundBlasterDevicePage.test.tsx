@@ -88,15 +88,24 @@ describe('SoundBlasterDevicePage', () => {
     expect(api.setSoundBlasterOutput).toHaveBeenCalledWith('headphones');
   });
 
-  it('keeps the effects off while Scout Mode is on', async () => {
+  it('holds the effects under a veil while Scout Mode is on, with a way out', async () => {
     await mount(state({ scout: true, sbx: false }));
     expect(screen.getByRole('switch', { name: `${P}crystalizer` })).toBeDisabled();
     expect(screen.getByRole('switch', { name: `${P}scout` })).toBeChecked();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: `${P}scoutOff` })); });
+    expect(api.setSoundBlasterScout).toHaveBeenCalledWith(false);
   });
 
-  it('sets the mic boost on the microphone tab', async () => {
+  it('keeps the effects usable with SBX off, as the device turns SBX on with them', async () => {
+    await mount(state({ sbx: false }));
+    expect(screen.getByRole('switch', { name: `${P}surround` })).toBeEnabled();
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: `${P}surround` })); });
+    expect(api.setSoundBlasterParameter).toHaveBeenCalledWith(0x96, 0x00, 1);
+  });
+
+  it('shows the microphone under the playback settings and sets the mic boost', async () => {
     await mount(state());
-    await act(async () => { fireEvent.click(screen.getByRole('tab', { name: `${P}microphone` })); });
+    expect(screen.queryByRole('tab')).toBeNull();
     await act(async () => { fireEvent.click(screen.getByRole('radio', { name: '+20 dB' })); });
     expect(api.setSoundBlasterMicBoost).toHaveBeenCalledWith(20);
   });
