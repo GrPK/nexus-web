@@ -32,6 +32,7 @@ import { LogitechSpeakerDevicePage } from './LogitechSpeakerDevicePage';
 import { LogitechKeyboardDevicePage } from './LogitechKeyboardDevicePage';
 import { LogitechMouseDevicePage } from './LogitechMouseDevicePage';
 import { LogitechHubPage } from './LogitechHubPage';
+import { SoundBlasterDevicePage } from './SoundBlasterDevicePage';
 import { DeepCoolMystiqueDevicePage } from './DeepCoolMystiqueDevicePage';
 import { GlacialPanelRoute } from './GlacialPanelRoute';
 import { KrakenDevicePage } from './KrakenDevicePage';
@@ -366,6 +367,10 @@ function DeviceBody({ device, fanScreens = null, unified, controlDevice, platfor
 
   if (device.curatedId === 'logitech-keyboard') {
     return <LogitechKeyboardDevicePage key={device.key} />;
+  }
+
+  if (device.curatedId === 'creative-soundblaster') {
+    return <SoundBlasterDevicePage key={device.key} />;
   }
 
   if (device.curatedId === 'deepcool-mystique') {
