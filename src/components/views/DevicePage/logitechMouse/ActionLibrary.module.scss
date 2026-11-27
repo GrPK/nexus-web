@@ -1,0 +1,122 @@
+@use '../../../../styles/text' as *;
+
+.library {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border-bottom: var(--border-width) solid var(--separator);
+}
+
+.title {
+  @include text-heading;
+}
+
+.hint {
+  @include text-caption;
+  color: var(--text-dim);
+}
+
+.groups {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-xs) 0;
+}
+
+.empty {
+  @include text-caption;
+  padding: var(--space-md);
+  color: var(--text-dim);
+}
+
+.group + .group {
+  border-top: var(--border-width) solid var(--separator);
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--ease-fast);
+
+  &:hover {
+    background: var(--bg-card-hover);
+  }
+}
+
+.groupIcon {
+  display: inline-flex;
+  color: var(--text-dim);
+}
+
+.groupTitle {
+  @include text-label;
+  flex: 1;
+}
+
+.count {
+  @include text-caption;
+  color: var(--text-dim);
+}
+
+.items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md) var(--space-sm);
+}
+
+.item {
+  @include text-caption;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.3rem 0.6rem 0.3rem 0.35rem;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: grab;
+  transition: border-color var(--ease), background var(--ease), transform var(--ease-fast);
+
+  &:hover:not(:disabled) {
+    border-color: var(--accent-glow);
+    transform: translateY(-1px);
+  }
+
+  &:active:not(:disabled) {
+    cursor: grabbing;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.current {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.grip {
+  color: var(--text-dim);
+}

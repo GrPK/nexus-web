@@ -1,0 +1,375 @@
+@use '../../../../styles/text' as *;
+
+// The mouse drawing with its callouts. The drawing keeps its own colours (matte black shell,
+// metal wheel, the light strip); hover, selection and assignments take the theme's accent.
+// Selection glows the button, draws its leader line in, ripples its marker and lifts its
+// callout, like the vendor app. Lines keep one weight on screen whatever the view's scale.
+
+.canvas {
+  position: relative;
+  width: 100%;
+  container-type: inline-size;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.art {
+  pointer-events: none;
+}
+
+// The small top view on the sensitivity page; its DPI buttons glow.
+.mini {
+  display: block;
+  height: 100%;
+  width: auto;
+  overflow: visible;
+  filter: drop-shadow(0 18px 24px rgb(0 0 0 / 0.55));
+}
+
+.lit {
+  fill: color-mix(in srgb, var(--accent) 35%, transparent);
+  stroke: var(--accent-glow);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 6px var(--accent-glow-shadow));
+}
+
+.miniLeader {
+  fill: none;
+  stroke: var(--accent-glow);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.7;
+}
+
+.miniDot {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+
+.miniLabel {
+  fill: var(--text);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  text-anchor: end;
+  dominant-baseline: middle;
+}
+
+.miniBadge {
+  fill: var(--accent-glow);
+  font-weight: 800;
+}
+
+// Labels printed on the mouse.
+.printed,
+.printedMid {
+  font-family: var(--font-sans, sans-serif);
+  font-weight: 700;
+}
+
+.printedMid {
+  text-anchor: middle;
+}
+
+// The buttons themselves: clear until hovered, glowing in the accent when selected.
+.region {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  cursor: pointer;
+  transition: fill var(--ease), stroke var(--ease);
+}
+
+.region.hover,
+.region.dropOver {
+  fill: var(--accent-soft);
+  stroke: var(--accent-glow);
+}
+
+.region.dropOver {
+  stroke-dasharray: 6 4;
+}
+
+.region.selected {
+  fill: color-mix(in srgb, var(--accent) 40%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 8px var(--accent-glow-shadow));
+}
+
+.leader {
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.45;
+  pointer-events: none;
+  transition: stroke var(--ease), opacity var(--ease);
+}
+
+.leader.hover,
+.leader.dropOver {
+  stroke: var(--accent-glow);
+  opacity: 0.9;
+}
+
+.leader.selected {
+  stroke: var(--accent);
+  stroke-width: 1.6px;
+  opacity: 1;
+  stroke-dasharray: 3000;
+}
+
+.marker {
+  cursor: pointer;
+}
+
+.dot {
+  fill: #121215;
+  stroke: rgb(255 255 255 / 0.75);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: fill var(--ease), stroke var(--ease), transform var(--ease);
+}
+
+.marker.hover .dot,
+.marker.dropOver .dot {
+  stroke: var(--accent-glow);
+  transform: scale(1.25);
+}
+
+.marker.selected .dot {
+  fill: var(--accent);
+  stroke: #fff;
+  transform: scale(1.35);
+}
+
+.ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.callout {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: 30%;
+  padding: 0.3rem 0.55rem;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  backdrop-filter: blur(6px);
+  --shift-x: 0%;
+  transform: translate(var(--shift-x), -50%);
+  transition: border-color var(--ease), background var(--ease), box-shadow var(--ease), transform var(--ease);
+}
+
+.calloutLeft {
+  --shift-x: -100%;
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.calloutRight {
+  --shift-x: 0%;
+}
+
+.callout.hover,
+.callout.dropOver {
+  border-color: var(--accent-glow);
+}
+
+.callout.dropOver {
+  border-style: dashed;
+}
+
+.callout.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 var(--border-width) var(--accent), var(--shadow-md);
+}
+
+.badge {
+  @include text-label;
+  flex: none;
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.callout.selected .badge {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.action {
+  @include text-caption;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bloom {
+    animation: bloom-breathe calc(var(--ease-slow) * 16) ease-in-out infinite;
+  }
+
+  .region.selected {
+    animation: region-breathe calc(var(--ease-slow) * 6) ease-in-out infinite;
+  }
+
+  .lit {
+    animation: lit-flash calc(var(--ease-slow) * 4) ease-out;
+  }
+
+  .lit.litPress {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: lit-press calc(var(--ease-slow) * 3) ease-out;
+  }
+
+  .region.flash {
+    animation: region-flash calc(var(--ease-slow) * 3) ease-out;
+  }
+
+  .leader.selected {
+    animation: leader-draw calc(var(--ease-slow) * 2) ease-out;
+  }
+
+  .marker.selected .ring {
+    animation: marker-ripple calc(var(--ease-slow) * 6) ease-out infinite;
+  }
+
+  .marker.selected .ringLate {
+    animation-delay: calc(var(--ease-slow) * 3);
+  }
+
+  .callout.selected {
+    animation: callout-pop var(--ease-slow) ease-out;
+  }
+
+  .callout.flash .action {
+    animation: callout-flash calc(var(--ease-slow) * 3) ease-out;
+  }
+}
+
+@keyframes bloom-breathe {
+  0%,
+  100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.55;
+  }
+}
+
+@keyframes lit-flash {
+  0% {
+    fill: var(--accent-glow);
+    filter: drop-shadow(0 0 14px var(--accent-glow));
+  }
+  100% {
+    filter: drop-shadow(0 0 6px var(--accent-glow-shadow));
+  }
+}
+
+@keyframes lit-press {
+  0% {
+    fill: #fff;
+    transform: scale(0.9);
+    filter: drop-shadow(0 0 18px var(--accent-glow));
+  }
+  40% {
+    fill: var(--accent-glow);
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 6px var(--accent-glow-shadow));
+  }
+}
+
+@keyframes region-breathe {
+  0%,
+  100% {
+    fill-opacity: 0.7;
+  }
+  50% {
+    fill-opacity: 1;
+  }
+}
+
+@keyframes region-flash {
+  0% {
+    fill: var(--accent-glow);
+    fill-opacity: 0.9;
+  }
+  100% {
+    fill-opacity: 0.4;
+  }
+}
+
+@keyframes leader-draw {
+  from {
+    stroke-dashoffset: 3000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes marker-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+
+@keyframes callout-pop {
+  0% {
+    transform: translate(var(--shift-x), -50%) scale(0.92);
+  }
+  60% {
+    transform: translate(var(--shift-x), -50%) scale(1.04);
+  }
+  100% {
+    transform: translate(var(--shift-x), -50%) scale(1);
+  }
+}
+
+@keyframes callout-flash {
+  0% {
+    color: var(--accent-glow);
+  }
+  100% {
+    color: inherit;
+  }
+}

@@ -1,0 +1,506 @@
+@use '../../../../styles/text' as *;
+
+// The sensitivity stage, in the mouse page's studio look: a big glowing readout beside the mouse,
+// a glowing track with orbs and one straight row of values, then glass cards per level.
+
+$label-row: 1.7rem;
+$lead: 1rem; // LEAD_HEIGHT in DpiTrack.tsx (16 px)
+$knob: 1.9rem;
+$knob-top: $label-row + $lead;
+$rail: 0.25rem;
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+// The big readout beside the mouse.
+.hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-xl);
+  min-height: 12rem;
+}
+
+.visual {
+  height: 13rem;
+  padding: 0 var(--space-md);
+}
+
+.readout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.kicker {
+  @include text-label;
+  color: var(--text-dim);
+  letter-spacing: 0.14em;
+}
+
+.bigRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+@mixin big-digits {
+  font-family: var(--font-sans);
+  font-size: clamp(2.8rem, 5.5vw, 4.4rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.bigField {
+  position: relative;
+  display: inline-block;
+}
+
+.bigSizer {
+  @include big-digits;
+  display: block;
+  padding-right: 0.08em;
+  border-bottom: 2px solid transparent;
+  white-space: pre;
+  visibility: hidden;
+}
+
+.big {
+  @include big-digits;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text);
+  text-shadow: 0 0 28px var(--accent-glow-shadow);
+  appearance: textfield;
+  transition: border-color var(--ease);
+
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  &:hover {
+    border-bottom-color: var(--border);
+  }
+
+  &:focus {
+    outline: none;
+    border-bottom-color: var(--accent);
+  }
+}
+
+.unit {
+  @include text-label;
+  color: var(--accent-glow);
+  font-size: var(--type-small);
+  letter-spacing: 0.16em;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  min-height: 1.7rem;
+}
+
+.badge {
+  @include text-caption;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+// The track.
+.track {
+  position: relative;
+  height: $knob-top + $knob + 2.8rem;
+  margin: 0 1.5rem;
+  touch-action: none;
+}
+
+.rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: $knob-top + ($knob - $rail) * 0.5;
+  height: $rail;
+  border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / 0.07);
+}
+
+.fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, transparent, var(--accent) 35%, var(--accent-glow));
+  box-shadow: 0 0 14px var(--accent-glow-shadow), 0 0 4px var(--accent);
+  transition: width var(--ease);
+}
+
+.tick {
+  position: absolute;
+  top: $knob-top + $knob + 0.7rem;
+  width: 0;
+  height: 0.35rem;
+  border-left: var(--border-width) solid rgb(255 255 255 / 0.18);
+}
+
+.tickLabel {
+  @include text-caption;
+  position: absolute;
+  top: 0.55rem;
+  translate: -50% 0;
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.leads {
+  position: absolute;
+  top: $label-row;
+  left: 0;
+  width: 100%;
+  height: $lead;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.lead {
+  stroke: var(--text-dim);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.4;
+  transition: stroke var(--ease), opacity var(--ease);
+}
+
+.lead.selected {
+  stroke: var(--accent-glow);
+  opacity: 1;
+}
+
+// One row, one baseline: every value sits at the same height.
+.value {
+  position: absolute;
+  top: 0;
+  translate: -50% 0;
+  height: $label-row - 0.2rem;
+  padding: 0 0.55rem;
+  border: var(--border-width) solid rgb(255 255 255 / 0.1);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 65%, transparent);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--type-tiny);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: $label-row - 0.3rem;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease), border-color var(--ease), left var(--ease), box-shadow var(--ease);
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.value.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 0 16px var(--accent-glow-shadow);
+}
+
+// Orbs, every one centred on the track's line.
+.knob {
+  position: absolute;
+  top: $knob-top;
+  translate: -50% 0;
+  display: grid;
+  place-items: center;
+  width: $knob;
+  height: $knob;
+  padding: 0;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-pill);
+  background: radial-gradient(circle at 35% 30%, #3a3b42, #141418 70%);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--type-tiny);
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.5);
+  cursor: grab;
+  transition: scale var(--ease), background var(--ease), color var(--ease), box-shadow var(--ease);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border: 2px solid var(--accent);
+    border-radius: inherit;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &:hover {
+    scale: 1.12;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.knob.selected {
+  background: radial-gradient(circle at 35% 30%, var(--accent-glow), var(--accent) 70%);
+  color: var(--accent-text);
+  box-shadow: 0 0 0 0.3rem var(--accent-soft), 0 0 22px var(--accent-glow-shadow);
+}
+
+.knob.dragging {
+  scale: 1.2;
+  cursor: grabbing;
+  transition: none;
+}
+
+// The level the mouse uses right now: its own green mark on the orb, the card and the readout.
+.liveIcon {
+  color: var(--good);
+}
+
+.liveTag {
+  position: absolute;
+  top: -0.55rem;
+  right: -0.55rem;
+  display: grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 1.5px solid var(--good);
+  border-radius: var(--radius-pill);
+  background: #0d1210;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--good) 55%, transparent);
+}
+
+.knob.live {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--good) 70%, transparent), 0 4px 12px rgb(0 0 0 / 0.5);
+}
+
+.knob.live.selected {
+  box-shadow: 0 0 0 0.3rem var(--accent-soft), 0 0 0 calc(0.3rem + 2px) color-mix(in srgb, var(--good) 70%, transparent), 0 0 22px var(--accent-glow-shadow);
+}
+
+.card.live {
+  box-shadow: inset 0 2px 0 var(--good);
+}
+
+.card.live.selected {
+  box-shadow: inset 0 2px 0 var(--good), 0 0 0 var(--border-width) var(--accent), 0 12px 30px var(--accent-glow-shadow);
+}
+
+.liveBadge {
+  border-color: color-mix(in srgb, var(--good) 60%, transparent);
+  color: var(--good);
+}
+
+.star {
+  color: var(--warn);
+  fill: currentColor;
+}
+
+.shift {
+  color: var(--accent-glow);
+}
+
+// Glass cards, one per level, in the order the DPI buttons step through them.
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: var(--space-sm);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem 0.7rem;
+  border: var(--border-width) solid rgb(255 255 255 / 0.08);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(160deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.01) 60%),
+    color-mix(in srgb, var(--surface) 70%, transparent);
+  color: var(--text);
+  text-align: left;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: border-color var(--ease), background var(--ease), box-shadow var(--ease), translate var(--ease);
+
+  &:hover {
+    border-color: var(--accent-glow);
+    translate: 0 -2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.card.selected {
+  border-color: var(--accent);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 30%, transparent), color-mix(in srgb, var(--accent) 6%, transparent) 70%),
+    color-mix(in srgb, var(--surface) 70%, transparent);
+  box-shadow: 0 0 0 var(--border-width) var(--accent), 0 12px 30px var(--accent-glow-shadow);
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.cardNumber {
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-mini);
+  font-weight: 800;
+}
+
+.card.selected .cardNumber {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.cardMarks {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.cardValue {
+  margin-top: 0.35rem;
+  font-family: var(--font-sans);
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.cardUnit {
+  @include text-label;
+  color: var(--text-dim);
+}
+
+.addCard {
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-style: dashed;
+  border-color: rgb(255 255 255 / 0.18);
+  background: transparent;
+  color: var(--text-dim);
+}
+
+@media (max-width: 760px) {
+  .hero {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .visual {
+    height: 10rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bigRow {
+    animation: readout-in var(--ease-slow) ease-out;
+  }
+
+  .knob.selected {
+    animation: knob-pop var(--ease-slow) ease-out;
+  }
+
+  .knob.selected::after {
+    animation: knob-ripple calc(var(--ease-slow) * 6) ease-out infinite;
+  }
+
+  .liveTag {
+    animation: live-beat calc(var(--ease-slow) * 5) ease-in-out infinite;
+  }
+}
+
+@keyframes readout-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    filter: blur(0);
+  }
+}
+
+@keyframes live-beat {
+  0%,
+  100% {
+    box-shadow: 0 0 6px color-mix(in srgb, var(--good) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 14px color-mix(in srgb, var(--good) 80%, transparent);
+  }
+}
+
+@keyframes knob-pop {
+  0% {
+    scale: 0.85;
+  }
+  60% {
+    scale: 1.15;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+@keyframes knob-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}

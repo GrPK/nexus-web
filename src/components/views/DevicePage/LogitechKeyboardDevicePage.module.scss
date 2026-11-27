@@ -1,0 +1,274 @@
+@use '../../../styles/text' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: 0.25rem 0 1.25rem;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 3rem 0;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.layoutSelect {
+  min-width: 13rem;
+}
+
+.assign {
+  display: grid;
+  grid-template-columns: minmax(15rem, 18rem) 1fr;
+  gap: var(--space-md);
+  min-height: 32rem;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+  padding: var(--space-md);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  // A dark studio with a soft spotlight on the device, like the vendor app's stage.
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgb(255 255 255 / 0.07), transparent 70%),
+    radial-gradient(ellipse 60% 30% at 50% 100%, var(--accent-glow-shadow), transparent 70%),
+    var(--bg);
+}
+
+.stageBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.layerBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-width: 30rem;
+}
+
+.layerChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.layerCount {
+  @include text-label;
+  min-width: 1.2rem;
+  padding: 0 0.35rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-text);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.layerHint {
+  @include text-caption;
+  color: var(--text-dim);
+}
+
+.selectedInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0.2rem 0.3rem 0.2rem 0.6rem;
+  border: var(--border-width) solid var(--accent);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+}
+
+.capturing {
+  border-style: dashed;
+}
+
+.selectedBadge {
+  @include text-label;
+  min-width: 1.6rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-text);
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+.selectedArrow {
+  color: var(--text-dim);
+}
+
+.selectedAction {
+  @include text-caption;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text);
+}
+
+.fromBase {
+  @include text-label;
+  padding: 0 0.4rem;
+  border: var(--border-width) dashed var(--accent);
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+}
+
+.board {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-md) var(--space-sm) var(--space-lg);
+  transition: filter var(--ease-slow);
+}
+
+// The layers read apart at a glance: Fn cooler, G-Shift towards the purple of the G-Shift key.
+.layer_fn {
+  filter: hue-rotate(-40deg);
+}
+
+.layer_gShift {
+  filter: hue-rotate(60deg);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: var(--border-width) solid var(--separator);
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.switchText {
+  display: flex;
+  flex-direction: column;
+}
+
+.switchTitle {
+  @include text-label;
+  color: var(--text);
+}
+
+.switchHint {
+  @include text-caption;
+  color: var(--text-dim);
+}
+
+// The copy kept in Nexus: its own card under the keyboard.
+.copyCard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.copyText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-width: 46rem;
+}
+
+.copyTitle {
+  @include text-label;
+  color: var(--text);
+}
+
+.copyHint,
+.copySaved {
+  @include text-caption;
+  color: var(--text-dim);
+}
+
+.copySaved {
+  color: var(--text);
+}
+
+.copyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.offBadge {
+  @include text-label;
+  padding: 0.25rem 0.6rem;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+}
+
+@media (max-width: 900px) {
+  .assign {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .selectedInfo {
+    animation: info-in var(--ease-slow) ease-out;
+  }
+
+  .capturing {
+    animation: capture-pulse calc(var(--ease-slow) * 4) ease-in-out infinite;
+  }
+}
+
+@keyframes info-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes capture-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--accent-glow-shadow);
+  }
+  50% {
+    box-shadow: 0 0 0 6px var(--accent-glow-shadow);
+  }
+}

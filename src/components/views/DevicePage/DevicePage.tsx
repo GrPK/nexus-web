@@ -1,7 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Eye, Unplug } from 'lucide-react';
 import {
-  useUnifiedDevices, controlGateIsPanel, claimsKey, groupMembers, isLianLiMemberId, LIANLI_GROUP, LIANLI_HUB_KEY, type UnifiedDevice,
+  useUnifiedDevices, controlGateIsPanel, claimsKey, groupMembers, isLianLiMemberId, LIANLI_GROUP, LIANLI_HUB_KEY,
+  LOGITECH_GROUP, LOGITECH_HUB_KEY, type UnifiedDevice,
 } from '../../../hooks/useUnifiedDevices';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
@@ -28,6 +29,9 @@ import { AsusGlacialLcdDevicePage } from './AsusGlacialLcdDevicePage';
 import { AstralDevicePage } from './AstralDevicePage';
 import { AsusRyujinExtremeDevicePage } from './AsusRyujinExtremeDevicePage';
 import { LogitechSpeakerDevicePage } from './LogitechSpeakerDevicePage';
+import { LogitechKeyboardDevicePage } from './LogitechKeyboardDevicePage';
+import { LogitechMouseDevicePage } from './LogitechMouseDevicePage';
+import { LogitechHubPage } from './LogitechHubPage';
 import { DeepCoolMystiqueDevicePage } from './DeepCoolMystiqueDevicePage';
 import { GlacialPanelRoute } from './GlacialPanelRoute';
 import { KrakenDevicePage } from './KrakenDevicePage';
@@ -273,6 +277,10 @@ function DeviceBody({ device, fanScreens = null, unified, controlDevice, platfor
     return <LianLiHubPage key={device.key} members={groupMembers(unified, LIANLI_GROUP)} controlDevice={controlDevice} onSectionNavigate={onSectionNavigate} />;
   }
 
+  if (device.key === LOGITECH_HUB_KEY) {
+    return <LogitechHubPage key={device.key} members={groupMembers(unified, LOGITECH_GROUP)} />;
+  }
+
   if (device.kind === 'panel' && device.panelDevice && device.curatedId === 'asus-glacial-lcd') {
     return <GlacialPanelRoute key={device.key} device={device.panelDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />;
   }
@@ -350,6 +358,14 @@ function DeviceBody({ device, fanScreens = null, unified, controlDevice, platfor
 
   if (device.curatedId === 'logitech-speaker') {
     return <LogitechSpeakerDevicePage key={device.key} />;
+  }
+
+  if (device.curatedId === 'logitech-mouse') {
+    return <LogitechMouseDevicePage key={device.key} />;
+  }
+
+  if (device.curatedId === 'logitech-keyboard') {
+    return <LogitechKeyboardDevicePage key={device.key} />;
   }
 
   if (device.curatedId === 'deepcool-mystique') {

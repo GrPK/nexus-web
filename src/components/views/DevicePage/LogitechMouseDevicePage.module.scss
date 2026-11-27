@@ -1,0 +1,260 @@
+@use '../../../styles/text' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+// Inside the Logitech page: the assignments, then the sensitivity.
+.stacked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: 0.25rem 0 1.25rem;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 3rem 0;
+}
+
+.box {
+  gap: 0.75rem;
+}
+
+.profileBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.profileSelect {
+  min-width: 14rem;
+}
+
+.nameField {
+  width: 12rem;
+}
+
+.cycle {
+  @include text-caption;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.activePill {
+  @include text-label;
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.assign {
+  display: grid;
+  grid-template-columns: minmax(15rem, 19rem) 1fr;
+  gap: var(--space-md);
+  min-height: 34rem;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding: var(--space-md);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  // A dark studio with a soft spotlight on the mouse, like the vendor app's stage.
+  background:
+    radial-gradient(ellipse 65% 60% at 45% 42%, rgb(255 255 255 / 0.07), transparent 70%),
+    radial-gradient(ellipse 60% 30% at 50% 100%, var(--accent-glow-shadow), transparent 70%),
+    var(--bg);
+}
+
+.stageBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: 2.2rem;
+}
+
+.selectedInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0.2rem 0.3rem 0.2rem 0.6rem;
+  border: var(--border-width) solid var(--accent);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+}
+
+.selectedBadge {
+  @include text-label;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.selectedName {
+  @include text-caption;
+  color: var(--text-dim);
+}
+
+.selectedArrow {
+  color: var(--text-dim);
+}
+
+.selectedAction {
+  @include text-caption;
+  color: var(--text);
+}
+
+.views {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-md);
+  transition: filter var(--ease-slow);
+}
+
+.gShift {
+  filter: hue-rotate(160deg);
+}
+
+.viewTop {
+  flex: 0 1 62%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.viewSide {
+  flex: 0 1 36%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+// The sensitivity tab: one studio stage like the assignments one.
+.sensitivity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-lg);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(ellipse 60% 70% at 22% 30%, rgb(255 255 255 / 0.07), transparent 70%),
+    radial-gradient(ellipse 70% 35% at 50% 100%, var(--accent-glow-shadow), transparent 70%),
+    var(--bg);
+}
+
+.sensHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.sensIntro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-width: 40rem;
+}
+
+.sensTitle {
+  @include text-heading;
+  margin: 0;
+}
+
+.sensHint {
+  @include text-caption;
+  margin: 0;
+  color: var(--text-dim);
+}
+
+.rate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-xs);
+}
+
+.rateLabel {
+  @include text-label;
+  color: var(--text-dim);
+  letter-spacing: 0.12em;
+}
+
+.viewCaption {
+  @include text-caption;
+  color: var(--text-dim);
+}
+
+@media (max-width: 900px) {
+  .assign {
+    grid-template-columns: 1fr;
+  }
+
+  .views {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .viewTop,
+  .viewSide {
+    flex-basis: auto;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tab {
+    animation: tab-in var(--ease-slow) ease-out;
+  }
+}
+
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

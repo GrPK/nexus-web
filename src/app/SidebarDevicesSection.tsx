@@ -108,7 +108,7 @@ export function SidebarDevicesSection({
   // (Paired phone remotes are already excluded upstream in useUnifiedDevices -
   // they're remote controls, not devices.)
   const sorted = useMemo(() => {
-    // A grouped device (a Lian Li part) is listed through its group's entry.
+    // A grouped device (a Lian Li or Logitech one) is listed through its group's entry.
     return unified
       .filter(d => d.navigable && !d.groupKey && isListedInSidebar(d, hiddenDevices))
       .sort((a, b) =>

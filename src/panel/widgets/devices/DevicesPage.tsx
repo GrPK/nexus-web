@@ -113,7 +113,7 @@ export function DevicesPage({ serviceOnline, connectionState, onDeviceSelect, ta
   }, [allUsb.devices]);
 
   // Alphabetical by the card label (shortName, the sidebar's name plus its brand), key breaking ties so the order holds across polls.
-  // A grouped device (a Lian Li part) is listed through its group's entry.
+  // A grouped device (a Lian Li or Logitech one) is listed through its group's entry.
   const orderedDevices = useMemo(
     () => unified.filter(d => !d.groupKey).sort((a, b) =>
       a.shortName.localeCompare(b.shortName, undefined, { sensitivity: 'base', numeric: true })

@@ -31,3 +31,10 @@
   justify-content: center;
   padding: 3rem 0;
 }
+
+// Inside the Logitech page: the acoustics, then the surround.
+.stacked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}

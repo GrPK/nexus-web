@@ -79,8 +79,8 @@ export interface UnifiedDevice {
   // 'failing' while Nexus controls the device but its lighting writes keep failing.
   writeHealth?: 'failing';
   // Set on a device the sidebar and the Devices list show inside a group entry
-  // (the Lian Li page) instead of on its own row. Its own page still opens.
-  groupKey?: typeof LIANLI_GROUP;
+  // (the Lian Li or Logitech page) instead of on its own row. Its own page still opens.
+  groupKey?: string;
 }
 
 /** The group the Lian Li devices share, and the key of its entry. */
@@ -127,9 +127,6 @@ export function groupLianLiDevices(list: readonly UnifiedDevice[]): UnifiedDevic
   return grouped;
 }
 
-/** The devices a group entry stands for. */
-export function groupMembers(list: readonly UnifiedDevice[], group: string): UnifiedDevice[] {
-  return list.filter(d => d.groupKey === group);
 }
 
 // A simulated panel carries the marker on its panel record; the Tryx sim sets
@@ -175,7 +172,53 @@ const BRAND_LOGOS: Record<string, string> = {
   iBUYPOWER: '/assets/devices/ibuypower.svg',
   NZXT: '/assets/devices/nzxt.svg',
   Tryx: '/assets/devices/tryx.svg',
+  Logitech: '/assets/devices/logitech.svg',
 };
+
+/** The group the Logitech devices share, and the key of its entry. */
+export const LOGITECH_GROUP = 'logitech';
+export const LOGITECH_HUB_KEY = 'logitech-hub';
+const LOGITECH_NAME = 'Logitech';
+const LOGITECH_MEMBER_IDS = new Set(['logitech-mouse', 'logitech-keyboard', 'logitech-speaker']);
+// Below this many connected Logitech devices each keeps its own row.
+const LOGITECH_GROUP_MIN = 2;
+
+/**
+ * With two or more Logitech devices connected (mouse, keyboard, speakers), marks each as a member
+ * of the Logitech group and adds one "Logitech" entry for them, like G HUB's one window. The
+ * members stay in the list, so their own pages, search and deep links keep working; the sidebar
+ * and the Devices list show the entry.
+ */
+export function groupLogitechDevices(list: readonly UnifiedDevice[]): UnifiedDevice[] {
+  const memberKeys = new Set(
+    list.filter(d => d.connected && !d.simulated && LOGITECH_MEMBER_IDS.has(d.curatedId ?? '')).map(d => d.key),
+  );
+  if (memberKeys.size < LOGITECH_GROUP_MIN) return [...list];
+  const grouped = list.map((d): UnifiedDevice => (memberKeys.has(d.key) ? { ...d, groupKey: LOGITECH_GROUP } : d));
+  grouped.push({
+    key: LOGITECH_HUB_KEY,
+    shortName: LOGITECH_NAME,
+    name: LOGITECH_NAME,
+    subtitle: 'mouse',
+    category: 'mouse',
+    iconSrc: BRAND_LOGOS.Logitech,
+    connected: true,
+    kind: 'curated',
+    navigable: true,
+    nexusControlEnabled: true,
+    supportsNexusControl: false,
+    experimental: false,
+    requiresBeta: false,
+    warning: grouped.find(d => d.groupKey && d.warning)?.warning,
+    bus: 'usb',
+  });
+  return grouped;
+}
+
+/** The devices a group entry stands for. */
+export function groupMembers(list: readonly UnifiedDevice[], group: string): UnifiedDevice[] {
+  return list.filter(d => d.groupKey === group);
+}
 
 /** The logo of the brand a device name starts with ("Lian Li HydroShift II" -> Lian Li). */
 function brandLogoFor(name: string): string | undefined {
@@ -382,7 +425,7 @@ export function useUnifiedDevices(enabled: boolean) {
         bus: 'usb',
       });
     }
-    return groupLianLiDevices(list);
+    return groupLogitechDevices(groupLianLiDevices(list));
   }, [panels.devices, devices, deviceApps, streamDecks, tryxSimulated, t]);
 
   const turnedOffMonitorKeys = useMemo(
