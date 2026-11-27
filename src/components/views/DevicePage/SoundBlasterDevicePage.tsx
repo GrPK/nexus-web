@@ -46,6 +46,7 @@ const DB_STEP = 0.5;
 const CROSSOVER_MIN = 10;
 const CROSSOVER_MAX = 300;
 const GRAPH_H = 220;
+const EASING = 'smooth';
 const SVM_MODES = ['normal', 'loud', 'night'] as const;
 // Creative's dynamic range values: 1 full, 2 normal, 3 night.
 const RANGES = [{ key: '1', label: 'full' }, { key: '2', label: 'normal' }, { key: '3', label: 'night' }] as const;
@@ -158,7 +159,7 @@ function EqBands({ state, change, disabled }: TabProps & { disabled: boolean }) 
       tempMin={-0.5}
       tempMax={BAND_HZ.length - 0.5}
       editable={!disabled}
-      easing="smooth"
+      easing={EASING}
       axis={axis}
       yAxis={yAxis}
       verticalDrag={drag}
