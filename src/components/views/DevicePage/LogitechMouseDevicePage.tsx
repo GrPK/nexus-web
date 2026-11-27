@@ -34,8 +34,8 @@ const TABS: readonly { key: Tab; icon: ReactNode }[] = [
   { key: 'assignments', icon: <Mouse size={14} /> },
   { key: 'sensitivity', icon: <Gauge size={14} /> },
 ];
-// The DPI up and down buttons (slots), lit on the sensitivity page.
-const DPI_BUTTONS: readonly number[] = [9, 10];
+// The DPI up and down buttons (slots) with their names, lit on the sensitivity page.
+const DPI_BUTTONS: readonly { slot: number; key: string }[] = [{ slot: 9, key: 'dpiUp' }, { slot: 10, key: 'dpiDown' }];
 // How long an assigned button's callout keeps its flash.
 const FLASH_MS = 1200;
 const ARROW = '→';
@@ -352,7 +352,7 @@ function SensitivityTab({ state, profile, change, busy }: ProfileProps) {
           isDefault: t(`${P}defaultLevel`),
           isShift: t(`${P}shiftLevel`),
         }}
-        visual={selected => <MouseMini lit={DPI_BUTTONS} pulse={selected} />}
+        visual={selected => <MouseMini lit={DPI_BUTTONS.map(b => ({ slot: b.slot, text: t(`${P}special.${b.key}`) }))} pulse={selected} />}
         onCommit={c => { void change(() => updateMouseProfile(profile.number, c)); }}
       />
     </div>
