@@ -6,11 +6,11 @@ name: fork-dist
 
 on:
   push:
-    branches: [ci-logitech-mouse-page]
+    branches: [ci-all-ours]
   workflow_dispatch:
 
 env:
-  FAST_BASE: 9c52a6e31
+  FAST_BASE: 77f1ccff8
 
 jobs:
   dist:
