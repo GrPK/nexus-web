@@ -4,7 +4,7 @@ import { keyCap } from '../logitechMouse/hidKeys';
 
 /** Legends printed on keys that hidKeys does not word (it names keys for macro steps). */
 const CAP_EXTRA: Record<number, string> = {
-  0x28: 'Enter', 0x29: 'Esc', 0x2A: '⌫', 0x2B: 'Tab', 0x2C: '', 0x32: '\\', 0x39: 'Caps', 0x46: 'PrtSc',
+  0x28: 'Enter', 0x29: 'Esc', 0x2A: '⌫', 0x2B: 'Tab', 0x2C: '', 0x32: '#', 0x39: 'Caps', 0x46: 'PrtSc',
   0x47: 'ScrLk', 0x4C: 'Del', 0x49: 'Ins', 0x65: '☰', 0x53: 'Num', 0x58: '↵',
   0xE0: 'Ctrl', 0xE1: 'Shift', 0xE2: 'Alt', 0xE3: '⊞', 0xE4: 'Ctrl', 0xE5: 'Shift', 0xE6: 'Alt Gr', 0xE7: '⊞',
 };

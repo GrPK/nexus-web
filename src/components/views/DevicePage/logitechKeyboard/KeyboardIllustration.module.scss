@@ -1,5 +1,6 @@
-// The keyboard drawing: a low-profile board on brushed aluminium. The device keeps its own colours
-// (dark metal, white legends); only light, selection and assignments take the theme's accent.
+// The keyboard drawing: the G915 X drawn by hand, a carbon brushed-aluminium plate with low-profile
+// black caps. The device keeps its own colours (dark metal, legends lit in a rainbow like its own
+// lighting); only selection and assignments take the theme's accent.
 
 .canvas {
   position: relative;
@@ -14,35 +15,91 @@
   overflow: visible;
 }
 
-.band {
-  stroke: rgb(0 0 0 / 0.5);
+// The plate's chamfer: dark fall-off inside its edge, a catch-light along the top, a crisp outline.
+.chamfer {
+  fill: none;
+  stroke: #000;
+  stroke-opacity: 0.55;
+  stroke-width: 10;
+}
+
+.catchLight {
+  stroke: #fff;
+  stroke-opacity: 0.45;
   stroke-width: 2;
+}
+
+.outline {
+  fill: none;
+  stroke: #000;
+  stroke-opacity: 0.85;
+  stroke-width: 1.5;
+  pointer-events: none;
 }
 
 .well {
-  fill: #0a0a0c;
+  fill: #050506;
 }
 
-.ridgeLight {
-  stroke: rgb(255 255 255 / 0.18);
-  stroke-width: 2;
+.housing {
+  fill: #0c0c0e;
+  stroke: #000;
+  stroke-width: 1.5;
 }
 
-.ridgeDark {
-  stroke: rgb(0 0 0 / 0.45);
-  stroke-width: 2;
+.knurl {
+  stroke: rgb(0 0 0 / 0.35);
+  stroke-width: 1.6;
+}
+
+.rollerLight {
+  fill: #fff;
+  opacity: 0.35;
 }
 
 .fixedIcon {
-  color: #c9c9d1;
+  color: #f2f3f5;
   pointer-events: none;
 }
 
-// Light spilling from under every key, in the accent colour.
-.underglow {
-  fill: var(--accent);
-  opacity: 0.38;
+.sunIcon {
+  color: #ffd23c;
   pointer-events: none;
+}
+
+.lockText {
+  text-anchor: middle;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  fill: #b9bcc2;
+  opacity: 0.8;
+}
+
+.lockDot {
+  fill: #141518;
+  stroke: #000;
+  stroke-width: 1;
+}
+
+// Light spilling from under every key onto the plate, in the keys' rainbow.
+.underglow {
+  fill: none;
+  stroke-width: 6;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.capEdge {
+  stroke: #000;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.roundEdge {
+  stroke: #000;
+  stroke-width: 2;
 }
 
 .key {
@@ -104,23 +161,31 @@
   user-select: none;
 }
 
+// Legends are lit in the rainbow (fill and glow set on each), printed in capitals like the caps.
 .legend {
-  fill: #f1f1f4;
-  font-weight: 600;
-  filter: drop-shadow(0 0 2.5px rgb(255 255 255 / 0.35));
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .word {
-  fill: #c4c4cc;
+  letter-spacing: 0.04em;
+}
+
+.roundLegend {
+  fill: #f4f5f7;
+  text-transform: none;
 }
 
 .shifted {
-  fill: #9d9da8;
-  font-weight: 600;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
-.legendIcon {
-  color: #e6e6ea;
+.mediaLegend {
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
   pointer-events: none;
 }
 
