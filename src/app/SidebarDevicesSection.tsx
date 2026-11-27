@@ -109,7 +109,8 @@ export function SidebarDevicesSection({
   // they're remote controls, not devices.)
   const sorted = useMemo(() => {
     return unified
-      .filter(d => d.navigable && isListedInSidebar(d, hiddenDevices))
+      // A grouped device (a Logitech one) is listed through its group's entry.
+      .filter(d => d.navigable && !d.groupKey && isListedInSidebar(d, hiddenDevices))
       .sort((a, b) =>
         sidebarSortName(a).localeCompare(sidebarSortName(b), undefined, { sensitivity: 'base', numeric: true })
         || a.key.localeCompare(b.key));

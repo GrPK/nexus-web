@@ -611,6 +611,24 @@ describe('sidebarDeviceName', () => {
     expect(speaker.iconSrc).toBe('/assets/devices/logitech.svg');
     expect(sidebarDeviceName(mouse)).toBe('G502 X PLUS');
     expect(sidebarDeviceName(speaker)).toBe('G560');
+    // Two or more of them share one Logitech entry, which the sidebar lists instead of them.
+    expect(mouse.groupKey).toBe('logitech');
+    expect(speaker.groupKey).toBe('logitech');
+    const hub = result.current.unified.find(d => d.key === 'logitech-hub')!;
+    expect(hub.shortName).toBe('Logitech');
+    expect(hub.iconSrc).toBe('/assets/devices/logitech.svg');
+    expect(sidebarDeviceName(hub)).toBe('Logitech');
+  });
+
+  it('keeps a lone Logitech device on its own row', () => {
+    mockUseDevices.mockReturnValue({
+      devices: [makeHandlerRow({ id: 'logitech-mouse', name: 'Logitech G502 X PLUS', category: 'mouse', connected: true })],
+      controlDevice: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useUnifiedDevices(true));
+    expect(result.current.unified.find(d => d.curatedId === 'logitech-mouse')!.groupKey).toBeUndefined();
+    expect(result.current.unified.some(d => d.key === 'logitech-hub')).toBe(false);
   });
 
   it('keeps the brand when the icon is not that brand\'s logo', () => {

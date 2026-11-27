@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Eye, Unplug } from 'lucide-react';
-import { useUnifiedDevices, controlGateIsPanel, claimsKey, type UnifiedDevice } from '../../../hooks/useUnifiedDevices';
+import {
+  useUnifiedDevices, controlGateIsPanel, claimsKey, groupMembers, LOGITECH_GROUP, LOGITECH_HUB_KEY, type UnifiedDevice,
+} from '../../../hooks/useUnifiedDevices';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { ServiceRequired } from '../ServiceRequired';
@@ -24,6 +26,7 @@ import { AsusRyujinExtremeDevicePage } from './AsusRyujinExtremeDevicePage';
 import { LogitechSpeakerDevicePage } from './LogitechSpeakerDevicePage';
 import { LogitechKeyboardDevicePage } from './LogitechKeyboardDevicePage';
 import { LogitechMouseDevicePage } from './LogitechMouseDevicePage';
+import { LogitechHubPage } from './LogitechHubPage';
 import { DeepCoolMystiqueDevicePage } from './DeepCoolMystiqueDevicePage';
 import { GlacialPanelRoute } from './GlacialPanelRoute';
 import { KrakenDevicePage } from './KrakenDevicePage';
@@ -222,7 +225,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
       )}
       <div className={holdBody ? styles.bodyHeld : styles.bodyShown}>
         <DeviceDetectingContext.Provider value={reportWaiting}>
-          <DeviceBody device={device} controlDevice={controlDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />
+          <DeviceBody device={device} unified={unified} controlDevice={controlDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />
         </DeviceDetectingContext.Provider>
       </div>
     </>
@@ -231,13 +234,19 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
 
 interface DeviceBodyProps {
   device: UnifiedDevice;
+  /** Every listed device, for a group entry's page. */
+  unified: readonly UnifiedDevice[];
   controlDevice: (id: string, nextEnabled: boolean) => Promise<unknown>;
   platform: string;
   onOpenFirmware?: () => void;
   onSectionNavigate?: DashboardSectionNavigate;
 }
 
-function DeviceBody({ device, controlDevice, platform, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
+function DeviceBody({ device, unified, controlDevice, platform, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
+  if (device.key === LOGITECH_HUB_KEY) {
+    return <LogitechHubPage key={device.key} members={groupMembers(unified, LOGITECH_GROUP)} />;
+  }
+
   if (device.kind === 'panel' && device.panelDevice && device.curatedId === 'asus-glacial-lcd') {
     return <GlacialPanelRoute key={device.key} device={device.panelDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />;
   }

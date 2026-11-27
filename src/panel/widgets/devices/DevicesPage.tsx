@@ -114,7 +114,8 @@ export function DevicesPage({ serviceOnline, connectionState, onDeviceSelect, ta
 
   // Alphabetical by the card label (shortName, the sidebar's name plus its brand), key breaking ties so the order holds across polls.
   const orderedDevices = useMemo(
-    () => [...unified].sort((a, b) =>
+    // A grouped device (a Logitech one) is listed through its group's entry.
+    () => unified.filter(d => !d.groupKey).sort((a, b) =>
       a.shortName.localeCompare(b.shortName, undefined, { sensitivity: 'base', numeric: true })
       || a.key.localeCompare(b.key)),
     [unified],

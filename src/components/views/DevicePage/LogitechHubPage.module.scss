@@ -1,0 +1,23 @@
+// The Logitech page: its device tabs on top, the chosen device's own page (with its own tab row)
+// filling the rest.
+
+.hub {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.device {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
