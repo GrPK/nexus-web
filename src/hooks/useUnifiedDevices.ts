@@ -123,6 +123,7 @@ const BRAND_LOGOS: Record<string, string> = {
   iBUYPOWER: '/assets/devices/ibuypower.svg',
   NZXT: '/assets/devices/nzxt.svg',
   Tryx: '/assets/devices/tryx.svg',
+  Logitech: '/assets/devices/logitech.svg',
 };
 
 /** The logo of the brand a device name starts with ("Lian Li HydroShift II" -> Lian Li). */

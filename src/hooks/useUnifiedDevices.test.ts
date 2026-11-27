@@ -594,6 +594,25 @@ describe('sidebarDeviceName', () => {
     expect(sidebarDeviceName(entry)).toBe('NP50');
   });
 
+  it('groups the Logitech speaker, mouse and keyboard under the Logitech logo', () => {
+    mockUseDevices.mockReturnValue({
+      devices: [
+        makeHandlerRow({ id: 'logitech-mouse', name: 'Logitech G502 X PLUS', category: 'mouse', connected: true }),
+        makeHandlerRow({ id: 'logitech-speaker', name: 'Logitech G560', category: 'speaker', connected: true }),
+      ],
+      controlDevice: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useUnifiedDevices(true));
+    const mouse = result.current.unified.find(d => d.curatedId === 'logitech-mouse')!;
+    const speaker = result.current.unified.find(d => d.curatedId === 'logitech-speaker')!;
+
+    expect(mouse.iconSrc).toBe('/assets/devices/logitech.svg');
+    expect(speaker.iconSrc).toBe('/assets/devices/logitech.svg');
+    expect(sidebarDeviceName(mouse)).toBe('G502 X PLUS');
+    expect(sidebarDeviceName(speaker)).toBe('G560');
+  });
+
   it('keeps the brand when the icon is not that brand\'s logo', () => {
     const entry = { shortName: 'Corsair iCUE LINK LCD', iconSrc: '/assets/devices/monitor.svg' } as UnifiedDevice;
     expect(sidebarDeviceName(entry)).toBe('Corsair iCUE LINK LCD');
