@@ -25,10 +25,10 @@ export function TopArt({ id, url, link }: ArtIds) {
           <stop offset="0" stopColor="#fff" stopOpacity="0.06"/><stop offset="0.5" stopColor="#fff" stopOpacity="0"/><stop offset="1" stopColor="#000" stopOpacity="0.45"/>
         </linearGradient>
         <linearGradient id={id('lb')} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#3b3d43"/><stop offset="0.45" stopColor="#26272c"/><stop offset="1" stopColor="#16171a"/>
+          <stop offset="0" stopColor="#4a4c53"/><stop offset="0.4" stopColor="#2f3035"/><stop offset="1" stopColor="#18191c"/>
         </linearGradient>
         <linearGradient id={id('rb')} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#2f3136"/><stop offset="0.55" stopColor="#232428"/><stop offset="0.85" stopColor="#2e3035"/><stop offset="1" stopColor="#121214"/>
+          <stop offset="0" stopColor="#3a3c42"/><stop offset="0.5" stopColor="#2a2b30"/><stop offset="0.82" stopColor="#3a3c42"/><stop offset="1" stopColor="#141416"/>
         </linearGradient>
         <linearGradient id={id('center')} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#4b4d54"/><stop offset="0.07" stopColor="#2b2c31"/><stop offset="1" stopColor="#1b1c20"/>
@@ -59,18 +59,56 @@ export function TopArt({ id, url, link }: ArtIds) {
           <stop offset="0" stopColor="#9b3cff"/><stop offset="0.28" stopColor="#ff5fd2"/><stop offset="0.55" stopColor="#ffd3f0"/>
           <stop offset="0.78" stopColor="#a9e6ff"/><stop offset="1" stopColor="#63c4ff"/>
         </linearGradient>
-        <linearGradient id={id('rgbUp')} gradientUnits="userSpaceOnUse" x1="278" y1="444" x2="322" y2="300">
-          <stop offset="0" stopColor="#63c4ff"/><stop offset="1" stopColor="#2f5dff"/>
+        <linearGradient id={id('rgbUp')} gradientUnits="userSpaceOnUse" x1="278" y1="444" x2="335" y2="205">
+          <stop offset="0" stopColor="#63c4ff"/><stop offset="0.6" stopColor="#2f5dff"/><stop offset="0.85" stopColor="#2f5dff" stopOpacity="0.5"/><stop offset="1" stopColor="#2f5dff" stopOpacity="0"/>
         </linearGradient>
         <linearGradient id={id('rgbDown')} gradientUnits="userSpaceOnUse" x1="278" y1="444" x2="296" y2="518">
           <stop offset="0" stopColor="#63c4ff"/><stop offset="1" stopColor="#2f4cff"/>
+        </linearGradient>
+        <linearGradient id={id('rimGrad')} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.32"/><stop offset="0.45" stopColor="#fff" stopOpacity="0.1"/><stop offset="1" stopColor="#fff" stopOpacity="0.02"/>
+        </linearGradient>
+        <radialGradient id={id('spillBlue')} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#4aa8ff" stopOpacity="0.55"/><stop offset="1" stopColor="#4aa8ff" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id={id('spillPink')} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#ff5fd2" stopOpacity="0.45"/><stop offset="1" stopColor="#ff5fd2" stopOpacity="0"/>
+        </radialGradient>
+        <clipPath id={id('cLb')}><path d="M98 36 C120 29 145 22 164 17 L168 287 C140 296 100 308 70 318 C72 260 76 200 82 140 C86 100 90 64 98 36 Z"/></clipPath>
+        <clipPath id={id('cRb')}><path d="M227 6 C250 16 271 28 286 40 C299 50 309 66 315 88 C325 126 331 176 333 232 C300 242 262 254 233 262 Z"/></clipPath>
+        <clipPath id={id('cPalm')}><path d="M58 322 L70 318 C100 308 140 296 168 288 L175 320 C190 316 212 310 230 302 L232 262 C260 255 300 243 322 236 C328 260 326 284 322 300 C321 325 318 345 313 365 C304 400 292 430 278 444 C270 446 262 447 250 448 C215 449 175 446 140 438 C115 432 95 420 82 400 Z"/></clipPath>
+        <clipPath id={id('cCenter')}><path d="M166 18 L222 7 C224 7 225 8 225 10 L230 294 C230 299 227 302 222 303 L177 316 C173 317 171 314 171 311 L164 21 Z"/></clipPath>
+        <clipPath id={id('cWing')}><path d="M93 36 C85 39 77 47 71 59 C60 85 52 121 46 160 C40 190 37 220 36 246 L46 252 C60 260 68 280 70 318 L76 230 L84 150 L92 80 Z"/></clipPath>
+        <filter id={id('b2')} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2"/></filter>
+        <filter id={id('b4')} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+        <radialGradient id={id('ribFade')} cx="0.75" cy="0.15" r="0.9">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.07"/><stop offset="0.5" stopColor="#000" stopOpacity="0"/><stop offset="1" stopColor="#000" stopOpacity="0.45"/>
+        </radialGradient>
+        <linearGradient id={id('coreFade')} gradientUnits="userSpaceOnUse" x1="90" y1="0" x2="262" y2="0">
+          <stop offset="0" stopColor="#fff" stopOpacity="0"/><stop offset="0.2" stopColor="#fff" stopOpacity="0.6"/><stop offset="0.75" stopColor="#fff" stopOpacity="0.6"/><stop offset="1" stopColor="#fff" stopOpacity="0"/>
+        </linearGradient>
+        <linearGradient id={id('edgeBlue')} gradientUnits="userSpaceOnUse" x1="0" y1="190" x2="0" y2="500">
+          <stop offset="0" stopColor="#5aa8ff" stopOpacity="0"/><stop offset="0.35" stopColor="#5aa8ff" stopOpacity="0.7"/><stop offset="0.75" stopColor="#5aa8ff" stopOpacity="0.45"/><stop offset="1" stopColor="#5aa8ff" stopOpacity="0"/>
+        </linearGradient>
+        <mask id={id('seamMask')} maskUnits="userSpaceOnUse" x="-30" y="-30" width="420" height="660">
+          <path d="M58 322 L82 400 C90 430 96 470 100 520 L100 640 L390 640 L390 -30 L58 -30 Z" fill="#fff" filter={url('b1')}/>
+        </mask>
+        <linearGradient id={id('ledBar')} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#2bff72" stopOpacity="0.35"/><stop offset="0.22" stopColor="#5dffa0"/><stop offset="0.5" stopColor="#e2fff0"/>
+          <stop offset="0.78" stopColor="#5dffa0"/><stop offset="1" stopColor="#2bff72" stopOpacity="0.35"/>
+        </linearGradient>
+        <radialGradient id={id('ledHalo')} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#2bff72" stopOpacity="0.55"/><stop offset="0.55" stopColor="#2bff72" stopOpacity="0.18"/><stop offset="1" stopColor="#2bff72" stopOpacity="0"/>
+        </radialGradient>
+        <linearGradient id={id('bevel')} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.34"/><stop offset="0.35" stopColor="#fff" stopOpacity="0.12"/><stop offset="0.7" stopColor="#fff" stopOpacity="0"/>
         </linearGradient>
         <filter id={id('grain')} x="0" y="0" width="1" height="1">
           <feTurbulence type="fractalNoise" baseFrequency="2.4" numOctaves="2" seed="5"/>
           <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .3 -.1"/>
         </filter>
-        <filter id={id('b1')}><feGaussianBlur stdDeviation="1"/></filter>
-        <filter id={id('b3')}><feGaussianBlur stdDeviation="3"/></filter>
+        <filter id={id('b1')} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1"/></filter>
+        <filter id={id('b3')} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
         <filter id={id('b6')} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
         <filter id={id('b10')} x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="10"/></filter>
         <path id={id('outline')} d="M93 36 C120 28 145 21 166 15 L222 4 C246 14 268 27 284 38 C297 47 307 62 314 84 C324 118 331 160 334 210
@@ -86,7 +124,7 @@ export function TopArt({ id, url, link }: ArtIds) {
       <g clipPath={url('clip')}>
         {/* Thumb rest, ribbed. */}
         <path d="M36 246 L58 322 L82 400 C90 430 96 470 100 520 L100 600 L-20 600 L-20 240 Z" fill={url('thumb')}/>
-        <g stroke="#2a2b30" strokeWidth="1.1" strokeLinecap="round" opacity="0.8">
+        <g stroke="#4a4c53" strokeWidth="1.2" strokeLinecap="round" opacity="0.75">
           <line x1="8" y1="282" x2="40" y2="330"/><line x1="7" y1="296" x2="46" y2="352"/><line x1="6" y1="310" x2="52" y2="374"/>
           <line x1="6" y1="324" x2="58" y2="396"/><line x1="6" y1="338" x2="64" y2="418"/><line x1="7" y1="352" x2="70" y2="440"/>
           <line x1="8" y1="366" x2="76" y2="462"/><line x1="11" y1="382" x2="81" y2="484"/><line x1="16" y1="398" x2="85" y2="506"/>
@@ -99,19 +137,34 @@ export function TopArt({ id, url, link }: ArtIds) {
           <line x1="8" y1="366" x2="76" y2="462"/><line x1="11" y1="382" x2="81" y2="484"/><line x1="16" y1="398" x2="85" y2="506"/>
           <line x1="22" y1="414" x2="88" y2="528"/>
         </g>
+        <path d="M36 246 L58 322 L82 400 C90 430 96 470 100 520 L100 600 L-20 600 L-20 240 Z" fill={url('ribFade')}/>
         {/* Back shell below the strip, with its own soft highlight. */}
         <path d="M82 400 C95 420 115 432 140 438 C175 446 215 449 250 448 C262 447 270 446 278 444 C292 430 304 400 313 365 C318 345 321 325 322 300
           L360 300 L360 600 L80 600 Z" fill={url('back')}/>
-        <ellipse cx="190" cy="510" rx="70" ry="30" fill="#fff" opacity="0.05" filter={url('b10')}/>
+        <ellipse cx="185" cy="515" rx="85" ry="34" fill="#fff" opacity="0.08" filter={url('b10')}/>
+        <ellipse cx="292" cy="480" rx="26" ry="60" fill={url('spillBlue')}/>
+        <ellipse cx="140" cy="455" rx="70" ry="22" fill={url('spillPink')} opacity="0.8"/>
         {/* Palm between the buttons and the strip. */}
         <path d="M58 322 L70 318 C100 308 140 296 168 288 L175 320 C190 316 212 310 230 302 L232 262 C260 255 300 243 322 236
           C328 260 326 284 322 300 C321 325 318 345 313 365 C304 400 292 430 278 444 C270 446 262 447 250 448 C215 449 175 446 140 438
           C115 432 95 420 82 400 Z" fill={url('palm')}/>
+        <g clipPath={url('cPalm')}>
+          <path d="M58 322 L70 318 C100 308 140 296 168 288 L175 320 C190 316 212 310 230 302 L232 262 C260 255 300 243 322 236 C328 260 326 284 322 300 C321 325 318 345 313 365 C304 400 292 430 278 444 C270 446 262 447 250 448 C215 449 175 446 140 438 C115 432 95 420 82 400 Z" fill="none" stroke="#000" strokeWidth="12" strokeOpacity="0.5" filter={url('b4')}/>
+          <path d="M58 322 L70 318 C100 308 140 296 168 288 L175 320 C190 316 212 310 230 302 L232 262 C260 255 300 243 322 236 C328 260 326 284 322 300 C321 325 318 345 313 365 C304 400 292 430 278 444 C270 446 262 447 250 448 C215 449 175 446 140 438 C115 432 95 420 82 400 Z" fill="none" stroke="#fff" strokeOpacity="0.14" strokeWidth="1.6" transform="translate(1 1.4)"/>
+          <path d="M96 345 C160 326 240 308 304 288" fill="none" stroke="#fff" strokeOpacity="0.13" strokeWidth="34" strokeLinecap="round" filter={url('b6')}/>
+          <path d="M230 290 C270 280 300 270 318 262 L314 360 C290 350 260 330 230 320 Z" fill="#fff" opacity="0.07" filter={url('b10')}/>
+        </g>
+        <ellipse cx="302" cy="395" rx="42" ry="80" fill={url('spillBlue')}/>
+        <ellipse cx="135" cy="420" rx="60" ry="28" fill={url('spillPink')} opacity="0.55" mask={url('seamMask')}/>
         <path d="M58 322 L82 400" fill="none" stroke="#020203" strokeWidth="2.6"/>
         <path d="M60.5 321 L84.5 399" fill="none" stroke="#fff" strokeOpacity="0.07" strokeWidth="0.9"/>
         {/* DPI wing on the left: G8 and G7 in their rim. */}
         <path d="M93 36 C85 39 77 47 71 59 C60 85 52 121 46 160 C40 190 37 220 36 246 L46 252 C60 260 68 280 70 318
           L76 230 L84 150 L92 80 Z" fill={url('wing')}/>
+        <g clipPath={url('cWing')}>
+          <path d="M93 36 C85 39 77 47 71 59 C60 85 52 121 46 160 C40 190 37 220 36 246 L46 252 C60 260 68 280 70 318 L76 230 L84 150 L92 80 Z" fill="none" stroke="#000" strokeWidth="8" strokeOpacity="0.6" filter={url('b4')}/>
+          <path d="M80 60 C70 110 60 170 56 240" fill="none" stroke="#fff" strokeOpacity="0.12" strokeWidth="8" strokeLinecap="round" filter={url('b2')}/>
+        </g>
         <path d="M68 96 L90 94 L87 135 L56 140 C57 124 61 108 68 96 Z" fill={url('dpiKey')}/>
         <path d="M53 147 L85 143 L77 268 C72 272 66 270 62 262 C54 246 46 226 44 204 C44 182 47 162 53 147 Z" fill={url('dpiKey')}/>
         <path d="M68 96 L90 94 M53 147 L85 143" stroke="#fff" strokeOpacity="0.35" strokeWidth="0.9"/>
@@ -122,14 +175,34 @@ export function TopArt({ id, url, link }: ArtIds) {
         <path d="M98 36 C120 29 145 22 164 17 L168 287 C140 296 100 308 70 318 C72 260 76 200 82 140 C86 100 90 64 98 36 Z" fill={url('lb')}/>
         {/* Right button. */}
         <path d="M227 6 C250 16 271 28 286 40 C299 50 309 66 315 88 C325 126 331 176 333 232 C300 242 262 254 233 262 Z" fill={url('rb')}/>
+        <g clipPath={url('cLb')}>
+          <path d="M98 36 C120 29 145 22 164 17 L168 287 C140 296 100 308 70 318 C72 260 76 200 82 140 C86 100 90 64 98 36 Z" fill="none" stroke="#000" strokeWidth="9" strokeOpacity="0.6" filter={url('b4')}/>
+          <path d="M98 36 C120 29 145 22 164 17 L168 287 C140 296 100 308 70 318 C72 260 76 200 82 140 C86 100 90 64 98 36 Z" fill="none" stroke="#fff" strokeOpacity="0.2" strokeWidth="1.6" transform="translate(1 1.4)"/>
+          <path d="M120 50 C115 100 110 150 106 200" fill="none" stroke="#fff" strokeOpacity="0.13" strokeWidth="22" strokeLinecap="round" filter={url('b6')}/>
+          <path d="M104 40 C130 30 160 24 166 30 L162 120 C140 124 116 128 96 132 Z" fill="#fff" opacity="0.07" filter={url('b10')}/>
+        </g>
+        <g clipPath={url('cRb')}>
+          <path d="M227 6 C250 16 271 28 286 40 C299 50 309 66 315 88 C325 126 331 176 333 232 C300 242 262 254 233 262 Z" fill="none" stroke="#000" strokeWidth="9" strokeOpacity="0.6" filter={url('b4')}/>
+          <path d="M227 6 C250 16 271 28 286 40 C299 50 309 66 315 88 C325 126 331 176 333 232 C300 242 262 254 233 262 Z" fill="none" stroke="#fff" strokeOpacity="0.2" strokeWidth="1.6" transform="translate(1 1.4)"/>
+          <path d="M260 32 C280 64 294 110 300 170" fill="none" stroke="#fff" strokeOpacity="0.13" strokeWidth="20" strokeLinecap="round" filter={url('b6')}/>
+          <path d="M232 14 C260 24 290 40 304 70 L312 130 C290 128 260 126 234 126 Z" fill="#fff" opacity="0.07" filter={url('b10')}/>
+        </g>
         {/* Seams around the buttons. */}
         <path d="M98 36 C90 64 86 100 82 140 C76 200 72 260 70 318 L168 287 M233 262 C262 254 300 242 333 232" fill="none" stroke="#020203" strokeWidth="2.6" strokeLinejoin="round"/>
         <path d="M71 320.5 L168 289.5 M233 264.5 C262 256.5 300 244.5 333 234.5" fill="none" stroke="#fff" strokeOpacity="0.08" strokeWidth="0.9"/>
         {/* Centre strip: the LED, the wheel and the two small buttons. */}
         <path d="M164 16 L223 4 C226 4 228 6 228 9 L233 296 C233 302 229 306 223 308 L176 321 C171 322 168 318 168 314 L161 20 C161 18 162 17 164 16 Z" fill="#050506"/>
         <path d="M166 18 L222 7 C224 7 225 8 225 10 L230 294 C230 299 227 302 222 303 L177 316 C173 317 171 314 171 311 L164 21 Z" fill={url('center')}/>
-        <rect x="181" y="56" width="30" height="10" rx="5" fill="#2bff72" opacity="0.8" filter={url('b3')}/>
-        <rect x="183" y="58" width="26" height="6" rx="3" fill="#a6ffc8"/>
+        <g clipPath={url('cCenter')}>
+          <path d="M166 18 L222 7 C224 7 225 8 225 10 L230 294 C230 299 227 302 222 303 L177 316 C173 317 171 314 171 311 L164 21 Z" fill="none" stroke="#000" strokeWidth="7" strokeOpacity="0.6" filter={url('b2')}/>
+          <path d="M170 24 L222 14" stroke="#fff" strokeOpacity="0.28" strokeWidth="3" strokeLinecap="round" filter={url('b1')}/>
+          <path d="M198 30 L204 290" stroke="#fff" strokeOpacity="0.05" strokeWidth="22" filter={url('b6')}/>
+        </g>
+        <ellipse cx="196.5" cy="61" rx="24" ry="11" fill={url('ledHalo')}/>
+        <rect x="180" y="55.5" width="33" height="11" rx="5.5" fill="#050506"/>
+        <rect x="180" y="55.5" width="33" height="11" rx="5.5" fill="none" stroke="#fff" strokeOpacity="0.08" strokeWidth="0.8"/>
+        <rect x="182.5" y="58" width="28" height="6" rx="3" fill={url('ledBar')}/>
+        <path d="M186 58.9 L207 58.9" stroke="#fff" strokeOpacity="0.65" strokeWidth="0.8" strokeLinecap="round"/>
         <rect x="175" y="95" width="45" height="98" rx="10" fill="#020202"/>
         <rect x="181" y="100" width="33" height="88" rx="7" fill={url('tire')}/>
         <g stroke="#000" strokeWidth="1.6" opacity="0.85">
@@ -146,20 +219,20 @@ export function TopArt({ id, url, link }: ArtIds) {
         <rect x="187" y="251" width="23" height="32" rx="4" fill={url('smallKey')}/>
         <text x="198.5" y="271" fontSize="9" fill="#a8abb3" className={styles.printedMid}>{gName(9)}</text>
         {/* The light strip: bloom, tube, hot core; a Y on the right, one arm up to the edge, one down the back. */}
-        <g fill="none" strokeLinecap="round">
-          <path d="M82 400 C95 420 115 432 140 438 C175 446 215 449 250 448 C262 447 270 446 278 444" stroke={url('rgbMain')} strokeWidth="26" opacity="0.45" className={styles.bloom} filter={url('b10')}/>
-          <path d="M278 444 C292 430 304 400 313 365 C318 345 321 325 322 300" stroke={url('rgbUp')} strokeWidth="22" opacity="0.45" className={styles.bloom} filter={url('b10')}/>
-          <path d="M278 444 C286 460 292 480 296 516" stroke={url('rgbDown')} strokeWidth="20" opacity="0.4" className={styles.bloom} filter={url('b10')}/>
-          <path d="M82 400 C95 420 115 432 140 438 C175 446 215 449 250 448 C262 447 270 446 278 444" stroke={url('rgbMain')} strokeWidth="12" opacity="0.55" filter={url('b1')}/>
-          <path d="M278 444 C292 430 304 400 313 365 C318 345 321 325 322 300" stroke={url('rgbUp')} strokeWidth="11" opacity="0.55" filter={url('b1')}/>
-          <path d="M278 444 C286 460 292 480 296 516" stroke={url('rgbDown')} strokeWidth="10" opacity="0.5" filter={url('b1')}/>
-          <path d="M82 400 C95 420 115 432 140 438 C175 446 215 449 250 448 C262 447 270 446 278 444" stroke={url('rgbMain')} strokeWidth="8"/>
-          <path d="M278 444 C292 430 304 400 313 365 C318 345 321 325 322 300" stroke={url('rgbUp')} strokeWidth="7"/>
-          <path d="M278 444 C286 460 292 480 296 516" stroke={url('rgbDown')} strokeWidth="6.5"/>
-          <path d="M90 410 C105 426 120 434 140 438 C175 446 215 449 250 448" stroke="#fff" strokeOpacity="0.55" strokeWidth="2.4" filter={url('b1')}/>
+        <g fill="none" strokeLinecap="round" mask={url('seamMask')}>
+          <path d="M70 381 C75 389 79 395 82 400 C95 420 115 432 140 438 C175 446 215 449 250 448 C262 447 270 446 278 444" stroke={url('rgbMain')} strokeWidth="26" opacity="0.45" className={styles.bloom} filter={url('b10')}/>
+          <path d="M278 444 C292 430 304 400 313 365 C318 345 321 325 323 300 C325 280 329 250 335 205" stroke={url('rgbUp')} strokeWidth="22" opacity="0.45" className={styles.bloom} filter={url('b10')}/>
+          <path d="M278 444 C286 460 292 480 296 516 C298 532 300 548 303 566" stroke={url('rgbDown')} strokeWidth="20" opacity="0.4" className={styles.bloom} filter={url('b10')}/>
+          <path d="M70 381 C75 389 79 395 82 400 C95 420 115 432 140 438 C175 446 215 449 250 448 C262 447 270 446 278 444" stroke={url('rgbMain')} strokeWidth="12" opacity="0.55" filter={url('b1')}/>
+          <path d="M278 444 C292 430 304 400 313 365 C318 345 321 325 323 300 C325 280 329 250 335 205" stroke={url('rgbUp')} strokeWidth="11" opacity="0.55" filter={url('b1')}/>
+          <path d="M278 444 C286 460 292 480 296 516 C298 532 300 548 303 566" stroke={url('rgbDown')} strokeWidth="10" opacity="0.5" filter={url('b1')}/>
+          <path d="M70 381 C75 389 79 395 82 400 C95 420 115 432 140 438 C175 446 215 449 250 448 C262 447 270 446 278 444" stroke={url('rgbMain')} strokeWidth="8"/>
+          <path d="M278 444 C292 430 304 400 313 365 C318 345 321 325 323 300 C325 280 329 250 335 205" stroke={url('rgbUp')} strokeWidth="7"/>
+          <path d="M278 444 C286 460 292 480 296 516 C298 532 300 548 303 566" stroke={url('rgbDown')} strokeWidth="6.5"/>
+          <path d="M90 410 C105 426 120 434 140 438 C175 446 215 449 250 448 C255 448 259 447.5 262 447" stroke={url('coreFade')} strokeWidth="2.4" filter={url('b1')}/>
         </g>
         {/* Glow of the strip on the palm. */}
-        <path d="M90 408 C120 430 200 446 270 440" fill="none" stroke={url('rgbMain')} strokeWidth="40" opacity="0.10" className={styles.bloom} filter={url('b10')} transform="translate(0 -18)"/>
+        <path d="M90 408 C120 430 200 446 270 440" fill="none" stroke={url('rgbMain')} strokeWidth="40" opacity="0.10" className={styles.bloom} mask={url('seamMask')} filter={url('b10')} transform="translate(0 -18)"/>
         {/* Studio highlights. */}
         <path d="M104 44 C125 36 145 29 160 25" stroke="#fff" strokeOpacity="0.3" strokeWidth="2.4" strokeLinecap="round" fill="none" filter={url('b1')}/>
         <path d="M232 14 C252 22 270 32 282 42" stroke="#fff" strokeOpacity="0.22" strokeWidth="2.4" strokeLinecap="round" fill="none" filter={url('b1')}/>
@@ -167,11 +240,14 @@ export function TopArt({ id, url, link }: ArtIds) {
         <path d="M300 80 C312 130 318 180 320 225" stroke="#fff" strokeOpacity="0.1" strokeWidth="10" strokeLinecap="round" fill="none" filter={url('b6')}/>
         <path d="M80 330 C140 312 230 296 310 268" stroke="#fff" strokeOpacity="0.06" strokeWidth="14" strokeLinecap="round" fill="none" filter={url('b6')}/>
         <use href={link('outline')} fill={url('fall')}/>
+        <use href={link('outline')} fill="none" stroke="#000" strokeWidth="16" strokeOpacity="0.55" filter={url('b6')}/>
         <rect x="-25" y="-18" width="395" height="625" filter={url('grain')} opacity="0.45"/>
       </g>
       {/* Rim light: a thin edge, cool on the right where the strip lights it. */}
-      <use href={link('outline')} fill="none" stroke="#fff" strokeOpacity="0.12" strokeWidth="1.1"/>
-      <path d="M326 140 C331 180 334 210 334 240 C336 290 336 330 335 380 C334 430 332 466 324 488" fill="none" stroke="#5aa8ff" strokeOpacity="0.55" strokeWidth="2.4" filter={url('b1')}/>
+      <use href={link('outline')} fill="none" stroke="#000" strokeOpacity="0.85" strokeWidth="1.4"/>
+      <g clipPath={url('clip')}>
+        <use href={link('outline')} fill="none" stroke={url('bevel')} strokeWidth="2.4" transform="translate(1.3 1.8)" filter={url('b1')}/>
+      </g>
     </g>
   );
 }
@@ -219,16 +295,35 @@ export function SideArt({ id, url, link }: ArtIds) {
         </radialGradient>
         <pattern id={id('ribs')} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-27)">
           <rect width="6" height="6" fill="#18191c"/>
-          <rect x="0" width="1.8" height="6" fill="#2d2f34"/>
+          <rect x="0" width="1.8" height="6" fill="#3a3c42"/>
           <rect x="1.8" width="1.1" height="6" fill="#08080a"/>
         </pattern>
+        <linearGradient id={id('rimGrad')} x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.3"/><stop offset="0.5" stopColor="#fff" stopOpacity="0.08"/><stop offset="1" stopColor="#fff" stopOpacity="0.02"/>
+        </linearGradient>
+        <clipPath id={id('cLbs')}><path d="M122 517 L190 467 C222 446 252 430 280 418 L410 366 L438 340 L444 327 L505 322 L507 323 L548 320 L552 327 C575 350 595 378 610 404 L400 416 C360 420 330 426 300 436 C240 456 180 486 128 512 Z"/></clipPath>
+        <clipPath id={id('cGp')}><path d="M552 327 C620 323 700 328 760 340 C775 343 784 347 788 353 C790 366 790 378 786 388 L610 404 C595 378 575 350 552 327 Z"/></clipPath>
+        <clipPath id={id('cRear')}><path d="M800 359 C840 368 880 390 912 422 C950 460 982 505 996 542 C1000 556 994 566 978 574 C940 584 880 582 840 578 C826 577 814 574 808 570 C809 530 809 490 805 455 C802 420 800 390 800 359 Z"/></clipPath>
+        <clipPath id={id('cLower')}><path d="M140 523 C200 500 270 478 340 465 L405 520 L396 555 L440 621 L470 664 L505 669 C440 660 380 640 330 620 C290 605 250 588 215 570 C195 560 175 550 152 538 L168 527 Z"/></clipPath>
+        <filter id={id('b4s')} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+        <filter id={id('b10s')} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10"/></filter>
+        <linearGradient id={id('ledBar')} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#2bff72" stopOpacity="0.35"/><stop offset="0.22" stopColor="#5dffa0"/><stop offset="0.5" stopColor="#e2fff0"/>
+          <stop offset="0.78" stopColor="#5dffa0"/><stop offset="1" stopColor="#2bff72" stopOpacity="0.35"/>
+        </linearGradient>
+        <radialGradient id={id('ledHalo')} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#2bff72" stopOpacity="0.55"/><stop offset="0.55" stopColor="#2bff72" stopOpacity="0.18"/><stop offset="1" stopColor="#2bff72" stopOpacity="0"/>
+        </radialGradient>
+        <linearGradient id={id('bevel')} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.34"/><stop offset="0.35" stopColor="#fff" stopOpacity="0.12"/><stop offset="0.7" stopColor="#fff" stopOpacity="0"/>
+        </linearGradient>
         <filter id={id('grain')} x="0" y="0" width="1" height="1">
           <feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="2" seed="11"/>
           <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .28 -.1"/>
         </filter>
-        <filter id={id('b1')}><feGaussianBlur stdDeviation="0.8"/></filter>
-        <filter id={id('b3')}><feGaussianBlur stdDeviation="3"/></filter>
-        <filter id={id('b6')} x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="6"/></filter>
+        <filter id={id('b1')} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="0.8"/></filter>
+        <filter id={id('b3')} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+        <filter id={id('b6')} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
         <filter id={id('b14')} x="-40%" y="-200%" width="180%" height="500%"><feGaussianBlur stdDeviation="12"/></filter>
         <path id={id('side')} d="M122 517 L190 467 C222 446 252 430 280 418 C288 392 312 362 350 357 C376 354 398 359 410 366
           L438 340 L444 327 L505 322 L507 323 L548 320 L552 327 C620 323 700 328 760 340 C775 343 784 347 788 353 L800 359
@@ -248,8 +343,18 @@ export function SideArt({ id, url, link }: ArtIds) {
         {/* Left button, seen from the side. */}
         <path d="M122 517 L190 467 C222 446 252 430 280 418 L410 366 L438 340 L444 327 L505 322 L507 323 L548 320 L552 327
           C575 350 595 378 610 404 L400 416 C360 420 330 426 300 436 C240 456 180 486 128 512 Z" fill={url('mat')}/>
+        <g clipPath={url('cLbs')}>
+          <path d="M122 517 L190 467 C222 446 252 430 280 418 L410 366 L438 340 L444 327 L505 322 L507 323 L548 320 L552 327 C575 350 595 378 610 404 L400 416 C360 420 330 426 300 436 C240 456 180 486 128 512 Z" fill="none" stroke="#000" strokeWidth="9" strokeOpacity="0.6" filter={url('b4s')}/>
+          <path d="M122 517 L190 467 C222 446 252 430 280 418 L410 366 L438 340 L444 327 L505 322 L507 323 L548 320 L552 327 C575 350 595 378 610 404 L400 416 C360 420 330 426 300 436 C240 456 180 486 128 512 Z" fill="none" stroke="#fff" strokeOpacity="0.18" strokeWidth="1.6" transform="translate(0 1.4)"/>
+          <path d="M300 410 C360 390 440 370 540 350 L560 380 C470 392 380 404 300 425 Z" fill="#fff" opacity="0.08" filter={url('b10s')}/>
+        </g>
         {/* Palm top panel. */}
         <path d="M552 327 C620 323 700 328 760 340 C775 343 784 347 788 353 C790 366 790 378 786 388 L610 404 C595 378 575 350 552 327 Z" fill={url('gpanel')}/>
+        <g clipPath={url('cGp')}>
+          <path d="M552 327 C620 323 700 328 760 340 C775 343 784 347 788 353 C790 366 790 378 786 388 L610 404 C595 378 575 350 552 327 Z" fill="none" stroke="#000" strokeWidth="9" strokeOpacity="0.6" filter={url('b4s')}/>
+          <path d="M552 327 C620 323 700 328 760 340 C775 343 784 347 788 353 C790 366 790 378 786 388 L610 404 C595 378 575 350 552 327 Z" fill="none" stroke="#fff" strokeOpacity="0.18" strokeWidth="1.6" transform="translate(0 1.4)"/>
+          <path d="M600 335 C660 333 720 338 770 350 L770 372 C710 366 650 364 610 366 Z" fill="#fff" opacity="0.08" filter={url('b10s')}/>
+        </g>
         <path d="M552 327 C575 350 595 378 610 404" stroke="#030304" strokeWidth="2.6" fill="none"/>
         <path d="M555 326 C578 349 598 377 613 403" stroke="#fff" strokeOpacity="0.12" strokeWidth="1" fill="none"/>
         {/* Rear shell and its underside. */}
@@ -257,6 +362,11 @@ export function SideArt({ id, url, link }: ArtIds) {
           C826 577 814 574 808 570 C809 530 809 490 805 455 C802 420 800 390 800 359 Z" fill={url('rear')}/>
         <path d="M808 570 C814 574 826 577 840 578 C880 582 940 584 978 574 C962 588 935 598 905 606 C870 616 840 632 812 652
           L792 662 C802 645 808 625 808 600 Z" fill={url('under')}/>
+        <g clipPath={url('cRear')}>
+          <path d="M800 359 C840 368 880 390 912 422 C950 460 982 505 996 542 C1000 556 994 566 978 574 C940 584 880 582 840 578 C826 577 814 574 808 570 C809 530 809 490 805 455 C802 420 800 390 800 359 Z" fill="none" stroke="#000" strokeWidth="14" strokeOpacity="0.55" filter={url('b4s')}/>
+          <path d="M800 359 C840 368 880 390 912 422 C950 460 982 505 996 542 C1000 556 994 566 978 574 C940 584 880 582 840 578 C826 577 814 574 808 570 C809 530 809 490 805 455 C802 420 800 390 800 359 Z" fill="none" stroke="#fff" strokeOpacity="0.18" strokeWidth="1.6" transform="translate(0 1.4)"/>
+          <path d="M830 380 C880 400 930 440 960 490 C930 500 890 480 850 450 C830 430 820 400 830 380 Z" fill="#fff" opacity="0.08" filter={url('b10s')}/>
+        </g>
         <path d="M818 573 C860 580 930 583 976 573" stroke="#fff" strokeOpacity="0.22" strokeWidth="1.6" fill="none" filter={url('b1')}/>
         <path d="M822 374 C880 400 940 452 978 512" stroke="#fff" strokeOpacity="0.12" strokeWidth="9" strokeLinecap="round" fill="none" filter={url('b3')}/>
         {/* Glossy black band along the left button, nose to palm. */}
@@ -271,6 +381,11 @@ export function SideArt({ id, url, link }: ArtIds) {
         {/* Lower front panel under the nose, with its chamfers. */}
         <path d="M140 523 C200 500 270 478 340 465 L405 520 L396 555 L440 621 L470 664 L505 669 C440 660 380 640 330 620
           C290 605 250 588 215 570 C195 560 175 550 152 538 L168 527 Z" fill={url('lower')}/>
+        <g clipPath={url('cLower')}>
+          <path d="M140 523 C200 500 270 478 340 465 L405 520 L396 555 L440 621 L470 664 L505 669 C440 660 380 640 330 620 C290 605 250 588 215 570 C195 560 175 550 152 538 L168 527 Z" fill="none" stroke="#000" strokeWidth="10" strokeOpacity="0.5" filter={url('b4s')}/>
+          <path d="M140 523 C200 500 270 478 340 465 L405 520 L396 555 L440 621 L470 664 L505 669 C440 660 380 640 330 620 C290 605 250 588 215 570 C195 560 175 550 152 538 L168 527 Z" fill="none" stroke="#fff" strokeOpacity="0.14" strokeWidth="1.6" transform="translate(0 1.4)"/>
+          <path d="M200 520 C250 505 300 492 340 485 L360 520 C300 530 250 545 210 555 Z" fill="#fff" opacity="0.08" filter={url('b10s')}/>
+        </g>
         <path d="M206 526 C250 512 300 498 350 490" stroke="#fff" strokeOpacity="0.22" strokeWidth="2" strokeLinecap="round" fill="none" filter={url('b1')}/>
         <path d="M166 542 C200 566 250 595 296 616" stroke="#000" strokeOpacity="0.7" strokeWidth="2" fill="none"/>
         <path d="M168 539 C202 563 252 592 298 613" stroke="#fff" strokeOpacity="0.08" strokeWidth="1" fill="none"/>
@@ -287,12 +402,16 @@ export function SideArt({ id, url, link }: ArtIds) {
         {/* Foot along the bottom. */}
         <path d="M512 664 L752 664" stroke="#3a3c42" strokeWidth="2.2" strokeLinecap="round"/>
         {/* Green onboard LED at the nose. */}
-        <ellipse cx="214" cy="458" rx="16" ry="5" fill="#2bff72" opacity="0.8" filter={url('b3')} transform="rotate(-32 214 458)"/>
-        <ellipse cx="214" cy="458" rx="8" ry="1.8" fill="#c4ffd9" transform="rotate(-32 214 458)"/>
+        <g transform="rotate(-32 214 458)">
+          <ellipse cx="214" cy="458" rx="22" ry="9" fill={url('ledHalo')}/>
+          <rect x="203" y="455.5" width="22" height="5" rx="2.5" fill="#050506"/>
+          <rect x="204.5" y="456.6" width="19" height="2.8" rx="1.4" fill={url('ledBar')}/>
+        </g>
         {/* Highlights on the top edge. */}
         <path d="M132 511 C180 478 230 448 280 420" stroke="#fff" strokeOpacity="0.3" strokeWidth="1.6" fill="none" filter={url('b1')}/>
         <path d="M560 328 C640 325 720 331 778 346" stroke="#fff" strokeOpacity="0.22" strokeWidth="3" strokeLinecap="round" fill="none" filter={url('b1')}/>
         <path d="M420 372 C470 356 520 346 560 340" stroke="#fff" strokeOpacity="0.1" strokeWidth="12" strokeLinecap="round" fill="none" filter={url('b3')}/>
+        <use href={link('side')} fill="none" stroke="#000" strokeWidth="16" strokeOpacity="0.5" filter={url('b6')}/>
         <rect x="100" y="300" width="920" height="400" filter={url('grain')} opacity="0.4"/>
       </g>
       {/* Scroll mode and G9 buttons on the top strip, seen side-on. */}
@@ -317,7 +436,10 @@ export function SideArt({ id, url, link }: ArtIds) {
         <circle r="7.5"/><path d="M0 -12 V-4 M0 4 V12 M-12 0 H-4 M4 0 H12"/>
       </g>
       {/* Rim light around the whole mouse. */}
-      <use href={link('side')} fill="none" stroke="#fff" strokeOpacity="0.12" strokeWidth="1.2"/>
+      <use href={link('side')} fill="none" stroke="#000" strokeOpacity="0.85" strokeWidth="1.4"/>
+      <g clipPath={url('clip')}>
+        <use href={link('side')} fill="none" stroke={url('bevel')} strokeWidth="2.4" transform="translate(0.6 1.9)" filter={url('b1')}/>
+      </g>
     </g>
   );
 }
