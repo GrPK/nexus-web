@@ -23,7 +23,7 @@ import { useLogitechSpeaker } from './useLogitechSpeaker';
 import {
   SPEAKER_FACING, SPEAKER_POS, builtInPresetLabelKey, currentPreset, dbLabel, hzLabel, isFlat, testOrder, volMax, volOf,
 } from './speakerUtils';
-import { DeviceSwitcherContext } from './logitechHubContext';
+import { InLogitechHub } from './logitechHubContext';
 import styles from './LogitechSpeakerDevicePage.module.scss';
 
 type Tab = 'acoustics' | 'surround';
@@ -378,19 +378,21 @@ function SurroundTab({ state, change, report }: TabProps) {
 export function LogitechSpeakerDevicePage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('acoustics');
-  const switcher = useContext(DeviceSwitcherContext);
+  // Inside the Logitech page: no header of its own, both sections one under the other.
+  const embedded = useContext(InLogitechHub);
   const { state, loadFailed, failure, report, change } = useLogitechSpeaker();
 
   return (
     <div className={styles.page}>
-      <ViewHeader
-        // eslint-disable-next-line i18next/no-literal-string -- brand + model name
-        title="Logitech G560"
-        tabs={state?.present ? TABS.map(({ key, icon }) => ({ key, icon, label: t(`${P}${key}`) })) : undefined}
-        activeTab={tab}
-        onTabChange={key => setTab(key as Tab)}
-        tabActions={switcher ?? undefined}
-      />
+      {!embedded && (
+        <ViewHeader
+          // eslint-disable-next-line i18next/no-literal-string -- brand + model name
+          title="Logitech G560"
+          tabs={state?.present ? TABS.map(({ key, icon }) => ({ key, icon, label: t(`${P}${key}`) })) : undefined}
+          activeTab={tab}
+          onTabChange={key => setTab(key as Tab)}
+        />
+      )}
       <div className={styles.body}>
         {failure && <Notice tone="critical" role="alert">{t(failure)}</Notice>}
         {loadFailed && !state && <Notice tone="critical" role="alert">{t(`${P}loadFailed`)}</Notice>}
@@ -398,13 +400,18 @@ export function LogitechSpeakerDevicePage() {
         {state && !state.present && (
           <EmptyState icon={<Speaker size={40} />} title={t(`${P}notFound`)} hint={t(`${P}notFoundHint`)} />
         )}
-        {state?.present && (
+        {state?.present && (embedded ? (
+          <div className={`${styles.tab} ${styles.stacked}`}>
+            <AcousticsTab state={state} change={change} report={report} />
+            <SurroundTab state={state} change={change} report={report} />
+          </div>
+        ) : (
           <div className={styles.tab}>
             {tab === 'surround'
               ? <SurroundTab state={state} change={change} report={report} />
               : <AcousticsTab state={state} change={change} report={report} />}
           </div>
-        )}
+        ))}
       </div>
     </div>
   );

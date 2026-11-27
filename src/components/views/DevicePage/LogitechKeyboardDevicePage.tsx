@@ -1,10 +1,10 @@
 import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  Ban, Keyboard, MousePointer2, Music, Pause, RefreshCw, SkipBack, SkipForward, Sparkles,
+  Ban, Keyboard, MousePointer2, Music, Pause, RotateCcw, Save, SkipBack, SkipForward, Sparkles,
   Square, Undo2, Volume1, Volume2, VolumeX, Zap,
 } from 'lucide-react';
 import {
-  fetchKeyboard, rewriteKeyboard, setKeyboardEnabled, setKeyboardLayers, setKeyboardLayout,
+  fetchKeyboard, restoreKeyboardCopy, saveKeyboardCopy, setKeyboardEnabled, setKeyboardLayers, setKeyboardLayout,
   type KeyAssignment, type KeyboardLayers, type KeyboardState,
 } from '../../../api/logitechKeyboard';
 import { useTranslation } from '../../../lib/i18n';
@@ -22,7 +22,7 @@ import { KeyboardIllustration, legendOf, type KeyFace } from './logitechKeyboard
 import { KEYS, type KeyboardLayout } from './logitechKeyboard/g915x';
 import { MEDIA, MODIFIERS, MOUSE_BUTTONS, capText, keyName, modifierCaps, shortcutText } from './logitechKeyboard/keyNames';
 import { usePolledDevice } from './usePolledDevice';
-import { DeviceSwitcherContext } from './logitechHubContext';
+import { InLogitechHub } from './logitechHubContext';
 import styles from './LogitechKeyboardDevicePage.module.scss';
 
 const P = 'devices.logitechKeyboard.';
@@ -375,14 +375,37 @@ function AssignmentsStage({ state, change, busy }: StageProps) {
               <span className={styles.switchHint}>{t(`${P}stored`)} {t(`${P}switchHint`)}</span>
             </span>
           </label>
-          {state.written && (
-            <Button size="sm" tone="ghost" icon={<RefreshCw size={14} />} disabled={busy} onClick={() => { void change(() => rewriteKeyboard()); }}>
-              {t(`${P}rewrite`)}
-            </Button>
-          )}
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A copy of the assignments kept in Nexus, under the whole keyboard: the keyboard cannot be read back,
+ * so the user saves the current set here and restores it after another app or a reset changed the keyboard.
+ */
+function KeyboardCopyCard({ state, change, busy }: StageProps) {
+  const { t, language } = useTranslation();
+  const savedAt = state.savedAt ? new Date(state.savedAt) : null;
+  return (
+    <section className={styles.copyCard}>
+      <div className={styles.copyText}>
+        <span className={styles.copyTitle}>{t(`${P}copy.title`)}</span>
+        <span className={styles.copyHint}>{t(`${P}copy.hint`)}</span>
+        <span className={styles.copySaved}>
+          {savedAt ? t(`${P}copy.savedAt`, { time: savedAt.toLocaleString(language) }) : t(`${P}copy.none`)}
+        </span>
+      </div>
+      <div className={styles.copyActions}>
+        <Button size="sm" icon={<Save size={14} />} disabled={busy} onClick={() => { void change(() => saveKeyboardCopy()); }}>
+          {t(`${P}copy.save`)}
+        </Button>
+        <Button size="sm" tone="ghost" icon={<RotateCcw size={14} />} disabled={busy || !savedAt} onClick={() => { void change(() => restoreKeyboardCopy()); }}>
+          {t(`${P}copy.restore`)}
+        </Button>
+      </div>
+    </section>
   );
 }
 
@@ -394,13 +417,14 @@ export function LogitechKeyboardDevicePage() {
   const title = 'Logitech ' + (state?.model ?? 'G915 X');
   const layoutValue = state?.layoutChoice ?? LAYOUT_AUTO;
   const autoLayout = state?.layoutDetected ? state.layoutDetected.toUpperCase() : '?';
-  const switcher = useContext(DeviceSwitcherContext);
+  // Inside the Logitech page: no header of its own.
+  const embedded = useContext(InLogitechHub);
   // The keyboard says its layout; the choice only shows when it did not, or one was picked by hand.
   const askLayout = !state?.layoutDetected || state.layoutChoice !== null && state.layoutChoice !== undefined;
 
   return (
     <div className={styles.page}>
-      <ViewHeader title={title} tabActions={switcher ?? undefined} />
+      {!embedded && <ViewHeader title={title} />}
       <div className={styles.body}>
         {failure && <Notice tone="critical" role="alert">{t(failure)}</Notice>}
         {loadFailed && !state && <Notice tone="critical" role="alert">{t(`${P}loadFailed`)}</Notice>}
@@ -436,6 +460,7 @@ export function LogitechKeyboardDevicePage() {
             </div>
             )}
             <AssignmentsStage state={state} change={change} busy={busy} />
+            <KeyboardCopyCard state={state} change={change} busy={busy} />
           </>
         )}
       </div>

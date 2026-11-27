@@ -6,31 +6,9 @@ import { LogitechHubPage } from './LogitechHubPage';
 vi.mock('../../../lib/i18n', () => ({
   useTranslation: () => ({ language: 'en', t: (key: string) => key }),
 }));
-// Each mocked page shows the switcher in its tab row, as the real ones do.
-vi.mock('./LogitechMouseDevicePage', async () => {
-  const { useContext } = await import('react');
-  const { DeviceSwitcherContext } = await import('./logitechHubContext');
-  function LogitechMouseDevicePage() {
-    return <div><span>mouse page</span>{useContext(DeviceSwitcherContext)}</div>;
-  }
-  return { LogitechMouseDevicePage };
-});
-vi.mock('./LogitechKeyboardDevicePage', async () => {
-  const { useContext } = await import('react');
-  const { DeviceSwitcherContext } = await import('./logitechHubContext');
-  function LogitechKeyboardDevicePage() {
-    return <div><span>keyboard page</span>{useContext(DeviceSwitcherContext)}</div>;
-  }
-  return { LogitechKeyboardDevicePage };
-});
-vi.mock('./LogitechSpeakerDevicePage', async () => {
-  const { useContext } = await import('react');
-  const { DeviceSwitcherContext } = await import('./logitechHubContext');
-  function LogitechSpeakerDevicePage() {
-    return <div><span>speaker page</span>{useContext(DeviceSwitcherContext)}</div>;
-  }
-  return { LogitechSpeakerDevicePage };
-});
+vi.mock('./LogitechMouseDevicePage', () => ({ LogitechMouseDevicePage: () => <div>mouse page</div> }));
+vi.mock('./LogitechKeyboardDevicePage', () => ({ LogitechKeyboardDevicePage: () => <div>keyboard page</div> }));
+vi.mock('./LogitechSpeakerDevicePage', () => ({ LogitechSpeakerDevicePage: () => <div>speaker page</div> }));
 
 const member = (id: string, shortName: string) => ({
   key: `curated-${id}`,

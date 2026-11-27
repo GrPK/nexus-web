@@ -14,6 +14,8 @@ const api = vi.hoisted(() => ({
   fetchKeyboard: vi.fn(),
   setKeyboardLayers: vi.fn(),
   rewriteKeyboard: vi.fn(),
+  saveKeyboardCopy: vi.fn(),
+  restoreKeyboardCopy: vi.fn(),
   setKeyboardEnabled: vi.fn(),
   setKeyboardLayout: vi.fn(),
   keyboardPhotoUrl: vi.fn(() => 'photo.webp'),
@@ -127,6 +129,20 @@ describe('LogitechKeyboardDevicePage', () => {
     fireEvent.click(screen.getByRole('switch', { name: `${P}switch` }));
     await settle();
     expect(api.setKeyboardEnabled).toHaveBeenCalledWith(false);
+  });
+
+  it('saves a copy of the assignments in Nexus and restores it once one is saved', async () => {
+    await mount(state());
+    expect(screen.getByText(`${P}copy.none`)).toBeTruthy();
+    expect(screen.getByText(`${P}copy.restore`).closest('button')?.disabled).toBe(true);
+    api.saveKeyboardCopy.mockResolvedValue(state({ savedAt: '2026-11-28T00:30:00Z' }));
+    fireEvent.click(screen.getByText(`${P}copy.save`));
+    await settle();
+    expect(api.saveKeyboardCopy).toHaveBeenCalled();
+    api.restoreKeyboardCopy.mockResolvedValue(state({ savedAt: '2026-11-28T00:30:00Z' }));
+    fireEvent.click(screen.getByText(`${P}copy.restore`));
+    await settle();
+    expect(api.restoreKeyboardCopy).toHaveBeenCalled();
   });
 
   it('greys the keys and keeps them from being picked while the custom assignments are off', async () => {

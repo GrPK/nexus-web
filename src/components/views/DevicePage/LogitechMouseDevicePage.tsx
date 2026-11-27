@@ -22,7 +22,7 @@ import { MouseIllustration } from './logitechMouse/MouseIllustration';
 import { MouseMini } from './logitechMouse/MouseMini';
 import { FACTORY, HOTSPOTS, gName, type MouseView } from './logitechMouse/g502x';
 import { useLogitechMouse } from './useLogitechMouse';
-import { DeviceSwitcherContext } from './logitechHubContext';
+import { InLogitechHub } from './logitechHubContext';
 import styles from './LogitechMouseDevicePage.module.scss';
 
 const P = 'devices.logitechMouse.';
@@ -466,7 +466,8 @@ export function LogitechMouseDevicePage() {
   const { t } = useTranslation();
   const { state, loadFailed, failure, busy, change } = useLogitechMouse();
   const [tab, setTab] = useState<Tab>('assignments');
-  const switcher = useContext(DeviceSwitcherContext);
+  // Inside the Logitech page: no header of its own, both sections one under the other.
+  const embedded = useContext(InLogitechHub);
   const [selected, setSelected] = useState<number | null>(null);
 
   const profiles = state?.profiles ?? [];
@@ -477,13 +478,14 @@ export function LogitechMouseDevicePage() {
 
   return (
     <div className={styles.page}>
-      <ViewHeader
-        title={title}
-        tabs={state?.present ? TABS.map(({ key, icon }) => ({ key, icon, label: t(`${P}tab.${key}`) })) : undefined}
-        activeTab={tab}
-        onTabChange={key => setTab(key as Tab)}
-        tabActions={switcher ?? undefined}
-      />
+      {!embedded && (
+        <ViewHeader
+          title={title}
+          tabs={state?.present ? TABS.map(({ key, icon }) => ({ key, icon, label: t(`${P}tab.${key}`) })) : undefined}
+          activeTab={tab}
+          onTabChange={key => setTab(key as Tab)}
+        />
+      )}
       <div className={styles.body}>
         {failure && <Notice tone="critical" role="alert">{t(failure)}</Notice>}
         {loadFailed && !state && <Notice tone="critical" role="alert">{t(`${P}loadFailed`)}</Notice>}
@@ -503,11 +505,18 @@ export function LogitechMouseDevicePage() {
         {state?.present && profile && (
           <>
             <ProfileBar state={state} profile={profile} change={change} busy={busy} onPick={setSelected} />
-            <div className={styles.tab} key={tab}>
-              {tab === 'assignments'
-                ? <AssignmentsTab state={state} profile={profile} change={change} busy={busy} />
-                : <SensitivityTab state={state} profile={profile} change={change} busy={busy} />}
-            </div>
+            {embedded ? (
+              <div className={styles.stacked}>
+                <AssignmentsTab state={state} profile={profile} change={change} busy={busy} />
+                <SensitivityTab state={state} profile={profile} change={change} busy={busy} />
+              </div>
+            ) : (
+              <div className={styles.tab} key={tab}>
+                {tab === 'assignments'
+                  ? <AssignmentsTab state={state} profile={profile} change={change} busy={busy} />
+                  : <SensitivityTab state={state} profile={profile} change={change} busy={busy} />}
+              </div>
+            )}
           </>
         )}
       </div>

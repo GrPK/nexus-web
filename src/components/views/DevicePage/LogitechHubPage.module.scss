@@ -1,5 +1,4 @@
-// The Logitech page: the chosen device's own page fills it; the device switcher rides in that
-// page's tab row.
+// The Logitech page: its device tabs on top, the chosen device's sections filling the rest.
 
 .hub {
   display: flex;
@@ -15,8 +14,3 @@
   min-height: 0;
 }
 
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}

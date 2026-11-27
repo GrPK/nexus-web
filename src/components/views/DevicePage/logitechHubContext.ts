@@ -1,8 +1,7 @@
-import { createContext, type ReactNode } from 'react';
+import { createContext } from 'react';
 
 /**
- * The Logitech page's device switcher (G502 X PLUS / G915 X / G560). A Logitech device page shows
- * it at the right of its own tab row, so the Logitech page has one row of tabs, not two; null when
- * the page is open on its own.
+ * True for a Logitech device page shown inside the Logitech page: that page's own tab row picks the
+ * device, so the device page leaves out its header and shows all its sections one under the other.
  */
-export const DeviceSwitcherContext = createContext<ReactNode>(null);
+export const InLogitechHub = createContext(false);

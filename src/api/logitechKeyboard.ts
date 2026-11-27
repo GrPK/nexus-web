@@ -42,6 +42,8 @@ export interface KeyboardState {
   enabled?: boolean | null;
   /** Whether Nexus has written its layers to this keyboard yet. */
   written: boolean;
+  /** When the user last saved a copy of the assignments in Nexus (ISO time); null when there is none. */
+  savedAt?: string | null;
   layers: KeyboardLayers;
 }
 
@@ -61,6 +63,12 @@ export const setKeyboardLayers = (layers: KeyboardLayers) => putService<Keyboard
 
 /** Writes the kept layers again, after another app changed the keyboard. */
 export const rewriteKeyboard = () => postService<KeyboardState>(`${BASE}/rewrite`, {});
+
+/** Saves a copy of the current assignments in Nexus. */
+export const saveKeyboardCopy = () => postService<KeyboardState>(`${BASE}/copy/save`, {});
+
+/** Makes the saved copy current again and writes it to the keyboard. */
+export const restoreKeyboardCopy = () => postService<KeyboardState>(`${BASE}/copy/restore`, {});
 
 export const setKeyboardEnabled = (enabled: boolean) => postService<KeyboardState>(`${BASE}/enabled`, { enabled });
 
