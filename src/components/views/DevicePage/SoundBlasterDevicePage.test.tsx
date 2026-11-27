@@ -90,7 +90,9 @@ describe('SoundBlasterDevicePage', () => {
 
   it('holds the effects under a veil while Scout Mode is on, with a way out', async () => {
     await mount(state({ scout: true, sbx: false }));
-    expect(screen.getByRole('switch', { name: `${P}crystalizer` })).toBeDisabled();
+    // Under the veil the effects are hidden from assistive tech as well as disabled.
+    expect(screen.getByRole('switch', { name: `${P}crystalizer`, hidden: true })).toBeDisabled();
+    expect(screen.queryByRole('switch', { name: `${P}crystalizer` })).toBeNull();
     expect(screen.getByRole('switch', { name: `${P}scout` })).toBeChecked();
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: `${P}scoutOff` })); });
     expect(api.setSoundBlasterScout).toHaveBeenCalledWith(false);
