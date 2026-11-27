@@ -65,9 +65,9 @@ describe('SoundBlasterDevicePage', () => {
     expect(screen.queryByRole('tab')).toBeNull();
   });
 
-  it('shows the device name and what it holds', async () => {
+  it('shows what the device holds and its firmware', async () => {
     await mount(state());
-    expect(screen.getByText('Creative Sound Blaster G8')).toBeInTheDocument();
+    expect(screen.getByText(`${P}firmware:{"version":"1.0.240911.1010"}`)).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: `${P}sbx` })).toBeChecked();
     expect(screen.getByRole('switch', { name: `${P}crystalizer` })).toBeChecked();
     expect(screen.getByRole('switch', { name: `${P}surround` })).not.toBeChecked();
