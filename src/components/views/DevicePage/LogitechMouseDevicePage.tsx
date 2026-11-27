@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Gauge, Keyboard, ListOrdered, Mouse, MousePointer2, Music, Pencil, RotateCcw, Sparkles, Undo2 } from 'lucide-react';
 import {
-  restoreMouseProfile, setMouseActiveProfile, setMouseKeepOnboard, setMouseMode, setMouseProfileCycle, updateMouseProfile,
-  type MacroStep, type MouseButton, type MouseProfile, type MouseProfilePatch, type MouseState,
+  fetchMouseLive, restoreMouseProfile, setMouseActiveProfile, setMouseKeepOnboard, setMouseMode, setMouseProfileCycle, updateMouseProfile,
+  type MacroStep, type MouseButton, type MouseLive, type MouseProfile, type MouseProfilePatch, type MouseState,
 } from '../../../api/logitechMouse';
 import { useTranslation } from '../../../lib/i18n';
 import { Button } from '../../common/Button/Button';
@@ -36,6 +36,8 @@ const TABS: readonly { key: Tab; icon: ReactNode }[] = [
 ];
 // The DPI up and down buttons (slots) with their names, lit on the sensitivity page.
 const DPI_BUTTONS: readonly { slot: number; key: string }[] = [{ slot: 9, key: 'dpiUp' }, { slot: 10, key: 'dpiDown' }];
+// How often the sensitivity tab asks the mouse which DPI level it uses (the DPI buttons change it).
+const LIVE_MS = 400;
 // How long an assigned button's callout keeps its flash.
 const FLASH_MS = 1200;
 const ARROW = '→';
@@ -315,8 +317,31 @@ function AssignmentsTab({ state, profile, change, busy }: ProfileProps) {
   );
 }
 
+/** What the mouse uses right now, asked every LIVE_MS while mounted; null until the first answer. */
+function useMouseLive(): MouseLive | null {
+  const [live, setLive] = useState<MouseLive | null>(null);
+  useEffect(() => {
+    const stop = new AbortController();
+    let timer = 0;
+    const ask = () => {
+      fetchMouseLive(stop.signal)
+        .then(next => {
+          if (stop.signal.aborted || !next) return;
+          setLive(prev => (prev && prev.present === next.present && prev.activeProfile === next.activeProfile && prev.dpiIndex === next.dpiIndex ? prev : next));
+        })
+        .catch(() => undefined)
+        .finally(() => { if (!stop.signal.aborted) timer = window.setTimeout(ask, LIVE_MS); });
+    };
+    ask();
+    return () => { stop.abort(); window.clearTimeout(timer); };
+  }, []);
+  return live;
+}
+
 function SensitivityTab({ state, profile, change, busy }: ProfileProps) {
   const { t } = useTranslation();
+  const live = useMouseLive();
+  const activeIndex = live?.present && live.activeProfile === profile.number ? live.dpiIndex ?? null : null;
   return (
     <div className={styles.sensitivity}>
       <div className={styles.sensHead}>
@@ -351,8 +376,16 @@ function SensitivityTab({ state, profile, change, busy }: ProfileProps) {
           add: t(`${P}addLevel`),
           isDefault: t(`${P}defaultLevel`),
           isShift: t(`${P}shiftLevel`),
+          active: t(`${P}active`),
         }}
-        visual={selected => <MouseMini lit={DPI_BUTTONS.map(b => ({ slot: b.slot, text: t(`${P}special.${b.key}`) }))} pulse={selected} />}
+        activeIndex={activeIndex}
+        visual={(selected, bump) => (
+          <MouseMini
+            lit={DPI_BUTTONS.map(b => ({ slot: b.slot, text: t(`${P}special.${b.key}`) }))}
+            pulse={selected}
+            press={bump ? { slot: DPI_BUTTONS[bump.up ? 0 : 1].slot, n: bump.n } : null}
+          />
+        )}
         onCommit={c => { void change(() => updateMouseProfile(profile.number, c)); }}
       />
     </div>

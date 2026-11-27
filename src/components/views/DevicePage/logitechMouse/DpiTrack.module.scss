@@ -286,6 +286,46 @@ $rail: 0.25rem;
   transition: none;
 }
 
+// The level the mouse uses right now: its own green mark on the orb, the card and the readout.
+.liveIcon {
+  color: var(--good);
+}
+
+.liveTag {
+  position: absolute;
+  top: -0.55rem;
+  right: -0.55rem;
+  display: grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 1.5px solid var(--good);
+  border-radius: var(--radius-pill);
+  background: #0d1210;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--good) 55%, transparent);
+}
+
+.knob.live {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--good) 70%, transparent), 0 4px 12px rgb(0 0 0 / 0.5);
+}
+
+.knob.live.selected {
+  box-shadow: 0 0 0 0.3rem var(--accent-soft), 0 0 0 calc(0.3rem + 2px) color-mix(in srgb, var(--good) 70%, transparent), 0 0 22px var(--accent-glow-shadow);
+}
+
+.card.live {
+  box-shadow: inset 0 2px 0 var(--good);
+}
+
+.card.live.selected {
+  box-shadow: inset 0 2px 0 var(--good), 0 0 0 var(--border-width) var(--accent), 0 12px 30px var(--accent-glow-shadow);
+}
+
+.liveBadge {
+  border-color: color-mix(in srgb, var(--good) 60%, transparent);
+  color: var(--good);
+}
+
 .star {
   color: var(--warn);
   fill: currentColor;
@@ -413,6 +453,10 @@ $rail: 0.25rem;
   .knob.selected::after {
     animation: knob-ripple calc(var(--ease-slow) * 6) ease-out infinite;
   }
+
+  .liveTag {
+    animation: live-beat calc(var(--ease-slow) * 5) ease-in-out infinite;
+  }
 }
 
 @keyframes readout-in {
@@ -425,6 +469,16 @@ $rail: 0.25rem;
     opacity: 1;
     translate: 0 0;
     filter: blur(0);
+  }
+}
+
+@keyframes live-beat {
+  0%,
+  100% {
+    box-shadow: 0 0 6px color-mix(in srgb, var(--good) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 14px color-mix(in srgb, var(--good) 80%, transparent);
   }
 }
 

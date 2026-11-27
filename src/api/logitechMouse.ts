@@ -91,6 +91,17 @@ const BASE = '/devices/logitech-mouse';
 
 export const fetchMouse = (signal?: AbortSignal) => fetchService<MouseState>(BASE, signal);
 
+/** What the mouse uses right now, read from it on each call: its profile and DPI level. */
+export interface MouseLive {
+  present: boolean;
+  /** Number of the profile it uses (1-based); null when unknown. */
+  activeProfile?: number | null;
+  /** Index of the DPI level it uses in that profile's list (0-based); null when unknown. */
+  dpiIndex?: number | null;
+}
+
+export const fetchMouseLive = (signal?: AbortSignal) => fetchService<MouseLive>(`${BASE}/live`, signal);
+
 /** URL of the picture of the mouse kept in its Nexus folder. */
 export function mousePictureUrl(): string {
   const base = resolveHttp(`${BASE}/picture`);

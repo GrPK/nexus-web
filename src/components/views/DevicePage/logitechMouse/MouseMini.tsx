@@ -14,10 +14,12 @@ export interface MouseMiniProps {
   lit: readonly { slot: number; text: string }[];
   /** Changes when the glow should flash again (a new level picked). */
   pulse: string | number;
+  /** A button just pressed on the mouse (slot), flashed harder; n changes on every press. */
+  press?: { slot: number; n: number } | null;
 }
 
 /** The mouse's top view, small, with a few buttons glowing and named (the DPI buttons on the sensitivity page). */
-export function MouseMini({ lit, pulse }: MouseMiniProps) {
+export function MouseMini({ lit, pulse, press = null }: MouseMiniProps) {
   const uid = useId().replace(/:/g, '');
   const id = (name: string) => `mm-${uid}-${name}`;
   const art = ART.top;
@@ -30,7 +32,11 @@ export function MouseMini({ lit, pulse }: MouseMiniProps) {
     <svg className={styles.mini} viewBox={`${art.x - LABEL_ROOM} ${art.y} ${art.width + LABEL_ROOM} ${art.height}`} aria-hidden>
       <TopArt id={id} url={name => `url(#${id(name)})`} link={name => `#${id(name)}`} />
       {spots.map(h => (
-        <path key={`${h.slot}-${pulse}`} className={styles.lit} d={h.region} />
+        <path
+          key={`${h.slot}-${pulse}-${press?.slot === h.slot ? press.n : 0}`}
+          className={`${styles.lit} ${press?.slot === h.slot ? styles.litPress : ''}`}
+          d={h.region}
+        />
       ))}
       {spots.map(h => (
         <g key={`l${h.slot}`}>

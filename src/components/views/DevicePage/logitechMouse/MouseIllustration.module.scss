@@ -246,6 +246,12 @@
     animation: lit-flash calc(var(--ease-slow) * 4) ease-out;
   }
 
+  .lit.litPress {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: lit-press calc(var(--ease-slow) * 3) ease-out;
+  }
+
   .region.flash {
     animation: region-flash calc(var(--ease-slow) * 3) ease-out;
   }
@@ -287,6 +293,22 @@
     filter: drop-shadow(0 0 14px var(--accent-glow));
   }
   100% {
+    filter: drop-shadow(0 0 6px var(--accent-glow-shadow));
+  }
+}
+
+@keyframes lit-press {
+  0% {
+    fill: #fff;
+    transform: scale(0.9);
+    filter: drop-shadow(0 0 18px var(--accent-glow));
+  }
+  40% {
+    fill: var(--accent-glow);
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
     filter: drop-shadow(0 0 6px var(--accent-glow-shadow));
   }
 }

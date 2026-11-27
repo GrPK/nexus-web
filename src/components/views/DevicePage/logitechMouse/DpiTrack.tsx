@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { Crosshair, Plus, Star, Trash2 } from 'lucide-react';
+import { Activity, Crosshair, Plus, Star, Trash2 } from 'lucide-react';
 import { Button } from '../../../common/Button/Button';
 import styles from './DpiTrack.module.scss';
 
@@ -79,6 +79,14 @@ export interface DpiTrackLabels {
   add: string;
   isDefault: string;
   isShift: string;
+  /** The level the mouse uses right now ("In use"). */
+  active: string;
+}
+
+/** The DPI buttons moved the mouse to another level: up or down, and a count to replay the flash. */
+export interface DpiBump {
+  up: boolean;
+  n: number;
 }
 
 export interface DpiTrackProps {
@@ -87,8 +95,10 @@ export interface DpiTrackProps {
   shiftDpiIndex: number;
   busy: boolean;
   labels: DpiTrackLabels;
-  /** Drawn beside the big readout (the mouse with its DPI buttons lit); gets the selected level. */
-  visual?: (selected: number) => ReactNode;
+  /** The level the mouse uses right now (its DPI buttons change it); null when unknown. */
+  activeIndex?: number | null;
+  /** Drawn beside the big readout (the mouse with its DPI buttons lit); gets the selected level and the last button press. */
+  visual?: (selected: number, bump: DpiBump | null) => ReactNode;
   onCommit: (change: DpiChange) => void;
 }
 
@@ -100,12 +110,14 @@ export interface DpiTrackProps {
  * Last, a card per level in the order the DPI buttons step through them, and one to add a level. A
  * drag only writes to the mouse when it ends.
  */
-export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, visual, onCommit }: DpiTrackProps) {
+export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, activeIndex = null, visual, onCommit }: DpiTrackProps) {
   const track = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [drag, setDrag] = useState<{ index: number; value: number } | null>(null);
   const [selected, setSelected] = useState(defaultDpiIndex);
   const [draft, setDraft] = useState<string | null>(null);
+  const [bump, setBump] = useState<DpiBump | null>(null);
+  const lastActive = useRef<number | null>(null);
   const levels = dpi.map((v, i) => (drag?.index === i ? drag.value : v));
   const order = levels.map((v, i) => ({ v, i })).filter(l => l.v > 0).sort((a, b) => a.v - b.v);
   const labelX = new Map<number, number>();
@@ -116,6 +128,15 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, vi
   const used = dpi.filter(v => v > 0).length;
   const highest = Math.max(DPI_MIN, ...levels);
   useEffect(() => { setDraft(null); }, [selected, dpi]);
+  // The DPI buttons moved the mouse to another level: show that level, and flash the button pressed.
+  useEffect(() => {
+    if (activeIndex === null) return;
+    const prev = lastActive.current;
+    lastActive.current = activeIndex;
+    if (prev === activeIndex) return;
+    if (!drag && draft === null) setSelected(activeIndex);
+    if (prev !== null) setBump(b => ({ up: activeIndex > prev, n: (b?.n ?? 0) + 1 }));
+  }, [activeIndex, drag, draft]);
   useEffect(() => { if (selected >= used) setSelected(Math.max(0, used - 1)); }, [selected, used]);
   useEffect(() => {
     const el = track.current;
@@ -182,18 +203,21 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, vi
   };
   const readout = draft ?? String(dpi[selected] ?? '');
   const state = (i: number) =>
-    `${selected === i ? styles.selected : ''} ${drag?.index === i ? styles.dragging : ''}`;
+    `${selected === i ? styles.selected : ''} ${drag?.index === i ? styles.dragging : ''} ${activeIndex === i ? styles.live : ''}`;
+  const liveMark = (i: number, size: number) =>
+    activeIndex === i ? <Activity size={size} className={styles.liveIcon} aria-label={labels.active} /> : null;
   const marks = (i: number) => (
     <>
       {defaultDpiIndex === i && <Star size={12} className={styles.star} aria-label={labels.isDefault} />}
       {shiftDpiIndex === i && <Crosshair size={12} className={styles.shift} aria-label={labels.isShift} />}
+      {liveMark(i, 13)}
     </>
   );
 
   return (
     <div className={styles.wrap}>
       <div className={styles.hero}>
-        {visual && <div className={styles.visual}>{visual(selected)}</div>}
+        {visual && <div className={styles.visual}>{visual(selected, bump)}</div>}
         <div className={styles.readout}>
           <span className={styles.kicker}>{labels.level(selected + 1)}</span>
           <div key={selected} className={styles.bigRow}>
@@ -218,6 +242,7 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, vi
             <span className={styles.unit}>{labels.unit}</span>
           </div>
           <div className={styles.badges}>
+            {activeIndex === selected && <span className={`${styles.badge} ${styles.liveBadge}`}><Activity size={13} className={styles.liveIcon} />{labels.active}</span>}
             {defaultDpiIndex === selected && <span className={styles.badge}><Star size={13} className={styles.star} />{labels.isDefault}</span>}
             {shiftDpiIndex === selected && <span className={styles.badge}><Crosshair size={13} className={styles.shift} />{labels.isShift}</span>}
           </div>
@@ -281,6 +306,7 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, vi
             onClick={() => setSelected(i)}
           >
             {i + 1}
+            {activeIndex === i && <span className={styles.liveTag} aria-hidden>{liveMark(i, 10)}</span>}
           </button>
         ))}
       </div>

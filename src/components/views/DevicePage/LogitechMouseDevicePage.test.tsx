@@ -14,6 +14,7 @@ vi.mock('../../../lib/i18n', () => ({
 
 const api = vi.hoisted(() => ({
   fetchMouse: vi.fn(),
+  fetchMouseLive: vi.fn(() => Promise.resolve({ present: true, activeProfile: 1, dpiIndex: 0 })),
   updateMouseProfile: vi.fn(),
   restoreMouseProfile: vi.fn(),
   setMouseActiveProfile: vi.fn(),
@@ -132,6 +133,17 @@ describe('LogitechMouseDevicePage', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     await settle();
     expect(api.updateMouseProfile).toHaveBeenCalledWith(1, { dpi: [1500, 2000, 2200, 2500, 3000], defaultDpiIndex: 2, shiftDpiIndex: 2 });
+  });
+
+  it('marks the DPI level the mouse uses and shows it when the DPI buttons change it', async () => {
+    api.fetchMouseLive.mockResolvedValue({ present: true, activeProfile: 1, dpiIndex: 3 });
+    await mount(state());
+    fireEvent.click(screen.getByText(`${P}tab.sensitivity`));
+    await settle();
+    await settle();
+    expect((screen.getByLabelText(`${P}dpiValue`) as HTMLInputElement).value).toBe('2500');
+    expect(screen.getAllByLabelText(`${P}active`).length).toBeGreaterThan(0);
+    api.fetchMouseLive.mockResolvedValue({ present: true, activeProfile: 1, dpiIndex: 0 });
   });
 
   it('normalizes DPI levels: ascending, zeros last, start and shift levels follow their values', () => {
