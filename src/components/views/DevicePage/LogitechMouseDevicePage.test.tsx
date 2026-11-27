@@ -17,6 +17,8 @@ const api = vi.hoisted(() => ({
   fetchMouseLive: vi.fn(() => Promise.resolve({ present: true, activeProfile: 1, dpiIndex: 0 })),
   updateMouseProfile: vi.fn(),
   restoreMouseProfile: vi.fn(),
+  saveMouseCopy: vi.fn(),
+  restoreMouseCopy: vi.fn(),
   setMouseActiveProfile: vi.fn(),
   setMouseMode: vi.fn(),
   setMouseProfileCycle: vi.fn(),
@@ -200,11 +202,33 @@ describe('LogitechMouseDevicePage', () => {
     ] }] });
   });
 
-  it('restores a profile from its backup', async () => {
+  it('restores a profile from its backup, in the card under the mouse', async () => {
     api.restoreMouseProfile.mockResolvedValue(state());
     await mount(state());
-    fireEvent.click(screen.getByText(`${P}restore`));
+    fireEvent.click(screen.getByText(`${P}copy.original:{"n":"1"}`));
     await settle();
     expect(api.restoreMouseProfile).toHaveBeenCalledWith(1);
+  });
+
+  it('saves a copy in Nexus and restores it once there is one', async () => {
+    api.saveMouseCopy.mockResolvedValue(state({ savedAt: '2026-11-28T10:00:00Z' }));
+    await mount(state());
+    expect(screen.getByText(`${P}copy.none`)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `${P}copy.restore` })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: `${P}copy.save` }));
+    await settle();
+    expect(api.saveMouseCopy).toHaveBeenCalled();
+    api.restoreMouseCopy.mockResolvedValue(state({ savedAt: '2026-11-28T10:00:00Z' }));
+    fireEvent.click(screen.getByRole('button', { name: `${P}copy.restore` }));
+    await settle();
+    expect(api.restoreMouseCopy).toHaveBeenCalled();
+  });
+
+  it('keeps the onboard memory switch in its own card', async () => {
+    api.setMouseKeepOnboard.mockResolvedValue(state({ keepOnboard: false }));
+    await mount(state({ keepOnboard: true }));
+    fireEvent.click(screen.getByRole('switch', { name: `${P}keepOnboard` }));
+    await settle();
+    expect(api.setMouseKeepOnboard).toHaveBeenCalledWith(false);
   });
 });

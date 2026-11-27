@@ -1706,7 +1706,6 @@
   "devices.logitechMouse.reportRate": "Frecuence di rapuart",
   "devices.logitechMouse.reportRateHint": "Trop dispès che il mouse al dîs al PC dulà che al è.",
   "devices.logitechMouse.resetButton": "Torne al predefinît",
-  "devices.logitechMouse.restore": "Torne a la origjin",
   "devices.logitechMouse.setDefault": "Partìs di chi",
   "devices.logitechMouse.setShift": "Dopre pal DPI Shift",
   "devices.logitechMouse.shiftLevel": "Nivel dal DPI Shift",
@@ -6970,5 +6969,13 @@
   "welcome.startWithOs.description": "Otimizât par sta in esecuzion come servizi in sotfont.",
   "welcome.startWithOs.label": "Invie cul to PC",
   "welcome.tagline": "Control unificât dal computer",
-  "welcome.title": "Benvignûts in Nexus"
+  "welcome.title": "Benvignûts in Nexus",
+  "devices.logitechMouse.copy.title": "Copie in Nexus",
+  "devices.logitechMouse.copy.savedAt": "Salvade: {time}",
+  "devices.logitechMouse.copy.none": "Nissune copie salvade ancjemò",
+  "devices.logitechMouse.copy.save": "Salve la configurazion atuâl",
+  "devices.logitechMouse.copy.restore": "Ripristine",
+  "devices.logitechMouse.copy.hint": "Cuant che tu la salvis, Nexus al ten une copie dai profîi te memorie dal mouse. Se une altre aplicazion o un reset a cambiin il mouse, torne a meti la copie. Al ven tignût ancje l'origjinâl di ogni profîl, di prime de prime modifiche di Nexus.",
+  "devices.logitechMouse.copy.original": "Profîl {n} come prime di Nexus",
+  "devices.logitechMouse.keepOnboardHint": "Il mouse al dopre i profîi te sô memorie, duncje a funzionin cence aplicazions viertis. Se une altre aplicazion lu passe al control software, Nexus lu torne a meti (no intant che G HUB al è in vore)."
 }

@@ -1,7 +1,7 @@
 import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Keyboard, ListOrdered, Mouse, MousePointer2, Music, Pencil, RotateCcw, Sparkles, Target, Undo2 } from 'lucide-react';
+import { History, Keyboard, ListOrdered, Mouse, MousePointer2, Music, Pencil, RotateCcw, Save, Sparkles, Target, Undo2 } from 'lucide-react';
 import {
-  fetchMouseLive, restoreMouseProfile, setMouseActiveProfile, setMouseKeepOnboard, setMouseMode, setMouseProfileCycle, updateMouseProfile,
+  fetchMouseLive, restoreMouseCopy, restoreMouseProfile, saveMouseCopy, setMouseActiveProfile, setMouseKeepOnboard, setMouseMode, setMouseProfileCycle, updateMouseProfile,
   type MacroStep, type MouseButton, type MouseLive, type MouseProfile, type MouseProfilePatch, type MouseState,
 } from '../../../api/logitechMouse';
 import { useTranslation } from '../../../lib/i18n';
@@ -442,21 +442,50 @@ function ProfileBar({ state, profile, change, busy, onPick }: ProfileProps & { o
         />
       </div>
       {busy && <Spinner size={16} />}
-      {profile.canRestore && (
-        <Button size="sm" tone="ghost" icon={<RotateCcw size={14} />} disabled={busy} onClick={() => { void change(() => restoreMouseProfile(profile.number)); }}>
-          {t(`${P}restore`)}
-        </Button>
-      )}
-      <label className={styles.cycle}>
+    </div>
+  );
+}
+
+/** Under the mouse, as on the keyboard page: the copy kept in Nexus, and whether Nexus keeps the mouse on its memory. */
+function MouseMemoryCards({ state, profile, change, busy }: ProfileProps) {
+  const { t, language } = useTranslation();
+  const savedAt = state.savedAt ? new Date(state.savedAt) : null;
+  return (
+    <div className={styles.memoryCards}>
+      <section className={styles.copyCard}>
+        <div className={styles.copyText}>
+          <span className={styles.copyTitle}>{t(`${P}copy.title`)}</span>
+          <span className={styles.copyHint}>{t(`${P}copy.hint`)}</span>
+          <span className={styles.copySaved}>
+            {savedAt ? t(`${P}copy.savedAt`, { time: savedAt.toLocaleString(language) }) : t(`${P}copy.none`)}
+          </span>
+        </div>
+        <div className={styles.copyActions}>
+          <Button size="sm" icon={<Save size={14} />} disabled={busy} onClick={() => { void change(() => saveMouseCopy()); }}>
+            {t(`${P}copy.save`)}
+          </Button>
+          <Button size="sm" tone="ghost" icon={<RotateCcw size={14} />} disabled={busy || !savedAt} onClick={() => { void change(() => restoreMouseCopy()); }}>
+            {t(`${P}copy.restore`)}
+          </Button>
+          {profile.canRestore && (
+            <Button size="sm" tone="ghost" icon={<History size={14} />} disabled={busy} onClick={() => { void change(() => restoreMouseProfile(profile.number)); }}>
+              {t(`${P}copy.original`, { n: String(profile.number) })}
+            </Button>
+          )}
+        </div>
+      </section>
+      <section className={styles.copyCard}>
+        <div className={styles.copyText}>
+          <span className={styles.copyTitle}>{t(`${P}keepOnboard`)}</span>
+          <span className={styles.copyHint}>{t(`${P}keepOnboardHint`)}</span>
+        </div>
         <Toggle
-          size="sm"
           checked={state.keepOnboard === true}
           disabled={busy}
           ariaLabel={t(`${P}keepOnboard`)}
           onChange={next => { void change(() => setMouseKeepOnboard(next)); }}
         />
-        <span>{t(`${P}keepOnboard`)}</span>
-      </label>
+      </section>
     </div>
   );
 }
@@ -517,6 +546,7 @@ export function LogitechMouseDevicePage() {
                   : <SensitivityTab state={state} profile={profile} change={change} busy={busy} />}
               </div>
             )}
+            <MouseMemoryCards state={state} profile={profile} change={change} busy={busy} />
           </>
         )}
       </div>

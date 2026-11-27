@@ -62,6 +62,8 @@ export interface MouseState {
   mode?: 'onboard' | 'host';
   /** Nexus puts the mouse back on its onboard memory when another app switches it to host mode (not while G HUB runs). */
   keepOnboard?: boolean;
+  /** When a copy of the profiles was last saved in Nexus (UTC ISO); absent when there is none. */
+  savedAt?: string | null;
   /** A picture of the mouse kept in its Nexus folder; null when there is none. */
   picture?: MousePicture | null;
   activeProfile?: number;
@@ -126,3 +128,9 @@ export const setMouseProfileCycle = (profile: number, enabled: boolean) =>
 export const setMouseMode = (mode: 'onboard' | 'host') => postService<MouseState>(`${BASE}/mode`, { mode });
 
 export const setMouseKeepOnboard = (enabled: boolean) => postService<MouseState>(`${BASE}/keep-onboard`, { enabled });
+
+/** Keeps every profile as the mouse holds it now. */
+export const saveMouseCopy = () => postService<MouseState>(`${BASE}/copy/save`, {});
+
+/** Writes the profiles saved with saveMouseCopy back into the mouse. */
+export const restoreMouseCopy = () => postService<MouseState>(`${BASE}/copy/restore`, {});

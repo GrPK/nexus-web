@@ -1706,7 +1706,6 @@
   "devices.logitechMouse.reportRate": "Report rate",
   "devices.logitechMouse.reportRateHint": "How often the mouse tells the PC where it is.",
   "devices.logitechMouse.resetButton": "Reset to default",
-  "devices.logitechMouse.restore": "Restore original",
   "devices.logitechMouse.setDefault": "Start here",
   "devices.logitechMouse.setShift": "Use for DPI shift",
   "devices.logitechMouse.shiftLevel": "DPI shift level",
@@ -6970,5 +6969,13 @@
   "welcome.startWithOs.description": "Optimized to run as a background service.",
   "welcome.startWithOs.label": "Start with your PC",
   "welcome.tagline": "Unified Computer Control",
-  "welcome.title": "Welcome to Nexus"
+  "welcome.title": "Welcome to Nexus",
+  "devices.logitechMouse.copy.title": "Copy in Nexus",
+  "devices.logitechMouse.copy.savedAt": "Saved {time}",
+  "devices.logitechMouse.copy.none": "No copy saved yet",
+  "devices.logitechMouse.copy.save": "Save current configuration",
+  "devices.logitechMouse.copy.restore": "Restore",
+  "devices.logitechMouse.copy.hint": "Nexus keeps a copy of the profiles in the mouse's memory when you save one. If another app or a reset changes the mouse, restore the copy. Each profile's original, from before Nexus first changed it, is kept too.",
+  "devices.logitechMouse.copy.original": "Profile {n} as before Nexus",
+  "devices.logitechMouse.keepOnboardHint": "The mouse runs the profiles in its own memory, so they work with no app open. If another app switches it to software control, Nexus switches it back (not while G HUB is running)."
 }

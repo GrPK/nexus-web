@@ -1706,7 +1706,6 @@
   "devices.logitechMouse.reportRate": "Rapportagesnelheid",
   "devices.logitechMouse.reportRateHint": "Hoe vaak de muis zijn positie aan de pc doorgeeft.",
   "devices.logitechMouse.resetButton": "Standaard herstellen",
-  "devices.logitechMouse.restore": "Origineel herstellen",
   "devices.logitechMouse.setDefault": "Hier beginnen",
   "devices.logitechMouse.setShift": "Gebruiken voor DPI-shift",
   "devices.logitechMouse.shiftLevel": "DPI-shiftniveau",
@@ -6970,5 +6969,13 @@
   "welcome.startWithOs.description": "Geoptimaliseerd om als achtergrondservice te draaien.",
   "welcome.startWithOs.label": "Starten met je pc",
   "welcome.tagline": "Verenigde computerbediening",
-  "welcome.title": "Welkom bij Nexus"
+  "welcome.title": "Welkom bij Nexus",
+  "devices.logitechMouse.copy.title": "Kopie in Nexus",
+  "devices.logitechMouse.copy.savedAt": "Opgeslagen: {time}",
+  "devices.logitechMouse.copy.none": "Nog geen kopie opgeslagen",
+  "devices.logitechMouse.copy.save": "Huidige configuratie opslaan",
+  "devices.logitechMouse.copy.restore": "Terugzetten",
+  "devices.logitechMouse.copy.hint": "Nexus bewaart een kopie van de profielen in het geheugen van de muis als je er een opslaat. Verandert een andere app of een reset de muis, zet dan de kopie terug. Het origineel van elk profiel, van voor de eerste wijziging door Nexus, blijft ook bewaard.",
+  "devices.logitechMouse.copy.original": "Profiel {n} zoals voor Nexus",
+  "devices.logitechMouse.keepOnboardHint": "De muis gebruikt de profielen in zijn eigen geheugen, dus ze werken zonder open app. Zet een andere app hem op softwarebesturing, dan zet Nexus hem terug (niet terwijl G HUB draait)."
 }

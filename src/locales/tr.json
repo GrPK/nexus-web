@@ -1706,7 +1706,6 @@
   "devices.logitechMouse.reportRate": "Raporlama hızı",
   "devices.logitechMouse.reportRateHint": "Farenin konumunu bilgisayara ne sıklıkla bildirdiği.",
   "devices.logitechMouse.resetButton": "Varsayılana sıfırla",
-  "devices.logitechMouse.restore": "Orijinali geri yükle",
   "devices.logitechMouse.setDefault": "Buradan başla",
   "devices.logitechMouse.setShift": "DPI Shift için kullan",
   "devices.logitechMouse.shiftLevel": "DPI Shift seviyesi",
@@ -6970,5 +6969,13 @@
   "welcome.startWithOs.description": "Arka planda hizmet olarak çalışacak şekilde optimize edilmiştir.",
   "welcome.startWithOs.label": "Bilgisayarınızla başlat",
   "welcome.tagline": "Birleşik bilgisayar kontrolü",
-  "welcome.title": "Nexus'a hoş geldiniz"
+  "welcome.title": "Nexus'a hoş geldiniz",
+  "devices.logitechMouse.copy.title": "Nexus'taki kopya",
+  "devices.logitechMouse.copy.savedAt": "Kaydedildi: {time}",
+  "devices.logitechMouse.copy.none": "Henüz kaydedilmiş kopya yok",
+  "devices.logitechMouse.copy.save": "Geçerli yapılandırmayı kaydet",
+  "devices.logitechMouse.copy.restore": "Geri yükle",
+  "devices.logitechMouse.copy.hint": "Kaydettiğinizde Nexus, faredeki profillerin bir kopyasını tutar. Başka bir uygulama ya da sıfırlama fareyi değiştirirse kopyayı geri yükleyin. Her profilin Nexus'un ilk değişikliğinden önceki orijinali de saklanır.",
+  "devices.logitechMouse.copy.original": "Profil {n}, Nexus'tan önceki hâli",
+  "devices.logitechMouse.keepOnboardHint": "Fare kendi belleğindeki profilleri kullanır, bu yüzden açık uygulama olmadan çalışır. Başka bir uygulama onu yazılım kontrolüne geçirirse Nexus geri alır (G HUB çalışırken değil)."
 }

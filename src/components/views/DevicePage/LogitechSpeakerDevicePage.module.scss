@@ -38,3 +38,10 @@
   flex-direction: column;
   gap: var(--space-lg);
 }
+
+// Test all and Reset, side by side on one line.
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}

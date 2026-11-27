@@ -258,3 +258,51 @@
     transform: none;
   }
 }
+
+// Under the mouse, as on the keyboard page: the copy kept in Nexus and the onboard memory switch, each its own card.
+.memoryCards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.copyCard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.copyText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-width: 46rem;
+}
+
+.copyTitle {
+  @include text-label;
+  color: var(--text);
+}
+
+.copyHint,
+.copySaved {
+  @include text-caption;
+  color: var(--text-dim);
+}
+
+.copySaved {
+  color: var(--text);
+}
+
+.copyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}

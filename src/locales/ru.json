@@ -1715,7 +1715,6 @@
   "devices.logitechMouse.reportRate": "Частота опроса",
   "devices.logitechMouse.reportRateHint": "Как часто мышь сообщает ПК своё положение.",
   "devices.logitechMouse.resetButton": "Сбросить",
-  "devices.logitechMouse.restore": "Восстановить исходный",
   "devices.logitechMouse.setDefault": "Начинать здесь",
   "devices.logitechMouse.setShift": "Для DPI Shift",
   "devices.logitechMouse.shiftLevel": "Уровень DPI Shift",
@@ -7027,5 +7026,13 @@
   "welcome.startWithOs.description": "Оптимизировано для работы в фоновом режиме как служба.",
   "welcome.startWithOs.label": "Запускать вместе с ПК",
   "welcome.tagline": "Единое управление компьютером",
-  "welcome.title": "Добро пожаловать в Nexus"
+  "welcome.title": "Добро пожаловать в Nexus",
+  "devices.logitechMouse.copy.title": "Копия в Nexus",
+  "devices.logitechMouse.copy.savedAt": "Сохранено: {time}",
+  "devices.logitechMouse.copy.none": "Копия ещё не сохранена",
+  "devices.logitechMouse.copy.save": "Сохранить текущую конфигурацию",
+  "devices.logitechMouse.copy.restore": "Восстановить",
+  "devices.logitechMouse.copy.hint": "Nexus сохраняет копию профилей из памяти мыши, когда вы её сохраняете. Если другая программа или сброс изменят мышь, восстановите копию. Оригинал каждого профиля, до первого изменения Nexus, тоже хранится.",
+  "devices.logitechMouse.copy.original": "Профиль {n} как до Nexus",
+  "devices.logitechMouse.keepOnboardHint": "Мышь использует профили из собственной памяти, поэтому они работают без открытых программ. Если другая программа переключит её на программное управление, Nexus вернёт её обратно (не при запущенном G HUB)."
 }
