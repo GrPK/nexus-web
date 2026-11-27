@@ -129,7 +129,10 @@ import { HydroShift2CurveHeadSettings } from './HydroShift2CurveHeadSettings';
 import { HydroShift2CurveSettings } from './HydroShift2CurveSettings';
 import { AsusGlacialLcdControls } from './AsusGlacialLcdDevicePage';
 import { useHydroShift2CurveScreen } from './useHydroShift2CurveScreen';
+import { LianLiScreen88Settings } from './LianLiScreen88Settings';
+import { useLianLiScreen88Screen } from './useLianLiScreen88Screen';
 import { hydroShift2CurveMediaPreviewUrl } from '../../../api/hydroshift2Curve';
+import { lianLiScreen88MediaPreviewUrl } from '../../../api/lianliScreen88';
 import { useFirmwareStatus } from '../../../hooks/useFirmwareStatus';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { Button } from '../../common/Button/Button';
@@ -557,9 +560,12 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
   const isCorsairLinkLcdPanel = recordFamily === 'corsair-link-lcd' && !isSimulated;
   const isHydroShift2Panel = recordFamily === 'lianli-hydroshift2' && !isSimulated;
   const isHydroShift2CurvePanel = recordFamily === 'lianli-hydroshift2-curve' && !isSimulated;
+  // The Universal Screen 8.8: its screen options are the service's own, set from this page's settings tab.
+  const isScreen88Panel = recordFamily === 'lianli-screen88' && !isSimulated;
   const isGlacialLcdPanel = recordFamily === 'asus-glacial-lcd' && !isSimulated;
   const isGalahad2LcdPanel = recordFamily === 'lianli-galahad2-lcd' && !isSimulated;
   const curveScreen = useHydroShift2CurveScreen(isHydroShift2CurvePanel);
+  const screen88Screen = useLianLiScreen88Screen(isScreen88Panel);
   // Cooler LCDs whose firmware takes a backlight command. The service decides
   // which those are and stamps the capability on the record, so a new dimmable
   // model needs no edit here. The setting lives on the record, so it rides the
@@ -637,6 +643,29 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
   // renders, so the immersive-on-load toggle offers exactly the immersive views
   // the device can actually open.
   const previewLandscape = !!previewCanvas && previewCanvas.width > previewCanvas.height;
+  // An orientation change that crosses portrait/landscape restacks the page (a landscape
+  // strip docks its preview under the options, a portrait one sits beside them), and the
+  // settings reflow at the new width; left alone, the scroller keeps its old offset and the
+  // view lands somewhere else, often at the bottom. The Mounting section, where the change
+  // was made, is held at the same place on screen instead.
+  const tabContentRef = useRef<HTMLDivElement | null>(null);
+  const mountingRef = useRef<HTMLDivElement | null>(null);
+  const mountingOffsetRef = useRef<number | null>(null);
+  const holdMountingInView = () => {
+    const scroller = tabContentRef.current;
+    const mounting = mountingRef.current;
+    mountingOffsetRef.current = scroller && mounting
+      ? mounting.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+      : null;
+  };
+  useLayoutEffect(() => {
+    const offset = mountingOffsetRef.current;
+    const scroller = tabContentRef.current;
+    const mounting = mountingRef.current;
+    mountingOffsetRef.current = null;
+    if (offset === null || !scroller || !mounting) return;
+    scroller.scrollTop += mounting.getBoundingClientRect().top - scroller.getBoundingClientRect().top - offset;
+  }, [previewLandscape, dockPreview]);
   const settingsAvailable = supportsDisplayControls || supportsAutoLaunch || ddcSupported
     || monitorRotation || monitorReserve || isMonitorPanel
     // The Xeneon Edge's native settings replace DDC brightness for this
@@ -657,7 +686,8 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
     || isSecondaryMonitorCapablePanel
     || hasFrameRateSetting
     || isGlacialLcdPanel
-    || isGalahad2LcdPanel;
+    || isGalahad2LcdPanel
+    || isScreen88Panel;
   const activeTab: Tab = tab === 'settings' && !settingsAvailable ? 'widgets' : tab;
   // Theme and layout read and write the panel record for simulators and hardware alike;
   // a simulator has no display or cooler, so its hardware controls are off.
@@ -1686,7 +1716,7 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
               </PanelGaugeGradientProvider>
             ) : (
               <>
-                <div className={`${styles.tabContent}${activeTab === 'widgets' ? ` ${styles.tabContentCatalog}` : ''}`}>
+                <div ref={tabContentRef} className={`${styles.tabContent}${activeTab === 'widgets' ? ` ${styles.tabContentCatalog}` : ''}`}>
                   {activeTab === 'widgets' && (
                     <>
                       <div className={styles.catalogHost}>
@@ -2089,7 +2119,7 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                       (its own section below), so the software rotation would double-apply. */}
                   {activeTab === 'settings' && (supportsMountOrientation || recordSupportsPortrait)
                     && !isSimulated && !isCorsairLinkLcdPanel && (
-                    <div className={styles.settingsContent}>
+                    <div ref={mountingRef} className={styles.settingsContent}>
                       <SettingsSection title={t('devices.lcd.mounting')} boxClassName={styles.deviceSettingsBox}>
                         {recordSupportedRotations.length > 1 && (
                           <SettingSelect
@@ -2100,18 +2130,36 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                               if (next === undefined) return;
                               const seq = ++rotationSeqRef.current;
                               const previous = confirmedRotationRef.current;
+                              const crosses = rotationCrossesClass(previous, next);
+                              if (crosses) holdMountingInView();
                               setRecordRotation(next);
+                              // The 8.8 turns on the press: its preview and its videos' aspect follow at once,
+                              // and the service's answer settles them.
+                              if (isScreen88Panel) {
+                                if (crosses) setLiveCanvas(c => (c ? { width: c.height, height: c.width } : c));
+                                const portrait = next === 90 || next === 270;
+                                screen88Screen.assume({ videoPortrait: portrait, videoWidth: portrait ? 480 : 1920, videoHeight: portrait ? 1920 : 480 });
+                              }
                               const id = device?.panelRecordId;
                               if (!id) return;
+                              const undo = () => {
+                                if (seq !== rotationSeqRef.current) return;
+                                setRecordRotation(confirmedRotationRef.current);
+                                if (isScreen88Panel) {
+                                  if (crosses) refetchDeviceRecord();
+                                  void screen88Screen.refresh();
+                                }
+                              };
                               void patchPanelDevice(id, { rotation: next })
                                 .then(r => {
                                   if (r) {
                                     confirmedRotationRef.current = next;
                                     // The service keeps a layout per orientation class, so crossing one reads the other slot and the new render size.
-                                    if (rotationCrossesClass(previous, next)) refetchDeviceRecord();
-                                  } else if (seq === rotationSeqRef.current) setRecordRotation(confirmedRotationRef.current);
+                                    if (crosses) refetchDeviceRecord();
+                                    if (isScreen88Panel) void screen88Screen.refresh();
+                                  } else undo();
                                 })
-                                .catch(() => { if (seq === rotationSeqRef.current) setRecordRotation(confirmedRotationRef.current); });
+                                .catch(undo);
                             }}
                             options={rotationOptions(recordSupportedRotations)}
                           />
@@ -2171,10 +2219,17 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                       <HydroShift2RingSettings onSectionNavigate={onSectionNavigate} />
                     </div>
                   )}
+                  {/* The Curve's edge LEDs are on the Lian Li page's Lighting tab, its pump option on Cooling. */}
                   {activeTab === 'settings' && isHydroShift2CurvePanel && (
                     <div className={styles.settingsContent}>
                       <HydroShift2CurveHeadSettings />
                       <HydroShift2CurveSettings screen={curveScreen} />
+                    </div>
+                  )}
+                  {/* The 8.8's bezel LEDs are set on the Lian Li page's Lighting tab, like every other Lian Li light. */}
+                  {activeTab === 'settings' && isScreen88Panel && (
+                    <div className={styles.settingsContent}>
+                      <LianLiScreen88Settings screen={screen88Screen} />
                     </div>
                   )}
                   {activeTab === 'settings' && isGlacialLcdPanel && (
@@ -2360,6 +2415,19 @@ export function PanelDevicePage({ device, platform = '', onOpenFirmware, onSecti
                   key={curveScreen.playingClip}
                   className={styles.curveVideoPreview}
                   src={hydroShift2CurveMediaPreviewUrl(curveScreen.playingClip)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  aria-hidden="true"
+                />
+              )}
+              {/* The 8.8's preview follows its mount: 4:1, or 1:4 turned a quarter. */}
+              {isScreen88Panel && screen88Screen.playingClip && (
+                <video
+                  key={`${screen88Screen.playingClip}:${screen88Screen.settings?.videoPortrait === true}`}
+                  className={screen88Screen.settings?.videoPortrait ? styles.screen88VideoPreviewPortrait : styles.screen88VideoPreview}
+                  src={lianLiScreen88MediaPreviewUrl(screen88Screen.playingClip, screen88Screen.settings?.videoPortrait === true)}
                   autoPlay
                   loop
                   muted

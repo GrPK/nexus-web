@@ -79,7 +79,7 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
     const options = (await screen.findAllByRole('option')).map(o => o.textContent);
     // Per zone leads, set apart from the effects by a rule that is not an option.
     expect(options).toEqual(['devices.lianli-flex.modePerZone', 'devices.lianliEffect.rainbow', 'devices.lianliEffect.static', 'devices.lianliEffect.meteor']);
-    expect(screen.queryByText('devices.lianli-flex.zoneUp')).not.toBeInTheDocument();
+    expect(screen.queryByText('devices.lianli-wireless.halfRight')).not.toBeInTheDocument();
   });
 
   it('picking Per zone saves the mode', async () => {
@@ -89,14 +89,18 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
     expect(mockSet).toHaveBeenCalledWith('AA11', { mode: 'perZone', effectMode: undefined });
   });
 
-  it('TL Per zone lists Up and Down, each with its own effect, and saves one zone at a time', async () => {
+  it('TL Per zone lists the left half, then the right half, each with its own effect, and saves one zone at a time', async () => {
     await renderTab([{ ...tlUnit, mode: 'perZone' }]);
-    expect(screen.getByText('devices.lianli-flex.zoneUp')).toBeInTheDocument();
-    expect(screen.getByText('devices.lianli-flex.zoneDown')).toBeInTheDocument();
-    // The chain's own Mode, then Up's, then Down's.
+    const left = screen.getByText('devices.lianli-wireless.halfLeft');
+    expect(left.compareDocumentPosition(screen.getByText('devices.lianli-wireless.halfRight')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('devices.lianli-flex.zoneUp')).not.toBeInTheDocument();
+    // The chain's own Mode, then the left half's ("down"), then the right half's ("up").
     fireEvent.click(screen.getAllByLabelText('devices.lianli.lightingMode')[1]);
     fireEvent.click(await screen.findByRole('option', { name: 'devices.lianliEffect.static' }));
-    expect(mockSet).toHaveBeenCalledWith('AA11', { zones: [{ id: 'up', mode: 'static' }], effectMode: undefined });
+    expect(mockSet).toHaveBeenCalledWith('AA11', { zones: [{ id: 'down', mode: 'static' }], effectMode: undefined });
+    fireEvent.click(screen.getAllByLabelText('devices.lianli.lightingMode')[2]);
+    fireEvent.click(await screen.findByRole('option', { name: 'devices.lianliEffect.meteor' }));
+    expect(mockSet).toHaveBeenCalledWith('AA11', { zones: [{ id: 'up', mode: 'meteor' }], effectMode: undefined });
   });
 
   it('SL-INF Per zone lists Blades, Inner and Outer', async () => {
@@ -105,11 +109,12 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
       expect(screen.getByText(`devices.lianli-flex.zone${z}`)).toBeInTheDocument();
     }
     expect(screen.queryByText(/zoneUp/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/halfRight/)).not.toBeInTheDocument();
   });
 
-  it('shows the up and down swap on a TL unit only and saves it', async () => {
+  it('shows the left and right swap on a TL unit only and saves it', async () => {
     await renderTab([tlUnit, slInfUnit]);
-    const swaps = screen.getAllByRole('switch', { name: 'devices.lianli-flex.upDownSwap' });
+    const swaps = screen.getAllByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' });
     expect(swaps).toHaveLength(1);
     fireEvent.click(swaps[0]);
     expect(mockSet).toHaveBeenCalledWith('AA11', { upDownSwap: true, effectMode: undefined });
@@ -169,7 +174,7 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
     await renderTab([wirelessChain, { ...wirelessChain, mac: 'CC33' }], { get: api.get, set: api.set });
     expect(screen.queryByText('devices.lianli-flex.resetLighting')).not.toBeInTheDocument();
     expect(screen.queryByText('devices.lianli-flex.lightSequence')).not.toBeInTheDocument();
-    expect(screen.queryByRole('switch', { name: 'devices.lianli-flex.upDownSwap' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' })).not.toBeInTheDocument();
     fireEvent.click(screen.getAllByLabelText('devices.lianli.lightingMode')[0]);
     expect((await screen.findAllByRole('option')).map(o => o.textContent)).not.toContain('devices.lianli-flex.modePerZone');
   });
@@ -236,9 +241,9 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
     await renderTab([{ ...tlUnit, mode: 'perZone' }]);
     const order = [
       screen.getAllByLabelText('devices.lianli.lightingMode')[0],
-      screen.getByText('devices.lianli-flex.zoneUp'),
-      screen.getByText('devices.lianli-flex.zoneDown'),
-      screen.getByText('devices.lianli-flex.upDownSwap'),
+      screen.getByText('devices.lianli-wireless.halfLeft'),
+      screen.getByText('devices.lianli-wireless.halfRight'),
+      screen.getByText('devices.lianli-wireless.leftRightSwap'),
       screen.getByText('devices.lianli-flex.resetLighting'),
     ];
     order.slice(1).forEach((el, i) => {
@@ -285,7 +290,7 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
     for (const select of screen.getAllByLabelText('devices.lianli.lightingMode')) expect(select).toBeDisabled();
     for (const merge of screen.getAllByRole('switch', { name: 'devices.lianli-wireless.merge' })) expect(merge).toBeDisabled();
     for (const sw of screen.getAllByRole('switch', { name: 'devices.lightingPage.use' })) expect(sw).toBeDisabled();
-    expect(screen.getByRole('switch', { name: 'devices.lianli-flex.upDownSwap' })).not.toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' })).not.toBeDisabled();
     expect(screen.getAllByRole('button', { name: 'devices.lianli-wireless.orderMoveRight' })[0]).not.toBeDisabled();
   });
 
@@ -297,7 +302,7 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
 
   it('keeps swap enabled while the Lighting page controls the fan', async () => {
     await renderTab([{ ...tlUnit, mode: 'custom', effectMode: 'rainbow' }]);
-    expect(screen.getByRole('switch', { name: 'devices.lianli-flex.upDownSwap' })).not.toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' })).not.toBeDisabled();
   });
 
   it('says no unit leads for an empty mergeLeaderMac, with no Follows row', async () => {
@@ -331,11 +336,11 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
     mockGet.mockResolvedValue({ laneModes: [], chains: [tlUnit] });
     await act(async () => { render(<LianLiWirelessLightingTab api={api} onSettled={written} />); });
     expect(mockGet).toHaveBeenCalledTimes(1);
-    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-flex.upDownSwap' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' })); });
     expect(mockGet).toHaveBeenCalledTimes(2);
     expect(written).toHaveBeenCalledTimes(1);
     mockSet.mockResolvedValue(false);
-    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-flex.upDownSwap' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' })); });
     expect(mockGet).toHaveBeenCalledTimes(3);
     expect(written).toHaveBeenCalledTimes(2);
   });
@@ -410,7 +415,7 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
 
     describe('a write the service never answers', () => {
       const HOLD = 10001;
-      const swapSwitch = () => screen.getByRole('switch', { name: 'devices.lianli-flex.upDownSwap' });
+      const swapSwitch = () => screen.getByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' });
 
       async function setup() {
         vi.useFakeTimers();
@@ -428,11 +433,11 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
           await act(async () => { fireEvent.click(swapSwitch()); });
           mockGet.mockResolvedValue({ laneModes: [], chains: [{ ...tl, mode: 'perZone' }] });
           await act(async () => { window.dispatchEvent(new Event('focus')); });
-          expect(screen.queryByText('devices.lianli-flex.zoneUp')).not.toBeInTheDocument();
+          expect(screen.queryByText('devices.lianli-wireless.halfRight')).not.toBeInTheDocument();
           expect(settled).not.toHaveBeenCalled();
           await act(async () => { await vi.advanceTimersByTimeAsync(HOLD); });
           expect(settled).toHaveBeenCalledTimes(1);
-          expect(screen.getByText('devices.lianli-flex.zoneUp')).toBeInTheDocument();
+          expect(screen.getByText('devices.lianli-wireless.halfRight')).toBeInTheDocument();
         } finally {
           vi.useRealTimers();
         }
@@ -449,11 +454,11 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
           // The second write is held: a read answered meanwhile is dropped.
           mockGet.mockResolvedValue({ laneModes: [], chains: [{ ...tl, mode: 'perZone' }] });
           await act(async () => { window.dispatchEvent(new Event('focus')); });
-          expect(screen.queryByText('devices.lianli-flex.zoneUp')).not.toBeInTheDocument();
+          expect(screen.queryByText('devices.lianli-wireless.halfRight')).not.toBeInTheDocument();
           await act(async () => { writes[1](); });
           expect(mockGet.mock.calls.length).toBe(reads + 2);
           expect(settled).toHaveBeenCalledTimes(2);
-          expect(screen.getByText('devices.lianli-flex.zoneUp')).toBeInTheDocument();
+          expect(screen.getByText('devices.lianli-wireless.halfRight')).toBeInTheDocument();
         } finally {
           vi.useRealTimers();
         }
@@ -505,9 +510,9 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
           await act(async () => { fireEvent.click(swapSwitch()); });
           mockGet.mockResolvedValue({ laneModes: [], chains: [{ ...tl, mode: 'perZone' }] });
           await act(async () => { window.dispatchEvent(new Event('focus')); });
-          expect(screen.queryByText('devices.lianli-flex.zoneUp')).not.toBeInTheDocument();
+          expect(screen.queryByText('devices.lianli-wireless.halfRight')).not.toBeInTheDocument();
           await act(async () => { writes[1](); });
-          expect(screen.getByText('devices.lianli-flex.zoneUp')).toBeInTheDocument();
+          expect(screen.getByText('devices.lianli-wireless.halfRight')).toBeInTheDocument();
         } finally {
           vi.useRealTimers();
         }
@@ -519,7 +524,7 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
       beforeEach(() => { unhandled.mockClear(); process.on('unhandledRejection', unhandled); });
       afterEach(() => { process.off('unhandledRejection', unhandled); });
       const swap = async (settled: () => void) => {
-        await act(async () => { fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-flex.upDownSwap' })); });
+        await act(async () => { fireEvent.click(screen.getByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' })); });
         await waitFor(() => expect(settled).toHaveBeenCalledTimes(1));
       };
 
@@ -551,10 +556,10 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
     mockGet.mockResolvedValue({ laneModes: [], chains: [{ ...tlUnit, mode: 'perZone' }] });
     const view = render(<LianLiWirelessLightingTab api={api} reloadSignal={0} />);
     await act(async () => {});
-    expect(screen.getByText('devices.lianli-flex.zoneUp')).toBeInTheDocument();
+    expect(screen.getByText('devices.lianli-wireless.halfRight')).toBeInTheDocument();
     mockGet.mockResolvedValue({ laneModes: [], chains: [{ ...tlUnit, mode: 'rainbow' }] });
     await act(async () => { view.rerender(<LianLiWirelessLightingTab api={api} reloadSignal={1} />); });
-    expect(screen.queryByText('devices.lianli-flex.zoneUp')).not.toBeInTheDocument();
+    expect(screen.queryByText('devices.lianli-wireless.halfRight')).not.toBeInTheDocument();
     expect(screen.getByLabelText('devices.lianli.lightingMode')).toHaveTextContent('devices.lianliEffect.rainbow');
   });
 
@@ -614,7 +619,7 @@ describe('LianLiWirelessLightingTab with the wired LCD Flex api', () => {
       await renderTab([{ ...tlUnit, argbCableConnected: true, motherboardArgb: true }]);
       expect(screen.getByLabelText('devices.lianli.lightingMode')).toBeDisabled();
       expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
-      expect(screen.getByRole('switch', { name: 'devices.lianli-flex.upDownSwap' })).toBeDisabled();
+      expect(screen.getByRole('switch', { name: 'devices.lianli-wireless.leftRightSwap' })).toBeDisabled();
       expect(screen.getByRole('switch', { name: 'devices.lianli-wireless.merge' })).toBeDisabled();
     });
   });

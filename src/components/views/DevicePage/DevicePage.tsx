@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Eye, Unplug } from 'lucide-react';
-import { useUnifiedDevices, controlGateIsPanel, claimsKey, type UnifiedDevice } from '../../../hooks/useUnifiedDevices';
+import {
+  useUnifiedDevices, controlGateIsPanel, claimsKey, groupMembers, isLianLiMemberId, LIANLI_GROUP, LIANLI_HUB_KEY, type UnifiedDevice,
+} from '../../../hooks/useUnifiedDevices';
 import { ViewHeader } from '../../common/ViewHeader/ViewHeader';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { ServiceRequired } from '../ServiceRequired';
@@ -15,7 +17,11 @@ import { CnvsDevicePage } from './CnvsDevicePage';
 import { SdkMarketplacePage } from '../../../panel/widgets/marketplace/SdkMarketplacePage';
 import { typeForMarketplace } from '../../../widgets/marketplaceRegistry';
 import { LianLiTlDevicePage } from './LianLiTlDevicePage';
-import { LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
+import { LianLiFanScreensPage, LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
+import { lianLiFanScreensOf, lianLiFanScreensTitle, lianLiScreenTitle, useLianLiFanScreenCount } from './lianliFanScreens';
+import { LianLiHubPage } from './LianLiHubPage';
+import { LianLiScreen88PageGate } from './LianLiScreen88Settings';
+import { LIANLI_SCREEN88_ID, LIANLI_SCREEN88_NAME } from '../../../api/lianliScreen88';
 import { Galahad2DevicePage } from './Galahad2DevicePage';
 import { AsiahorseUmbraDevicePage } from './AsiahorseUmbraDevicePage';
 import { AsusGlacialLcdDevicePage } from './AsusGlacialLcdDevicePage';
@@ -92,11 +98,25 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
   const { unified, controlDevice, turnedOffMonitorKeys } = useUnifiedDevices(serviceOnline);
   // A connected cooler LCD's panel row replaces its curated row, so a page
   // opened on the curated key shows the panel in place.
+  // A unit's fan screens page (from the Lian Li page's Screens tab) stands on the unit's own row.
+  const fanScreens = lianLiFanScreensOf(deviceKey);
   const device = useMemo<UnifiedDevice | undefined>(
-    () => unified.find(d => d.key === deviceKey) ?? unified.find(d => claimsKey(d, deviceKey)),
-    [unified, deviceKey],
+    () => (fanScreens !== null
+      ? unified.find(d => d.curatedId === (fanScreens ? 'lianli-flex' : 'lianli-wireless'))
+      : unified.find(d => d.key === deviceKey) ?? unified.find(d => claimsKey(d, deviceKey))),
+    [unified, deviceKey, fanScreens],
   );
-  const title = device?.shortName;
+  // A Lian Li screen's page and a unit's fan screens page carry the title of the Lian Li page's card.
+  const fanScreenCount = useLianLiFanScreenCount(fanScreens === true, fanScreens !== null);
+  const title = fanScreens !== null
+    ? (device ? lianLiFanScreensTitle(t, fanScreens, device.shortName === 'Lian Li P28 V2', fanScreenCount) : undefined)
+    : device?.kind === 'panel' && isLianLiMemberId(device.curatedId) ? lianLiScreenTitle(t, device.shortName) : device?.shortName;
+  // The 8.8's page stays its page when its panel row leaves the list (the glass turned into a
+  // Windows display), so the settings route, not the list, decides what it shows.
+  const screen88KeyRef = useRef<string | null>(null);
+  if (device?.curatedId === LIANLI_SCREEN88_ID) screen88KeyRef.current = deviceKey;
+  const isScreen88Page = deviceKey === `curated-${LIANLI_SCREEN88_ID}` || device?.curatedId === LIANLI_SCREEN88_ID
+    || screen88KeyRef.current === deviceKey;
   useEffect(() => { onTitleChange?.(deviceKey, title); }, [onTitleChange, deviceKey, title]);
 
   // The device appearing in `unified` re-renders and dispatches immediately,
@@ -151,7 +171,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
   }
 
   if (notConnected) {
-    return (
+    const notConnectedView = (
       <div className={styles.page}>
         <ViewHeader title={t('devices.page.title')} />
         {graceElapsed && (
@@ -161,6 +181,11 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
         )}
       </div>
     );
+    // The 8.8 in its own Windows display mode may list no panel, yet it is not unplugged.
+    if (isScreen88Page) {
+      return <LianLiScreen88PageGate key={deviceKey} name={device?.shortName ?? LIANLI_SCREEN88_NAME} fallback={notConnectedView} />;
+    }
+    return notConnectedView;
   }
 
   // When the user turns Nexus Control off, the device's settings are
@@ -220,7 +245,7 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
       )}
       <div className={holdBody ? styles.bodyHeld : styles.bodyShown}>
         <DeviceDetectingContext.Provider value={reportWaiting}>
-          <DeviceBody device={device} controlDevice={controlDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />
+          <DeviceBody device={device} fanScreens={fanScreens} unified={unified} controlDevice={controlDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />
         </DeviceDetectingContext.Provider>
       </div>
     </>
@@ -229,15 +254,39 @@ export function DevicePage({ deviceKey, serviceOnline, connectionState, platform
 
 interface DeviceBodyProps {
   device: UnifiedDevice;
+  /** The unit's fan screens page rather than the unit's own (true for the Flex hub's), or null. */
+  fanScreens?: boolean | null;
+  /** Every listed device, for a group entry's page. */
+  unified: readonly UnifiedDevice[];
   controlDevice: (id: string, nextEnabled: boolean) => Promise<unknown>;
   platform: string;
   onOpenFirmware?: () => void;
   onSectionNavigate?: DashboardSectionNavigate;
 }
 
-function DeviceBody({ device, controlDevice, platform, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
+function DeviceBody({ device, fanScreens = null, unified, controlDevice, platform, onOpenFirmware, onSectionNavigate }: DeviceBodyProps) {
+  if (fanScreens !== null) {
+    return <LianLiFanScreensPage key={`fan-screens-${device.key}`} flex={fanScreens} onSectionNavigate={onSectionNavigate} />;
+  }
+
+  if (device.key === LIANLI_HUB_KEY) {
+    return <LianLiHubPage key={device.key} members={groupMembers(unified, LIANLI_GROUP)} controlDevice={controlDevice} onSectionNavigate={onSectionNavigate} />;
+  }
+
   if (device.kind === 'panel' && device.panelDevice && device.curatedId === 'asus-glacial-lcd') {
     return <GlacialPanelRoute key={device.key} device={device.panelDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />;
+  }
+
+  // The 8.8's panel page gives way to its Windows display view as soon as the settings route says so,
+  // even while the list still shows the panel.
+  if (device.kind === 'panel' && device.panelDevice && device.curatedId === LIANLI_SCREEN88_ID) {
+    return (
+      <LianLiScreen88PageGate
+        key={device.key}
+        name={device.shortName}
+        fallback={<PanelDevicePage device={device.panelDevice} platform={platform} onOpenFirmware={onOpenFirmware} onSectionNavigate={onSectionNavigate} />}
+      />
+    );
   }
 
   if (device.kind === 'panel' && device.panelDevice) {
@@ -311,12 +360,14 @@ function DeviceBody({ device, controlDevice, platform, onOpenFirmware, onSection
     return <KrakenDevicePage key={device.key} onSectionNavigate={onSectionNavigate} />;
   }
 
+  // Opened from the Lian Li page, which holds their lighting, screens and cooling,
+  // the L-Wireless and Flex pages show only their connection and wireless devices.
   if (device.curatedId === 'lianli-wireless') {
-    return <LianLiWirelessDevicePage key={device.key} onSectionNavigate={onSectionNavigate} />;
+    return <LianLiWirelessDevicePage key={device.key} onSectionNavigate={onSectionNavigate} devicesOnly={device.groupKey === LIANLI_GROUP} />;
   }
 
   if (device.curatedId === 'lianli-flex') {
-    return <LianLiWirelessDevicePage key={device.key} flex onSectionNavigate={onSectionNavigate} />;
+    return <LianLiWirelessDevicePage key={device.key} flex onSectionNavigate={onSectionNavigate} devicesOnly={device.groupKey === LIANLI_GROUP} />;
   }
 
   if (device.curatedId === 'strimer') {
@@ -346,7 +397,12 @@ function DeviceBody({ device, controlDevice, platform, onOpenFirmware, onSection
     );
   }
 
-  return <PanelNotConnected name={device.shortName} deviceKey={device.key} warning={device.warning} />;
+  const panelNotConnected = <PanelNotConnected name={device.shortName} deviceKey={device.key} warning={device.warning} />;
+  // The 8.8's glass in its own Windows display mode: no panel, but no "not connected" either.
+  if (device.curatedId === LIANLI_SCREEN88_ID) {
+    return <LianLiScreen88PageGate key={device.key} name={device.shortName} fallback={panelNotConnected} />;
+  }
+  return panelNotConnected;
 }
 
 /** A screen whose page is its panel (a cooler LCD, a Q-series), before that panel connects. */

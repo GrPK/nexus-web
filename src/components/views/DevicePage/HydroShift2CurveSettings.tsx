@@ -29,7 +29,27 @@ interface CropTarget {
   file: File;
 }
 
-/** The HydroShift II Curved screen (Nexus panel or an uploaded video), screen saver, clock and pump options. */
+/** The pump option: the pump follows the motherboard's pump header. It lives with the cooling only (the Lian Li page's Cooling tab). */
+export function HydroShift2CurvePumpSettings({ screen }: { screen: HydroShift2CurveScreen }) {
+  const { settings, write } = screen;
+  const { t } = useTranslation();
+  if (!settings || !settings.connected) return null;
+  return (
+    <SettingsSection title={t('devices.lianliCurve.pumpSection')}>
+      <SettingToggle
+        label={t('devices.lianliCurve.pumpFollowsMotherboard')}
+        description={t('devices.lianliCurve.pumpFollowsMotherboardHint')}
+        checked={settings.pumpFollowsMotherboard}
+        onChange={pumpFollowsMotherboard => { void write({ pumpFollowsMotherboard }); }}
+      />
+    </SettingsSection>
+  );
+}
+
+/**
+ * The HydroShift II Curved screen (Nexus panel or an uploaded video), screen saver and clock options.
+ * The pump option is HydroShift2CurvePumpSettings, shown with the cooling.
+ */
 export function HydroShift2CurveSettings({ screen }: { screen: HydroShift2CurveScreen }) {
   const { settings, write, previewBrightness, commitBrightness, refresh: refreshSettings } = screen;
   const { t } = useTranslation();
@@ -236,15 +256,6 @@ export function HydroShift2CurveSettings({ screen }: { screen: HydroShift2CurveS
             if (done) commitBrightness(v);
           }}
           onCommit={commitBrightness}
-        />
-      </SettingsSection>
-
-      <SettingsSection title={t('devices.lianliCurve.pumpSection')}>
-        <SettingToggle
-          label={t('devices.lianliCurve.pumpFollowsMotherboard')}
-          description={t('devices.lianliCurve.pumpFollowsMotherboardHint')}
-          checked={settings.pumpFollowsMotherboard}
-          onChange={pumpFollowsMotherboard => { void write({ pumpFollowsMotherboard }); }}
         />
       </SettingsSection>
 

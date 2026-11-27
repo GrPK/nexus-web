@@ -46,6 +46,13 @@ beforeEach(() => {
   mockSet.mockResolvedValue({});
 });
 
+/** The setting row an element sits in: its nearest ancestor that holds a switch. */
+function rowOf(el: HTMLElement): HTMLElement | null {
+  let n: HTMLElement | null = el;
+  while (n && !n.querySelector('[role="switch"]')) n = n.parentElement;
+  return n;
+}
+
 describe('HydroShift2RingSettings', () => {
   it('lists the pump head effects by their localized names', async () => {
     await renderSettings();
@@ -80,5 +87,110 @@ describe('HydroShift2RingSettings', () => {
     await renderSettings({ ...lighting, mode: 'canvas', effectMode: 'rainbow' });
     fireEvent.click(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
     expect(mockSet).toHaveBeenLastCalledWith({ mode: 'rainbow' });
+  });
+
+  it('reports whether the Lighting page drives it, once read and on a change', async () => {
+    const onLightingPage = vi.fn();
+    mockGet.mockResolvedValue(lighting);
+    await act(async () => {
+      render(<HydroShift2RingSettings onLightingPage={onLightingPage} />);
+    });
+    expect(onLightingPage).toHaveBeenLastCalledWith(false);
+    fireEvent.click(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
+    expect(onLightingPage).toHaveBeenLastCalledWith(true);
+  });
+
+  it('under Sync all locks its look and the Lighting page switch, and says it follows Sync all', async () => {
+    mockGet.mockResolvedValue(lighting);
+    await act(async () => {
+      render(<HydroShift2RingSettings syncedAll />);
+    });
+    // In the Lighting page row, as a pill; no row of its own.
+    expect(rowOf(screen.getByText('devices.lianli-hub.syncActive'))).toContainElement(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
+    expect(screen.getByRole('switch', { name: 'devices.lightingPage.use' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'devices.lianli.lightingMode' })).toBeDisabled();
+  });
+
+  it('under Sync all still lets the Lighting page switch go off', async () => {
+    mockGet.mockResolvedValue({ ...lighting, mode: 'canvas', effectMode: 'rainbow' });
+    await act(async () => {
+      render(<HydroShift2RingSettings syncedAll />);
+    });
+    const lightingPage = screen.getByRole('switch', { name: 'devices.lightingPage.use' });
+    expect(lightingPage).not.toBeDisabled();
+    fireEvent.click(lightingPage);
+    expect(mockSet).toHaveBeenLastCalledWith({ mode: 'rainbow' });
+  });
+});
+
+describe('HydroShift2RingSettings on the OLED Curved edge', () => {
+  const curveGet = vi.fn();
+  const curveSet = vi.fn();
+  const api = { get: curveGet, set: curveSet };
+  const edge: HydroShift2Lighting = {
+    mode: 'runway',
+    effectMode: 'runway',
+    speed: 3,
+    direction: 0,
+    brightness: 4,
+    maxLevel: 4,
+    colors: ['#111111'],
+    modes: [
+      { key: 'rainbow', colors: 0, hasDirection: true, hasSpeed: true, hasBrightness: true, defaultColors: [] },
+      { key: 'static', colors: 1, hasDirection: false, hasSpeed: false, hasBrightness: true, defaultColors: ['#ff0000'] },
+      {
+        key: 'runway', colors: 6, hasDirection: false, hasSpeed: true, hasBrightness: true,
+        defaultColors: ['#ff0000', '#ff8000', '#ffff00', '#00ff00', '#0000ff', '#8000ff'],
+      },
+    ],
+  };
+
+  async function renderEdge(data: HydroShift2Lighting = edge) {
+    curveGet.mockResolvedValue(data);
+    curveSet.mockResolvedValue({});
+    await act(async () => {
+      render(<HydroShift2RingSettings api={api} />);
+    });
+  }
+
+  it('reads and saves through the edge endpoints, not the pump ring', async () => {
+    await renderEdge();
+    expect(curveGet).toHaveBeenCalledTimes(1);
+    expect(mockGet).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText('devices.lianli.lightingMode'));
+    fireEvent.click(await screen.findByRole('option', { name: 'devices.lianliEffect.static' }));
+    expect(curveSet).toHaveBeenLastCalledWith({ mode: 'static' });
+    expect(mockSet).not.toHaveBeenCalled();
+  });
+
+  it('shows as many pickers as the effect uses, filled from its own defaults past the colours set', async () => {
+    await renderEdge();
+    const inputs = screen.getAllByLabelText('common.hexColor') as HTMLInputElement[];
+    expect(inputs.map(i => i.value.toLowerCase())).toEqual(['#111111', '#ff8000', '#ffff00', '#00ff00', '#0000ff', '#8000ff']);
+    expect(screen.queryByText('devices.lianli.lightingDirection')).not.toBeInTheDocument();
+  });
+
+  it('saves all six colours when one changes', async () => {
+    await renderEdge();
+    fireEvent.change(screen.getAllByLabelText('common.hexColor')[5], { target: { value: '#abcdef' } });
+    expect(curveSet).toHaveBeenLastCalledWith({ colors: ['#111111', '#ff8000', '#ffff00', '#00ff00', '#0000ff', '#abcdef'] });
+  });
+
+  it('an effect that draws its own colours shows no pickers', async () => {
+    await renderEdge({ ...edge, mode: 'rainbow', effectMode: 'rainbow' });
+    expect(screen.queryAllByLabelText('common.hexColor')).toHaveLength(0);
+    expect(screen.getByText('devices.lianli.lightingDirection')).toBeInTheDocument();
+  });
+
+  it('places the speed and brightness sliders on the levels the service reports', async () => {
+    await renderEdge({ ...edge, maxLevel: 2, speed: 1, brightness: 2 });
+    expect((screen.getByRole('slider', { name: 'devices.lianli.lightingSpeedAria' }) as HTMLInputElement).value).toBe('50');
+    expect((screen.getByRole('slider', { name: 'devices.lianli.lightingBrightnessAria' }) as HTMLInputElement).value).toBe('100');
+  });
+
+  it('follows the Lighting page with the canvas mode', async () => {
+    await renderEdge();
+    fireEvent.click(screen.getByRole('switch', { name: 'devices.lightingPage.use' }));
+    expect(curveSet).toHaveBeenLastCalledWith({ mode: 'canvas' });
   });
 });

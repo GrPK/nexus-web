@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { SettingSelect, SettingSlider } from '../../common/SettingRow/SettingRow';
 import { HsvPicker } from '../../common/HsvPicker/HsvPicker';
+import type { SelectOption } from '../../common/Select/Select';
 import type { LianLiWirelessLightingEffect } from '../../../api/lianli-wireless';
 import { useUnitPrefs } from '../../../hooks/useUiSettings';
 import { useTranslation } from '../../../lib/i18n';
@@ -28,8 +29,8 @@ export interface LianLiEffectValue {
 interface LianLiChainEffectControlsProps {
   modes: readonly LianLiWirelessLightingEffect[];
   value: LianLiEffectValue;
-  /** What the mode picker lists; the chain adds its own non-effect choices. */
-  modeOptions: { value: string; label: string }[];
+  /** What the mode picker lists; the chain adds its own non-effect choices, the sync bar its group headings. */
+  modeOptions: SelectOption[];
   /** The picker's selection, which is not the effect while a non-effect choice is made. */
   modeValue: string;
   disabled: boolean;

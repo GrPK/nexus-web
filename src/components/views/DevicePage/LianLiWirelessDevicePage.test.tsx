@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
+import { LianLiFanScreensPage, LianLiWirelessDevicePage } from './LianLiWirelessDevicePage';
 import { fanTypeKey, deviceTypeKey, isFanDevice } from './LianLiWirelessFansTab';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -180,6 +180,26 @@ describe('LianLiWirelessDevicePage', () => {
     expect(screen.getByText('devices.lianli-wireless.fanTypeSlv3Lcd')).toBeInTheDocument();
     expect(screen.queryByText('1,918 RPM')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /cooling\.title/ })).toBeInTheDocument();
+  });
+
+  it('opened from the Lian Li page it shows only the connection and the wireless devices, no tabs', async () => {
+    await act(async () => {
+      render(<LianLiWirelessDevicePage devicesOnly />);
+    });
+    expect(screen.getByText('devices.lianli-wireless.connectionSection')).toBeInTheDocument();
+    expect(screen.getByText('devices.lianli-wireless.fanTypeSlv3Lcd')).toBeInTheDocument();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /lighting\.title|cooling\.title/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('devices.lianli-wireless.selectionSection')).not.toBeInTheDocument();
+  });
+
+  it('the fan screens page holds the controller\'s screen settings alone, under its own title', async () => {
+    await act(async () => {
+      render(<LianLiFanScreensPage />);
+    });
+    expect(screen.getByText('devices.lianli-wireless.selectionSection')).toBeInTheDocument();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.queryByText('devices.lianli-wireless.connectionSection')).not.toBeInTheDocument();
   });
 
   it('drops a state read that was sent earlier but resolved after a newer one', async () => {

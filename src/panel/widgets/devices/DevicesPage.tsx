@@ -113,8 +113,9 @@ export function DevicesPage({ serviceOnline, connectionState, onDeviceSelect, ta
   }, [allUsb.devices]);
 
   // Alphabetical by the card label (shortName, the sidebar's name plus its brand), key breaking ties so the order holds across polls.
+  // A grouped device (a Lian Li part) is listed through its group's entry.
   const orderedDevices = useMemo(
-    () => [...unified].sort((a, b) =>
+    () => unified.filter(d => !d.groupKey).sort((a, b) =>
       a.shortName.localeCompare(b.shortName, undefined, { sensitivity: 'base', numeric: true })
       || a.key.localeCompare(b.key)),
     [unified],
@@ -350,7 +351,8 @@ function ConnectedDevicesModal({ open, onClose, devices, loading, onRefresh }: C
   );
 }
 
-function DeviceCard({
+/** One device row of the Devices list; the Lian Li page lists its devices with it too. */
+export function DeviceCard({
   device, icon, runningConflict, updateAvailable, onClick, onToggleControl, onFixLighting,
 }: {
   device: UnifiedDevice;
