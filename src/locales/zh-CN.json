@@ -1639,7 +1639,6 @@
   "devices.logitechMouse.reportRate": "回报率",
   "devices.logitechMouse.reportRateHint": "鼠标向电脑报告位置的频率。",
   "devices.logitechMouse.resetButton": "恢复默认",
-  "devices.logitechMouse.restore": "恢复原始设置",
   "devices.logitechMouse.setDefault": "从此档开始",
   "devices.logitechMouse.setShift": "用于 DPI 切换",
   "devices.logitechMouse.shiftLevel": "DPI 切换档位",
@@ -6844,5 +6843,13 @@
   "welcome.startWithOs.description": "已针对后台服务运行进行优化。",
   "welcome.startWithOs.label": "随电脑启动",
   "welcome.tagline": "统一电脑控制",
-  "welcome.title": "欢迎使用 Nexus"
+  "welcome.title": "欢迎使用 Nexus",
+  "devices.logitechMouse.copy.title": "Nexus 中的副本",
+  "devices.logitechMouse.copy.savedAt": "保存于 {time}",
+  "devices.logitechMouse.copy.none": "尚未保存副本",
+  "devices.logitechMouse.copy.save": "保存当前配置",
+  "devices.logitechMouse.copy.restore": "恢复",
+  "devices.logitechMouse.copy.hint": "保存时，Nexus 会保留鼠标内存中配置文件的副本。如果其他应用或重置改变了鼠标，请恢复副本。每个配置文件在 Nexus 首次更改前的原始版本也会保留。",
+  "devices.logitechMouse.copy.original": "Nexus 之前的配置文件 {n}",
+  "devices.logitechMouse.keepOnboardHint": "鼠标使用自身内存中的配置文件，因此不打开任何应用也能工作。如果其他应用将其切换为软件控制，Nexus 会切换回来（G HUB 运行时除外）。"
 }

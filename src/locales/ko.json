@@ -1639,7 +1639,6 @@
   "devices.logitechMouse.reportRate": "폴링 레이트",
   "devices.logitechMouse.reportRateHint": "마우스가 PC에 위치를 알리는 빈도입니다.",
   "devices.logitechMouse.resetButton": "기본값으로 재설정",
-  "devices.logitechMouse.restore": "원래대로 복원",
   "devices.logitechMouse.setDefault": "여기서 시작",
   "devices.logitechMouse.setShift": "DPI 시프트에 사용",
   "devices.logitechMouse.shiftLevel": "DPI 시프트 레벨",
@@ -6844,5 +6843,13 @@
   "welcome.startWithOs.description": "백그라운드 서비스로 실행되도록 최적화되어 있습니다.",
   "welcome.startWithOs.label": "PC와 함께 실행",
   "welcome.tagline": "통합 컴퓨터 제어",
-  "welcome.title": "Nexus에 오신 것을 환영합니다"
+  "welcome.title": "Nexus에 오신 것을 환영합니다",
+  "devices.logitechMouse.copy.title": "Nexus의 사본",
+  "devices.logitechMouse.copy.savedAt": "저장됨: {time}",
+  "devices.logitechMouse.copy.none": "아직 저장된 사본이 없습니다",
+  "devices.logitechMouse.copy.save": "현재 구성 저장",
+  "devices.logitechMouse.copy.restore": "복원",
+  "devices.logitechMouse.copy.hint": "저장하면 Nexus가 마우스 메모리에 있는 프로필의 사본을 보관합니다. 다른 앱이나 초기화로 마우스가 바뀌면 사본을 복원하세요. Nexus가 처음 바꾸기 전 각 프로필의 원본도 보관됩니다.",
+  "devices.logitechMouse.copy.original": "Nexus 이전의 프로필 {n}",
+  "devices.logitechMouse.keepOnboardHint": "마우스는 자체 메모리의 프로필로 동작하므로 앱을 열지 않아도 작동합니다. 다른 앱이 소프트웨어 제어로 바꾸면 Nexus가 되돌립니다(G HUB 실행 중에는 제외)."
 }

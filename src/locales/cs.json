@@ -1648,7 +1648,6 @@
   "devices.logitechMouse.reportRate": "Frekvence hlášení",
   "devices.logitechMouse.reportRateHint": "Jak často myš hlásí počítači svou polohu.",
   "devices.logitechMouse.resetButton": "Obnovit výchozí",
-  "devices.logitechMouse.restore": "Obnovit původní",
   "devices.logitechMouse.setDefault": "Začínat zde",
   "devices.logitechMouse.setShift": "Použít pro DPI Shift",
   "devices.logitechMouse.shiftLevel": "Úroveň DPI Shift",
@@ -6901,5 +6900,13 @@
   "welcome.startWithOs.description": "Optimalizováno pro běh jako služba na pozadí.",
   "welcome.startWithOs.label": "Spustit spolu s PC",
   "welcome.tagline": "Sjednocené ovládání počítače",
-  "welcome.title": "Vítejte v Nexusu"
+  "welcome.title": "Vítejte v Nexusu",
+  "devices.logitechMouse.copy.title": "Kopie v Nexusu",
+  "devices.logitechMouse.copy.savedAt": "Uloženo {time}",
+  "devices.logitechMouse.copy.none": "Zatím žádná uložená kopie",
+  "devices.logitechMouse.copy.save": "Uložit aktuální nastavení",
+  "devices.logitechMouse.copy.restore": "Obnovit",
+  "devices.logitechMouse.copy.hint": "Nexus si při uložení ponechá kopii profilů z paměti myši. Pokud myš změní jiná aplikace nebo reset, obnovte kopii. Zachová se i originál každého profilu z doby před první změnou od Nexusu.",
+  "devices.logitechMouse.copy.original": "Profil {n} jako před Nexusem",
+  "devices.logitechMouse.keepOnboardHint": "Myš používá profily ve vlastní paměti, takže fungují bez otevřené aplikace. Když ji jiná aplikace přepne na softwarové řízení, Nexus ji přepne zpět (ne když běží G HUB)."
 }

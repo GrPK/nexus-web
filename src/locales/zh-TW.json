@@ -1639,7 +1639,6 @@
   "devices.logitechMouse.reportRate": "回報率",
   "devices.logitechMouse.reportRateHint": "滑鼠向電腦回報位置的頻率。",
   "devices.logitechMouse.resetButton": "恢復預設",
-  "devices.logitechMouse.restore": "還原原始設定",
   "devices.logitechMouse.setDefault": "從此段開始",
   "devices.logitechMouse.setShift": "用於 DPI 切換",
   "devices.logitechMouse.shiftLevel": "DPI 切換段位",
@@ -6844,5 +6843,13 @@
   "welcome.startWithOs.description": "已針對背景服務執行進行最佳化。",
   "welcome.startWithOs.label": "隨電腦啟動",
   "welcome.tagline": "統一電腦控制",
-  "welcome.title": "歡迎使用 Nexus"
+  "welcome.title": "歡迎使用 Nexus",
+  "devices.logitechMouse.copy.title": "Nexus 中的副本",
+  "devices.logitechMouse.copy.savedAt": "儲存於 {time}",
+  "devices.logitechMouse.copy.none": "尚未儲存副本",
+  "devices.logitechMouse.copy.save": "儲存目前設定",
+  "devices.logitechMouse.copy.restore": "還原",
+  "devices.logitechMouse.copy.hint": "儲存時，Nexus 會保留滑鼠記憶體中設定檔的副本。如果其他應用程式或重設改變了滑鼠，請還原副本。每個設定檔在 Nexus 首次變更前的原始版本也會保留。",
+  "devices.logitechMouse.copy.original": "Nexus 之前的設定檔 {n}",
+  "devices.logitechMouse.keepOnboardHint": "滑鼠使用自身記憶體中的設定檔，因此不開啟任何應用程式也能運作。如果其他應用程式將其切換為軟體控制，Nexus 會切換回來（G HUB 執行時除外）。"
 }

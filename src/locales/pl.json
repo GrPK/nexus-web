@@ -1648,7 +1648,6 @@
   "devices.logitechMouse.reportRate": "Częstotliwość raportowania",
   "devices.logitechMouse.reportRateHint": "Jak często mysz przekazuje komputerowi swoją pozycję.",
   "devices.logitechMouse.resetButton": "Przywróć domyślne",
-  "devices.logitechMouse.restore": "Przywróć oryginał",
   "devices.logitechMouse.setDefault": "Zaczynaj tutaj",
   "devices.logitechMouse.setShift": "Użyj dla DPI Shift",
   "devices.logitechMouse.shiftLevel": "Poziom DPI Shift",
@@ -6901,5 +6900,13 @@
   "welcome.startWithOs.description": "Zoptymalizowany do działania jako usługa w tle.",
   "welcome.startWithOs.label": "Uruchamiaj z komputerem",
   "welcome.tagline": "Ujednolicone sterowanie komputerem",
-  "welcome.title": "Witamy w Nexus"
+  "welcome.title": "Witamy w Nexus",
+  "devices.logitechMouse.copy.title": "Kopia w Nexusie",
+  "devices.logitechMouse.copy.savedAt": "Zapisano: {time}",
+  "devices.logitechMouse.copy.none": "Nie zapisano jeszcze kopii",
+  "devices.logitechMouse.copy.save": "Zapisz bieżącą konfigurację",
+  "devices.logitechMouse.copy.restore": "Przywróć",
+  "devices.logitechMouse.copy.hint": "Nexus zachowuje kopię profili z pamięci myszy, gdy ją zapiszesz. Jeśli inna aplikacja lub reset zmieni mysz, przywróć kopię. Zachowany jest też oryginał każdego profilu sprzed pierwszej zmiany przez Nexus.",
+  "devices.logitechMouse.copy.original": "Profil {n} sprzed Nexus",
+  "devices.logitechMouse.keepOnboardHint": "Mysz używa profili z własnej pamięci, więc działają bez otwartej aplikacji. Jeśli inna aplikacja przełączy ją na sterowanie programowe, Nexus przełączy ją z powrotem (nie gdy działa G HUB)."
 }

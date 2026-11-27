@@ -1639,7 +1639,6 @@
   "devices.logitechMouse.reportRate": "レポートレート",
   "devices.logitechMouse.reportRateHint": "マウスが PC に位置を伝える頻度です。",
   "devices.logitechMouse.resetButton": "既定に戻す",
-  "devices.logitechMouse.restore": "元に戻す",
   "devices.logitechMouse.setDefault": "ここから開始",
   "devices.logitechMouse.setShift": "DPI シフトに使う",
   "devices.logitechMouse.shiftLevel": "DPI シフトのレベル",
@@ -6844,5 +6843,13 @@
   "welcome.startWithOs.description": "バックグラウンドサービスとして動作するように最適化されています。",
   "welcome.startWithOs.label": "PCと同時に起動",
   "welcome.tagline": "統合コンピューター制御",
-  "welcome.title": "Nexus へようこそ"
+  "welcome.title": "Nexus へようこそ",
+  "devices.logitechMouse.copy.title": "Nexus 内のコピー",
+  "devices.logitechMouse.copy.savedAt": "保存日時: {time}",
+  "devices.logitechMouse.copy.none": "まだコピーは保存されていません",
+  "devices.logitechMouse.copy.save": "現在の設定を保存",
+  "devices.logitechMouse.copy.restore": "復元",
+  "devices.logitechMouse.copy.hint": "保存すると、Nexus はマウスのメモリにあるプロファイルのコピーを保持します。別のアプリやリセットでマウスが変わったら、コピーを復元してください。Nexus が最初に変更する前の各プロファイルの元の状態も保持されます。",
+  "devices.logitechMouse.copy.original": "Nexus 以前のプロファイル {n}",
+  "devices.logitechMouse.keepOnboardHint": "マウスは自身のメモリにあるプロファイルで動くため、アプリを開いていなくても使えます。別のアプリがソフトウェア制御に切り替えると、Nexus が元に戻します（G HUB の実行中は除く）。"
 }

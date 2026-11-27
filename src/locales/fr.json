@@ -1639,7 +1639,6 @@
   "devices.logitechMouse.reportRate": "Taux de rapport",
   "devices.logitechMouse.reportRateHint": "La fréquence à laquelle la souris envoie sa position au PC.",
   "devices.logitechMouse.resetButton": "Rétablir par défaut",
-  "devices.logitechMouse.restore": "Restaurer l'original",
   "devices.logitechMouse.setDefault": "Démarrer ici",
   "devices.logitechMouse.setShift": "Utiliser pour DPI Shift",
   "devices.logitechMouse.shiftLevel": "Niveau du DPI Shift",
@@ -6844,5 +6843,13 @@
   "welcome.startWithOs.description": "Optimisé pour fonctionner en tant que service en arrière-plan.",
   "welcome.startWithOs.label": "Démarrer avec votre PC",
   "welcome.tagline": "Contrôle unifié de l'ordinateur",
-  "welcome.title": "Bienvenue sur Nexus"
+  "welcome.title": "Bienvenue sur Nexus",
+  "devices.logitechMouse.copy.title": "Copie dans Nexus",
+  "devices.logitechMouse.copy.savedAt": "Enregistrée : {time}",
+  "devices.logitechMouse.copy.none": "Aucune copie enregistrée",
+  "devices.logitechMouse.copy.save": "Enregistrer la configuration actuelle",
+  "devices.logitechMouse.copy.restore": "Restaurer",
+  "devices.logitechMouse.copy.hint": "Nexus garde une copie des profils de la mémoire de la souris quand vous l'enregistrez. Si une autre app ou une réinitialisation modifie la souris, restaurez la copie. L'original de chaque profil, d'avant la première modification par Nexus, est aussi conservé.",
+  "devices.logitechMouse.copy.original": "Profil {n} comme avant Nexus",
+  "devices.logitechMouse.keepOnboardHint": "La souris utilise les profils de sa propre mémoire, ils marchent donc sans app ouverte. Si une autre app la passe en contrôle logiciel, Nexus la remet (pas pendant que G HUB tourne)."
 }
