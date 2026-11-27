@@ -49,19 +49,39 @@ $rail: 0.25rem;
   gap: 0.6rem;
 }
 
-.big {
-  min-width: 3.4ch;
-  padding: 0;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--text);
+@mixin big-digits {
   font-family: var(--font-sans);
   font-size: clamp(2.8rem, 5.5vw, 4.4rem);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+}
+
+.bigField {
+  position: relative;
+  display: inline-block;
+}
+
+.bigSizer {
+  @include big-digits;
+  display: block;
+  padding-right: 0.08em;
+  border-bottom: 2px solid transparent;
+  white-space: pre;
+  visibility: hidden;
+}
+
+.big {
+  @include big-digits;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text);
   text-shadow: 0 0 28px var(--accent-glow-shadow);
   appearance: textfield;
   transition: border-color var(--ease);

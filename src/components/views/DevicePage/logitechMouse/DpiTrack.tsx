@@ -180,6 +180,7 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, vi
     commitLevels(next);
     setSelected(used);
   };
+  const readout = draft ?? String(dpi[selected] ?? '');
   const state = (i: number) =>
     `${selected === i ? styles.selected : ''} ${drag?.index === i ? styles.dragging : ''}`;
   const marks = (i: number) => (
@@ -196,21 +197,24 @@ export function DpiTrack({ dpi, defaultDpiIndex, shiftDpiIndex, busy, labels, vi
         <div className={styles.readout}>
           <span className={styles.kicker}>{labels.level(selected + 1)}</span>
           <div key={selected} className={styles.bigRow}>
-            <input
-              className={styles.big}
-              type="number"
-              inputMode="numeric"
-              min={DPI_MIN}
-              max={DPI_MAX}
-              step={DPI_STEP}
-              aria-label={labels.value}
-              style={{ width: `${Math.max(3, (draft ?? String(dpi[selected] ?? '')).length) + 0.4}ch` }}
-              value={draft ?? String(dpi[selected] ?? '')}
-              disabled={busy}
-              onChange={e => setDraft(e.target.value)}
-              onKeyDown={onKey}
-              onBlur={e => { if (draft !== null) typed(e.currentTarget.value); }}
-            />
+            <span className={styles.bigField}>
+              {/* The hidden copy sizes the field to its digits, so the unit sits right after them. */}
+              <span className={styles.bigSizer} aria-hidden>{readout || '0'}</span>
+              <input
+                className={styles.big}
+                type="number"
+                inputMode="numeric"
+                min={DPI_MIN}
+                max={DPI_MAX}
+                step={DPI_STEP}
+                aria-label={labels.value}
+                value={readout}
+                disabled={busy}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={onKey}
+                onBlur={e => { if (draft !== null) typed(e.currentTarget.value); }}
+              />
+            </span>
             <span className={styles.unit}>{labels.unit}</span>
           </div>
           <div className={styles.badges}>
