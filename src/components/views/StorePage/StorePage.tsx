@@ -601,9 +601,6 @@ function AppDetail({ appId, onBack, installed, onNeedsSignIn, onInstalled }: {
           <div className={styles.heroActions}>
             <LocalPreviewChip app={app} />
             <InstallButton app={app} installedVersion={installed?.version} onNeedsSignIn={onNeedsSignIn} onInstalled={onInstalled} />
-            {installed && (
-              <RemoveAppButton app={{ id: app.id, name: app.name }} label={t('account.purchases.uninstall')} tone="ghost" />
-            )}
           </div>
           {installed && (
             <span className={`${styles.installedVersion} selectable`}>
@@ -611,6 +608,11 @@ function AppDetail({ appId, onBack, installed, onNeedsSignIn, onInstalled }: {
             </span>
           )}
         </div>
+        {installed && (
+          <div className={styles.heroRemove}>
+            <RemoveAppButton app={{ id: app.id, name: app.name }} label={t('account.purchases.uninstall')} tone="ghost" />
+          </div>
+        )}
       </header>
 
       {app.latest && <Highlights latest={app.latest} />}
