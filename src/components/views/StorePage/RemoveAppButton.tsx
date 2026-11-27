@@ -5,7 +5,7 @@ import { ConfirmModal } from '../../common/ConfirmModal/ConfirmModal';
 import { useTranslation } from '../../../lib/i18n';
 import { findAppUsage, removeAppEverywhere, type AppUsage } from '../../../api/storeUsage';
 import { postService } from '../../../api/service';
-import { loadMarketplaceApps } from '../../../widgets/marketplaceRegistry';
+import { reloadMarketplaceApps } from '../../../widgets/marketplaceRegistry';
 
 interface RemoveAppButtonProps {
   app: { id: string; name: string };
@@ -27,19 +27,33 @@ export function RemoveAppButton({ app, onRemoved, label, iconOnly, tone = 'dange
   const { t } = useTranslation();
   const [usage, setUsage] = useState<AppUsage | null>(null);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const ask = useCallback(async () => {
+    setFailed(false);
     setUsage(await findAppUsage(app.id, t('nav.dashboard')));
   }, [app.id, t]);
 
   const confirm = useCallback(async () => {
     setBusy(true);
-    await removeAppEverywhere(app.id);
-    await postService('/apps-api/uninstall', { id: app.id });
-    await loadMarketplaceApps();
-    setBusy(false);
-    setUsage(null);
-    onRemoved?.();
+    setFailed(false);
+    try {
+      // Uninstall first: if the service refuses, the app's widgets are still in place.
+      // A load already in flight can predate the uninstall, so the reload must not join it.
+      const res = await postService<{ error?: boolean }>('/apps-api/uninstall', { id: app.id });
+      if (!res || res.error) {
+        setFailed(true);
+        return;
+      }
+      await removeAppEverywhere(app.id);
+      await reloadMarketplaceApps();
+      setUsage(null);
+      onRemoved?.();
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
   }, [app.id, onRemoved]);
 
   // Just the place, the way the user names it. A count only when it is there
@@ -67,6 +81,9 @@ export function RemoveAppButton({ app, onRemoved, label, iconOnly, tone = 'dange
         bullets={bullets}
         confirmLabel={label}
         confirmDisabled={busy}
+        note={failed ? t('store.removeFailed', { name: app.name }) : undefined}
+        // eslint-disable-next-line i18next/no-literal-string -- enum tone value, not user-facing text
+        noteTone="critical"
         onConfirm={() => { void confirm(); }}
         onCancel={() => setUsage(null)}
       />

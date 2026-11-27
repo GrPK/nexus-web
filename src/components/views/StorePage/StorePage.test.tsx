@@ -46,8 +46,9 @@ const listings = new Map<string, { id: string; version: string; iconUrl: string 
 vi.mock('../../../widgets/marketplaceRegistry', () => ({
   getAllMarketplaceListings: () => installed,
   getMarketplaceListing: (id: string) => listings.get(id),
-  loadMarketplaceApps: () => { registryListeners.forEach(fn => fn()); return Promise.resolve(); },
-  reloadMarketplaceApps: () => Promise.resolve(true),
+  // A load joins what is cached and never notifies; only a reload refetches, as a stale in-flight load would.
+  loadMarketplaceApps: () => Promise.resolve(),
+  reloadMarketplaceApps: () => { registryListeners.forEach(fn => fn()); return Promise.resolve(true); },
   subscribeMarketplaceRegistry: (fn: () => void) => { registryListeners.add(fn); return () => { registryListeners.delete(fn); }; },
   typeForMarketplace: (id: string) => `app:${id}`,
 }));
@@ -317,15 +318,43 @@ describe('StorePage app page uninstall', () => {
     render(<StorePage tab={app.id} onTabChange={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'account.purchases.uninstall' }));
-    await screen.findByText('store.removeTitle name=Aquarium');
+    const dialog = await screen.findByRole('alertdialog');
     installed.length = 0;
-    // The dialog's confirm action reuses the label and renders after the page button.
-    const buttons = screen.getAllByRole('button', { name: 'account.purchases.uninstall' });
-    fireEvent.click(buttons[buttons.length - 1]);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'account.purchases.uninstall' }));
 
     await waitFor(() => expect(removal.post).toHaveBeenCalledWith('/apps-api/uninstall', { id: app.id }));
     expect(await screen.findByRole('button', { name: 'store.install' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'account.purchases.uninstall' })).not.toBeInTheDocument();
+  });
+});
+
+describe('StorePage app page uninstall failure', () => {
+  const openConfirm = async () => {
+    installed.push({ id: app.id, version: '1.0.2', iconUrl: null });
+    render(<StorePage tab={app.id} onTabChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'account.purchases.uninstall' }));
+    return within(await screen.findByRole('alertdialog'));
+  };
+
+  beforeEach(() => {
+    removal.post.mockReset();
+    removal.removeEverywhere.mockReset();
+    removal.removeEverywhere.mockResolvedValue(0);
+  });
+
+  it.each([
+    ['an error response', () => removal.post.mockResolvedValue({ error: true, msg: 'nope' })],
+    ['a thrown request', () => removal.post.mockRejectedValue(new Error('offline'))],
+    ['no response', () => removal.post.mockResolvedValue(null)],
+  ])('keeps the widgets, the modal and the app on %s, and can retry', async (_name, arrange) => {
+    arrange();
+    const dialog = await openConfirm();
+    fireEvent.click(dialog.getByRole('button', { name: 'account.purchases.uninstall' }));
+
+    expect(await dialog.findByText('store.removeFailed name=Aquarium')).toBeInTheDocument();
+    expect(removal.removeEverywhere).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'store.installed' })).toBeInTheDocument();
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'account.purchases.uninstall' })).toBeEnabled());
   });
 });
 
