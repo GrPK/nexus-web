@@ -40,7 +40,7 @@ export function RemoveAppButton({ app, onRemoved, label, iconOnly, tone = 'dange
     try {
       // Uninstall first: if the service refuses, the app's widgets are still in place.
       // A load already in flight can predate the uninstall, so the reload must not join it.
-      const res = await postService<{ error?: boolean }>('/apps-api/uninstall', { id: app.id });
+      const res = await postService<{ error?: string }>('/apps-api/uninstall', { id: app.id });
       if (!res || res.error) {
         setFailed(true);
         return;

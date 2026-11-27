@@ -283,7 +283,7 @@ describe('StorePage app page uninstall', () => {
   beforeEach(() => {
     removal.post.mockReset();
     removal.removeEverywhere.mockReset();
-    removal.post.mockResolvedValue({ error: false, msg: '' });
+    removal.post.mockResolvedValue({ id: app.id, installed: false });
     removal.removeEverywhere.mockResolvedValue(0);
   });
 
@@ -343,7 +343,7 @@ describe('StorePage app page uninstall failure', () => {
   });
 
   it.each([
-    ['an error response', () => removal.post.mockResolvedValue({ error: true, msg: 'nope' })],
+    ['an error response', () => removal.post.mockResolvedValue({ id: app.id, installed: false, error: 'nope' })],
     ['a thrown request', () => removal.post.mockRejectedValue(new Error('offline'))],
     ['no response', () => removal.post.mockResolvedValue(null)],
   ])('keeps the widgets, the modal and the app on %s, and can retry', async (_name, arrange) => {
