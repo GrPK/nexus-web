@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Ban, Keyboard, MousePointer2, Music, Pause, RefreshCw, SkipBack, SkipForward, Sparkles,
   Square, Undo2, Volume1, Volume2, VolumeX, Zap,
@@ -22,6 +22,7 @@ import { KeyboardIllustration, legendOf, type KeyFace } from './logitechKeyboard
 import { KEYS, type KeyboardLayout } from './logitechKeyboard/g915x';
 import { MEDIA, MODIFIERS, MOUSE_BUTTONS, capText, keyName, modifierCaps, shortcutText } from './logitechKeyboard/keyNames';
 import { usePolledDevice } from './usePolledDevice';
+import { DeviceSwitcherContext } from './logitechHubContext';
 import styles from './LogitechKeyboardDevicePage.module.scss';
 
 const P = 'devices.logitechKeyboard.';
@@ -268,10 +269,14 @@ function AssignmentsStage({ state, change, busy }: StageProps) {
     },
     () => setCapturing(false),
   );
+  // With the custom assignments off the keyboard ignores them, so they show greyed and cannot be picked.
+  const off = state.enabled === false;
   const select = (key: number) => {
+    if (off) return;
     setCapturing(false);
     setSelected(prev => (prev === key ? null : key));
   };
+  useEffect(() => { if (off) { setSelected(null); setCapturing(false); } }, [off]);
 
   const current = selected === null ? null : effective(selected);
   const counts = (name: LayerName) => state.layers[name].length;
@@ -282,12 +287,12 @@ function AssignmentsStage({ state, change, busy }: StageProps) {
         groups={library}
         initiallyOpen={OPEN_GROUPS}
         currentValue={current?.source === 'own' ? encode(current.row) : null}
-        disabled={busy}
+        disabled={busy || off}
         title={t(`${M}library`)}
         hint={selected !== null ? t(`${P}libraryHintSelected`, { key: keyTitle(selected, state, t) }) : t(`${P}libraryHint`)}
         searchLabel={t(`${M}librarySearch`)}
         emptyLabel={t(`${M}libraryEmpty`)}
-        onPick={value => { if (selected !== null) assign(selected, value); }}
+        onPick={value => { if (selected !== null && !off) assign(selected, value); }}
       />
       <div className={styles.stage}>
         <div className={styles.stageBar}>
@@ -308,6 +313,7 @@ function AssignmentsStage({ state, change, busy }: StageProps) {
             />
             <span className={styles.layerHint}>{t(`${P}layerHint.${layer}`)}</span>
           </div>
+          {off && <span className={styles.offBadge}>{t(`${P}switch`)}: {t(`${P}switchOff`)}</span>}
           {selected !== null && (
             <div className={`${styles.selectedInfo} ${capturing ? styles.capturing : ''}`} aria-live="polite">
               <span className={styles.selectedBadge}>{keyTitle(selected, state, t)}</span>
@@ -339,6 +345,7 @@ function AssignmentsStage({ state, change, busy }: StageProps) {
         </div>
         <div className={`${styles.board} ${styles[`layer_${layer}`] ?? ''}`}>
           <KeyboardIllustration
+            inactive={off}
             layout={layout}
             keyOf={cid => keyOfCid.get(cid)}
             face={face}
@@ -352,7 +359,7 @@ function AssignmentsStage({ state, change, busy }: StageProps) {
               return hit ? `${name} ${ARROW} ${describe(hit.row, t)}` : name;
             }}
             onSelect={select}
-            onDropAction={(key, value) => assign(key, value)}
+            onDropAction={(key, value) => { if (!off) assign(key, value); }}
           />
         </div>
         <div className={styles.footer}>
@@ -365,10 +372,14 @@ function AssignmentsStage({ state, change, busy }: StageProps) {
             />
             <span className={styles.switchText}>
               <span className={styles.switchTitle}>{t(`${P}switch`)}: {state.enabled ? t(`${P}switchOn`) : t(`${P}switchOff`)}</span>
-              <span className={styles.switchHint}>{t(`${P}switchHint`)}</span>
+              <span className={styles.switchHint}>{t(`${P}stored`)} {t(`${P}switchHint`)}</span>
             </span>
           </label>
-          <span className={styles.stored}>{t(`${P}stored`)}</span>
+          {state.written && (
+            <Button size="sm" tone="ghost" icon={<RefreshCw size={14} />} disabled={busy} onClick={() => { void change(() => rewriteKeyboard()); }}>
+              {t(`${P}rewrite`)}
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -383,10 +394,13 @@ export function LogitechKeyboardDevicePage() {
   const title = 'Logitech ' + (state?.model ?? 'G915 X');
   const layoutValue = state?.layoutChoice ?? LAYOUT_AUTO;
   const autoLayout = state?.layoutDetected ? state.layoutDetected.toUpperCase() : '?';
+  const switcher = useContext(DeviceSwitcherContext);
+  // The keyboard says its layout; the choice only shows when it did not, or one was picked by hand.
+  const askLayout = !state?.layoutDetected || state.layoutChoice !== null && state.layoutChoice !== undefined;
 
   return (
     <div className={styles.page}>
-      <ViewHeader title={title} />
+      <ViewHeader title={title} tabActions={switcher ?? undefined} />
       <div className={styles.body}>
         {failure && <Notice tone="critical" role="alert">{t(failure)}</Notice>}
         {loadFailed && !state && <Notice tone="critical" role="alert">{t(`${P}loadFailed`)}</Notice>}
@@ -405,6 +419,7 @@ export function LogitechKeyboardDevicePage() {
         )}
         {state?.present && !state.error && (
           <>
+            {askLayout && (
             <div className={styles.toolbar}>
               <Select
                 className={styles.layoutSelect}
@@ -418,12 +433,8 @@ export function LogitechKeyboardDevicePage() {
                 onChange={v => { void change(() => setKeyboardLayout(v === LAYOUT_AUTO ? null : (v as KeyboardLayout))); }}
               />
               {busy && <Spinner size={16} />}
-              {state.written && (
-                <Button size="sm" tone="ghost" icon={<RefreshCw size={14} />} disabled={busy} onClick={() => { void change(() => rewriteKeyboard()); }}>
-                  {t(`${P}rewrite`)}
-                </Button>
-              )}
             </div>
+            )}
             <AssignmentsStage state={state} change={change} busy={busy} />
           </>
         )}

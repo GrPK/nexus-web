@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Music, Radio, Speaker, User, Volume2 } from 'lucide-react';
 import {
   deleteSpeakerPreset, resetSpeakerChannels, saveSpeakerPreset, setSpeakerChannel, setSpeakerEq,
@@ -23,6 +23,7 @@ import { useLogitechSpeaker } from './useLogitechSpeaker';
 import {
   SPEAKER_FACING, SPEAKER_POS, builtInPresetLabelKey, currentPreset, dbLabel, hzLabel, isFlat, testOrder, volMax, volOf,
 } from './speakerUtils';
+import { DeviceSwitcherContext } from './logitechHubContext';
 import styles from './LogitechSpeakerDevicePage.module.scss';
 
 type Tab = 'acoustics' | 'surround';
@@ -377,6 +378,7 @@ function SurroundTab({ state, change, report }: TabProps) {
 export function LogitechSpeakerDevicePage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('acoustics');
+  const switcher = useContext(DeviceSwitcherContext);
   const { state, loadFailed, failure, report, change } = useLogitechSpeaker();
 
   return (
@@ -387,6 +389,7 @@ export function LogitechSpeakerDevicePage() {
         tabs={state?.present ? TABS.map(({ key, icon }) => ({ key, icon, label: t(`${P}${key}`) })) : undefined}
         activeTab={tab}
         onTabChange={key => setTab(key as Tab)}
+        tabActions={switcher ?? undefined}
       />
       <div className={styles.body}>
         {failure && <Notice tone="critical" role="alert">{t(failure)}</Notice>}

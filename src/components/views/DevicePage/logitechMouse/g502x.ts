@@ -51,16 +51,16 @@ export const ART: Record<MouseView, MouseArtView> = {
 };
 
 export const HOTSPOTS: readonly MouseHotspot[] = [
-  { g: 1, slot: 0, view: 'top', x: 128, y: 82, side: 'left', labelY: 20,
+  { g: 1, slot: 0, view: 'top', x: 117.5, y: 100, side: 'left', labelY: 20,
     region: 'M98 36 C120 29 145 22 164 17 L168 287 C140 296 100 308 70 318 C72 260 76 200 82 140 C86 100 90 64 98 36 Z' },
-  { g: 2, slot: 1, view: 'top', x: 284, y: 130, side: 'right', labelY: 20,
+  { g: 2, slot: 1, view: 'top', x: 277.5, y: 100, side: 'right', labelY: 20,
     region: 'M227 6 C250 16 271 28 286 40 C299 50 309 66 315 88 C325 126 331 176 333 232 C300 242 262 254 233 262 Z' },
   { g: 3, slot: 2, view: 'top', x: 197.5, y: 144, side: 'right', labelY: 100,
     region: 'M181 108 Q181 100 189 100 L206 100 Q214 100 214 108 L214 180 Q214 188 206 188 L189 188 Q181 188 181 180 Z' },
   // Wheel tilt left and right.
-  { g: 10, slot: 6, view: 'top', x: 155, y: 146, side: 'left', labelY: 175,
+  { g: 10, slot: 6, view: 'top', x: 154, y: 146, side: 'left', labelY: 175,
     region: 'M163 131 L145 146 L163 161 Z' },
-  { g: 11, slot: 7, view: 'top', x: 241, y: 145, side: 'right', labelY: 175,
+  { g: 11, slot: 7, view: 'top', x: 241, y: 146, side: 'right', labelY: 175,
     region: 'M233 130 L251 145 L233 160 Z' },
   // Profile switch, behind the wheel.
   { g: 9, slot: 8, view: 'top', x: 198.5, y: 267, side: 'right', labelY: 255,

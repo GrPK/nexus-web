@@ -181,9 +181,16 @@
   color: var(--text);
 }
 
-.switchHint,
-.stored {
+.switchHint {
   @include text-caption;
+  color: var(--text-dim);
+}
+
+.offBadge {
+  @include text-label;
+  padding: 0.25rem 0.6rem;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-pill);
   color: var(--text-dim);
 }
 

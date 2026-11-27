@@ -128,4 +128,11 @@ describe('LogitechKeyboardDevicePage', () => {
     await settle();
     expect(api.setKeyboardEnabled).toHaveBeenCalledWith(false);
   });
+
+  it('greys the keys and keeps them from being picked while the custom assignments are off', async () => {
+    await mount(state({ enabled: false }));
+    fireEvent.click(key('G1'));
+    expect(key('G1').getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getAllByText(`${P}switch: ${P}switchOff`).length).toBeGreaterThan(1);
+  });
 });

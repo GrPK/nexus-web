@@ -58,8 +58,8 @@ const shiftedOf = (usage: number | undefined, layout: KeyboardLayout) =>
  * its own legend in the corner; a changed key pops with a ripple; opening a layer sweeps the keys
  * in. Actions from the library drop onto keys.
  */
-export function KeyboardIllustration(props: KeyboardIllustrationProps) {
-  const { layout, keyOf, face, selectedKey, flashKey, layerKey, ariaLabel, keyAria, onSelect, onDropAction } = props;
+export function KeyboardIllustration(props: KeyboardIllustrationProps & { inactive?: boolean }) {
+  const { layout, keyOf, face, selectedKey, flashKey, layerKey, ariaLabel, keyAria, onSelect, onDropAction, inactive = false } = props;
   const [hover, setHover] = useState<number | null>(null);
   const [dropOver, setDropOver] = useState<number | null>(null);
   const uid = useId().replace(/:/g, '');
@@ -91,7 +91,7 @@ export function KeyboardIllustration(props: KeyboardIllustrationProps) {
   });
 
   return (
-    <div className={styles.canvas} style={{ aspectRatio: `${width} / ${height}` }} role="group" aria-label={ariaLabel}>
+    <div className={`${styles.canvas} ${inactive ? styles.inactive : ''}`} style={{ aspectRatio: `${width} / ${height}` }} role="group" aria-label={ariaLabel} aria-disabled={inactive || undefined}>
       <svg className={styles.svg} viewBox={`${-PAD} ${top} ${width} ${height}`}>
         <defs>
           <linearGradient id={id('plate')} x1="0" y1="0" x2="0" y2="1">
@@ -238,7 +238,7 @@ export function KeyboardIllustration(props: KeyboardIllustrationProps) {
                 className={cls}
                 style={style}
                 role="button"
-                tabIndex={0}
+                tabIndex={inactive ? -1 : 0}
                 aria-label={keyAria(key, legend)}
                 aria-pressed={selectedKey === key}
                 onClick={() => onSelect(key)}

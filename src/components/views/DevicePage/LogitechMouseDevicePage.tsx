@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Gauge, Keyboard, ListOrdered, Mouse, MousePointer2, Music, Pencil, RotateCcw, Sparkles, Undo2 } from 'lucide-react';
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Keyboard, ListOrdered, Mouse, MousePointer2, Music, Pencil, RotateCcw, Sparkles, Target, Undo2 } from 'lucide-react';
 import {
   fetchMouseLive, restoreMouseProfile, setMouseActiveProfile, setMouseKeepOnboard, setMouseMode, setMouseProfileCycle, updateMouseProfile,
   type MacroStep, type MouseButton, type MouseLive, type MouseProfile, type MouseProfilePatch, type MouseState,
@@ -22,6 +22,7 @@ import { MouseIllustration } from './logitechMouse/MouseIllustration';
 import { MouseMini } from './logitechMouse/MouseMini';
 import { FACTORY, HOTSPOTS, gName, type MouseView } from './logitechMouse/g502x';
 import { useLogitechMouse } from './useLogitechMouse';
+import { DeviceSwitcherContext } from './logitechHubContext';
 import styles from './LogitechMouseDevicePage.module.scss';
 
 const P = 'devices.logitechMouse.';
@@ -32,7 +33,7 @@ const LAYERS: readonly Layer[] = ['primary', 'gShift'];
 const VIEWS: readonly MouseView[] = ['top', 'side'];
 const TABS: readonly { key: Tab; icon: ReactNode }[] = [
   { key: 'assignments', icon: <Mouse size={14} /> },
-  { key: 'sensitivity', icon: <Gauge size={14} /> },
+  { key: 'sensitivity', icon: <Target size={14} /> },
 ];
 // The DPI up and down buttons (slots) with their names, lit on the sensitivity page.
 const DPI_BUTTONS: readonly { slot: number; key: string }[] = [{ slot: 9, key: 'dpiUp' }, { slot: 10, key: 'dpiDown' }];
@@ -465,6 +466,7 @@ export function LogitechMouseDevicePage() {
   const { t } = useTranslation();
   const { state, loadFailed, failure, busy, change } = useLogitechMouse();
   const [tab, setTab] = useState<Tab>('assignments');
+  const switcher = useContext(DeviceSwitcherContext);
   const [selected, setSelected] = useState<number | null>(null);
 
   const profiles = state?.profiles ?? [];
@@ -480,6 +482,7 @@ export function LogitechMouseDevicePage() {
         tabs={state?.present ? TABS.map(({ key, icon }) => ({ key, icon, label: t(`${P}tab.${key}`) })) : undefined}
         activeTab={tab}
         onTabChange={key => setTab(key as Tab)}
+        tabActions={switcher ?? undefined}
       />
       <div className={styles.body}>
         {failure && <Notice tone="critical" role="alert">{t(failure)}</Notice>}

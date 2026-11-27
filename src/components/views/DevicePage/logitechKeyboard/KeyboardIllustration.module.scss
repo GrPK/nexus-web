@@ -102,6 +102,27 @@
   stroke-width: 2;
 }
 
+// Custom assignments off: the keyboard ignores them, so assigned keys grey out and nothing is pickable.
+.inactive .key {
+  cursor: default;
+  pointer-events: none;
+}
+
+.inactive .assigned .face,
+.inactive .gshift .face,
+.inactive .disabled .face {
+  fill: #3a3b40;
+  filter: none;
+}
+
+.inactive .label,
+.inactive .sub,
+.inactive .icon,
+.inactive .corner {
+  opacity: 0.45;
+  filter: none;
+}
+
 .key {
   cursor: pointer;
   outline: none;
