@@ -55,8 +55,10 @@ const FILTER_NAMES = 5;
 // The preset toolbar needs a cap; the service keeps any number of modes.
 const MODE_LIMIT = 99;
 // Windows' names for the card's endpoints, and the words shown for them.
+// Firmware 1.2 names them like the G6 (External Mic, Line In, SPDIF In, What U Hear); 1.0 used the others.
 const CHANNELS: Record<string, string> = {
-  Speakers: 'chSpeakers', Microphone: 'chMicrophone', Line: 'chLine', 'SPDIF Interface': 'chSpdif', 'Digital Audio Interface': 'chDigital',
+  Speakers: 'chSpeakers', Microphone: 'chMicrophone', 'External Mic': 'chMicrophone', Line: 'chLine', 'Line In': 'chLine',
+  'SPDIF Interface': 'chSpdif', 'SPDIF In': 'chSpdif', 'Digital Audio Interface': 'chDigital', 'What U Hear': 'chWhatUHear',
 };
 
 const pct = (v: number) => `${Math.round(v)}%`;
