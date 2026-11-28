@@ -154,7 +154,10 @@ describe('SoundBlasterDevicePage', () => {
     await mount(state());
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: `${P}mute:{"name":"${P}chSpeakers"}` })); });
     expect(api.setSoundBlasterMixer).toHaveBeenCalledWith('spk', { muted: true });
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: `${P}unmute:{"name":"${P}chLine"}` })); });
+    const unmute = screen.getByRole('button', { name: `${P}unmute:{"name":"${P}chLine"}` });
+    // A muted channel's row stays usable, so its mute button can be pressed again.
+    expect(unmute.closest('[class*="disabled"]')).toBeNull();
+    await act(async () => { fireEvent.click(unmute); });
     expect(api.setSoundBlasterMixer).toHaveBeenCalledWith('line', { muted: false });
   });
 

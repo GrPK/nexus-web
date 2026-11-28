@@ -516,11 +516,11 @@ function MixerRow({ channel, change }: { channel: SoundBlasterMixerChannel; chan
       label={label}
       description={t(channel.direction === 'playback' ? `${P}playbackChannel` : `${P}recordingChannel`)}
       editable
-      trackFill
       min={0}
       max={100}
       formatValue={pct}
-      disabled={channel.muted}
+      // Not disabled while muted: that would disable the mute button beside the name too. Windows keeps the level while muted.
+      trackFill={!channel.muted}
       value={drag ?? Math.round(channel.volume * 100)}
       labelSuffix={(
         <button
