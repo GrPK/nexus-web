@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Crosshair, Headphones, Speaker } from 'lucide-react';
+import { Crosshair, Headphones, Radio, Speaker, Volume2, VolumeX } from 'lucide-react';
 import {
-  DECODER, PLAYBACK, RECORDING, paramKey, setSoundBlasterFilter, setSoundBlasterMicBoost, setSoundBlasterOutput,
-  setSoundBlasterParameter, setSoundBlasterSbx, setSoundBlasterScout,
-  type SoundBlasterOutput, type SoundBlasterState,
+  DECODER, PLAYBACK, RECORDING, applySoundBlasterMode, deleteSoundBlasterMode, paramKey, renameSoundBlasterMode,
+  saveSoundBlasterMode, setSoundBlasterFeature, setSoundBlasterFilter, setSoundBlasterMicBoost, setSoundBlasterMicEq,
+  setSoundBlasterMixer, setSoundBlasterOutput, setSoundBlasterParameter, setSoundBlasterSbx, setSoundBlasterScout,
+  setSoundBlasterVoiceMorph,
+  type SoundBlasterFeature, type SoundBlasterMixerChannel, type SoundBlasterOutput, type SoundBlasterState,
 } from '../../../api/soundBlaster';
 import { useTranslation } from '../../../lib/i18n';
 import { Button } from '../../common/Button/Button';
 import { ChipGroup } from '../../common/ChipGroup/ChipGroup';
 import { EmptyState } from '../../common/EmptyState/EmptyState';
 import { Notice } from '../../common/Notice/Notice';
+import { PresetToolbar } from '../../common/PresetToolbar/PresetToolbar';
+import { Select } from '../../common/Select/Select';
 import { SettingGroup, SettingRow, SettingSlider, SettingToggle } from '../../common/SettingRow/SettingRow';
 import { SettingsSection } from '../../common/SettingsSection/SettingsSection';
 import { CurveGraph } from '../../../panel/widgets/cooling/page/CurveEditor';
@@ -31,7 +35,7 @@ const SMART_VOLUME = 0x04, SMART_VOLUME_LEVEL = 0x05, SMART_VOLUME_MODE = 0x06;
 const CRYSTALIZER = 0x07, CRYSTALIZER_LEVEL = 0x08, EQ = 0x09, PREAMP = 0x0a, BAND0 = 0x0b;
 const CROSSOVER = 0x17, BASS = 0x18, BASS_LEVEL = 0x19;
 // Recording parameters (MalcolmVoiceInputManagerCommand) and the decoder's dynamic range.
-const ECHO = 0x00, NOISE = 0x04, NOISE_LEVEL = 0x05, MIC_SVM = 0x2c, MIC_SVM_LEVEL = 0x2d, RANGE = 0x02;
+const ECHO = 0x00, NOISE = 0x04, NOISE_LEVEL = 0x05, VOICE_FX = 0x0a, MIC_EQ = 0x13, MIC_SVM = 0x2c, MIC_SVM_LEVEL = 0x2d, RANGE = 0x02;
 
 // The G8 reports these ranges itself: pre-amp ±6 dB, bands ±12 dB, crossover 10 to 300 Hz.
 const BAND_HZ = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
@@ -46,6 +50,14 @@ const SVM_MODES = ['normal', 'loud', 'night'] as const;
 // Creative's dynamic range values: 1 full, 2 normal, 3 night.
 const RANGES = [{ key: '1', label: 'full' }, { key: '2', label: 'normal' }, { key: '3', label: 'night' }] as const;
 const BOOSTS = [0, 10, 20, 30];
+// The G8's five DAC filters, in its numbering (Creative App's names for them).
+const FILTER_NAMES = 5;
+// The preset toolbar needs a cap; the service keeps any number of modes.
+const MODE_LIMIT = 99;
+// Windows' names for the card's endpoints, and the words shown for them.
+const CHANNELS: Record<string, string> = {
+  Speakers: 'chSpeakers', Microphone: 'chMicrophone', Line: 'chLine', 'SPDIF Interface': 'chSpdif', 'Digital Audio Interface': 'chDigital',
+};
 
 const pct = (v: number) => `${Math.round(v)}%`;
 
@@ -180,9 +192,10 @@ function EqBands({ state, change, disabled }: TabProps & { disabled: boolean }) 
   );
 }
 
-/** While Scout Mode holds the effects: the sections under it blurred, with a way out on top. */
-function ScoutVeil({ active, onOff, children }: { active: boolean; onOff: () => void; children: ReactNode }) {
+/** While Scout Mode or Direct Mode holds the effects: the sections under it blurred, with a way out on top. */
+function Veil({ mode, onOff, children }: { mode: 'scout' | 'direct' | null; onOff: () => void; children: ReactNode }) {
   const { t } = useTranslation();
+  const active = mode !== null;
   return (
     <div className={styles.veilWrap}>
       <div className={active ? `${styles.veilContent} ${styles.veiled}` : styles.veilContent} aria-hidden={active || undefined}>
@@ -191,10 +204,10 @@ function ScoutVeil({ active, onOff, children }: { active: boolean; onOff: () => 
       {active && (
         <div className={styles.veil}>
           <div className={styles.veilCard} role="status">
-            <Crosshair size={22} className={styles.veilIcon} aria-hidden />
-            <span className={styles.veilTitle}>{t(`${P}scoutVeilTitle`)}</span>
-            <span className={styles.veilBody}>{t(`${P}scoutVeilBody`)}</span>
-            <Button size="sm" onClick={onOff}>{t(`${P}scoutOff`)}</Button>
+            {mode === 'direct' ? <Radio size={22} className={styles.veilIcon} aria-hidden /> : <Crosshair size={22} className={styles.veilIcon} aria-hidden />}
+            <span className={styles.veilTitle}>{t(mode === 'direct' ? `${P}directVeilTitle` : `${P}scoutVeilTitle`)}</span>
+            <span className={styles.veilBody}>{t(mode === 'direct' ? `${P}directVeilBody` : `${P}scoutVeilBody`)}</span>
+            <Button size="sm" onClick={onOff}>{t(mode === 'direct' ? `${P}directOff` : `${P}scoutOff`)}</Button>
           </div>
         </div>
       )}
@@ -202,11 +215,55 @@ function ScoutVeil({ active, onOff, children }: { active: boolean; onOff: () => 
   );
 }
 
+/** A device feature switch, shown only when the device has the feature. */
+function FeatureToggle({ state, change, name, label, description, nested }: TabProps & {
+  name: SoundBlasterFeature; label: string; description?: string; nested?: boolean;
+}) {
+  const on = state.features[name];
+  if (on === undefined) return null;
+  return (
+    <SettingToggle
+      label={label}
+      description={description}
+      checked={on}
+      nested={nested}
+      onChange={next => { void change(() => setSoundBlasterFeature(name, next)); }}
+    />
+  );
+}
+
+/** The modes saved in Nexus: the playback settings by name, applied from the list. */
+function ModesSection({ state, change }: TabProps) {
+  const { t } = useTranslation();
+  return (
+    <SettingsSection title={t(`${P}modes`)} description={t(`${P}modesHint`)} boxClassName={styles.box}>
+      <SettingRow label={t(`${P}mode`)}>
+        <PresetToolbar
+          showHistory={false}
+          translationPrefix="cooling.presets"
+          cap={MODE_LIMIT}
+          presetCount={state.modes.length}
+          presets={state.modes.map(m => ({ id: m, name: m }))}
+          activeId={state.activeMode ?? null}
+          presetsHeader={t(`${P}modesSaved`)}
+          inlineSave={{ label: t(`${P}modeSave`), disabled: !!state.activeMode }}
+          onLoad={id => { void change(() => applySoundBlasterMode(id)); }}
+          onCreate={async name => ((await change(() => saveSoundBlasterMode(name.trim()))) ? { error: false } : { error: true, msg: t(`${P}failed`) })}
+          onRename={(id, name) => { if (name.trim() && name.trim() !== id) void change(() => renameSoundBlasterMode(id, name.trim())); }}
+          onDelete={id => { void change(() => deleteSoundBlasterMode(id)); }}
+        />
+      </SettingRow>
+    </SettingsSection>
+  );
+}
+
 function PlaybackSections({ state, change }: TabProps) {
   const { t } = useTranslation();
   // The G8 ties SBX to the effects itself (an effect turned on turns SBX on, the last one off turns it off),
-  // so the switches stay usable with SBX off. Only Scout Mode holds them.
-  const off = state.scout;
+  // so the switches stay usable with SBX off. Only Scout Mode and Direct Mode hold them.
+  const direct = state.features.directMode === true;
+  const veil = direct ? 'direct' : state.scout ? 'scout' : null;
+  const off = veil !== null;
   const eqOn = val(state, PLAYBACK, EQ) >= 0.5;
   const bands = BAND_HZ.map((_, i) => val(state, PLAYBACK, BAND0 + i));
   const flatten = async () => {
@@ -217,16 +274,23 @@ function PlaybackSections({ state, change }: TabProps) {
 
   return (
     <>
-      <SettingsSection title={t(`${P}scout`)} boxClassName={styles.box}>
+      <ModesSection state={state} change={change} />
+
+      <SettingsSection title={t(`${P}listening`)} boxClassName={styles.box}>
         <SettingToggle
           label={t(`${P}scout`)}
           description={t(`${P}scoutHint`)}
           checked={state.scout}
+          disabled={direct}
           onChange={on => { void change(() => setSoundBlasterScout(on)); }}
         />
+        <FeatureToggle state={state} change={change} name="directMode" label={t(`${P}directMode`)} description={t(`${P}directModeHint`)} />
       </SettingsSection>
 
-      <ScoutVeil active={state.scout} onOff={() => { void change(() => setSoundBlasterScout(false)); }}>
+      <Veil
+        mode={veil}
+        onOff={() => { void change(() => (direct ? setSoundBlasterFeature('directMode', false) : setSoundBlasterScout(false))); }}
+      >
         <SettingsSection title={t(`${P}acoustic`)} description={t(`${P}acousticHint`)} boxClassName={styles.box}>
           <SettingToggle
             label={t(`${P}sbx`)}
@@ -298,7 +362,7 @@ function PlaybackSections({ state, change }: TabProps) {
           />
           <EqBands state={state} change={change} disabled={off || !eqOn} />
         </SettingsSection>
-      </ScoutVeil>
+      </Veil>
 
       <SettingsSection title={t(`${P}output`)} boxClassName={styles.box}>
         {state.outputs.length > 0 && (
@@ -318,12 +382,16 @@ function PlaybackSections({ state, change }: TabProps) {
           <SettingRow label={t(`${P}dacFilter`)} description={t(`${P}dacFilterHint`)}>
             <ChipGroup
               ariaLabel={t(`${P}dacFilter`)}
-              options={state.dacFilters.map(f => ({ key: String(f), label: t(`${P}filter`, { n: f }) }))}
+              options={state.dacFilters.map(f => ({ key: String(f), label: f >= 1 && f <= FILTER_NAMES ? t(`${P}filter${f}`) : t(`${P}filter`, { n: f }) }))}
               activeKey={String(state.dacFilter ?? '')}
               onChange={f => { void change(() => setSoundBlasterFilter(Number(f))); }}
             />
           </SettingRow>
         )}
+        {state.output === 'speakers' && (
+          <FeatureToggle state={state} change={change} name="speakerVirtualization" label={t(`${P}speakerVirtualization`)} description={t(`${P}speakerVirtualizationHint`)} />
+        )}
+        <FeatureToggle state={state} change={change} name="spdifDirect" label={t(`${P}spdifDirect`)} description={t(`${P}spdifDirectHint`)} />
         {has(state, DECODER, RANGE) && (
           <SettingRow label={t(`${P}dynamicRange`)} description={t(`${P}dynamicRangeHint`)}>
             <ChipGroup
@@ -384,6 +452,36 @@ function MicrophoneSections({ state, change }: TabProps) {
           />
         </SettingGroup>
         {toggle(ECHO, t(`${P}echo`), t(`${P}echoHint`))}
+        {has(state, RECORDING, VOICE_FX) && (
+          <SettingGroup>
+            {toggle(VOICE_FX, t(`${P}voiceMorph`), t(`${P}voiceMorphHint`))}
+            <SettingRow label={t(`${P}character`)} nested disabled={!on(VOICE_FX)}>
+              <Select
+                ariaLabel={t(`${P}character`)}
+                value={state.voiceMorph ?? ''}
+                placeholder={t(`${P}custom`)}
+                disabled={!on(VOICE_FX)}
+                options={state.voicePresets.map(p => ({ value: p.id, label: p.name }))}
+                onChange={id => { void change(() => setSoundBlasterVoiceMorph(id)); }}
+              />
+            </SettingRow>
+          </SettingGroup>
+        )}
+        {has(state, RECORDING, MIC_EQ) && (
+          <SettingGroup>
+            {toggle(MIC_EQ, t(`${P}micEq`), t(`${P}micEqHint`))}
+            <SettingRow label={t(`${P}micEqPreset`)} nested disabled={!on(MIC_EQ)}>
+              <Select
+                ariaLabel={t(`${P}micEqPreset`)}
+                value={state.micEq ?? ''}
+                placeholder={t(`${P}custom`)}
+                disabled={!on(MIC_EQ)}
+                options={state.micEqPresets.map(p => ({ value: p.id, label: p.name }))}
+                onChange={id => { void change(() => setSoundBlasterMicEq(id)); }}
+              />
+            </SettingRow>
+          </SettingGroup>
+        )}
         <SettingGroup>
           {toggle(MIC_SVM, t(`${P}micSmartVolume`), t(`${P}micSmartVolumeHint`))}
           <ParamSlider
@@ -402,6 +500,63 @@ function MicrophoneSections({ state, change }: TabProps) {
         </SettingGroup>
       </SettingsSection>
     </>
+  );
+}
+
+/** One endpoint's Windows volume: a slider, with its mute beside the name. */
+function MixerRow({ channel, change }: { channel: SoundBlasterMixerChannel; change: Change }) {
+  const { t } = useTranslation();
+  const [drag, setDrag] = useState<number | null>(null);
+  const word = CHANNELS[channel.name];
+  const label = word ? t(`${P}${word}`) : channel.name;
+  return (
+    <SettingSlider
+      label={label}
+      description={t(channel.direction === 'playback' ? `${P}playbackChannel` : `${P}recordingChannel`)}
+      editable
+      trackFill
+      min={0}
+      max={100}
+      formatValue={pct}
+      disabled={channel.muted}
+      value={drag ?? Math.round(channel.volume * 100)}
+      labelSuffix={(
+        <button
+          type="button"
+          className={styles.mute}
+          aria-pressed={channel.muted}
+          aria-label={t(channel.muted ? `${P}unmute` : `${P}mute`, { name: label })}
+          onClick={() => { void change(() => setSoundBlasterMixer(channel.id, { muted: !channel.muted })); }}
+        >
+          {channel.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+        </button>
+      )}
+      onChange={v => setDrag(v)}
+      onCommit={v => { void change(() => setSoundBlasterMixer(channel.id, { volume: v / 100 })).then(() => setDrag(cur => (cur === v ? null : cur))); }}
+    />
+  );
+}
+
+function MixerSection({ state, change }: TabProps) {
+  const { t } = useTranslation();
+  if (state.mixer.length === 0) return null;
+  return (
+    <SettingsSection title={t(`${P}mixer`)} description={t(`${P}mixerHint`)} boxClassName={styles.box}>
+      {state.mixer.map(c => <MixerRow key={c.id} channel={c} change={change} />)}
+    </SettingsSection>
+  );
+}
+
+function DeviceSection({ state, change }: TabProps) {
+  const { t } = useTranslation();
+  const names: SoundBlasterFeature[] = ['logoLed', 'energySaving', 'volumeSync'];
+  if (!names.some(n => state.features[n] !== undefined)) return null;
+  return (
+    <SettingsSection title={t(`${P}device`)} boxClassName={styles.box}>
+      <FeatureToggle state={state} change={change} name="logoLed" label={t(`${P}logoLed`)} />
+      <FeatureToggle state={state} change={change} name="energySaving" label={t(`${P}energySaving`)} description={t(`${P}energySavingHint`)} />
+      <FeatureToggle state={state} change={change} name="volumeSync" label={t(`${P}volumeSync`)} description={t(`${P}volumeSyncHint`)} />
+    </SettingsSection>
   );
 }
 
@@ -427,6 +582,8 @@ export function SoundBlasterDevicePage() {
           <div className={styles.tab}>
             <PlaybackSections state={state} change={change} />
             <MicrophoneSections state={state} change={change} />
+            <MixerSection state={state} change={change} />
+            <DeviceSection state={state} change={change} />
             {state.firmware && <p className={styles.meta}>{t(`${P}firmware`, { version: state.firmware })}</p>}
           </div>
         )}

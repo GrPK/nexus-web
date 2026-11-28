@@ -103,3 +103,28 @@
   font-size: 0.8125rem;
   color: var(--text-dim);
 }
+
+// A channel's mute, beside its name in the mixer.
+.mute {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-left: 0.35rem;
+  padding: 0;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-pill, 999px);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+
+  &[aria-pressed='true'] {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  &:hover {
+    color: var(--text);
+  }
+}
